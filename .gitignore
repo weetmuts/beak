@@ -1,0 +1,16 @@
+build/
+libtar/*.o
+libtar/*.lo
+libtar/.libs/
+libtar/Makefile
+libtar/INSTALL
+libtar/Makefile.in
+libtar/aclocal.m4
+libtar/autom4te.cache/
+libtar/configure
+libtar/config.h
+libtar/config.h.in
+libtar/config.log
+libtar/config.status
+libtar/libtool
+libtar/stamp-h1
