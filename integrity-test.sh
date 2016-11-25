@@ -79,15 +79,24 @@ fi
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+if [ "$DIR" = "/usr/local/bin" ]; then
+    PERL_PREFIX=/usr/local/lib/tarredfs/
+    UNTAR=/usr/local/bin/tarredfs-untar
+else
+    PERL_PREFIX="$DIR"/
+    UNTAR="$DIR/untar.sh"
+fi
+
+
 if [ "$onlypart2" = "" ]
 then
     # Find all files under root (using a potential filter)
     (cd $root && \
             eval "find . $filter -printf '%M\0%u/%g\0%s\0%TY-%Tm-%Td\0%TH:%TM\0%p\0%l\n'") \
-        | perl $DIR/format_find.pl $root > $dir/test_root.txt
+        | perl ${PERL_PREFIX}format_find.pl $root > $dir/test_root.txt
     
     # Find all files listed in the tar files below mount.
-    $DIR/untar.sh tv $mount | perl $DIR/format_tar.pl > $dir/test_mount.txt
+    ${UNTAR} tv $mount | perl ${PERL_PREFIX}format_tar.pl > $dir/test_mount.txt
     
     sort $dir/test_root.txt > $dir/test_root_sorted.txt
     sort $dir/test_mount.txt > $dir/test_mount_sorted.txt
@@ -132,7 +141,7 @@ then
         file=$(shuf $dir/files.txt | head -n 1)
         file=${file#./}
 
-        $DIR/untar.sh x "$mount" "$file"
+        ${UNTAR} x "$mount" "$file"
         diff "$root/$file" "$file"
         if [ "$?" = "0" ]; then
             echo echo "OK ($time_diff):" "$file"

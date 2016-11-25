@@ -2,7 +2,10 @@ build/
 libtar/*.o
 libtar/*.lo
 libtar/.libs/
+libtar/lib/*.o
+libtar/lib/*.lo
 libtar/Makefile
+libtar/libtar/Makefile
 libtar/INSTALL
 libtar/Makefile.in
 libtar/aclocal.m4
@@ -14,3 +17,11 @@ libtar/config.log
 libtar/config.status
 libtar/libtool
 libtar/stamp-h1
+libtar/autoconf/compile
+libtar/doc/Makefile
+libtar/lib/.libs/
+libtar/lib/Makefile
+libtar/libtar/.libs/
+libtar/libtar/*.lo
+libtar/libtar/*.o
+                                                        

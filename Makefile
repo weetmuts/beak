@@ -22,7 +22,7 @@ build/tarredfs-untar: untar.sh
 	chmod a+x build/tarredfs-untar
 
 build/tarredfs-pack: pack.sh
-	cp untar.sh build/tarredfs-pack
+	cp pack.sh build/tarredfs-pack
 	chmod a+x build/tarredfs-pack
 
 build/tarredfs-compare: compare.sh
@@ -46,6 +46,9 @@ install:
 	echo Installing into /usr/local/bin
 	cp build/tarredfs /usr/local/bin
 	cp build/tarredfs-* /usr/local/bin
+	mkdir -p /usr/local/lib/tarredfs
+	cp format_find.pl /usr/local/lib/tarredfs/format_find.pl
+	cp format_tar.pl /usr/local/lib/tarredfs/format_tar.pl
 
 clean:
 	rm -rf build/* *~
