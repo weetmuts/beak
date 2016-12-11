@@ -49,3 +49,8 @@ struct TarSort
 string commonPrefix(string a, string b);
 
 uint32_t hashString(string a);
+
+string permissionString(mode_t m);
+
+string ownergroupString(uid_t uid, gid_t gid);
+

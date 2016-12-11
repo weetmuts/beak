@@ -22,6 +22,7 @@
 
 #include<assert.h>
 
+
 #include"log.h"
 #include"tarfile.h"
 #include"tarentry.h"
@@ -57,7 +58,9 @@
 #include<map>
 #include<set>
 #include<string>
+#include<sstream>
 #include<vector>
+#include<set>
 
 using namespace std;
 
@@ -98,7 +101,7 @@ struct TarredFS {
     vector<pair<Filter,regex_t>> filters;
 
     int recurse(FileCB cb);
-    int addTarEntry(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf);
+    int addTarEntry(const char *fpath, const struct stat *sb, struct FTW *ftwbuf);
     void findChunkPoints();
     void recurseAddDir(string path, TarEntry *direntry);
     void addDirsToDirectories();
@@ -134,7 +137,7 @@ int TarredFS::recurse(FileCB cb) {
     return 0;
 }
 
-int TarredFS::addTarEntry(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf) {
+int TarredFS::addTarEntry(const char *fpath, const struct stat *sb, struct FTW *ftwbuf) {
     
     size_t len = strlen(fpath);
 
@@ -164,7 +167,6 @@ int TarredFS::addTarEntry(const char *fpath, const struct stat *sb, int tflag, s
         } else {
             status |= !rc;
         }
-        //fprintf(stderr, "FILTER name=(%s) vs rule=(%s) (%d) = %d (%d)\n", name, p.first.rule.c_str(), p.first.type, rc, status);
     }
     if (name[1] != 0 && status) {
         debug("Filter dropped \"%s\"\n", name);            
@@ -175,7 +177,7 @@ int TarredFS::addTarEntry(const char *fpath, const struct stat *sb, int tflag, s
         
     
     string p = pp;
-    TarEntry *te = new TarEntry(p, *sb, tflag, root_dir);
+    TarEntry *te = new TarEntry(p, *sb, root_dir);
     files[te->path] = te;
     
     if (TH_ISDIR(te->tar)) {
@@ -193,7 +195,6 @@ void TarredFS::findChunkPoints() {
     for(auto & direntry : files) {
         TarEntry *te = direntry.second;
         string dir = dirname(te->path);
-        //fprintf(stderr, "GURKA %s Parent %s\n", te->path.c_str(), dir.c_str());
         if (dir != te->path) {
             TarEntry *parent = directories[dir];
             assert(parent != NULL);
@@ -403,7 +404,7 @@ void TarredFS::calculateNumTars(TarEntry *te,
         // Put them all in a single tar and hope that they together are as large as
         // the target tar size.
         *sc = medium_size;
-        *nst = *nst + *nmt;
+        *nst = *nst + *nmt - 1;
         *sfs = *sfs + *mfs;
         *nmt = 0;
         *mfs = 0;
@@ -442,7 +443,6 @@ size_t TarredFS::groupFilesIntoTars() {
         }
         // Create the medium files tars
         for (size_t i=0; i<nmt; ++i) {
-            // Start counting from zero again, by subtracting nst.
             te->medium_tars[i] = TarFile(MEDIUM_FILES_TAR, i, false);
         }
 
@@ -454,7 +454,7 @@ size_t TarredFS::groupFilesIntoTars() {
             assert(!strncmp(entry->path.c_str(), te->path.c_str(), te->path.length()));
             
             if (entry->isDir()) {
-                dirs->addEntry(entry);                
+                dirs->addEntryLast(entry);                
             } else {
                 // Spread the files over the tars by the hash of the file name.
                 if (entry->blocked_size < smallcomp) {
@@ -469,22 +469,23 @@ size_t TarredFS::groupFilesIntoTars() {
                     // Create the large files tar here.
                     if (te->large_tars.count(entry->tarpath_hash) == 0) {
                         te->large_tars[entry->tarpath_hash] = TarFile(SINGLE_LARGE_FILE_TAR,
-                                                              entry->tarpath_hash, false);                   
-                        curr = &te->large_tars[entry->tarpath_hash]; 
+                                                              entry->tarpath_hash, false);
+                        curr = &te->large_tars[entry->tarpath_hash];
                         te->num_tars++;
                     } else {
                         curr = &te->large_tars[entry->tarpath_hash];
                     }
                     assert(curr->tar_contents == SINGLE_LARGE_FILE_TAR);
                 } 
-                curr->addEntry(entry);
+                curr->addEntryLast(entry);
             }            
         }
 
         // Finalize the tar files and add them to the contents listing.
         for (auto & t : te->large_tars) {
             TarFile *tf = &t.second;
-            if (tf->tar_offset > 0) {
+            tf->calculateSHA256Hash();
+            if (tf->tar_offset > dirs->volume_header->blocked_size) {
                 tf->size = tf->tar_offset;
                 debug("%s%s size became %zu\n", te->path.c_str(), tf->name.c_str(), tf->size);
                 te->files.push_back(tf->name);
@@ -492,7 +493,8 @@ size_t TarredFS::groupFilesIntoTars() {
         }
         for (auto & t : te->medium_tars) {
             TarFile *tf = &t.second;
-            if (tf->tar_offset > 0) {
+            tf->calculateSHA256Hash();            
+            if (tf->tar_offset > dirs->volume_header->blocked_size) {
                 tf->size = tf->tar_offset;
                 debug("%s%s size became %zu\n", te->path.c_str(), tf->name.c_str(), tf->size);
                 te->files.push_back(tf->name);
@@ -500,14 +502,95 @@ size_t TarredFS::groupFilesIntoTars() {
         }
         for (auto & t : te->small_tars) {
             TarFile *tf = &t.second;
-            if (tf->tar_offset > 0) {
+            tf->calculateSHA256Hash();            
+            if (tf->tar_offset > dirs->volume_header->blocked_size) {
                 tf->size = tf->tar_offset;
                 debug("%s%s size became %zu\n", te->path.c_str(), tf->name.c_str(), tf->size);
                 te->files.push_back(tf->name);
             }
         }
+
+        set<uid_t> uids;
+        set<gid_t> gids;
+        for(auto & entry : te->entries) {
+            uids.insert(entry->sb.st_uid);
+            gids.insert(entry->sb.st_gid);
+        }
+        string null("\0",1);
+        string listing;
+        listing.append("#tarredfs: " TARREDFS_VERSION "\n");
+        listing.append("#uids:");        
+        for (auto & x : uids) {
+            stringstream ss;
+            ss << x;
+            listing.append(" ");            
+            listing.append(ss.str());
+        }
+        listing.append("\n");
+        listing.append("#gids:");        
+        for (auto & x : gids) {
+            stringstream ss;
+            ss << x;
+            listing.append(" ");            
+            listing.append(ss.str());
+        }
+        listing.append("\n");
+
+        size_t width = 3;
+        string space(" ");
+        for(auto & entry : te->entries) {
+            ssize_t diff = width - entry->tv_line_size.length();
+            stringstream ss;            
+            if (diff < 0) {
+                width = entry->tv_line_size.length();
+                diff = 0;
+            }
+            while (diff > 0) {
+                ss << space;
+                diff--;
+            }
+            entry->tv_line_size = ss.str()+entry->tv_line_size;
+        }
+        
+        for(auto & entry : te->entries) {
+            // -r-------- fredrik/fredrik 745 1970-01-01 01:00 testing
+            // drwxrwxr-x fredrik/fredrik   0 2016-11-25 00:52 autoconf/
+            // -r-------- fredrik/fredrik   0 2016-11-25 11:23 libtar.so -> libtar.so.0.1
+            listing.append(entry->tv_line_left);
+            listing.append(null);
+            listing.append(entry->tv_line_size);
+            listing.append(null);
+            listing.append(entry->tv_line_right);
+            listing.append(null);
+            listing.append(entry->tarpath);
+            listing.append(null);
+            if (entry->link.length() > 0) {
+                listing.append(" -> ");
+                listing.append(entry->link);
+            }
+            listing.append(null);
+            listing.append(entry->tar_file->name);
+            listing.append(null);
+            stringstream ss;
+            ss << entry->tar_offset;
+            listing.append(ss.str());
+            listing.append("\n");
+        }
+        struct stat sb;
+        memset(&sb, 0, sizeof(sb));
+        sb.st_size = listing.length();
+        sb.st_uid = geteuid();
+        sb.st_gid = getegid();
+        sb.st_mode = S_IFREG | 0400;
+        sb.st_nlink = 1;
+        
+        TarEntry *list = new TarEntry("/tarredfs-contents", sb, "");
+        list->setContent(listing);
+        dirs->addEntryFirst(list);                                   
         dirs->size = dirs->tar_offset;
-        if (dirs->size > 0) {
+        dirs->calculateSHA256Hash();        
+
+        if (dirs->size > dirs->volume_header->blocked_size ) {
             debug("%s%s size became %zu\n", te->path.c_str(), dirs->name.c_str(), dirs->size);
             te->files.push_back(dirs->name);
             has_dir = 1;
@@ -688,6 +771,7 @@ int TarredFS::readCB(const char *path, char *buf, size_t size, off_t offset, str
         size_t tar_offset = r.second;
         assert(te != NULL);
         size_t l =  te->copy(buf, size, offset - tar_offset);
+        debug("readCB copy size=%ju result=%ju\n", size, l);
         size -= l;
         buf += l;
         offset += l;
@@ -702,6 +786,7 @@ int TarredFS::readCB(const char *path, char *buf, size_t size, off_t offset, str
         }                         
         memset(buf,0,l);
         size -= l;
+        debug("readCB clearing last pages.");
     }
 
     pthread_mutex_unlock(&global);
@@ -806,7 +891,7 @@ void parseOptions(int *argc, char **argv, TarredFS *tfs, struct fuse_operations 
             eraseArg(i, argc, argv);
             i--;
         } else
-        if (!strncmp(argv[i], "-f", 2)) {
+        if (!strncmp(argv[i], "-p", 2)) {
             tfs->forced_chunk_depth = atol(argv[i+1]);
             if (tfs->forced_chunk_depth < 0) {
                 error("Cannot set forced chunk depth to a negative number.");
@@ -843,7 +928,7 @@ void parseOptions(int *argc, char **argv, TarredFS *tfs, struct fuse_operations 
 
 template<TarredFS*fs> struct AddTarEntry {
     static int add(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf) {
-        return fs->addTarEntry(fpath, sb, tflag,ftwbuf);
+        return fs->addTarEntry(fpath, sb, ftwbuf);
     }
 };
 
@@ -888,7 +973,8 @@ int main(int argc, char *argv[])
     uint64_t start = clockGetTime();
     curr.recurse(ate.add);
     uint64_t stop = clockGetTime();
-
+    uint64_t scan_time = stop-start;
+    start = stop;    
     // Find suitable chunk points where tars will be created.
     curr.findChunkPoints();
     // Remove all other directories that will be hidden inside tars.
@@ -901,8 +987,11 @@ int main(int argc, char *argv[])
     curr.sortChunkPointEntries();
     // Group the entries into tar files.
     size_t num_tars = curr.groupFilesIntoTars();
-
-    info("Mounted %s with %zu virtual tars with %zu entries in %jdms.\n", curr.mount_dir.c_str(), num_tars, curr.files.size(), (stop-start)/1000);
+    stop = clockGetTime();
+    uint64_t group_time = stop-start;
+    
+    info("Mounted %s with %zu virtual tars with %zu entries, scan %jdms group %jdms.\n", curr.mount_dir.c_str(), num_tars, curr.files.size(),
+         scan_time/1000, group_time/1000);
 
     return fuse_main(argc, argv, &tarredfs_ops, NULL);
 }

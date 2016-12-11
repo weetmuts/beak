@@ -12,7 +12,7 @@ OBJS=build/main.o build/util.o build/log.o build/tarfile.o build/tarentry.o
 all: build/tarredfs build/tarredfs-untar build/tarredfs-pack build/tarredfs-compare build/tarredfs-integrity-test
 
 build/tarredfs: build $(OBJS) $(LIBTAR_A)
-	g++ -g -std=c++11  $(OBJS) $(LIBTAR_A) `pkg-config fuse --libs` -o build/tarredfs 
+	g++ -g -std=c++11  $(OBJS) $(LIBTAR_A) `pkg-config fuse --libs`  `pkg-config openssl --libs` -o build/tarredfs 
 
 build/%.o: %.cc $(HEADERS)
 	g++ $(CCFLAGS) $< -c -o $@

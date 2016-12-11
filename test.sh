@@ -214,7 +214,7 @@ if [ $do_test ]; then
     # require you to be root. So lets just mount /dev and
     # just list the contents of the tars!
     root=/dev
-    startFS devTest "-x shm -f 0"
+    startFS devTest "-x shm -p 0"
 fi
 
 setup basic10 "check that nothing gets between the directory and its contents"

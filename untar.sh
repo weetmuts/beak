@@ -30,7 +30,7 @@ trap finish EXIT
 
 function Help() {
     echo
-    echo Usage: tarredfs-untar {-d} [x\|t]{Jzj}{v} [DirWithTars] {PathToExtract}
+    echo Usage: tarredfs-untar {-d} {-c} [x\|t]{Jzj}{v} [DirWithTars] {PathToExtract}
     echo
     echo Example:
     echo tarredfs-untar x /Mirror/Storage
@@ -39,6 +39,7 @@ function Help() {
     echo tarredfs-untar tJv /Mirror/Storage/Work
     echo
     echo Add -d to debug.
+    echo Add -c to check that tarredfs-contents match the tars.
     exit
 }
 
@@ -58,6 +59,7 @@ function popDir() {
 }
 
 debug=''
+check=''
 cmd=''
 verbose=''
 extract=''
@@ -67,6 +69,10 @@ while [[ $1 =~ -.* ]]
 do
     case $1 in
         -d) debug='true'
+            shift ;;
+    esac
+    case $2 in
+        -c) check='true'
             shift ;;
     esac
 done
@@ -159,14 +165,14 @@ while IFS='' read tar_file; do
 
     if [ "$verbose" = "true" ]; then
 
-        CMD="tar ${cmd}f \"$root/$tar_file\" \"$ex\" $ignore_errs"
+        CMD="tar ${cmd}f \"$root/$tar_file\" --exclude='tarredfs-contents' \"$ex\" $ignore_errs"
         if [ "$try_tar" == "true" ]; then            
             pushDir
             if [ "$debug" == "true" ]; then echo "$CMD"; fi
             eval $CMD > $dir/tmplist
             popDir
             if [ "$?" == "0" ]; then
-                echo Tarredfs: tar ${cmd}f "$tar_file" "$ex"
+                echo Tarredfs: tar ${cmd}f "$tar_file" --exclude='tarredfs-contents' "$ex"
             fi
             # Insert the tar_dir path as a prefix of the tar contents.
             awk '{p=match($0," [0-9][0-9]:[0-9][0-9] "); print substr($0,0,p+6)"'"$tar_dir"'/"substr($0,p+7)}' $dir/tmplist
@@ -177,7 +183,7 @@ while IFS='' read tar_file; do
 
     else
         if [ "$try_tar" == "true" ]; then
-            CMD="tar ${cmd}f \"$root/$tar_file\" \"$ex\" $ignore_errs"
+            CMD="tar ${cmd}f \"$root/$tar_file\" --exclude='tarredfs-contents' \"$ex\" $ignore_errs"
             pushDir
             if [ "$debug" == "true" ]; then echo "$CMD"; fi
             eval $CMD

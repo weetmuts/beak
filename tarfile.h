@@ -31,8 +31,10 @@ using namespace std;
 enum TarContents { DIR_TAR, SMALL_FILES_TAR, MEDIUM_FILES_TAR, SINGLE_LARGE_FILE_TAR };
     
 struct TarFile {
+    // A virtual tar can contain small files, medium files or a single large file.
     TarContents tar_contents = SMALL_FILES_TAR;    
-    
+
+    // Name of the tar, tar00000000.tar taz00000000.tar tal00000000.tar tam00000000.tar
     string name;
     uint32_t hash;
     bool hash_initialized = false;
@@ -41,11 +43,17 @@ struct TarFile {
     vector<size_t> offsets;
     size_t tar_offset = 0;
     struct timespec mtim;
+    TarEntry *volume_header;
     
     TarFile() { }
     TarFile(TarContents tc, int n, bool dirs);
-    void addEntry(TarEntry *entry);
+    void addEntryLast(TarEntry *entry);
+    void addEntryFirst(TarEntry *entry);
+    void addVolumeHeader();
+    void finishHash();
     pair<TarEntry*,size_t> findTarEntry(size_t offset);
+
+    void calculateSHA256Hash();
 };
 
 #endif

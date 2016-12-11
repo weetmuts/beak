@@ -51,13 +51,14 @@
 #include<map>
 #include<set>
 #include<string>
+#include<sstream>
 #include<vector>
 
 using namespace std;
 
 bool sanityCheck(const char *x, const char *y);
 
-TarEntry::TarEntry(string p, struct stat b, int f, string root_dir) : path(p), sb(b), tflag(f) {
+TarEntry::TarEntry(string p, struct stat b, string root_dir, bool header) : path(p), sb(b) {
 
     children_size = 0;
     chunked_size = 0;
@@ -66,7 +67,7 @@ TarEntry::TarEntry(string p, struct stat b, int f, string root_dir) : path(p), s
     num_long_path_blocks = 0;
     num_long_link_blocks = 0;
     num_header_blocks = 1;
-    assert(path.length() == 0 || path[0] == '/');
+    assert(path.length() == 0 || path[0] == '/' || header);
     depth = std::count(path.begin(), path.end(), '/');
     abspath = root_dir+path;
     if (path.length() > 0) {
@@ -136,8 +137,6 @@ TarEntry::TarEntry(string p, struct stat b, int f, string root_dir) : path(p), s
         debug("Added %ju blocks for long path header for %s\n", num_long_path_blocks, path.c_str());            
     }
     
-//    assert(sanityCheck(path.c_str(), th_get_pathname(tar)));
-    
     header_size = size = num_header_blocks*T_BLOCKSIZE;
     if (!TH_ISDIR(tar) && !TH_ISSYM(tar) && !TH_ISFIFO(tar) && !TH_ISCHR(tar) && !TH_ISBLK(tar)) {
         // Directories, symbolic links and fifos have no content in the tar.
@@ -148,12 +147,36 @@ TarEntry::TarEntry(string p, struct stat b, int f, string root_dir) : path(p), s
     // Round size to nearest 512 byte boundary
     children_size = blocked_size = (size%T_BLOCKSIZE==0)?size:(size+T_BLOCKSIZE-(size%T_BLOCKSIZE));
     
-    assert(header_size >= T_BLOCKSIZE);
-    assert(size >= header_size);
+    assert(header_size >= T_BLOCKSIZE &&  size >= header_size && blocked_size >= size);
     assert((!TH_ISDIR(tar) && !TH_ISSYM(tar) && !TH_ISFIFO(tar) && !TH_ISCHR(tar) && !TH_ISBLK(tar)) || size == header_size);
-    assert(blocked_size >= size);
     assert(TH_ISDIR(tar) || TH_ISSYM(tar) || TH_ISFIFO(tar) || TH_ISCHR(tar) || TH_ISBLK(tar) || th_get_size(tar) == (size_t)sb.st_size);
 
+    string null("\0",1);
+    if (!header) {
+        stringstream ss;
+        ss << permissionString(sb.st_mode) << null << sb.st_uid << "/" << sb.st_gid;
+        tv_line_left = ss.str();
+        
+        ss.str("");
+        if (TH_ISSYM(tar)) {
+            ss << 0;
+        } else {
+            ss << sb.st_size;
+        }
+        tv_line_size = ss.str();
+        
+        ss.str("");
+        char datetime[17];
+        memset(datetime, 0, sizeof(datetime));
+        strftime(datetime, 17, "%Y-%m-%d %H:%M.%S", localtime(&sb.st_ctime));
+        ss << datetime;
+        ss << null;
+        char secs_and_nanos[32];
+        memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
+        snprintf(secs_and_nanos, 32, "%ju.%ju", sb.st_ctim.tv_sec, sb.st_ctim.tv_nsec);
+        ss << secs_and_nanos;
+        tv_line_right = ss.str();
+    }
     debug("Entry %s added\n", path.c_str());
 }
     
@@ -167,7 +190,7 @@ void TarEntry::removePrefix(size_t len) {
 
 size_t TarEntry::copy(char *buf, size_t size, size_t from) {
     size_t copied = 0;
-    debug("Copying into %p max %zu from %zu\n", buf, size, from);
+    debug("Copying max %zu from %zu\n", size, from);
     if (size > 0 && from < header_size) {
         char tmp[header_size];
         memset(tmp, 0, header_size);
@@ -238,24 +261,38 @@ size_t TarEntry::copy(char *buf, size_t size, size_t from) {
     }
     
     if (size > 0 && copied < blocked_size && from >= header_size && from < blocked_size) {
-        debug("reading from file size=%ju copied=%ju blocked_size=%ju from=%ju header_size=%ju\n",
-              size, copied, blocked_size, from, header_size);
-        // Read from file
-        int fd = open(abspath.c_str(), O_RDONLY);
-        if (fd==-1) {
-            failure("Could not open file >%s< in underlying filesystem err %d", path.c_str(), errno);
-            return 0;
+        if (virtual_file) {
+            debug("reading from tar_list size=%ju copied=%ju blocked_size=%ju from=%ju header_size=%ju\n",
+                  size, copied, blocked_size, from, header_size);
+            size_t off = from - header_size;
+            size_t len = content.length()-off;
+            if (len > size) {
+                len = size;
+            }
+            memcpy(buf, content.c_str()+off, len);
+            size -= len;
+            buf += len;
+            copied += len;
+        } else {
+            debug("reading from file size=%ju copied=%ju blocked_size=%ju from=%ju header_size=%ju\n",
+                  size, copied, blocked_size, from, header_size);
+            // Read from file
+            int fd = open(abspath.c_str(), O_RDONLY);
+            if (fd==-1) {
+                failure("Could not open file >%s< in underlying filesystem err %d", path.c_str(), errno);
+                return 0;
+            }
+            debug("    contents out from %s %zu size=%zu\n", path.c_str(), from-header_size, size);
+            ssize_t l = pread(fd, buf, size, from-header_size);
+            if (l==-1) {
+                failure("Could not read from file >%s< in underlying filesystem err %d", path.c_str(), errno);
+                return 0;
+            }
+            close(fd);
+            size -= l;
+            buf += l;
+            copied += l;
         }
-        debug("    contents out from %s %zu size=%zu\n", path.c_str(), from-header_size, size);
-        ssize_t l = pread(fd, buf, size, from-header_size);
-        if (l==-1) {
-            failure("Could not read from file >%s< in underlying filesystem err %d", path.c_str(), errno);
-            return 0;
-        }
-        close(fd);
-        size -= l;
-        buf += l;
-        copied += l;
     }
     // Round up to next 512 byte boundary.
     size_t remainder = (copied%T_BLOCKSIZE == 0) ? 0 : T_BLOCKSIZE-copied%T_BLOCKSIZE;
@@ -295,4 +332,9 @@ bool sanityCheck(const char *x, const char *y) {
         }
     }
     return true;
+}
+
+void TarEntry::setContent(string c) {
+    content = c;
+    virtual_file = true;
 }

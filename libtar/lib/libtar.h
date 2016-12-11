@@ -35,6 +35,7 @@ extern "C"
 /* GNU extensions for typeflag */
 #define GNU_LONGNAME_TYPE	'L'
 #define GNU_LONGLINK_TYPE	'K'
+#define GNU_VOLHDR_TYPE	        'V'
 
 /* our version of the tar header structure */
 struct tar_header
@@ -182,6 +183,8 @@ int th_write(TAR *t);
 			 || S_ISFIFO((mode_t)oct_to_int((t)->th_buf.mode)))
 #define TH_ISLONGNAME(t)	((t)->th_buf.typeflag == GNU_LONGNAME_TYPE)
 #define TH_ISLONGLINK(t)	((t)->th_buf.typeflag == GNU_LONGLINK_TYPE)
+
+#define TH_ISVOLHDR(t)	((t)->th_buf.typeflag == GNU_VOLHDR_TYPE)
 
 /* decode tar header info */
 #define th_get_crc(t) oct_to_int((t)->th_buf.chksum)

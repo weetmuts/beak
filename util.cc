@@ -18,8 +18,14 @@
 #include<assert.h>
 
 #include"util.h"
+#include"log.h"
 
 #include<string.h>
+#include<string>
+#include<sstream>
+#include<sys/stat.h>
+#include<pwd.h>
+#include<grp.h>
 
 #define KB 1024ull
 string humanReadable(size_t s)
@@ -206,4 +212,66 @@ uint32_t jenkins_one_at_a_time_hash(char *key, size_t len)
 uint32_t hashString(string a)
 {
     return djb_hash(a.c_str(), a.length());
+}
+
+string permissionString(mode_t m) {
+    stringstream ss;
+    
+    if (S_ISDIR(m)) ss << "d";
+    else if (S_ISLNK(m)) ss << "l";
+    else if (S_ISCHR(m)) ss << "c";
+    else if (S_ISBLK(m)) ss << "b";
+    else if (S_ISFIFO(m)) ss << "p";
+    else if (S_ISSOCK(m)) ss << "s";
+    else {
+        assert(S_ISREG(m));
+        ss << "-";
+    }
+    if (m & S_IRUSR) ss << "r"; else ss << "-";
+    if (m & S_IWUSR) ss << "w"; else ss << "-";
+    if (m & S_IXUSR) ss << "x"; else ss << "-";
+    if (m & S_IRGRP) ss << "r"; else ss << "-";
+    if (m & S_IWGRP) ss << "w"; else ss << "-";
+    if (m & S_IXGRP) ss << "x"; else ss << "-";
+    if (m & S_IROTH) ss << "r"; else ss << "-";
+    if (m & S_IWOTH) ss << "w"; else ss << "-";
+    if (m & S_IXOTH) ss << "x"; else ss << "-";
+    return ss.str();
+}
+
+string ownergroupString(uid_t uid, gid_t gid) {
+    struct passwd pwd;
+    struct passwd *result;
+    char buf[16000];
+    stringstream ss;
+    
+    int rc = getpwuid_r(uid, &pwd, buf, sizeof(buf), &result);
+    if (result == NULL) {
+        if (rc == 0)
+            ss << uid;
+        else {
+            errno = rc;
+            error("Internal error getpwuid_r %d", errno);
+        }
+    } else {
+        ss << pwd.pw_name;
+    }
+    ss << "/";
+
+    struct group grp;
+    struct group *gresult;
+    
+    rc = getgrgid_r(gid, &grp, buf, sizeof(buf), &gresult);
+    if (gresult == NULL) {
+        if (rc == 0)
+            ss << gid;
+        else {
+            errno = rc;
+            error("Internal error getgrgid_r %d", errno);
+        }
+    } else {
+        ss << grp.gr_name;
+    }
+    
+    return ss.str();    
 }

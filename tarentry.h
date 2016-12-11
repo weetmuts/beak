@@ -46,14 +46,20 @@ struct TarEntry {
     // And can be much shorter than path, because the tar can be located
     // deep in the tree below root_dir.
     string tarpath;
-    // The hash is used to spread the files into tars.
+    // The hash of the tarpath is used to spread the files into tars.
     uint32_t tarpath_hash;
     // The target file stored inside a symbolic link.
     string link;
-   
+
+    // This is a re-construction of how the entry would be listed by "tar tv"
+    // tv_line_left is accessbits, ownership
+    // tv_line_size is the size, to be left padded with space
+    // tv_line_right is the last modification time
+    string tv_line_left, tv_line_size, tv_line_right;
+
     struct stat sb;
-    int tflag;
     TarFile *tar_file;
+    size_t tar_offset;
     size_t size;
     size_t blocked_size;
     size_t disk_size;
@@ -75,10 +81,13 @@ struct TarEntry {
     TarEntry *chunk_point = NULL;
     bool added_to_directory = false;
     int depth = 0;
-    
+    bool virtual_file = false;
+    string content;
+
     TarEntry() { }
-    TarEntry(string p, struct stat b, int f, string root_dir);    
-    void removePrefix(size_t len);    
+    TarEntry(string p, struct stat b, string root_dir, bool header = false);    
+    void removePrefix(size_t len);
+    void setContent(string c);
     size_t copy(char *buf, size_t size, size_t from);
     const bool isDir();
 };
