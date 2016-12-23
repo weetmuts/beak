@@ -85,7 +85,7 @@ struct TarEntry {
     string content;
 
     TarEntry() { }
-    TarEntry(string p, struct stat b, string root_dir, bool header = false);    
+    TarEntry(string p, const struct stat *b, string root_dir, bool header = false);    
     void removePrefix(size_t len);
     void setContent(string c);
     size_t copy(char *buf, size_t size, size_t from);

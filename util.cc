@@ -239,6 +239,35 @@ string permissionString(mode_t m) {
     return ss.str();
 }
 
+mode_t stringToPermission(string s) {
+    mode_t rc = 0;
+
+    if (s[0] == 'd') rc |= S_IFDIR; else
+    if (s[0] == 'l') rc |= S_IFLNK; else
+    if (s[0] == 'c') rc |= S_IFCHR; else 
+    if (s[0] == 'b') rc |= S_IFBLK; else
+    if (s[0] == 'p') rc |= S_IFIFO; else
+    if (s[0] == 's') rc |= S_IFSOCK; else
+    if (s[0] == '-') rc |= S_IFREG; else goto err;
+
+    if (s[1] == 'r') rc |= S_IRUSR; else if (s[1] != '-') goto err;
+    if (s[2] == 'w') rc |= S_IWUSR; else if (s[2] != '-') goto err;
+    if (s[3] == 'x') rc |= S_IXUSR; else if (s[3] != '-') goto err;
+
+    if (s[4] == 'r') rc |= S_IRGRP; else if (s[4] != '-') goto err;
+    if (s[5] == 'w') rc |= S_IWGRP; else if (s[5] != '-') goto err;
+    if (s[6] == 'x') rc |= S_IXGRP; else if (s[6] != '-') goto err;
+
+    if (s[7] == 'r') rc |= S_IROTH; else if (s[7] != '-') goto err;
+    if (s[8] == 'w') rc |= S_IWOTH; else if (s[8] != '-') goto err;
+    if (s[9] == 'x') rc |= S_IXOTH; else if (s[9] != '-') goto err;
+
+    return rc;
+
+err:
+    return 0;
+}
+
 string ownergroupString(uid_t uid, gid_t gid) {
     struct passwd pwd;
     struct passwd *result;
@@ -274,4 +303,30 @@ string ownergroupString(uid_t uid, gid_t gid) {
     }
     
     return ss.str();    
+}
+
+void eraseArg(int i, int *argc, char **argv) {
+    for (int j=i+1; ; ++j) {
+        argv[j-1] = argv[j];
+        if (argv[j] == 0) break;
+    }
+    (*argc)--;
+}
+
+string eatTo(vector<char> &v, vector<char>::iterator &i, char c, size_t max) {
+    string s;
+
+    while (max > 0 && i != v.end() && *i != c) {
+        s += *i;
+        i++;
+        max--;
+    }
+    if (max == 0 && *i != c) {
+        debug("eatTo reached max but no termination char found!\n");
+        return "";
+    }
+    if (i != v.end()) {
+        i++;
+    }
+    return s;
 }

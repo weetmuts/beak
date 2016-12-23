@@ -51,12 +51,15 @@ function setup {
         dir=$tmpdir/$1
         root=$dir/Root
         mount=$dir/Mount
+        mountreverse=$dir/MountReverse
         check=$dir/Check
         log=$dir/log.txt
+        logreverse=$dir/logreverse.txt
         org=$dir/org.txt
         dest=$dir/dest.txt
         mkdir -p $root
         mkdir -p $mount
+        mkdir -p $mountreverse
         mkdir -p $check
     fi
 }
@@ -80,6 +83,42 @@ function startFS {
 
 function stopFS {
     (cd $mount; find . -exec ls -ld \{\} \; >> $log)
+    fusermount -u $mount
+    if [ -n "$test" ]; then
+        sleep 2
+    fi
+    if [ "$1" != "nook" ]; then
+        echo OK
+    fi
+}
+
+function startTwoFS {
+    run="$1"
+    extra="$2"
+    extrareverse="$3"
+    if [ -z "$test" ]; then
+        ./build/tarredfs $extra $root $mount > $log
+        sleep 2
+        ./build/tarredfs --reverse $extrareverse $mount $mountreverse > $log
+        ${run}
+    else
+        if [ -z "$gdb" ]; then
+            (sleep 4; eval ${run}) &
+            ./build/tarredfs $extra $root $mount 2>&1 | tee $log &
+            ./build/tarredfs -d --reverse $extrareverse $mount $mountreverse 2>&1 | tee $logreverse &
+        else
+            (sleep 5; eval ${run}) &
+            ./build/tarredfs $extra $root $mount > $log
+            sleep 2
+            gdb -ex=r --args ./build/tarredfs -d --reverse $extrareverse $mount $mountreverse 
+        fi        
+    fi        
+}
+
+function stopTwoFS {
+    (cd $mount; find . -exec ls -ld \{\} \; >> $log)
+    (cd $mountreverse; find . -exec ls -ld \{\} \; >> $logreverse)
+    fusermount -u $mountreverse
     fusermount -u $mount
     if [ -n "$test" ]; then
         sleep 2
@@ -365,10 +404,10 @@ function noAvalancheTestPart1 {
 
 function noAvalancheTestPart2 {
     (cd $mount; find . -exec ls -ld \{\} \; > $dest)
-    rc=$(diff -d $org $dest | grep -v ./tar00000001.tar | tr -d '[:space:]')
-    if [ "$rc" != "7c7---" ]; then
+    rc=$(diff -d $org $dest | grep -v ./tar00000001.tar | grep -v ./taz00000000.tar | tr -d '[:space:]')
+    if [ "$rc" != "7,8c7,8---" ]; then
         echo ++$rc++
-        echo Failed no avalanche test should only affect a single tar!
+        echo Failed no avalanche test should only affect a single tar! $ord $dest
         exit
     fi    
     stopFS    
@@ -393,6 +432,23 @@ if [ $do_test ]; then
     cp -a libtar $root
     startFS standardTest
 fi
+
+function compareTwo {
+    rc=$($THIS_DIR/compare.sh "$root" "$mountreverse" | grep -v $'< .\t' | grep -v $'> .\t')
+    if [ "$rc" != $'1c1\n---' ]; then
+        echo xx"$rc"xx
+        echo Unexpected diff after forward and then reverse!
+        exit
+    fi
+    stopTwoFS
+}
+
+setup reverse1 "Forward mount of libtar, Reverse mount back!"
+if [ $do_test ]; then
+    cp -a libtar $root
+    startTwoFS compareTwo
+fi
+
 
 echo All tests succeeded!
 #rm -rf $tmpdir

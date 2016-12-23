@@ -144,7 +144,7 @@ void TarFile::addEntryFirst(TarEntry *entry) {
 void TarFile::addVolumeHeader() {
     struct stat sb;
     memset(&sb, 0, sizeof(sb));
-    TarEntry *header = new TarEntry("", sb, "", true);
+    TarEntry *header = new TarEntry("", &sb, "", true);
     memcpy(header->tar->th_buf.name, "tarredfs", 9);
     header->name="tarredfs";
     header->tar->th_buf.typeflag = GNU_VOLHDR_TYPE;
@@ -192,7 +192,7 @@ void TarFile::calculateSHA256Hash() {
         // Update the hash with seconds and nanoseconds.
         char secs_and_nanos[32];
         memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
-        snprintf(secs_and_nanos, 32, "%ju.%ju", te->sb.st_ctim.tv_sec, te->sb.st_ctim.tv_nsec);
+        snprintf(secs_and_nanos, 32, "%ju.%ju", te->sb.st_mtim.tv_sec, te->sb.st_mtim.tv_nsec);
         SHA256_Update(&sha256, secs_and_nanos, strlen(secs_and_nanos));
     }
     SHA256_Final(hash, &sha256);
@@ -201,3 +201,14 @@ void TarFile::calculateSHA256Hash() {
     // Calculate the tar checksum for the volume header.
     th_finish(volume_header->tar);
 }
+
+
+/*
+Katrin Petterson
+
+Eugeniavägen 23
+plan 12, gå mot de gula golven
+8.15
+9.30 - 10
+
+*/

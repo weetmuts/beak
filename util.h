@@ -16,6 +16,7 @@
 */
 
 #include<string>
+#include<vector>
 
 using namespace std;
 
@@ -51,6 +52,10 @@ string commonPrefix(string a, string b);
 uint32_t hashString(string a);
 
 string permissionString(mode_t m);
+mode_t stringToPermission(string s);
 
 string ownergroupString(uid_t uid, gid_t gid);
 
+void eraseArg(int i, int *argc, char **argv);
+
+string eatTo(vector<char> &v, vector<char>::iterator &i, char c, size_t max);

@@ -62,6 +62,8 @@
 #include<vector>
 #include<set>
 
+#include<iostream>
+
 using namespace std;
 
 enum FilterType { INCLUDE, EXCLUDE };
@@ -177,7 +179,7 @@ int TarredFS::addTarEntry(const char *fpath, const struct stat *sb, struct FTW *
         
     
     string p = pp;
-    TarEntry *te = new TarEntry(p, *sb, root_dir);
+    TarEntry *te = new TarEntry(p, sb, root_dir);
     files[te->path] = te;
     
     if (TH_ISDIR(te->tar)) {
@@ -518,8 +520,8 @@ size_t TarredFS::groupFilesIntoTars() {
         }
         string null("\0",1);
         string listing;
-        listing.append("#tarredfs: " TARREDFS_VERSION "\n");
-        listing.append("#uids:");        
+        listing.append("#tarredfs " TARREDFS_VERSION "\n");
+        listing.append("#uids");        
         for (auto & x : uids) {
             stringstream ss;
             ss << x;
@@ -527,7 +529,7 @@ size_t TarredFS::groupFilesIntoTars() {
             listing.append(ss.str());
         }
         listing.append("\n");
-        listing.append("#gids:");        
+        listing.append("#gids");        
         for (auto & x : gids) {
             stringstream ss;
             ss << x;
@@ -535,7 +537,7 @@ size_t TarredFS::groupFilesIntoTars() {
             listing.append(ss.str());
         }
         listing.append("\n");
-
+        listing.append(null);
         size_t width = 3;
         string space(" ");
         for(auto & entry : te->entries) {
@@ -572,9 +574,10 @@ size_t TarredFS::groupFilesIntoTars() {
             listing.append(entry->tar_file->name);
             listing.append(null);
             stringstream ss;
-            ss << entry->tar_offset;
+            ss << entry->tar_offset+entry->header_size;
             listing.append(ss.str());
             listing.append("\n");
+            listing.append(null);
         }
         struct stat sb;
         memset(&sb, 0, sizeof(sb));
@@ -584,7 +587,7 @@ size_t TarredFS::groupFilesIntoTars() {
         sb.st_mode = S_IFREG | 0400;
         sb.st_nlink = 1;
         
-        TarEntry *list = new TarEntry("/tarredfs-contents", sb, "");
+        TarEntry *list = new TarEntry("/tarredfs-contents", &sb, "");
         list->setContent(listing);
         dirs->addEntryFirst(list);                                   
         dirs->size = dirs->tar_offset;
@@ -745,7 +748,7 @@ int TarredFS::readdirCB(const char *path, void *buf, fuse_fill_dir_t filler,
     return 0;
 }
 
-int open_callback(const char *path, struct fuse_file_info *fi)
+int reverse_open_callback(const char *path, struct fuse_file_info *fi)
 {
     return 0;
 }
@@ -816,14 +819,6 @@ void printHelp(const char *app) {
             "    -x pattern       exlude these files from \n"
             "\n"
             , app);
-}
-
-void eraseArg(int i, int *argc, char **argv) {
-    for (int j=i+1; ; ++j) {
-        argv[j-1] = argv[j];
-        if (argv[j] == 0) break;
-    }
-    (*argc)--;
 }
 
 void parseOptions(int *argc, char **argv, TarredFS *tfs, struct fuse_operations *tarredfs_ops)
@@ -951,15 +946,18 @@ template<TarredFS*fs> struct Read {
     }
 };
 
-TarredFS curr;
-struct fuse_operations tarredfs_ops;
+static TarredFS curr;
+static struct fuse_operations tarredfs_ops;
+
+int reversemain(int argc, char *argv[]);
 
 int main(int argc, char *argv[])
 {
-    tarredfs_ops.getattr = Getattr<&curr>::cb;
-    tarredfs_ops.open = open_callback;
-    tarredfs_ops.read = Read<&curr>::cb;
-    tarredfs_ops.readdir = Readdir<&curr>::cb;
+    if (argc > 1 && !strncmp(argv[1], "--reverse", 9)) {
+        eraseArg(1, &argc, argv);
+        int rc = reversemain(argc, argv);
+        exit(rc);
+    }
 
     parseOptions(&argc, argv, &curr, &tarredfs_ops);
 
@@ -967,6 +965,11 @@ int main(int argc, char *argv[])
         printHelp(argv[0]);
         exit(1);
     }
+
+    tarredfs_ops.getattr = Getattr<&curr>::cb;
+    tarredfs_ops.open = reverse_open_callback;
+    tarredfs_ops.read = Read<&curr>::cb;
+    tarredfs_ops.readdir = Readdir<&curr>::cb;
     
     info("Scanning %s\n", curr.root_dir.c_str());
     AddTarEntry<&curr> ate;

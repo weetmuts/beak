@@ -15,6 +15,9 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#define OK 0
+#define ERR 1
+
 enum LogLevel { QUITE, INFO, VERBOSE, DEBUG };
 
 void setLogLevel(LogLevel l);
@@ -22,6 +25,8 @@ void useSyslog(bool sl);
 
 void error(const char* fmt, ...);
 void failure(const char* fmt, ...);
+void warning(const char* fmt, ...);
 void debug(const char* fmt, ...);
 void verbose(const char* fmt, ...);
 void info(const char* fmt, ...);
+

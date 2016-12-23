@@ -63,6 +63,18 @@ void failure(const char* fmt, ...) {
     }
 }
 
+void warning(const char* fmt, ...) {
+    va_list args;
+    if (use_syslog) {
+        va_start(args, fmt);
+        vsyslog(LOG_INFO, fmt, args);
+        va_end(args);
+    }
+    va_start(args, fmt);
+    vfprintf(stdout, fmt, args);
+    va_end(args);        
+}
+
 void debug(const char* fmt, ...) {
     if (log_level == DEBUG) {
         va_list args;
@@ -103,3 +115,4 @@ void info(const char* fmt, ...) {
         va_end(args);        
     }
 }
+

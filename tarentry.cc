@@ -54,12 +54,13 @@
 #include<sstream>
 #include<vector>
 
+#include<iostream>
+
 using namespace std;
 
 bool sanityCheck(const char *x, const char *y);
 
-TarEntry::TarEntry(string p, struct stat b, string root_dir, bool header) : path(p), sb(b) {
-
+TarEntry::TarEntry(string p, const struct stat *b, string root_dir, bool header) : path(p), sb(*b) {
     children_size = 0;
     chunked_size = 0;
     parent = NULL;
@@ -83,7 +84,7 @@ TarEntry::TarEntry(string p, struct stat b, string root_dir, bool header) : path
         }
     }
 
-    if(S_ISDIR(b.st_mode)) {
+    if(S_ISDIR(b->st_mode)) {
         path += '/';
     }
     
@@ -168,12 +169,12 @@ TarEntry::TarEntry(string p, struct stat b, string root_dir, bool header) : path
         ss.str("");
         char datetime[17];
         memset(datetime, 0, sizeof(datetime));
-        strftime(datetime, 17, "%Y-%m-%d %H:%M.%S", localtime(&sb.st_ctime));
+        strftime(datetime, 17, "%Y-%m-%d %H:%M.%S", localtime(&sb.st_mtime));
         ss << datetime;
         ss << null;
         char secs_and_nanos[32];
         memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
-        snprintf(secs_and_nanos, 32, "%ju.%ju", sb.st_ctim.tv_sec, sb.st_ctim.tv_nsec);
+        snprintf(secs_and_nanos, 32, "%ju.%ju", sb.st_mtim.tv_sec, sb.st_mtim.tv_nsec);
         ss << secs_and_nanos;
         tv_line_right = ss.str();
     }
