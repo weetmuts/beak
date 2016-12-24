@@ -15,10 +15,14 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef UTIL_H
+#define UTIL_H
+
 #include<string>
 #include<vector>
 
 using namespace std;
+
 
 string humanReadable(size_t s);
 uint64_t clockGetTime();
@@ -59,3 +63,5 @@ string ownergroupString(uid_t uid, gid_t gid);
 void eraseArg(int i, int *argc, char **argv);
 
 string eatTo(vector<char> &v, vector<char>::iterator &i, char c, size_t max);
+
+#endif

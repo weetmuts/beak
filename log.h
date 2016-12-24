@@ -15,6 +15,9 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef LOG_H
+#define LOG_H
+
 #define OK 0
 #define ERR 1
 
@@ -30,3 +33,4 @@ void debug(const char* fmt, ...);
 void verbose(const char* fmt, ...);
 void info(const char* fmt, ...);
 
+#endif

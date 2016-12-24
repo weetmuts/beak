@@ -15,6 +15,9 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef TARENTRY_H
+#define TARENTRY_H
+
 #include<assert.h>
 
 #include"libtar.h"
@@ -74,6 +77,7 @@ struct TarEntry {
     vector<string> files; // Files to be listed inside this TarEntry (ie the virtual tar files..)
     size_t num_tars = 0;
     TarFile dir_tar;
+    bool dir_tar_in_use = false;
     map<size_t,TarFile> small_tars;  // Small file tars in side this TarEntry
     map<size_t,TarFile> medium_tars;  // Medium file tars in side this TarEntry   
     map<size_t,TarFile> large_tars;  // Large file tars in side this TarEntry   
@@ -91,3 +95,5 @@ struct TarEntry {
     size_t copy(char *buf, size_t size, size_t from);
     const bool isDir();
 };
+
+#endif

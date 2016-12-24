@@ -61,6 +61,7 @@ using namespace std;
 bool sanityCheck(const char *x, const char *y);
 
 TarEntry::TarEntry(string p, const struct stat *b, string root_dir, bool header) : path(p), sb(*b) {
+    dir_tar_in_use = false;
     children_size = 0;
     chunked_size = 0;
     parent = NULL;

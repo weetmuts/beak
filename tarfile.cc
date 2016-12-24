@@ -77,7 +77,7 @@ TarFile::TarFile(TarContents tc, int n, bool dirs) {
     char buffer[256];
     snprintf(buffer, sizeof(buffer), "ta%c%08x.tar", c, n);
     name = buffer;
-    addVolumeHeader();        
+    addVolumeHeader();
 }
 
 void TarFile::addEntryLast(TarEntry *entry) {

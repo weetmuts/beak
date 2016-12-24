@@ -7,7 +7,7 @@ CCFLAGS=-g -std=c++11 -Wall -Wno-unused-function \
 	`pkg-config fuse --cflags` 
 
 HEADERS=$(wildcard *.h)
-OBJS=build/main.o build/reverse.o build/util.o build/log.o build/tarfile.o build/tarentry.o
+OBJS=build/main.o build/forward.o build/reverse.o build/util.o build/log.o build/tarfile.o build/tarentry.o
 
 all: build/tarredfs build/tarredfs-untar build/tarredfs-pack build/tarredfs-compare build/tarredfs-integrity-test
 

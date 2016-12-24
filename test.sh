@@ -105,12 +105,12 @@ function startTwoFS {
         if [ -z "$gdb" ]; then
             (sleep 4; eval ${run}) &
             ./build/tarredfs $extra $root $mount 2>&1 | tee $log &
-            ./build/tarredfs -d --reverse $extrareverse $mount $mountreverse 2>&1 | tee $logreverse &
+            ./build/tarredfs --reverse -d $extrareverse $mount $mountreverse 2>&1 | tee $logreverse &
         else
             (sleep 5; eval ${run}) &
             ./build/tarredfs $extra $root $mount > $log
             sleep 2
-            gdb -ex=r --args ./build/tarredfs -d --reverse $extrareverse $mount $mountreverse 
+            gdb -ex=r --args ./build/tarredfs --reverse -d $extrareverse $mount $mountreverse 
         fi        
     fi        
 }
