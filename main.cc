@@ -15,86 +15,41 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#define TARREDFS_VERSION "0.1"
-
-#define FUSE_USE_VERSION 26
-#define _XOPEN_SOURCE 500
-
 #include<assert.h>
 
-
+#include"defs.h"
 #include"log.h"
-#include"tarfile.h"
-#include"tarentry.h"
-#include"util.h"
-#include"libtar.h"
-
-#include<errno.h>
-
-#include<fcntl.h>
-#include<ftw.h>
-#include<fuse.h>
-
-#include<limits.h>
-
-#include<pthread.h>
-
-#include<regex.h>
-
-#include<stddef.h>
-#include<stdint.h>
-#include<stdio.h>
-#include<stdlib.h>
-#include<string.h>
-#include<syslog.h>
-
-#include<time.h>
-#include<sys/timeb.h>
-
-#include<unistd.h>
-
-#include<algorithm>
-#include<functional>
-#include<map>
-#include<set>
-#include<string>
-#include<sstream>
-#include<vector>
-#include<set>
-
-#include<iostream>
-
 #include"forward.h"
 #include"reverse.h"
 
+#include<limits.h>
+#include<string.h>
+
 using namespace std;
 
-void printForwardHelp(const char *app) {
+void printHelp(const char *app) {
     fprintf(stdout,
-            "usage: %s [options] [rootDirectory] [mountPoint]\n"
+            "usage: %s [-r|--reverse] [options] [rootDirectory] [mountPoint]\n"
             "\n"
             "general options:\n"
             "    -h   --help      print help\n"
             "    -V   --version   print version\n"
-            "    -f               foreground, ie do not start daemon\n"
             "    -v   --verbose   detailed output\n"
+            "    -d   --debug     very detailed output\n"
             "    -q               quite\n"
-            "    -p [num]         force all directories at depth [num] to be chunk points\n"
-            "    -i pattern       exlude these files from \n"
-            "    -x pattern       exlude these files from \n"
-            "\n"
-            , app);
-}
-
-void printReverseHelp(const char *app) {
-    fprintf(stdout,
-            "usage: %s --reverse [options] [rootDirectory] [mountPoint]\n"
-            "\n"
-            "general options:\n"
-            "    -h   --help      print help\n"
+            "    -p [num]         force all directories at depth [num] to contain tars\n"
+            "                     0 is the root, 1 is the first subdirectory level\n"
+            "                     the default is 1.\n"
+            "    -i pattern       only paths matching regex pattern are included\n"
+            "    -x pattern       paths matching regex pattern are excluded\n"
+            "    -s [num],[rps]   set chunk size automatically based on you upload bandwidth\n"
+            "                     num bytes per second and rps requests per second\n"       
+            "    -ta [num]        try to make virtual tars of this minimum size\n"
+            "                     default 10M\n"
+            "    -tr [num]        trigger tar generation when size exceeds\n"
+            "                     default 50M\n"
             "    -f               foreground, ie do not start daemon\n"
-            "    -v   --verbose   detailed output\n"
-            "    -q               quite\n"
+            "    -r   --reverse   mount a tarredfs directory and present the original files\n"
             "\n"
             , app);
 }
@@ -102,22 +57,22 @@ void printReverseHelp(const char *app) {
 void parseForwardOptions(int *argc, char **argv, TarredFS *tfs, struct fuse_operations *tarredfs_ops)
 {    
     for (int i=1; argv[i] != 0; ++i) {
-        if (!strncmp(argv[i], "-h", 2)) {
-            printForwardHelp(argv[0]);
+        if (!strcmp(argv[i], "-h")) {
+            printHelp(argv[0]);
             exit(1);
         } else
-        if (!strncmp(argv[i], "-d", 2)) {
+        if (!strcmp(argv[i], "-d")) {
             setLogLevel(DEBUG);
         } else
-        if (!strncmp(argv[i], "-v", 2)) {
+        if (!strcmp(argv[i], "-v")) {
             setLogLevel(VERBOSE);
             eraseArg(i, argc, argv);
             i--;
         } else
-        if (!strncmp(argv[i], "-q", 2)) {
+        if (!strcmp(argv[i], "-q")) {
             setLogLevel(QUITE);
         } else
-        if (!strncmp(argv[i], "-V", 2)  || !strncmp(argv[i], "--version", 9)) {
+        if (!strcmp(argv[i], "-V")  || !strcmp(argv[i], "--version")) {
             fprintf(stdout,"Tarredfs version " TARREDFS_VERSION "\n");
             char *argvs[3];
             argvs[0] = argv[0];
@@ -128,7 +83,7 @@ void parseForwardOptions(int *argc, char **argv, TarredFS *tfs, struct fuse_oper
             fuse_main(2, argvs, tarredfs_ops, NULL);
             exit(1);
         } else
-        if (!strncmp(argv[i], "-i", 2)) {            
+        if (!strcmp(argv[i], "-i")) {            
             regex_t re;
             if (regcomp(&re, argv[i+1], REG_EXTENDED|REG_NOSUB) != 0) {
                 fprintf(stderr, "Not a valid regexp \"%s\"\n", argv[i+1]);
@@ -139,7 +94,7 @@ void parseForwardOptions(int *argc, char **argv, TarredFS *tfs, struct fuse_oper
             eraseArg(i, argc, argv);
             i--;            
         } else
-        if (!strncmp(argv[i], "-x", 2)) {            
+        if (!strcmp(argv[i], "-x")) {            
             regex_t re;
             if (regcomp(&re, argv[i+1], REG_EXTENDED|REG_NOSUB) != 0) {
                 fprintf(stderr, "Not a valid regexp \"%s\"\n", argv[i+1]);
@@ -150,26 +105,62 @@ void parseForwardOptions(int *argc, char **argv, TarredFS *tfs, struct fuse_oper
             eraseArg(i, argc, argv);
             i--;
         } else
-        if (!strncmp(argv[i], "-mn", 3)) {
-            tfs->target_min_tar_size = tfs->tar_trigger_size = atol(argv[i+1]);             
-            debug("Target tar min size and trigger size \"%zu\"\n", tfs->target_min_tar_size);
+        if (!strcmp(argv[i], "-ta")) {
+            size_t s;
+            int rc = parseHumanReadable(argv[i+1], &s);
+            if (rc) {
+                error("Cannot set -ta because \"%s\" is not a proper number (e.g. 1,2K,3M,4G,5T)\n", argv[i+1]);
+            }
+            tfs->target_target_tar_size = s;
+            tfs->tar_trigger_size = s*2;
+            debug("Target tar min size and trigger size \"%zu\"\n", tfs->target_target_tar_size);
             eraseArg(i, argc, argv);
             eraseArg(i, argc, argv);
             i--;
         } else
-        if (!strncmp(argv[i], "-tr", 3)) {
-            tfs->tar_trigger_size = atol(argv[i+1]);             
+        if (!strcmp(argv[i], "-tr")) {
+            size_t s;
+            int rc = parseHumanReadable(argv[i+1], &s);
+            if (rc) {
+                error("Cannot set -tr because \"%s\" is not a proper number (e.g. 1,2K,3M,4G,5T)\n", argv[i+1]);
+            }
+            tfs->tar_trigger_size = s;
             debug("Tar trigger size \"%zu\"\n", tfs->tar_trigger_size);
             eraseArg(i, argc, argv);
             eraseArg(i, argc, argv);
             i--;
         } else
-        if (!strncmp(argv[i], "-p", 2)) {
+        if (!strcmp(argv[i], "-p")) {
             tfs->forced_chunk_depth = atol(argv[i+1]);
             if (tfs->forced_chunk_depth < 0) {
                 error("Cannot set forced chunk depth to a negative number.");
             }
             debug("Forced chunks at depth \"%jd\"\n", tfs->forced_chunk_depth);
+            eraseArg(i, argc, argv);
+            eraseArg(i, argc, argv);
+            i--;
+        } else
+        if (!strcmp(argv[i], "-s") && argv[i+1] != NULL) {
+            string arg = argv[i+1];
+            size_t bw,rqs;
+            std::vector<char> data(arg.begin(), arg.end());
+            auto j = data.begin();
+            string bws = eatTo(data, j, ',', 64);
+            string rqss = eatTo(data, j, 0, 64);
+            int rc1 = parseHumanReadable(bws, &bw);
+            int rc2 = parseHumanReadable(rqss, &rqs);
+            if (rc1) {
+                error("Cannot set -s bandwidth because \"%s\" is not a proper number (e.g. 1,2K,3M,4G,5T)\n", bws.c_str());
+            }
+            if (rc2) {
+                error("Cannot set -s number of requests per second because \"%s\" is not a proper number\n", rqss.c_str());
+            }
+            tfs->target_target_tar_size = roundoffHumanReadable(bw/(rqs*10));
+            tfs->tar_trigger_size = tfs->target_target_tar_size*2;
+            string ta = humanReadable(tfs->target_target_tar_size);
+            string tr = humanReadable(tfs->tar_trigger_size);
+            info("Calculated target tar size %sB and trigger size %sB from %s requests per second over %sbit/s .\n", ta.c_str(), tr.c_str(),
+                 rqss.c_str(), bws.c_str());
             eraseArg(i, argc, argv);
             eraseArg(i, argc, argv);
             i--;
@@ -204,7 +195,7 @@ void parseReverseOptions(int *argc, char **argv, ReverseTarredFS *tfs, struct fu
 {    
     for (int i=1; argv[i] != 0; ++i) {
         if (!strncmp(argv[i], "-h", 2)) {
-            printReverseHelp(argv[0]);
+            printHelp(argv[0]);
             exit(1);
         } else
         if (!strncmp(argv[i], "-d", 2)) {
@@ -281,7 +272,7 @@ int open_callback(const char *path, struct fuse_file_info *fi)
 
 int main(int argc, char *argv[])
 {
-    if (argc > 1 && !strncmp(argv[1], "--reverse", 9)) {
+    if (argc > 1 && (!strcmp(argv[1], "--reverse") || !strcmp(argv[1], "-r"))) {
         eraseArg(1, &argc, argv);
         int rc = reversemain(argc, argv);
         exit(rc);
@@ -290,7 +281,7 @@ int main(int argc, char *argv[])
     parseForwardOptions(&argc, argv, &forward_fs, &forward_tarredfs_ops);
 
     if (forward_fs.root_dir.empty() || forward_fs.mount_dir.empty()) {
-        printForwardHelp(argv[0]);
+        printHelp(argv[0]);
         exit(1);
     }
 
@@ -367,7 +358,7 @@ int reversemain(int argc, char *argv[])
     reverse_tarredfs_ops.readlink = ReverseReadlink<&reverse_fs>::cb;
 
     if (reverse_fs.root_dir.empty() || reverse_fs.mount_dir.empty()) {
-        printReverseHelp(argv[0]);
+        printHelp(argv[0]);
         exit(1);
     }
 

@@ -17,10 +17,10 @@
 
 #include<assert.h>
 
+#include"tarentry.h"
+
 #include"log.h"
 #include"util.h"
-#include"tarentry.h"
-#include"libtar.h"
 
 #include<errno.h>
 

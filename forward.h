@@ -18,50 +18,20 @@
 #ifndef FORWARD_H
 #define FORWARD_H
 
-
 #include<assert.h>
 
-
-#include"log.h"
+#include"defs.h"
 #include"tarfile.h"
 #include"tarentry.h"
-#include"util.h"
 #include"libtar.h"
+#include"util.h"
 
-#include<errno.h>
-
-#include<fcntl.h>
-#include<ftw.h>
 #include<fuse.h>
-
-#include<limits.h>
-
-#include<pthread.h>
-
 #include<regex.h>
 
-#include<stddef.h>
-#include<stdint.h>
-#include<stdio.h>
-#include<stdlib.h>
-#include<string.h>
-#include<syslog.h>
-
-#include<time.h>
-#include<sys/timeb.h>
-
-#include<unistd.h>
-
-#include<algorithm>
-#include<functional>
 #include<map>
-#include<set>
 #include<string>
-#include<sstream>
 #include<vector>
-#include<set>
-
-#include<iostream>
 
 using namespace std;
 
@@ -86,9 +56,9 @@ struct TarredFS {
     string root_dir;
     string mount_dir;
 
-    size_t target_min_tar_size = 10*1024*1024;
-    size_t target_split_tar_size = 100*1024*1024;
-    size_t tar_trigger_size = 5*1024*1024;
+    size_t target_target_tar_size = DEFAULT_TARGET_TAR_SIZE;
+    size_t tar_trigger_size = DEFAULT_TAR_TRIGGER_SIZE;
+    size_t target_split_tar_size = DEFAULT_SPLIT_TAR_SIZE;
     // The default setting is to trigger tars in each subdirectory below the root.
     // Even if the subdir does not qualify with enough data to create a min tar file.
     // However setting this to 0 and setting trigger size to 0, puts all content in
@@ -124,6 +94,5 @@ private:
                           size_t *sfs, size_t *mfs, size_t *lfs,
                           size_t *sc, size_t *mc);
 };
-
 
 #endif

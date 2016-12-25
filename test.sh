@@ -81,6 +81,23 @@ function startFS {
     fi        
 }
 
+function startFSExpectFail {
+    run="$1"
+    extra="$2"
+    if [ -z "$test" ]; then
+        ./build/tarredfs $extra $root $mount > $log 2>&1
+        ${run}
+    else
+        if [ -z "$gdb" ]; then
+            (sleep 2; eval ${run}) &
+            ./build/tarredfs -d $extra $root $mount 2>&1 | tee $log &
+        else
+            (sleep 3; eval ${run}) &
+            gdb -ex=r --args ./build/tarredfs -d $extra $root $mount 
+        fi        
+    fi        
+}
+
 function stopFS {
     (cd $mount; find . -exec ls -ld \{\} \; >> $log)
     fusermount -u $mount
@@ -408,6 +425,7 @@ function noAvalancheTestPart2 {
     if [ "$rc" != "7,8c7,8---" ]; then
         echo ++$rc++
         echo Failed no avalanche test should only affect a single tar! $ord $dest
+        echo This test depends on the default setting for target and trigger size.
         exit
     fi    
     stopFS    
@@ -427,10 +445,56 @@ if [ $do_test ]; then
     startFS noAvalancheTestPart1
 fi
 
-setup libtar1 "Mount of libtar extract all"
+function expectCaseConflict {
+    if [ "$?" == "0" ]; then
+        echo Expected tarredfs to fail startup!
+        stopFS nook
+        exit
+    fi
+    echo OK
+}
+
+setup basic18 "Test that case conflicts are detected"
+if [ $do_test ]; then
+    mkdir -p $root/Alfa
+    mkdir -p $root/alfa
+    echo HEJSAN > $root/Alfa/a
+    echo HEJSAN > $root/alfa/b
+    startFSExpectFail expectCaseConflict "-p 1 -ta 0"
+fi
+
+setup basic19 "Test that case conflicts can be hidden inside tars"
+if [ $do_test ]; then
+    mkdir -p $root/Alfa
+    mkdir -p $root/alfa
+    echo HEJSAN > $root/Alfa/a
+    echo HEJSAN > $root/alfa/b
+    startFS standardTest "-p 0 -ta 1G"
+fi
+
+
+setup libtar1 "Mount of libtar extract all default settings"
 if [ $do_test ]; then
     cp -a libtar $root
     startFS standardTest
+fi
+
+setup options1 "Mount of libtar -p 0 -ta 1G" 
+if [ $do_test ]; then
+    cp -a libtar $root
+    startFS standardTest "-p 0 -ta 1G"
+fi
+
+setup options2 "Mount of libtar -p 0 -ta 1K -tr 1K" 
+if [ $do_test ]; then
+    cp -a libtar $root
+    startFS standardTest "-p 0 -ta 1K -tr 1K"
+fi
+
+setup options3 "Mount of libtar -s 10M,2" 
+if [ $do_test ]; then
+    cp -a libtar $root
+    startFS standardTest "-s 10M,2"
 fi
 
 function compareTwo {

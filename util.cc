@@ -55,6 +55,71 @@ string humanReadable(size_t s)
     return to_string(s)+"P";
 }
 
+size_t roundoffHumanReadable(size_t s)
+{
+    if (s < KB) {
+        return s;
+    }
+    if (s < KB*KB) {
+        s /= KB;
+        s *= KB;
+        return s;
+    }
+    if (s < KB*KB*KB) {
+        s /= KB*KB;
+        s *= KB*KB;
+        return s;
+    }
+    if (s < KB*KB*KB*KB) {
+        s /= KB*KB*KB;
+        s *= KB*KB*KB;
+        return s;
+    }
+    if (s < KB*KB*KB*KB*KB) {
+        s /= KB*KB*KB*KB;
+        s *= KB*KB*KB*KB;
+        return s;
+    }
+    s /= KB*KB*KB*KB*KB;
+    s *= KB*KB*KB*KB*KB;
+    return s;
+}
+
+int parseHumanReadable(string s, size_t *out) 
+{
+    size_t mul = 1;
+    char c = s.back();
+
+    if (s.length() > 256) {
+        return ERR;
+    }
+    if (c == 'K') {
+        mul = KB;
+        s = s.substr(0,s.length()-1);
+    } else
+    if (c == 'M') {
+        mul = KB*KB;
+        s = s.substr(0,s.length()-1);
+    } else
+    if (c == 'G') {
+        mul = KB*KB*KB;
+        s = s.substr(0,s.length()-1);
+    } else
+    if (c == 'T') {
+        mul = KB*KB*KB*KB;
+        s = s.substr(0,s.length()-1);
+    }
+
+    for (auto c : s) {
+        if (!isdigit(c)) {
+            return ERR;
+        }
+    }
+    
+    *out = mul*atol(s.c_str());
+    return OK;
+}
+
 // Return microseconds
 uint64_t clockGetTime()
 {
@@ -330,3 +395,5 @@ string eatTo(vector<char> &v, vector<char>::iterator &i, char c, size_t max) {
     }
     return s;
 }
+
+

@@ -15,55 +15,19 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#define TARREDFS_VERSION "0.1"
-
-#define FUSE_USE_VERSION 26
-#define _XOPEN_SOURCE 500
-
-#include<assert.h>
-
+#include"forward.h"
 
 #include"log.h"
-#include"tarfile.h"
-#include"tarentry.h"
-#include"util.h"
-#include"libtar.h"
 
-#include<errno.h>
-
-#include<fcntl.h>
 #include<ftw.h>
-#include<fuse.h>
-
-#include<limits.h>
-
-#include<pthread.h>
-
-#include<regex.h>
-
-#include<stddef.h>
-#include<stdint.h>
-#include<stdio.h>
-#include<stdlib.h>
 #include<string.h>
-#include<syslog.h>
-
-#include<time.h>
-#include<sys/timeb.h>
-
 #include<unistd.h>
 
 #include<algorithm>
-#include<functional>
-#include<map>
+#include<codecvt>
+#include<locale>
 #include<set>
-#include<string>
 #include<sstream>
-#include<vector>
-#include<set>
-
-#include<iostream>
-#include"forward.h"
 
 using namespace std;
 
@@ -237,9 +201,31 @@ void TarredFS::addEntriesToChunkPoints() {
         debug("ADDED content %s            TO          \"%s\"\n", direntry.first.c_str(), dir->path.c_str());
     }    
 }
-    
+
+std::locale const user_locale("");
+
+std::wstring to_wstring(std::string const& s) {
+    std::wstring_convert<std::codecvt_utf8<wchar_t> > conv;
+    return conv.from_bytes(s);
+}
+
+std::string to_string(std::wstring const& s) {
+    std::wstring_convert<std::codecvt_utf8<wchar_t> > conv;
+    return conv.to_bytes(s);
+}
+
+std::string tolowercase(std::string const& s) {
+    auto ss = to_wstring(s);
+    for (auto& c : ss) {
+        c = std::tolower(c, user_locale);
+    }
+    return to_string(ss);
+}
+
 void TarredFS::pruneDirectories() {
     set<string> paths;
+    map<string,string> paths_lowercase;
+    
     for (auto & p : chunk_points) {
         string s = p.first->path;
         do {
@@ -257,6 +243,19 @@ void TarredFS::pruneDirectories() {
         if (paths.count(d.first) != 0) {
             debug( "Re-added %s to paths.\n", d.first.c_str());
             newd[d.first] = d.second;
+
+            // Now detect directory case conflicts that will prevent storage
+            // on case-insensitive drives. E.g.
+            //    /Development/PROGRAMS/src
+            //    /Development/programs/src
+            // We are doing this check on the remaining directories after the chunk points have
+            // been selected. Thus a lot of case conflicts can be handled inside the tars.
+            // Typically all file name conflicts are handled.
+            string dlc = tolowercase(d.first);
+            if (paths_lowercase.count(dlc) > 0) {
+                error("Case conflict for:\n%s\n%s\n", d.first.c_str(), paths_lowercase[dlc].c_str());
+            }
+            paths_lowercase[dlc] = d.first;
         }
     }
     // The root directory is always a chunk point.
@@ -310,8 +309,8 @@ void TarredFS::calculateNumTars(TarEntry *te,
     size_t large_files_size = 0;
     size_t num_large_files = 0;
 
-    size_t small_size = target_min_tar_size / 100; // Default 10M/100 = 100K
-    size_t medium_size = target_min_tar_size; // Default 10M
+    size_t small_size = target_target_tar_size / 100; // Default 10M/100 = 100K
+    size_t medium_size = target_target_tar_size; // Default 10M
     
     for(auto & entry : te->entries) {
         if (entry->blocked_size < small_size) {
@@ -329,10 +328,10 @@ void TarredFS::calculateNumTars(TarEntry *te,
         }
     }
     
-    *nst = findNumTarsFromSize(target_min_tar_size, small_files_size);
+    *nst = findNumTarsFromSize(target_target_tar_size, small_files_size);
     *sfs = small_files_size;
 
-    *nmt = findNumTarsFromSize(target_min_tar_size, medium_files_size);
+    *nmt = findNumTarsFromSize(target_target_tar_size, medium_files_size);
     *mfs = medium_files_size;
 
     *nlt = num_large_files;
@@ -341,8 +340,8 @@ void TarredFS::calculateNumTars(TarEntry *te,
     *sc = small_size;
     *mc = medium_size;
     
-    if (small_files_size <= target_min_tar_size ||
-        medium_files_size <= target_min_tar_size) {
+    if (small_files_size <= target_target_tar_size ||
+        medium_files_size <= target_target_tar_size) {
         // Either the small tar or the medium tar is not big enough.
         // Put them all in a single tar and hope that they together are as large as
         // the target tar size.

@@ -23,12 +23,9 @@
 #include"libtar.h"
 #include"tarfile.h"
 
-#include<fcntl.h>
-
 #include<map>
 #include<string>
 #include<vector>
-
 
 using namespace std;
 

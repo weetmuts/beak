@@ -17,6 +17,11 @@
 
 #include"reverse.h"
 
+#include"log.h"
+
+#include<string.h>
+#include<unistd.h>
+
 using namespace std;
 
 int ReverseTarredFS::parseTarredfsContent(vector<char> &v, string path) {
@@ -175,8 +180,8 @@ void ReverseTarredFS::loadTaz(string taz_path, string path) {
     }
     
     debug("Found proper taz file! %s\n", taz_path.c_str());
-    char taz_hash[SHA256_DIGEST_LENGTH];
-    char hash[SHA256_DIGEST_LENGTH];
+    //char taz_hash[SHA256_DIGEST_LENGTH];
+    //char hash[SHA256_DIGEST_LENGTH];
     
     tazs[taz_path] = Taz(t);
 
