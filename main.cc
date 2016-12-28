@@ -29,7 +29,7 @@ using namespace std;
 
 void printHelp(const char *app) {
     fprintf(stdout,
-            "usage: %s [-r|--reverse] [options] [rootDirectory] [mountPoint]\n"
+            "usage: %s {-r|--reverse} [options] [rootDirectory] [mountPoint]\n"
             "\n"
             "general options:\n"
             "    -h   --help      print help\n"
@@ -37,17 +37,17 @@ void printHelp(const char *app) {
             "    -v   --verbose   detailed output\n"
             "    -d   --debug     very detailed output\n"
             "    -q               quite\n"
+            "    -i pattern       only paths matching regex pattern are included\n"
+            "    -x pattern       paths matching regex pattern are excluded\n"
+            "    -s [num],[rps]   set -ta and -tr automatically based on you upload bandwidth\n"
+            "                     num bytes per second and rps requests per second\n"       
             "    -p [num]         force all directories at depth [num] to contain tars\n"
             "                     0 is the root, 1 is the first subdirectory level\n"
             "                     the default is 1.\n"
-            "    -i pattern       only paths matching regex pattern are included\n"
-            "    -x pattern       paths matching regex pattern are excluded\n"
-            "    -s [num],[rps]   set chunk size automatically based on you upload bandwidth\n"
-            "                     num bytes per second and rps requests per second\n"       
-            "    -ta [num]        try to make virtual tars of this minimum size\n"
+            "    -ta [num]        set the target size of the virtual tars to [num],\n"
             "                     default 10M\n"
-            "    -tr [num]        trigger tar generation when size exceeds\n"
-            "                     default 50M\n"
+            "    -tr [num]        trigger tar generation in a dir, when size of dir and its subdirs\n"
+            "                     exceeds [num], default 20M\n"
             "    -f               foreground, ie do not start daemon\n"
             "    -r   --reverse   mount a tarredfs directory and present the original files\n"
             "\n"
@@ -74,6 +74,7 @@ void parseForwardOptions(int *argc, char **argv, TarredFS *tfs, struct fuse_oper
         } else
         if (!strcmp(argv[i], "-V")  || !strcmp(argv[i], "--version")) {
             fprintf(stdout,"Tarredfs version " TARREDFS_VERSION "\n");
+            fprintf(stdout,"libtar version 1.2.20 (with additional fixes)\n");
             char *argvs[3];
             argvs[0] = argv[0];
             char *vv = (char*)malloc(strlen("--version"+1));
@@ -131,11 +132,11 @@ void parseForwardOptions(int *argc, char **argv, TarredFS *tfs, struct fuse_oper
             i--;
         } else
         if (!strcmp(argv[i], "-p")) {
-            tfs->forced_chunk_depth = atol(argv[i+1]);
-            if (tfs->forced_chunk_depth < 0) {
-                error("Cannot set forced chunk depth to a negative number.");
+            tfs->forced_tar_collection_dir_depth = atol(argv[i+1]);
+            if (tfs->forced_tar_collection_dir_depth < 0) {
+                error("Cannot set forced tar collection depth to a negative number.");
             }
-            debug("Forced chunks at depth \"%jd\"\n", tfs->forced_chunk_depth);
+            debug("Forced tar collection at depth \"%jd\"\n", tfs->forced_tar_collection_dir_depth);
             eraseArg(i, argc, argv);
             eraseArg(i, argc, argv);
             i--;
@@ -297,16 +298,16 @@ int main(int argc, char *argv[])
     uint64_t stop = clockGetTime();
     uint64_t scan_time = stop-start;
     start = stop;    
-    // Find suitable chunk points where tars will be created.
-    forward_fs.findChunkPoints();
+    // Find suitable directories points where virtual tars will be created.
+    forward_fs.findTarCollectionDirs();
     // Remove all other directories that will be hidden inside tars.
     forward_fs.pruneDirectories();
-    // Add remaining chunk point as dir entries to their parent directories.
+    // Add remaining dirs as dir entries to their parent directories.
     forward_fs.addDirsToDirectories();
-    // Add content (files and directories) to the chunk points.
-    forward_fs.addEntriesToChunkPoints();
+    // Add content (files and directories) to the tar collection dirs.
+    forward_fs.addEntriesToTarCollectionDirs();
     // Sort the entries in a tar friendly order.
-    forward_fs.sortChunkPointEntries();
+    forward_fs.sortTarCollectionEntries();
     // Group the entries into tar files.
     size_t num_tars = forward_fs.groupFilesIntoTars();
     stop = clockGetTime();

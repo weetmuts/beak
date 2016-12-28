@@ -63,25 +63,25 @@ struct TarredFS {
     // Even if the subdir does not qualify with enough data to create a min tar file.
     // However setting this to 0 and setting trigger size to 0, puts all content in
     // tars directly below the mount dir, ie no subdirs, only tars.
-    int forced_chunk_depth = 1;
+    int forced_tar_collection_dir_depth = 1;
     
     map<string,TarEntry*,depthFirstSort> files;
-    map<TarEntry*,pair<size_t,size_t>> chunk_points;
+    map<TarEntry*,pair<size_t,size_t>> tar_storage_dirs;
     map<string,TarEntry*> directories;
     
     vector<pair<Filter,regex_t>> filters;
 
     int recurse(FileCB cb);
     int addTarEntry(const char *fpath, const struct stat *sb, struct FTW *ftwbuf);
-    void findChunkPoints();
+    void findTarCollectionDirs();
     void recurseAddDir(string path, TarEntry *direntry);
     void addDirsToDirectories();
-    void addEntriesToChunkPoints();
+    void addEntriesToTarCollectionDirs();
     void pruneDirectories();
 
     
     size_t groupFilesIntoTars();
-    void sortChunkPointEntries();
+    void sortTarCollectionEntries();
     TarFile *findTarFromPath(string path);   
     int getattrCB(const char *path, struct stat *stbuf);
     int readdirCB(const char *path, void *buf, fuse_fill_dir_t filler,

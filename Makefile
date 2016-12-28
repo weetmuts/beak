@@ -13,14 +13,21 @@ OBJS=	build/util.o \
 	build/tarfile.o \
 	build/forward.o \
 	build/reverse.o \
-	build/main.o 
+	build/main.o
+
+OBJS2=  build/util.o \
+	build/log.o \
+	build/diff.o
 
 $(shell mkdir -p build)
 
-all: build/tarredfs build/tarredfs-untar build/tarredfs-pack build/tarredfs-compare build/tarredfs-integrity-test
+all: build/tarredfs build/tarredfs-diff build/tarredfs-untar build/tarredfs-pack build/tarredfs-compare build/tarredfs-integrity-test
 
 build/tarredfs: $(OBJS) $(LIBTAR_A)
 	g++ -g -std=c++11  $(OBJS) $(LIBTAR_A) `pkg-config fuse --libs`  `pkg-config openssl --libs` -o build/tarredfs 
+
+build/tarredfs-diff: $(OBJS2)
+	g++ -g -std=c++11  $(OBJS2) -o build/tarredfs-diff 
 
 build/%.o: %.cc $(HEADERS)
 	g++ $(CCFLAGS) $< -c -o $@
@@ -54,6 +61,7 @@ install:
 	mkdir -p /usr/local/lib/tarredfs
 	cp format_find.pl /usr/local/lib/tarredfs/format_find.pl
 	cp format_tar.pl /usr/local/lib/tarredfs/format_tar.pl
+	cp tarredfs.1 /usr/local/share/man/man1
 
 clean:
 	rm -rf build/* *~

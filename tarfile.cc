@@ -59,8 +59,6 @@ TarFile::TarFile(TarContents tc, int n, bool dirs) {
     char c;
     assert((dirs && tar_contents == DIR_TAR) || (!dirs && tar_contents != DIR_TAR));
     if (tar_contents == DIR_TAR) {
-        // Use taz0123.tar instead of tar0123.tar to have
-        // the directory tars at the end in the alphabetic list.
         c = 'z';
     } else if (tar_contents == SMALL_FILES_TAR) {
         c = 'r';
@@ -201,14 +199,3 @@ void TarFile::calculateSHA256Hash() {
     // Calculate the tar checksum for the volume header.
     th_finish(volume_header->tar);
 }
-
-
-/*
-Katrin Petterson
-
-Eugeniavägen 23
-plan 12, gå mot de gula golven
-8.15
-9.30 - 10
-
-*/

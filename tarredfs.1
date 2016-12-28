@@ -1,0 +1,149 @@
+
+.TH TARREDFS 1
+.SH NAME
+tarredfs \- mounts or creates a file system populated with virtual tar files
+.SH SYNOPSIS
+.B tarredfs
+[\fB\-r\fR|\fB\--reverse\fR]
+[\fB\-i\fR \fIREGEX\fR]
+[\fB\-x\fR \fIREGEX\fR]
+[\fB\-p\fR \fIDEPTH\fR]
+[\fB\-ta\fR \fISIZE\fR]
+[\fB\-tr\fR \fISIZE\fR]
+[\fB\-d\fR|\fB\--debug\fR]
+[\fB\-v\fR|\fB\--verbose\fR]
+[\fB\-V\fR|\fB\--version\fR]
+[\fB\-h\fR]
+\fIroot\fR \fImount\fR
+
+.B tarredfs-untar
+\fBx\fR|\fBxv\fR|\fBt\fR|\fBtv\fR|\fBxa\fR|\fBxav\fR|\fBta\fR|\fBtav\fR \fIpath\fR [\fIfile\fR]
+
+.B tarredfs-diff
+\fIfrom\fR \fIto\fR
+
+.SH DESCRIPTION
+.B tarredfs
+mounts a source file system (\fIroot\fR) and presents a new
+file system (\fImount\fR) filled with virtual tar files.
+All files are put into tars; smaller files are grouped together to make the
+tars reach the target size (default 10-20MB), larger files get their own tar files.
+
+The tar files are not compressed. This makes it possible to mount the
+tarred file system quickly, because no data is stored on disk. The tar
+headers and other meta data are generated on mount and served from ram
+while the tar contents are served from the source files.
+
+Tarredfs triggers tar generation in a directory when the size of the
+directory contents (including subdirectories, excluding already tarred
+subdirectories) is greater than the tar trigger size (default
+20MB). The search for directories to tar is performed from leaf
+directories to the root. Tar files are always generated in the root
+and by default also in the immediate subdirectories to the root.
+
+All directories are stored in the tar files. Directories that are
+necessary to reach the tarred directories are visible in the
+tarred file system. 
+
+Thus tarredfs makes the original file system more chunky, ie reduces
+the number of files and directories, while keeping the remaining directory structure
+intact.  This is beneficial when syncing data to a
+remote storage service that have high a transfer bandwidth but allows
+few files to be transferred per second. Tarredfs is also a work around
+for other remote storage service limitations, like case-insensitive
+and lack of symbolic links.
+
+The tarred file system is read only, and will not update itself, nor give a warning,
+if the source filesystem changes. 
+
+Example:    % tarredfs /home/you/Storage /home/you/TarredFS 
+
+.B tarredfs reverse mount
+
+Adding -r (or --reverse) will mount a tarred filesystem and present the original file system.
+This is a fast operation since tarredfs stores an index file in each tarred directory.
+
+Example:    % tarredfs -r /home/you/TarredFS /home/you/StorageCopy
+
+Since a directory with virtual tars is self contained, you can mount a part of
+the tarred file system.
+
+Example:    % tarredfs -r /home/you/TarredFS/Project /home/you/ProjectCopy
+
+.B tarredfs-untar 
+will untar the virtual tar files in the correct order to reconstruct the file system
+in the current directory as if the file system was stored in a single tar file.
+
+Example:    % tarredfs-untar x /home/you/TarredFS
+
+Since a directory with virtual tars are self contained, you can untar a part of
+the tarred file system:
+
+Example:    % tarredfs-untar x TarredFS/Project
+
+tarredfs-untar invokes the system tar (that is expected to support the GNU extensions)
+and performs the extraction in the right order to properly recreate the timestamps of
+both files and directories. This extraction does not (currently) make use of the index files.
+Thus to extracta small subset of the tarredfs, doing \fBcp -a\fR from a reverse mount
+is much faster.
+
+.B tarredfs-diff
+will compare two tarred file systems and present a human readable explanation of
+the differences. This is useful to understand how much will be synced to a remote storage
+service.
+
+.SH OPTIONS
+.TP
+.BR \-r ", " \-\-reverse
+Mount a tarredfs and present the original content.
+
+.TP
+.BR \-i " " REGEX
+Only include files and directories with paths that match the regex.
+
+.TP
+.BR \-x " " REGEX
+Exclude files and directories with paths that match the regex.
+
+.TP
+.BR \-p " " DEPTH
+Trigger tar generation at this depth, even if the trigger size has not been reached.
+The default is 1.
+
+.TP
+.BR \-ta " " SIZE
+Set the target tar size.
+
+Example: tarredfs -ta 50M Storage TarredFS
+
+.TP
+.BR \-tr " " SIZE
+Set the tar trigger size.
+
+Example: tarredfs -ta 100K -tr 1M Storage TarredFS
+
+.TP
+.BR \-f
+Run in foreground, ie do not start daemon.
+
+.TP
+.BR \-d
+Run in debug mode foreground, a lot of output.
+
+
+.SH EXAMPLES
+.TP
+
+Store all all virtual tar files in the root directory. The target size of each virtual tar is 100K.
+
+% tarredfs -p 0 -ta 50M -tr 1T Storage TarredFS
+
+.TP
+Tar the dev directory but exclude file/paths that contains the text "shm". Which are the share memory buffers, not suitable for archiving.
+
+% tarredfs -x shm /dev TarredFS
+
+
+
+
+

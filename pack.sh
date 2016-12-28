@@ -58,10 +58,8 @@ paste /tmp/bb /tmp/aa | sort | cut -f 2- > /tmp/cc
 # Iterate over the tar files and extract them
 # in the corresponding directory
 while read p; do
-    parent="$(dirname $p)"
-    curr="$(basename $p)"
+    parent="$(dirname "$p")"
     mkdir -p "$parent"
-    pushd "$parent" > /dev/null
-    $cmd --verbose -c $root/$p > $curr$ext
-    popd > /dev/null
+    $cmd --verbose -c "$root/$p" > "$p$ext"
 done </tmp/cc
+

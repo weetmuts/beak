@@ -66,10 +66,9 @@ struct TarEntry {
 
     // If this is a directory, then all children sizes are summed here.
     size_t children_size;
-    size_t chunked_size;
     TarEntry *parent;
     TAR *tar;
-    bool is_chunk_point;
+    bool is_tar_storage_dir;
     vector<TarEntry*> dirs; // Directories to be listed inside this TarEntry
     vector<string> files; // Files to be listed inside this TarEntry (ie the virtual tar files..)
     size_t num_tars = 0;
@@ -79,7 +78,7 @@ struct TarEntry {
     map<size_t,TarFile> medium_tars;  // Medium file tars in side this TarEntry   
     map<size_t,TarFile> large_tars;  // Large file tars in side this TarEntry   
     vector<TarEntry*> entries; // The contents stored in the tar files.
-    TarEntry *chunk_point = NULL;
+    TarEntry *tar_collection_dir = NULL; // This entry is stored in this tar collection dir.
     bool added_to_directory = false;
     int depth = 0;
     bool virtual_file = false;

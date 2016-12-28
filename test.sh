@@ -26,6 +26,8 @@ tmpdir=$(mktemp -d /tmp/tarredfs_testXXXXXXXX)
 dir=""
 root=""
 mount=""
+mountreverse=""
+checkpack=""
 check=""
 log=""
 org=""
@@ -53,6 +55,7 @@ function setup {
         mount=$dir/Mount
         mountreverse=$dir/MountReverse
         check=$dir/Check
+        packed=$dir/Packed
         log=$dir/log.txt
         logreverse=$dir/logreverse.txt
         org=$dir/org.txt
@@ -61,6 +64,7 @@ function setup {
         mkdir -p $mount
         mkdir -p $mountreverse
         mkdir -p $check
+        mkdir -p $packed
     fi
 }
 
@@ -84,16 +88,17 @@ function startFS {
 function startFSExpectFail {
     run="$1"
     extra="$2"
+    env="$3"
     if [ -z "$test" ]; then
-        ./build/tarredfs $extra $root $mount > $log 2>&1
+        "$env" ./build/tarredfs $extra $root $mount > $log 2>&1
         ${run}
     else
         if [ -z "$gdb" ]; then
             (sleep 2; eval ${run}) &
-            ./build/tarredfs -d $extra $root $mount 2>&1 | tee $log &
+            "$env" ./build/tarredfs -d $extra $root $mount 2>&1 | tee $log &
         else
             (sleep 3; eval ${run}) &
-            gdb -ex=r --args ./build/tarredfs -d $extra $root $mount 
+            gdb -ex=r --args "$env" ./build/tarredfs -d $extra $root $mount 
         fi        
     fi        
 }
@@ -149,6 +154,14 @@ function untar {
     (cd "$check"; $THIS_DIR/untar.sh x "$mount" "$1")
 }
 
+function pack {
+    (cd "$packed"; $THIS_DIR/pack.sh xz "$mount") >> "$log" 2>&1
+}
+
+function untarpacked {
+    (cd "$check"; $THIS_DIR/untar.sh xa "$packed" "$1")
+}
+
 function checkdiff {
     diff -rq $root $check
     if [ $? -ne 0 ]; then
@@ -169,6 +182,14 @@ function checkls-ld {
 
 function standardTest {
     untar
+    checkdiff
+    checkls-ld
+    stopFS
+}
+
+function standardPackedTest {
+    pack
+    untarpacked
     checkdiff
     checkls-ld
     stopFS
@@ -320,23 +341,23 @@ if [ $do_test ]; then
     startFS mtimeTestPart1
 fi
 
-function checkChunkCreation {
+function checkBasicVirtualTars {
     cat $log
     rc=$(cd $mount; find . -name "*.tar" | tr -d '[:space:]')
     if [ "$rc" != "./NNNNN/tar00000000.tar./NNNNN/tar00000001.tar./NNNNN/taz00000000.tar./taz00000000.tar" ]; then
-        echo Chunks not created in the proper order! Check in $dir for more information.
+        echo Virtual tars not created in the proper order! Check in $dir for more information.
         exit
     fi
     stopFS
 }
 
-setup basic12 "Test that sort order is right for proper chunk point creation"
+setup basic12 "Test that sort order is right for tar collection dir"
 if [ $do_test ]; then
     mkdir -p $root/NNNNN/SSSS
     dd bs=1024 count=6000 if=/dev/zero of=$root/NNNNN/RRRRR > /dev/null 2>&1
     dd bs=1024 count=1 if=/dev/zero of=$root/NNNNN/SSSS/SSSS > /dev/null 2>&1
     dd bs=1024 count=6000 if=/dev/zero of=$root/NNNNN/iiii > /dev/null 2>&1
-    startFS checkChunkCreation "-v"
+    startFS checkBasicVirtualTars "-v"
 fi
 
 setup basic13 "Test paths with spaces"
@@ -472,11 +493,32 @@ if [ $do_test ]; then
     startFS standardTest "-p 0 -ta 1G"
 fi
 
+function expectLocaleFailure {
+    if [ "$?" == "0" ]; then
+        echo Expected tarredfs to fail startup!
+        stopFS nook
+        exit
+    fi
+    echo OK
+}
+
+setup basic20 "Test that LC_ALL=C fails"
+if [ $do_test ]; then
+    mkdir -p $root/Alfa
+    echo HEJSAN > $root/Alfa/a
+    startFSExpectFail expectLocaleFailure "-p 1 -ta 0" LC_ALL=en_US.UTF-8
+fi
 
 setup libtar1 "Mount of libtar extract all default settings"
 if [ $do_test ]; then
     cp -a libtar $root
     startFS standardTest
+fi
+
+setup libtar2 "Mount of libtar, pack using xz, decompress and untar."
+if [ $do_test ]; then
+    cp -a libtar $root
+    startFS standardPackedTest
 fi
 
 setup options1 "Mount of libtar -p 0 -ta 1G" 

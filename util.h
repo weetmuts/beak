@@ -34,12 +34,12 @@ string dirname(string& s);
 struct depthFirstSort
 {
     // Special path comparison operator that sorts file names and directories in this order:
-    // This is the order necessary to find chunk points depth first.
+    // This is the order necessary to find tar collection dirs depth first.
     // TEXTS/filter/alfa
     // TEXTS/filter
     // TEXTS/filter.zip
     static bool compare(const char *f, const char *t);    
-    inline bool operator() (const std::string& a, const std::string& b) { return compare(a.c_str(), b.c_str()); }
+    inline bool operator() (const std::string& a, const std::string& b)  const { return compare(a.c_str(), b.c_str()); }
 };
 
 struct TarSort

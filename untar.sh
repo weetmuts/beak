@@ -30,16 +30,15 @@ trap finish EXIT
 
 function Help() {
     echo
-    echo Usage: tarredfs-untar {-d} {-c} [x\|t]{Jzj}{v} [DirWithTars] {PathToExtract}
+    echo Usage: tarredfs-untar {-d} {-c} [x\|t]{a}{v} [DirWithTars] {PathToExtract}
     echo
     echo Example:
     echo tarredfs-untar x /Mirror/Storage
     echo tarredfs-untar xv /Mirror/Storage/Articles
-    echo tarredfs-untar xzv /Mirror/Storage/Articles mag1.pdf
-    echo tarredfs-untar tJv /Mirror/Storage/Work
+    echo tarredfs-untar xa /Mirror/Storage/Articles mag1.pdf
+    echo tarredfs-untar tav /Mirror/Storage/Work
     echo
     echo Add -d to debug.
-    echo Add -c to check that tarredfs-contents match the tars.
     exit
 }
 
@@ -80,9 +79,9 @@ done
 case $1 in
     [xt]) ;;
     [xt]v) ;;
-    [xt][Jzj]) ;;
-    [xt]v[Jzj]) ;;
-    [xt][Jzj]v) ;;
+    [xt]a) ;;
+    [xt]va) ;;
+    [xt]av) ;;
     *) Help
 esac
 
@@ -98,17 +97,9 @@ case $1 in
 esac
 
 case $1 in
-    *J*)
-        cmd=${cmd}J
-        ext='.xz'
-        ;;
-    *z*)
-        cmd=${cmd}z
-        ext='.gz'
-        ;;
-    *j*)
-        cmd=${cmd}j
-        ext='.bz2'
+    *a*)
+        cmd=${cmd}a
+        ext='(\.xz|\.gz|\.bz2|)$'
         ;;
 esac
 
@@ -130,7 +121,7 @@ fi
 
 root="$(realpath $2)"
 # Find the tar files
-(cd "$root" && find . -name "ta[lmrz]*tar${ext}" | sed 's/^\.\///' | sort) > "$dir/aa"
+(cd "$root" && find . -type f -regextype awk -regex ".*/ta[rmlz][0-9a-z][0-9a-z][0-9a-z][0-9a-z][0-9a-z][0-9a-z][0-9a-z][0-9a-z]\.tar${ext}" | sed 's/^\.\///' | sort) > "$dir/aa"
 cat "$dir/aa" | tr -c -d '/\n' | tr / a > "$dir/bb"
 # Sort them on the number of slashes, ie handle the
 # deepest directories first, finish with the root

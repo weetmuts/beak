@@ -96,7 +96,7 @@ int TarredFS::addTarEntry(const char *fpath, const struct stat *sb, struct FTW *
     return 0;
 }
 
-void TarredFS::findChunkPoints() {
+void TarredFS::findTarCollectionDirs() {
     // Accumulate blocked sizes into children_size in the parent.
     // Set the parent pointer.
     for(auto & direntry : files) {
@@ -110,18 +110,18 @@ void TarredFS::findChunkPoints() {
         }
     }
     
-    // Find chunk points
+    // Find tar collection dirs
     for(auto & direntry : files) {
         TarEntry *te = direntry.second;
         
         if (TH_ISDIR(te->tar)) {
-            bool must_chunk = (te->path == "/" || te->depth == forced_chunk_depth);
-            bool ought_to_chunk = (tar_trigger_size > 0 && te->children_size > tar_trigger_size);
-            if (must_chunk || ought_to_chunk) {
-                te->is_chunk_point = true;
-                chunk_points[te] = pair<size_t,size_t>(te->children_size,0);
+            bool must_generate_tars = (te->path == "/" || te->depth == forced_tar_collection_dir_depth);
+            bool ought_to_generate_tars = (tar_trigger_size > 0 && te->children_size > tar_trigger_size);
+            if (must_generate_tars || ought_to_generate_tars) {
+                te->is_tar_storage_dir = true;
+                tar_storage_dirs[te] = pair<size_t,size_t>(te->children_size,0);
                 string hs = humanReadable(te->children_size);
-                verbose("Chunk point % 5s '%s'\n", hs.c_str(), te->path.c_str());
+                verbose("Tar collection dir % 5s '%s'\n", hs.c_str(), te->path.c_str());
                 TarEntry *i = te;
                 while (i->parent != NULL) {
                     i->parent->children_size -= te->children_size;
@@ -152,43 +152,43 @@ void TarredFS::recurseAddDir(string path, TarEntry *direntry) {
 }
     
 void TarredFS::addDirsToDirectories() {
-    // Find all directories that are chunk points
+    // Find all directories that are tar collection dirs
     // and make sure they can be listed in all the parent
     // directories down to the root. Even if those intermediate
-    // directores might not be chunk points.
+    // directores might not be tar collection dirs.
     for(auto & direntry : files) {
         string path = direntry.first;
         assert(path.length()>0);
-        if (!direntry.second->isDir() || path == "/" || !direntry.second->is_chunk_point) {
+        if (!direntry.second->isDir() || path == "/" || !direntry.second->is_tar_storage_dir) {
             // Ignore files
             // Ignore the root
-            // Ignore directories that are not chunk points
+            // Ignore directories that are not tar collection dirs.
             continue;
         }
         string name = basename(path);
         string dir = dirname(path);
         TarEntry *parent = directories[dir];
         assert(parent!=NULL);
-        // Add the chunk point directory to its parent.
+        // Add the tar collection dir to its parent.
         if (!direntry.second->added_to_directory) {
             parent->dirs.push_back(direntry.second);
             direntry.second->added_to_directory = true;
             debug("ADDED dir %s to %s\n", name.c_str(), dir.c_str());
             
             // Now make sure the parent is linked to its parent all the way to the root.
-            // Despite these parents might not be chunk points.
+            // Despite these parents might not be tar collection dirs.
             recurseAddDir(dir, parent);
         }
     }    
 }
 
-void TarredFS::addEntriesToChunkPoints() {
+void TarredFS::addEntriesToTarCollectionDirs() {
     for(auto & direntry : files) {
         string path = direntry.first;
         TarEntry *dir = NULL;
         
         if (path == "/") {
-            // Ignore the root, since there is no chunk_point to add it to.
+            // Ignore the root, since there is no tar_collection_dir to add it to.
             continue;
         }
         
@@ -196,7 +196,7 @@ void TarredFS::addEntriesToChunkPoints() {
             path = dirname(path);
             dir = directories[path];
             // dir is NULL for directories that are only stored inside tars.
-        } while (dir == NULL || !dir->is_chunk_point);            
+        } while (dir == NULL || !dir->is_tar_storage_dir);            
         dir->entries.push_back(direntry.second);
         debug("ADDED content %s            TO          \"%s\"\n", direntry.first.c_str(), dir->path.c_str());
     }    
@@ -225,8 +225,15 @@ std::string tolowercase(std::string const& s) {
 void TarredFS::pruneDirectories() {
     set<string> paths;
     map<string,string> paths_lowercase;
-    
-    for (auto & p : chunk_points) {
+
+    string lcn = user_locale.name();
+    string utf8 = ".UTF-8";
+    if (utf8.size() > lcn.size() ||
+        !equal(utf8.rbegin(), utf8.rend(), lcn.rbegin())) {
+        error("Tarredfs expects your locale to use the encoding UTF-8!\n");
+    }
+
+    for (auto & p : tar_storage_dirs) {
         string s = p.first->path;
         do {
             pair<set<string>::iterator,bool> rc = paths.insert(s);
@@ -248,7 +255,7 @@ void TarredFS::pruneDirectories() {
             // on case-insensitive drives. E.g.
             //    /Development/PROGRAMS/src
             //    /Development/programs/src
-            // We are doing this check on the remaining directories after the chunk points have
+            // We are doing this check on the remaining directories after the tar collection dirs have
             // been selected. Thus a lot of case conflicts can be handled inside the tars.
             // Typically all file name conflicts are handled.
             string dlc = tolowercase(d.first);
@@ -258,9 +265,9 @@ void TarredFS::pruneDirectories() {
             paths_lowercase[dlc] = d.first;
         }
     }
-    // The root directory is always a chunk point.
+    // The root directory is always a tar collection dir.
     newd["/"] = directories["/"];
-    newd["/"]->is_chunk_point = true;
+    newd["/"]->is_tar_storage_dir = true;
     
     directories = newd;
     debug( "dir size %ju\n", directories.size());
@@ -296,7 +303,7 @@ void TarredFS::calculateNumTars(TarEntry *te,
     //
     // We want to avoid avalance effects, ie that adding a single byte to a file,
     // triggers new timestamps and content in all following tars in the same
-    // chunk point. You get this often if you simply take the files in alphabetic order
+    // tar collection dir. You get this often if you simply take the files in alphabetic order
     // and switch to the next tar when the current one is filled up.
     //
     // Sum the sizes of the normal files
@@ -355,10 +362,10 @@ void TarredFS::calculateNumTars(TarEntry *te,
 
 size_t TarredFS::groupFilesIntoTars() {
     size_t num = 0;
-    for (auto & e : chunk_points) {
+    for (auto & e : tar_storage_dirs) {
         TarEntry *te = e.first;
         
-        debug("CHUNK %07ju %07ju %s\n", e.second.first, e.second.second, e.first->path.c_str());
+        debug("TAR COLLECTION DIR %07ju %07ju %s\n", e.second.first, e.second.second, e.first->path.c_str());
 
         for(auto & entry : te->entries) {
             // This will remove the prefix (ie path outside of tar) and update the hash.
@@ -369,10 +376,10 @@ size_t TarredFS::groupFilesIntoTars() {
         calculateNumTars(te, &nst,&nmt,&nlt,&sfs,&mfs,&lfs,
                          &smallcomp,&mediumcomp);
 
-        debug("CHUNK nst=%zu nmt=%zu nlt=%zu sfs=%zu mfs=%zu lfs=%zu\n",
+        debug("TAR COLLECTION DIR nst=%zu nmt=%zu nlt=%zu sfs=%zu mfs=%zu lfs=%zu\n",
               nst,nmt,nlt,sfs,mfs,lfs);
         
-        // This is the tar that store all the sub directories for this chunk point.
+        // This is the tar that store all the sub directories for this tar collection dir.
         te->dir_tar = TarFile(DIR_TAR, 0, true);
         TarFile *dirs = &te->dir_tar;
         size_t has_dir = 0;
@@ -390,8 +397,8 @@ size_t TarredFS::groupFilesIntoTars() {
 
         // Add the tar entries to the tar files.
         for(auto & entry : te->entries) {
-            // The entries must be files inside the chunkpoint directory,
-            // or subdirectories inside the chunkpoint subdirectory!
+            // The entries must be files inside the tar collection directory,
+            // or subdirectories inside the tar collection subdirectory!
             assert(entry->path.length() > te->path.length());
             assert(!strncmp(entry->path.c_str(), te->path.c_str(), te->path.length()));
             
@@ -546,8 +553,8 @@ size_t TarredFS::groupFilesIntoTars() {
     return num;
 }
 
-void TarredFS::sortChunkPointEntries() {
-    for (auto & p : chunk_points) {
+void TarredFS::sortTarCollectionEntries() {
+    for (auto & p : tar_storage_dirs) {
         TarEntry *te = p.first;
         std::sort(te->entries.begin(), te->entries.end(),
                   [](TarEntry *a, TarEntry *b)->bool {

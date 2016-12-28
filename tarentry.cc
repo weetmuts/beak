@@ -63,9 +63,8 @@ bool sanityCheck(const char *x, const char *y);
 TarEntry::TarEntry(string p, const struct stat *b, string root_dir, bool header) : path(p), sb(*b) {
     dir_tar_in_use = false;
     children_size = 0;
-    chunked_size = 0;
     parent = NULL;
-    is_chunk_point = false;
+    is_tar_storage_dir = false;
     num_long_path_blocks = 0;
     num_long_link_blocks = 0;
     num_header_blocks = 1;
