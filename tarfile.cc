@@ -19,6 +19,7 @@
 
 #include"log.h"
 #include"tarentry.h"
+#include"util.h"
 
 #include<errno.h>
 
@@ -177,20 +178,29 @@ void TarFile::calculateSHA256Hash() {
     SHA256_CTX sha256;
     SHA256_Init(&sha256);
 
-    // SHA256 all headers, including the first Volume label header with empty name and empty checksum.
+    // SHA256 all headers, including the first Volume label header with
+    // empty name and empty checksum.
+    int i = 0;
     for (auto & a : contents) {
         size_t len = a.second->header_size;
         assert(len<=512*5);
         char buf[len];
+        memset(buf, 0x42, len);
         TarEntry *te = a.second;
-        te->copy(buf,len,a.first);
+        size_t rc = te->copy(buf,len,0);
+        assert(rc == len);
         // Update the hash with the exact header bits.
         SHA256_Update(&sha256, buf, len);
-
+        if (logLevel()==DEBUG) {
+            string s = toHext(buf, len);
+            debug("-%d-%s-%ju----------\n%s\n", i, name.c_str(), a.first, s.c_str());
+        }
+        i++;
         // Update the hash with seconds and nanoseconds.
         char secs_and_nanos[32];
         memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
         snprintf(secs_and_nanos, 32, "%ju.%ju", te->sb.st_mtim.tv_sec, te->sb.st_mtim.tv_nsec);
+        debug("++++%s++++++++++\n", secs_and_nanos);
         SHA256_Update(&sha256, secs_and_nanos, strlen(secs_and_nanos));
     }
     SHA256_Final(hash, &sha256);

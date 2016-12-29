@@ -20,6 +20,7 @@
 #include"log.h"
 
 #include<ftw.h>
+#include<limits.h>
 #include<string.h>
 #include<unistd.h>
 
@@ -66,12 +67,18 @@ int DiffTarredFS::addToFile(const char *fpath, const struct stat *sb, struct FTW
 int DiffTarredFS::addFile(Target t, const char *fpath, const struct stat *sb, struct FTW *ftwbuf) {
     
     size_t len = strlen(fpath);
+    string root;
 
+    if (t == FROM) {
+        root = from_dir;
+    } else {
+        root = to_dir;
+    }
     // Skip root_dir path.
     const char *pp;
-    if (len > from_dir.length()) {
+    if (len > root.length()) {
         // We are in a subdirectory of the root.
-        pp = fpath+from_dir.length();
+        pp = fpath+root.length();
     } else {
         pp = "";
     }
@@ -114,15 +121,18 @@ void DiffTarredFS::compare() {
     }
 
     for (auto i : added) {
-        printf("Added %s %ju\n", i.first.c_str(), i.second->sb.st_size);
+        string s = humanReadable(i.second->sb.st_size);
+        printf("Added %s %s\n", i.first.c_str(), s.c_str());
         size_added += i.second->sb.st_size;
     }
     for (auto i : changed) {
-        printf("Changed %s %ju\n", i.first.c_str(), i.second->sb.st_size);
+        string s = humanReadable(i.second->sb.st_size);        
+        printf("Changed %s %s\n", i.first.c_str(), s.c_str());
         size_changed += i.second->sb.st_size;
     }
     for (auto i : deleted) {
-        printf("Deleted %s %ju\n", i.first.c_str(), i.second->sb.st_size);
+        string s = humanReadable(i.second->sb.st_size);        
+        printf("Deleted %s %s\n", i.first.c_str(), s.c_str());
         size_deleted += i.second->sb.st_size;        
     }
 
@@ -157,14 +167,25 @@ void printDiffHelp(const char *app) {
             , app);
 }
 
+string real(const char *p) {
+    char tmp[PATH_MAX];
+    const char *rc = realpath(p, tmp);
+    if (!rc) {
+        error("Could not find real path for %s\n", p);
+    }                                               
+    assert(rc == tmp);
+    return string(tmp);
+}
+
+
 int main(int argc, char **argv) {
 
     if (argc < 3) {
         printDiffHelp(argv[0]);
         exit(0);
     }
-    diff_fs.from_dir = argv[1];
-    diff_fs.to_dir = argv[2];
+    diff_fs.from_dir = real(argv[1]);
+    diff_fs.to_dir = real(argv[2]);
     
     AddFromFile<&diff_fs> aff;
     AddToFile<&diff_fs> atf;

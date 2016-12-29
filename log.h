@@ -24,6 +24,7 @@
 enum LogLevel { QUITE, INFO, VERBOSE, DEBUG };
 
 void setLogLevel(LogLevel l);
+LogLevel logLevel();
 void useSyslog(bool sl);
 
 void error(const char* fmt, ...);

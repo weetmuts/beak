@@ -32,6 +32,10 @@ void setLogLevel(LogLevel l) {
     log_level = l;
 }
 
+LogLevel logLevel() {
+    return log_level;
+}
+
 void useSyslog(bool sl) {
     use_syslog = sl;
 }

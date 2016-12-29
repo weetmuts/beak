@@ -65,4 +65,5 @@ void eraseArg(int i, int *argc, char **argv);
 
 string eatTo(vector<char> &v, vector<char>::iterator &i, char c, size_t max);
 
+string toHext(const char *b, size_t len);
 #endif

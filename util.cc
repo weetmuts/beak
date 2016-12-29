@@ -397,3 +397,20 @@ string eatTo(vector<char> &v, vector<char>::iterator &i, char c, size_t max) {
 }
 
 
+string toHext(const char *b, size_t len) {
+    string s;
+    char buf[32];
+
+    for(size_t j = 0; j < len; j++) {
+        if (b[j] >=32 && b[j]<='z') {
+            s += b[j];
+        } else {
+            memset(buf, 0, 32);
+            snprintf(buf, 31, "~%02x/", ((unsigned int)b[j])&255);
+            s += buf;
+        }
+        if (j>0 && j%64 == 0) s+="\n";
+    }
+
+    return s;
+}
