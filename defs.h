@@ -1,4 +1,4 @@
-/*  
+/*
     Copyright (C) 2016 Fredrik Öhrström
 
     This program is free software: you can redistribute it and/or modify
@@ -17,10 +17,6 @@
 
 #ifndef DEFS_H
 #define DEFS_H
-
-#define TARREDFS_VERSION "0.1"
-
-#define FUSE_USE_VERSION 26
 
 #define OK 0
 #define ERR 1

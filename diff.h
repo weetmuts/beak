@@ -1,4 +1,4 @@
-/*  
+/*
     Copyright (C) 2016 Fredrik Öhrström
 
     This program is free software: you can redistribute it and/or modify
@@ -15,22 +15,13 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef FORWARD_H
-#define FORWARD_H
+#ifndef DIFF_H
+#define DIFF_H
 
-#include<assert.h>
-
-#include"defs.h"
-#include"util.h"
-
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
 #include <string.h>
-
-#include<map>
-#include<string>
-#include<vector>
+#include <sys/stat.h>
+#include <map>
+#include <string>
 
 using namespace std;
 
@@ -50,18 +41,18 @@ typedef Entry *EntryP;
 enum Target { FROM, TO };
 
 struct DiffTarredFS {
-    string from_dir;
-    string to_dir;
-    
-    map<string,EntryP,depthFirstSort> from_files;
-    map<string,EntryP,depthFirstSort> to_files;
-    
+    Path *from_dir;
+    Path *to_dir;
+
+    map<Path*,EntryP,depthFirstSortPath> from_files;
+    map<Path*,EntryP,depthFirstSortPath> to_files;
+
     int recurse(Target t, FileCB cb);
     int addFromFile(const char *fpath, const struct stat *sb, struct FTW *ftwbuf);
     int addToFile(const char *fpath, const struct stat *sb, struct FTW *ftwbuf);
     int addFile(Target t, const char *fpath, const struct stat *sb, struct FTW *ftwbuf);
     void compare();
-    
+
 };
 
 #endif

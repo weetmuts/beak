@@ -1,4 +1,4 @@
-/*  
+/*
     Copyright (C) 2016 Fredrik Öhrström
 
     This program is free software: you can redistribute it and/or modify
@@ -18,20 +18,19 @@
 #ifndef FORWARD_H
 #define FORWARD_H
 
-#include<assert.h>
+#include <fuse/fuse.h>
+#include <pthread.h>
+#include <regex.h>
+#include <stddef.h>
+#include <sys/types.h>
+#include <map>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include"defs.h"
-#include"tarfile.h"
-#include"tarentry.h"
-#include"libtar.h"
-#include"util.h"
-
-#include<fuse.h>
-#include<regex.h>
-
-#include<map>
-#include<string>
-#include<vector>
+#include "defs.h"
+#include "tarentry.h"
+#include "util.h"
 
 using namespace std;
 
@@ -43,7 +42,7 @@ struct Filter {
 
     Filter(string rule_, FilterType type_) : rule(rule_), type(type_) { }
 };
-    
+
 typedef int (*FileCB)(const char *,const struct stat *,int,struct FTW *);
 
 typedef int (*GetAttrCB)(const char*, struct stat*);
@@ -52,7 +51,7 @@ typedef int (*ReadCB)(const char *,char *,size_t,off_t,struct fuse_file_info *);
 
 struct TarredFS {
     pthread_mutex_t global;
-    
+
     string root_dir;
     Path *root_dir_path;
     string mount_dir;
@@ -66,16 +65,16 @@ struct TarredFS {
     // However setting this to 1 and setting trigger size to 0, puts all content in
     // tars directly below the mount dir, ie no subdirs, only tars.
     int forced_tar_collection_dir_depth = 2;
-    
+
     map<Path*,TarEntry*,depthFirstSortPath> files;
     map<Path*,TarEntry*,depthFirstSortPath> tar_storage_directories;
     map<Path*,TarEntry*> directories;
     map<ino_t,TarEntry*> hard_links; // Only inodes for which st_nlink > 1
     size_t hardlinksavings = 0;
-    
+
     vector<pair<Filter,regex_t>> filters;
     vector<regex_t> triggers;
-    
+
     int recurse(FileCB cb);
     int addTarEntry(const char *fpath, const struct stat *sb, struct FTW *ftwbuf);
     void findTarCollectionDirs();
@@ -83,18 +82,18 @@ struct TarredFS {
     void addDirsToDirectories();
     void addEntriesToTarCollectionDirs();
     void pruneDirectories();
-    void fixTarPathsAndHardLinks();    
+    void fixTarPathsAndHardLinks();
     size_t groupFilesIntoTars();
     void sortTarCollectionEntries();
     TarEntry *findNearestStorageDirectory(TarEntry *te);
-    
-    TarFile *findTarFromPath(Path *path);   
+
+    TarFile *findTarFromPath(Path *path);
     int getattrCB(const char *path, struct stat *stbuf);
     int readdirCB(const char *path, void *buf, fuse_fill_dir_t filler,
                   off_t offset, struct fuse_file_info *fi);
     int readCB(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi);
 
-private:    
+private:
     size_t findNumTarsFromSize(size_t amount, size_t total_size);
     void calculateNumTars(TarEntry *te, size_t *nst, size_t *nmt, size_t *nlt,
                           size_t *sfs, size_t *mfs, size_t *lfs,

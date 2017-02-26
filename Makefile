@@ -5,6 +5,7 @@ LIBTAR_A:=libtar/lib/.libs/libtar.a
 LIBTAR_SOURCES:=$(shell find libtar -name "*.c" -o -name "*.h")
 
 CXXFLAGS :=	-O0 -g -Wall -fmessage-length=0 -std=c++11 -Wno-unused-function \
+	"-DTARREDFS_VERSION=\"0.1\"" -DFUSE_USE_VERSION=26 \
         -Ilibtar/lib -Ilibtar/listhash -I/usr/include \
         `pkg-config fuse --cflags` 
 

@@ -1,4 +1,4 @@
-/*  
+/*
     Copyright (C) 2016 Fredrik Öhrström
 
     This program is free software: you can redistribute it and/or modify
@@ -15,22 +15,18 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include<assert.h>
+#include "log.h"
 
-#include"log.h"
-
-#include<errno.h>
-#include<stdio.h>
-#include<stdlib.h>
-#include<stdarg.h>
-#include<string.h>
-#include<syslog.h>
-
-#include<algorithm>
-#include<set>
-#include<map>
-#include<string>
-#include<vector>
+#include <stdarg.h>
+#include <stddef.h>
+#include <string.h>
+#include <syslog.h>
+#include <algorithm>
+#include <cstdio>
+#include <cstdlib>
+#include <set>
+#include <utility>
+#include <vector>
 
 using namespace std;
 
@@ -122,7 +118,7 @@ void failure(ComponentId ci, const char* fmt, ...) {
     va_start(args, fmt);
     if (use_syslog) {
         vsyslog(LOG_ERR, fmt, args);
-    } 
+    }
     va_end(args);
     if (!log_level == QUITE) {
         va_start(args, fmt);
@@ -140,7 +136,7 @@ void warning(ComponentId ci, const char* fmt, ...) {
     }
     va_start(args, fmt);
     vfprintf(stdout, fmt, args);
-    va_end(args);        
+    va_end(args);
 }
 
 void debug(ComponentId ci, const char* fmt, ...) {
@@ -184,7 +180,7 @@ void info(ComponentId ci, const char* fmt, ...) {
         }
         va_start(args, fmt);
         vfprintf(stdout, fmt, args);
-        va_end(args);        
+        va_end(args);
     }
 }
 
