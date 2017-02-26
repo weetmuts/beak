@@ -22,6 +22,7 @@
 
 #include"libtar.h"
 #include"tarfile.h"
+#include"util.h"
 
 #include<map>
 #include<string>
@@ -31,65 +32,127 @@ using namespace std;
 
 struct TarEntry {
 
-    int num_long_path_blocks;
-    int num_long_link_blocks;
-    int num_header_blocks;
-    size_t header_size;
+    TarEntry() { }
+    TarEntry(Path *abspath, Path *path, const struct stat *b, bool header = false);
+    Path *path() { return path_; }
+    Path *tarpath() { return tarpath_; }
+    uint32_t tarpathHash() { return tarpath_hash_; }
+    Path *link() { return link_; }
+    bool isSymLink() { return TH_ISSYM(tar_); }
+    bool isHardLink() { return TH_ISLNK(tar_); }
+    
+    TarEntry *parent() { return parent_; }
+    size_t blockedSize() { return blocked_size_; }
+    size_t headerSize() { return header_size_; }
+    size_t childrenSize() { return children_size_; }
+    struct stat *stat() { return &sb_; }
+    bool isStorageDir() { return is_tar_storage_dir_; }
+    bool isAddedToDir() { return is_added_to_directory_; }
+    
+    void calculateTarpath(Path *storage_dir);
+    void setContent(string c);
+    size_t copy(char *buf, size_t size, size_t from);
+    const bool isDir();
+    const bool isHardlink();
+    void updateSizes();
+    void rewriteIntoHardLink(TarEntry *target);
+    bool fixHardLink(Path *storage_dir);
+    void moveEntryToNewParent(TarEntry *entry, TarEntry *parent);
+    void copyEntryToNewParent(TarEntry *entry, TarEntry *parent);
+    void updateMtim(struct timespec *mtim);
+    void registerTarFile(TarFile *tf, size_t o);
+    void registerTazFile();
+    void enableTazFile() { taz_file_in_use_ = true; }
+    bool hasTazFile() { return taz_file_in_use_; }
+    TarFile *tarFile() { return tar_file_; }
+    TarFile *tazFile() { return taz_file_; }
+    size_t tarOffset() { return tar_offset_; }
 
-    // Full path and name, to read the file from the underlying file system.
-    string abspath;
-    // Just the name of the file.
-    string name;
-    // The path below root_dir, starts with a /.
-    string path;
-    // The path inside the tar, does not start with a /.
-    // And can be much shorter than path, because the tar can be located
-    // deep in the tree below root_dir.
-    string tarpath;
-    // The hash of the tarpath is used to spread the files into tars.
-    uint32_t tarpath_hash;
-    // The target file stored inside a symbolic link.
-    string link;
+    vector<TarEntry*>& dirs() { return dirs_; }
+    vector<string>& files() { return files_; }
+
+    void createSmallTar(int i) { small_tars_[i] = new TarFile(this, SMALL_FILES_TAR, i, false); }
+    void createMediumTar(int i) { medium_tars_[i] = new TarFile(this, MEDIUM_FILES_TAR, i, false); }
+    void createLargeTar(uint32_t hash) { large_tars_[hash] = new TarFile(this, SINGLE_LARGE_FILE_TAR,
+                                                                     hash, false); }
+
+    TarFile *smallTar(int i) { return small_tars_[i]; }
+    TarFile *mediumTar(int i) { return medium_tars_[i]; }
+    TarFile *largeTar(uint32_t hash) { return large_tars_[hash]; }
+    bool hasLargeTar(uint32_t hash) { return large_tars_.count(hash) > 0; }
+    map<size_t,TarFile*>& smallTars() { return small_tars_; }
+    map<size_t,TarFile*>& mediumTars() { return medium_tars_; }
+    map<size_t,TarFile*>& largeTars() { return large_tars_; }
+    
+    void registerParent(TarEntry *p);
+    void addChildrenSize(size_t s);
+    
+    void secsAndNanos(char *buf, size_t len);
+    void injectHash(const char *buf, size_t len);
+    void setAsStorageDir() { is_tar_storage_dir_ = true; }
+    void setAsAddedToDir() { is_added_to_directory_ = true; }
+    void addDir(TarEntry *dir);
+    void addEntry(TarEntry *te);
+    vector<TarEntry*>& entries() { return entries_; }
+    void sortEntries();
+
+    void appendFileName(string name) { files_.push_back(name); }
+    
+    static TarEntry *newVolumeHeader();
 
     // This is a re-construction of how the entry would be listed by "tar tv"
     // tv_line_left is accessbits, ownership
     // tv_line_size is the size, to be left padded with space
     // tv_line_right is the last modification time
     string tv_line_left, tv_line_size, tv_line_right;
+    
+    private:
+    
+    int num_long_path_blocks;
+    int num_long_link_blocks;
+    int num_header_blocks;
+    size_t header_size_;
 
-    struct stat sb;
-    TarFile *tar_file;
-    size_t tar_offset;
+    // Full path and name, to read the file from the underlying file system.
+    Path *abspath_;
+    // Just the name of the file.
+    Atom *name_;
+    // The path below root_dir, starts with a /.
+    Path *path_;
+    // The path inside the tar, does not start with a /.
+    // And can be much shorter than path, because the tar can be located
+    // deep in the tree below root_dir.
+    Path *tarpath_;
+    // The hash of the tarpath is used to spread the files into tars.
+    uint32_t tarpath_hash_;
+    // The target file for a link.
+    Path *link_;
+
+    struct stat sb_;
+    TarFile *tar_file_;
+    size_t tar_offset_;
     size_t size;
-    size_t blocked_size;
+    size_t blocked_size_;
     size_t disk_size;
 
     // If this is a directory, then all children sizes are summed here.
-    size_t children_size;
-    TarEntry *parent;
-    TAR *tar;
-    bool is_tar_storage_dir;
-    vector<TarEntry*> dirs; // Directories to be listed inside this TarEntry
-    vector<string> files; // Files to be listed inside this TarEntry (ie the virtual tar files..)
-    size_t num_tars = 0;
-    TarFile dir_tar;
-    bool dir_tar_in_use = false;
-    map<size_t,TarFile> small_tars;  // Small file tars in side this TarEntry
-    map<size_t,TarFile> medium_tars;  // Medium file tars in side this TarEntry   
-    map<size_t,TarFile> large_tars;  // Large file tars in side this TarEntry   
-    vector<TarEntry*> entries; // The contents stored in the tar files.
+    size_t children_size_;
+    TarEntry *parent_;
+    TAR *tar_;
+    bool is_tar_storage_dir_;
+    vector<TarEntry*> dirs_; // Directories to be listed inside this TarEntry
+    vector<string> files_; // Files to be listed inside this TarEntry (ie the virtual tar files..)
+    TarFile *taz_file_;
+    bool taz_file_in_use_ = false;
+    map<size_t,TarFile*> small_tars_;  // Small file tars in side this TarEntry
+    map<size_t,TarFile*> medium_tars_;  // Medium file tars in side this TarEntry   
+    map<size_t,TarFile*> large_tars_;  // Large file tars in side this TarEntry   
+    vector<TarEntry*> entries_; // The contents stored in the tar files.
+    
     TarEntry *tar_collection_dir = NULL; // This entry is stored in this tar collection dir.
-    bool added_to_directory = false;
-    int depth = 0;
+    bool is_added_to_directory_ = false;
     bool virtual_file = false;
     string content;
-
-    TarEntry() { }
-    TarEntry(string p, const struct stat *b, string root_dir, bool header = false);    
-    void removePrefix(size_t len);
-    void setContent(string c);
-    size_t copy(char *buf, size_t size, size_t from);
-    const bool isDir();
 };
 
 #endif

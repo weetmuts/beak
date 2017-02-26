@@ -1,36 +1,31 @@
 
+$(shell mkdir -p build)
+
 LIBTAR_A:=libtar/lib/.libs/libtar.a
 LIBTAR_SOURCES:=$(shell find libtar -name "*.c" -o -name "*.h")
 
-CCFLAGS=-g -std=c++11 -Wall -Wno-unused-function \
-	-Ilibtar/lib -Ilibtar/listhash -I/usr/include \
-	`pkg-config fuse --cflags` 
+CXXFLAGS :=	-O0 -g -Wall -fmessage-length=0 -std=c++11 -Wno-unused-function \
+        -Ilibtar/lib -Ilibtar/listhash -I/usr/include \
+        `pkg-config fuse --cflags` 
 
-HEADERS=$(wildcard *.h)
-OBJS=	build/util.o \
-	build/log.o \
-	build/tarentry.o \
-	build/tarfile.o \
-	build/forward.o \
-	build/reverse.o \
-	build/main.o
-
-OBJS2=  build/util.o \
-	build/log.o \
-	build/diff.o
-
-$(shell mkdir -p build)
-
-all: build/tarredfs build/tarredfs-diff build/tarredfs-untar build/tarredfs-pack build/tarredfs-compare build/tarredfs-integrity-test
-
-build/tarredfs: $(OBJS) $(LIBTAR_A)
-	g++ -g -std=c++11  $(OBJS) $(LIBTAR_A) `pkg-config fuse --libs`  `pkg-config openssl --libs` -o build/tarredfs 
-
-build/tarredfs-diff: $(OBJS2)
-	g++ -g -std=c++11  $(OBJS2) -o build/tarredfs-diff 
+HEADERS := $(wildcard *.h)
 
 build/%.o: %.cc $(HEADERS)
-	g++ $(CCFLAGS) $< -c -o $@
+	g++ $(CXXFLAGS) $< -c -o $@
+
+OBJS :=		build/util.o build/log.o build/tarfile.o build/tarentry.o build/forward.o  build/reverse.o build/main.o 
+
+
+LIBS =
+
+TARGET =	tarredfs
+
+all: build/$(TARGET) \
+	build/tarredfs-untar build/tarredfs-pack \
+	build/tarredfs-compare build/tarredfs-integrity-test
+
+build/$(TARGET): $(OBJS) $(LIBTAR_A)
+	$(CXX) -o build/$(TARGET) $(OBJS) $(LIBS) $(LIBTAR_A) `pkg-config fuse --libs`  `pkg-config openssl --libs`
 
 build/tarredfs-untar: untar.sh
 	cp untar.sh build/tarredfs-untar
@@ -51,9 +46,6 @@ build/tarredfs-integrity-test: integrity-test.sh
 $(LIBTAR_A): $(LIBTAR_SOURCES)
 	(cd libtar; autoreconf --force --install; ./configure ; make)
 
-test:
-	@./test.sh
-
 install:
 	echo Installing into /usr/local/bin
 	cp build/tarredfs /usr/local/bin
@@ -63,11 +55,11 @@ install:
 	cp format_tar.pl /usr/local/lib/tarredfs/format_tar.pl
 	cp tarredfs.1 /usr/local/share/man/man1
 
-clean:
-	rm -rf build/* *~
-
 clean-all:
 	(cd libtar; make clean)
-	rm -rf build/* *~ 
+	rm -rf build/* *~
+
+clean:
+	rm -f $(OBJS) $(TARGET) *~
 
 .PHONY: clean clean-all

@@ -10,6 +10,7 @@ tarredfs \- mounts or creates a file system populated with virtual tar files
 [\fB\-p\fR \fIDEPTH\fR]
 [\fB\-ta\fR \fISIZE\fR]
 [\fB\-tr\fR \fISIZE\fR]
+[\fB\-tx\fR \fIREGEX\fR]
 [\fB\-d\fR|\fB\--debug\fR]
 [\fB\-v\fR|\fB\--verbose\fR]
 [\fB\-V\fR|\fB\--version\fR]
@@ -34,10 +35,10 @@ tarred file system quickly, because no data is stored on disk. The tar
 headers and other meta data are generated on mount and served from ram
 while the tar contents are served from the source files.
 
-Tarredfs triggers tar generation in a directory when the size of the
-directory contents (including subdirectories, excluding already tarred
-subdirectories) is greater than the tar trigger size (default
-20MB). The search for directories to tar is performed from leaf
+Tarredfs generates a tarred directory (ie it contains virtual tar files) when
+the size of the directory contents (including subdirectories, excluding already
+tarred subdirectories) is greater than the tar trigger size (default
+20MB). The search for potentially tarred directories is performed from leaf
 directories to the root. Tar files are always generated in the root
 and by default also in the immediate subdirectories to the root.
 
@@ -123,6 +124,12 @@ Set the tar trigger size.
 Example: tarredfs -ta 100K -tr 1M Storage TarredFS
 
 .TP
+.BR \-tx " " REGEX
+Trigger tar generation when the path of the directory matches the regex.
+
+Example: tarredfs -tx '/snapshot_....-..-..$' Storage TarredFS
+
+.TP
 .BR \-f
 Run in foreground, ie do not start daemon.
 
@@ -143,6 +150,23 @@ Tar the dev directory but exclude file/paths that contains the text "shm". Which
 
 % tarredfs -x shm /dev TarredFS
 
+.SH AUTHOR
+Written by Fredrik Öhrström.
+
+.SH COPYRIGHT
+Copyright \(co 2016 Fredrik Öhrström.
+.br
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.
+.br
+This is free software: you are free to change and redistribute it.
+.br
+There is NO WARRANTY, to the extent permitted by law.
+
+Contains source code from libtar:
+.br
+Copyright \(co 1998-2003  University of Illinois Board of Trustees
+.br
+Copyright \(co 1998-2003  Mark D. Roth
 
 
 

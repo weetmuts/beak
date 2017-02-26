@@ -32,6 +32,8 @@
 
 using namespace std;
 
+ComponentId DIFF = registerLogComponent("diff");
+
 bool Entry::same(Entry *e) {
     return sb.st_mode == e->sb.st_mode &&
         sb.st_uid == e->sb.st_uid &&
@@ -50,7 +52,7 @@ int DiffTarredFS::recurse(Target t, FileCB cb) {
     int rc = nftw(s.c_str(), cb, 256, FTW_PHYS|FTW_DEPTH);
     
     if (rc  == -1) {
-        error("Could not scan files");
+        error(DIFF, "diff", "Could not scan files");
         exit(EXIT_FAILURE);
     }
     return 0;
@@ -171,7 +173,7 @@ string real(const char *p) {
     char tmp[PATH_MAX];
     const char *rc = realpath(p, tmp);
     if (!rc) {
-        error("Could not find real path for %s\n", p);
+        error(DIFF, "Could not find real path for %s\n", p);
     }                                               
     assert(rc == tmp);
     return string(tmp);

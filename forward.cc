@@ -18,18 +18,20 @@
 #include"forward.h"
 
 #include"log.h"
-
+#include<errno.h>
 #include<ftw.h>
 #include<string.h>
 #include<unistd.h>
 
 #include<algorithm>
-#include<codecvt>
-#include<locale>
+
 #include<set>
 #include<sstream>
 
 using namespace std;
+
+ComponentId FORWARD = registerLogComponent("forward");
+ComponentId HARDLINKS = registerLogComponent("hardlinks");
 
 int TarredFS::recurse(FileCB cb) {
     // Recurse into the root dir. Maximum 256 levels deep.
@@ -38,33 +40,26 @@ int TarredFS::recurse(FileCB cb) {
     int rc = nftw(root_dir.c_str(), cb, 256, FTW_PHYS|FTW_DEPTH);
     
     if (rc  == -1) {
-        error("Could not scan files");
+        error(FORWARD,"Could not scan files");
         exit(EXIT_FAILURE);
     }
     return 0;
 }
 
-int TarredFS::addTarEntry(const char *fpath, const struct stat *sb, struct FTW *ftwbuf) {
+int TarredFS::addTarEntry(const char *p, const struct stat *sb, struct FTW *ftwbuf)
+{
+    Path *abspath = Path::lookup(p);
+    Path *path = abspath->subpath(root_dir_path->depth());
+    path = path->prepend(Path::lookup(""));
     
-    size_t len = strlen(fpath);
-
-    // Skip root_dir path.
-    const char *pp;
-    if (len > root_dir.length()) {
-        // We are in a subdirectory of the root.
-        pp = fpath+root_dir.length();
-    } else {
-        pp = "";
-    }
-
-    len = strlen(pp);
+    size_t len = strlen(path->c_str());
     char name[len+2];
-    strcpy(name, pp);
-    
+    strcpy(name, path->c_str());
+
     if(S_ISDIR(sb->st_mode)) {
         name[len] = '/';
         name[len+1] = 0;
-    }    
+    }
 
     int status = 0;
     for (auto & p : filters) {
@@ -76,78 +71,109 @@ int TarredFS::addTarEntry(const char *fpath, const struct stat *sb, struct FTW *
         }
     }
     if (name[1] != 0 && status) {
-        debug("Filter dropped \"%s\"\n", name);            
+        debug(FORWARD, "Filter dropped \"%s\"\n", name);
         return 0;
     } else {
-        debug("Filter NOT dropped \"%s\"\n", name);
+        debug(FORWARD, "Filter NOT dropped \"%s\"\n", name);
     }
         
     
-    string p = pp;
-    TarEntry *te = new TarEntry(p, sb, root_dir);
-    files[te->path] = te;
-    
-    if (TH_ISDIR(te->tar)) {
+    TarEntry *te = new TarEntry(abspath, path, sb);
+    // Store in files, for fast lookup from file path.
+    files[te->path()] = te;
+    assert(files[te->path()] == te);
+
+    if (te->isDir()) {
         // Storing the path in the lookup 
-        directories[te->path] = te;
-        debug("Added directory '%s'\n", te->path.c_str());
+        directories[te->path()] = te;
+        debug(FORWARD, "Added directory >%s<\n", te->path()->c_str());
     } 
-    
+
+    if (!te->isDir() && sb->st_nlink > 1 ) {
+        debug(HARDLINKS, "Found hard link '%s' to inode %ju\n",
+              te->path()->c_str(), sb->st_ino);
+        TarEntry *prev = hard_links[sb->st_ino];
+        if (prev == NULL) {
+            // Note that the directory tree traversal goes bottom up, which means
+            // that the deepest file (that is hard linked) will be stored in the tar as a file.
+            // The shallower files, will be links to the deepest file.
+            debug(HARDLINKS, "Storing inode %ju contents here '%s'\n", sb->st_ino, te->path()->c_str());
+            hard_links[sb->st_ino] = te;
+        } else {
+            // Second occurrence of this inode. Store it as a hard link.
+            debug(HARDLINKS, "Rewriting %s into a hard link to %s\n",
+                  te->path()->c_str(), prev->path()->c_str());
+            te->rewriteIntoHardLink(prev);
+            hardlinksavings += prev->blockedSize() - prev->headerSize();
+        }
+    }
     return 0;
 }
 
 void TarredFS::findTarCollectionDirs() {
     // Accumulate blocked sizes into children_size in the parent.
     // Set the parent pointer.
-    for(auto & direntry : files) {
-        TarEntry *te = direntry.second;
-        string dir = dirname(te->path);
-        if (dir != te->path) {
+    for(auto & e : files) {
+        TarEntry *te = e.second;
+        Path *dir = te->path()->parent();
+        if (dir) {
             TarEntry *parent = directories[dir];
             assert(parent != NULL);
-            te->parent = parent;
-            parent->children_size += te->children_size;
+            te->registerParent(parent);
+            parent->addChildrenSize(te->childrenSize());
         }
     }
     
     // Find tar collection dirs
-    for(auto & direntry : files) {
-        TarEntry *te = direntry.second;
+    for(auto & e : files) {
+        TarEntry *te = e.second;
+
+        debug(FORWARD, "ISDIR >%s< %d\n", te->path()->c_str(), te->isDir());
         
-        if (TH_ISDIR(te->tar)) {
-            bool must_generate_tars = (te->path == "/" || te->depth == forced_tar_collection_dir_depth);
-            bool ought_to_generate_tars = (tar_trigger_size > 0 && te->children_size > tar_trigger_size);
+        if (te->isDir()) {
+            bool must_generate_tars = (te->path()->depth() <= 1 ||
+                                 te->path()->depth() == forced_tar_collection_dir_depth);
+
+            debug(FORWARD, "TARS >%s< %d gentars? %d\n", te->path()->c_str(), te->path()->depth(), must_generate_tars); 
+            for (auto &re : triggers) {
+                int rc = regexec(&re, te->path()->c_str(), (size_t) 0, NULL, 0);
+                if (rc == 0) {
+                    must_generate_tars = true;
+                    break;
+                }
+            }
+            bool ought_to_generate_tars =
+                (tar_trigger_size > 0 && te->childrenSize() > tar_trigger_size);
+
             if (must_generate_tars || ought_to_generate_tars) {
-                te->is_tar_storage_dir = true;
-                tar_storage_dirs[te] = pair<size_t,size_t>(te->children_size,0);
-                string hs = humanReadable(te->children_size);
-                verbose("Tar collection dir % 5s '%s'\n", hs.c_str(), te->path.c_str());
+                te->setAsStorageDir();
+                tar_storage_directories[te->path()] = te;
+                string hs = humanReadable(te->childrenSize());
+                verbose(FORWARD, "Tar collection dir % 5s '%s'\n", hs.c_str(), te->path()->c_str());
                 TarEntry *i = te;
-                while (i->parent != NULL) {
-                    i->parent->children_size -= te->children_size;
-                    i = i->parent;
+                while (i->parent() != NULL) {
+                    i->parent()->addChildrenSize(-te->childrenSize());
+                    i = i->parent();
                 }
             }
         } 
     }
 }        
 
-void TarredFS::recurseAddDir(string path, TarEntry *direntry) {
-    if (direntry->added_to_directory || path == "/") {
+void TarredFS::recurseAddDir(Path *path, TarEntry *direntry) {
+    if (direntry->isAddedToDir() || path->isRoot()) {
         // Stop if the direntry is already added to a parent.
         // Stop at the root.
         return;
     }
-    string name = basename(path);
-    string dir = dirname(path);        
-    TarEntry *parent = directories[dir];
+    TarEntry *parent = directories[path->parent()];
     assert(parent!=NULL);
-    if (!direntry->added_to_directory) {
-        parent->dirs.push_back(direntry);
-        direntry->added_to_directory = true;
-        
-        debug("ADDED recursive dir %s to %s\n", name.c_str(), dir.c_str());
-        recurseAddDir(dir, parent);
+    if (!direntry->isAddedToDir()) {
+        parent->addDir(direntry);
+        direntry->setAsAddedToDir();        
+        debug(FORWARD, "ADDED recursive dir %s to %s\n",
+              path->name()->c_str(), path->parent()->c_str());
+        recurseAddDir(path->parent(), parent);
     }
 }
     
@@ -155,100 +181,82 @@ void TarredFS::addDirsToDirectories() {
     // Find all directories that are tar collection dirs
     // and make sure they can be listed in all the parent
     // directories down to the root. Even if those intermediate
-    // directores might not be tar collection dirs.
-    for(auto & direntry : files) {
-        string path = direntry.first;
-        assert(path.length()>0);
-        if (!direntry.second->isDir() || path == "/" || !direntry.second->is_tar_storage_dir) {
+    // directories might not be tar collection dirs.
+    for(auto & e : files) {
+        Path *path = e.first;
+        TarEntry *te = e.second;
+        if (!te->isDir() || path->isRoot() || !te->isStorageDir()) {
             // Ignore files
             // Ignore the root
             // Ignore directories that are not tar collection dirs.
             continue;
         }
-        string name = basename(path);
-        string dir = dirname(path);
-        TarEntry *parent = directories[dir];
+        TarEntry *parent = directories[path->parent()];
         assert(parent!=NULL);
         // Add the tar collection dir to its parent.
-        if (!direntry.second->added_to_directory) {
-            parent->dirs.push_back(direntry.second);
-            direntry.second->added_to_directory = true;
-            debug("ADDED dir %s to %s\n", name.c_str(), dir.c_str());
+        if (!te->isAddedToDir()) {
+            parent->addDir(te);
+            te->setAsAddedToDir();
+            debug(FORWARD,"ADDED dir >%s< to >%s\n",
+                  path->name()->c_str(), path->parent()->c_str());
             
             // Now make sure the parent is linked to its parent all the way to the root.
             // Despite these parents might not be tar collection dirs.
-            recurseAddDir(dir, parent);
+            recurseAddDir(path->parent(), parent);
         }
     }    
 }
 
 void TarredFS::addEntriesToTarCollectionDirs() {
-    for(auto & direntry : files) {
-        string path = direntry.first;
+    for(auto & e : files) {
+        Path *path = e.first;
         TarEntry *dir = NULL;
-        
-        if (path == "/") {
+        TarEntry *te = e.second;
+
+        if (path->isRoot()) {
             // Ignore the root, since there is no tar_collection_dir to add it to.
             continue;
         }
         
         do {
-            path = dirname(path);
+            path = path->parent();
             dir = directories[path];
             // dir is NULL for directories that are only stored inside tars.
-        } while (dir == NULL || !dir->is_tar_storage_dir);            
-        dir->entries.push_back(direntry.second);
-        debug("ADDED content %s            TO          \"%s\"\n", direntry.first.c_str(), dir->path.c_str());
+        } while (dir == NULL || !dir->isStorageDir());            
+        dir->addEntry(te);
+
+        debug(FORWARD,"ADDED content %s            TO          \"%s\"\n",
+              te->path()->c_str(), dir->path()->c_str());
     }    
 }
 
-std::locale const user_locale("");
-
-std::wstring to_wstring(std::string const& s) {
-    std::wstring_convert<std::codecvt_utf8<wchar_t> > conv;
-    return conv.from_bytes(s);
-}
-
-std::string to_string(std::wstring const& s) {
-    std::wstring_convert<std::codecvt_utf8<wchar_t> > conv;
-    return conv.to_bytes(s);
-}
-
-std::string tolowercase(std::string const& s) {
-    auto ss = to_wstring(s);
-    for (auto& c : ss) {
-        c = std::tolower(c, user_locale);
-    }
-    return to_string(ss);
-}
-
 void TarredFS::pruneDirectories() {
-    set<string> paths;
+    set<Path*> paths;
     map<string,string> paths_lowercase;
 
-    string lcn = user_locale.name();
+    string lcn = getLocale()->name();
     string utf8 = ".UTF-8";
     if (utf8.size() > lcn.size() ||
         !equal(utf8.rbegin(), utf8.rend(), lcn.rbegin())) {
-        error("Tarredfs expects your locale to use the encoding UTF-8!\n");
+        error(FORWARD, "Tarredfs expects your locale to use the encoding UTF-8!\n");
     }
 
-    for (auto & p : tar_storage_dirs) {
-        string s = p.first->path;
+    for (auto & p : tar_storage_directories) {
+        Path *s = p.first;
         do {
-            pair<set<string>::iterator,bool> rc = paths.insert(s);
+            pair<set<Path*>::iterator,bool> rc = paths.insert(s);
             if (rc.second == false) {
                 break;
             }
-            debug( "Added %s to paths.\n", s.c_str());
-            s = dirname(s);
-        } while (s.length()>1);            
+            debug(FORWARD, "Added %s to paths.\n", s->c_str());
+            s = s->parent();
+        } while (s != NULL);            
     }
     
-    map<string,TarEntry*> newd;
+    map<Path*,TarEntry*> newd;
     for (auto & d : directories) {
         if (paths.count(d.first) != 0) {
-            debug( "Re-added %s to paths.\n", d.first.c_str());
+            debug(FORWARD, "Re-added %s to paths.\n", d.first->c_str());
             newd[d.first] = d.second;
 
             // Now detect directory case conflicts that will prevent storage
@@ -258,21 +266,22 @@ void TarredFS::pruneDirectories() {
             // We are doing this check on the remaining directories after the tar collection dirs have
             // been selected. Thus a lot of case conflicts can be handled inside the tars.
             // Typically all file name conflicts are handled.
-            string dlc = tolowercase(d.first);
+            string dlc = tolowercase(d.first->path());
             if (paths_lowercase.count(dlc) > 0) {
-                error("Case conflict for:\n%s\n%s\n", d.first.c_str(), paths_lowercase[dlc].c_str());
+                error(FORWARD, "Case conflict for:\n%s\n%s\n", d.first->c_str(), paths_lowercase[dlc].c_str());
             }
-            paths_lowercase[dlc] = d.first;
+            paths_lowercase[dlc] = d.first->path();
         }
     }
     // The root directory is always a tar collection dir.
-    newd["/"] = directories["/"];
-    newd["/"]->is_tar_storage_dir = true;
+    Path *root = Path::lookup("");
+    newd[root] = directories[root];
+    newd[root]->setAsStorageDir();
     
     directories = newd;
-    debug( "dir size %ju\n", directories.size());
+    debug(FORWARD,"dir size %ju\n", directories.size());
     for (auto & d : directories) {
-        debug("Dir >%s<\n", d.first.c_str());
+        debug(FORWARD,"Dir >%s<\n", d.first->c_str());
     }    
 }
 
@@ -319,19 +328,19 @@ void TarredFS::calculateNumTars(TarEntry *te,
     size_t small_size = target_target_tar_size / 100; // Default 10M/100 = 100K
     size_t medium_size = target_target_tar_size; // Default 10M
     
-    for(auto & entry : te->entries) {
-        if (entry->blocked_size < small_size) {
-            small_files_size += entry->blocked_size;
+    for(auto & entry : te->entries()) {
+        if (entry->blockedSize() < small_size) {
+            small_files_size += entry->blockedSize();
             num_small_files++;
-            debug("Found small file %s %zu\n", entry->tarpath.c_str(), entry->blocked_size);
-        } else if (entry->blocked_size < medium_size) {
-            medium_files_size += entry->blocked_size;
+            debug(FORWARD,"Found small file %s %zu\n", entry->tarpath()->c_str(), entry->blockedSize());
+        } else if (entry->blockedSize() < medium_size) {
+            medium_files_size += entry->blockedSize();
             num_medium_files++;
-            debug("Found medium file %s %zu\n", entry->tarpath.c_str(), entry->blocked_size);
+            debug(FORWARD,"Found medium file %s %zu\n", entry->tarpath()->c_str(), entry->blockedSize());
         } else {
-            large_files_size += entry->blocked_size;
+            large_files_size += entry->blockedSize();
             num_large_files++;
-            debug("Found large file %s %zu\n", entry->tarpath.c_str(), entry->blocked_size);            
+            debug(FORWARD,"Found large file %s %zu\n", entry->tarpath()->c_str(), entry->blockedSize());
         }
     }
     
@@ -360,110 +369,153 @@ void TarredFS::calculateNumTars(TarEntry *te,
     }     
 }
 
+void TarredFS::fixTarPathsAndHardLinks() {
+    for (auto & e : tar_storage_directories) {
+        TarEntry *te = e.second;
+        vector<pair<TarEntry*,TarEntry*>> to_be_moved;
+        
+        for(auto & e : te->entries()) {
+            TarEntry *entry = e;
+            // This will remove the prefix (ie path outside of tar) and update the hash.
+            entry->calculateTarpath(te->path());
+
+            if (entry->isHardLink()) {
+                debug(HARDLINKS, "Found hardlink from >%s< to >%s<\n", entry->path()->c_str(), te->path()->c_str());
+
+                bool rc = entry->fixHardLink(te->path());
+                if (!rc) {
+                    // The hard link must be pushed closer to the directory tree root!
+                    TarEntry *parent = findNearestStorageDirectory(te->parent());
+                    if (parent == NULL) {
+                        error(HARDLINKS,"Cound not find higher storage directory from >%s<\n", te->parent()->path()->c_str());
+                    }
+                    debug(HARDLINKS, "Moving >%s< from >%s< to >%s<\n", entry->path()->c_str(), te->path()->c_str(), parent->path()->c_str());
+                    to_be_moved.push_back(pair<TarEntry*,TarEntry*>(entry,parent));
+                    te->copyEntryToNewParent(entry, parent);
+                    entry->calculateTarpath(parent->path());
+                    entry->fixHardLink(parent->path());             
+                    debug(HARDLINKS, "New tarpath of entry >%s< stored in >%s<\n", entry->tarpath()->c_str(), parent->path()->c_str());
+                    // Now, we have to copy the directory entries whose time stamps
+                    // will be updated when the hard link is extracted. I.e. the
+                    // sub-directories have already had their timestamps set correctly.
+                    // But a late hardlink extraction will touch those. So lets copy
+                    // the directory entries to the higher storage directory, to patch
+                    // up after the hard link is extracted.
+                    Path *common_path = Path::commonPrefix(entry->path(), entry->link());
+                    TarEntry *common_te = directories[common_path];
+                    common_te = findNearestStorageDirectory(common_te);
+                }
+            }
+        }
+        for (auto & p : to_be_moved) {
+            te->moveEntryToNewParent(p.first, p.second);
+        }
+    }
+
+}
+
 size_t TarredFS::groupFilesIntoTars() {
     size_t num = 0;
-    for (auto & e : tar_storage_dirs) {
-        TarEntry *te = e.first;
+    
+    for (auto & e : tar_storage_directories) {
+        TarEntry *te = e.second;
         
-        debug("TAR COLLECTION DIR %07ju %07ju %s\n", e.second.first, e.second.second, e.first->path.c_str());
-
-        for(auto & entry : te->entries) {
-            // This will remove the prefix (ie path outside of tar) and update the hash.
-            entry->removePrefix(te->path.length());
-        }
+        debug(FORWARD, "TAR COLLECTION DIR >%s< >%s<\n", e.first->c_str(), te->path()->c_str());
 
         size_t nst,nmt,nlt,sfs,mfs,lfs,smallcomp,mediumcomp;
         calculateNumTars(te, &nst,&nmt,&nlt,&sfs,&mfs,&lfs,
                          &smallcomp,&mediumcomp);
 
-        debug("TAR COLLECTION DIR nst=%zu nmt=%zu nlt=%zu sfs=%zu mfs=%zu lfs=%zu\n",
+        debug(FORWARD, "TAR COLLECTION DIR nst=%zu nmt=%zu nlt=%zu sfs=%zu mfs=%zu lfs=%zu\n",
               nst,nmt,nlt,sfs,mfs,lfs);
         
-        // This is the tar that store all the sub directories for this tar collection dir.
-        te->dir_tar = TarFile(DIR_TAR, 0, true);
-        TarFile *dirs = &te->dir_tar;
+        // This is the taz file that store sub directories for this tar collection dir.
+        te->registerTazFile();
         size_t has_dir = 0;
         
         // Order of creation: l m r z
-        TarFile *curr;
+        TarFile *curr = NULL;
         // Create the small files tars
         for (size_t i=0; i<nst; ++i) {
-            te->small_tars[i] = TarFile(SMALL_FILES_TAR, i, false);
+            te->createSmallTar(i);
         }
         // Create the medium files tars
         for (size_t i=0; i<nmt; ++i) {
-            te->medium_tars[i] = TarFile(MEDIUM_FILES_TAR, i, false);
+            te->createMediumTar(i);
         }
 
         // Add the tar entries to the tar files.
-        for(auto & entry : te->entries) {
+        for(auto & entry : te->entries()) {
             // The entries must be files inside the tar collection directory,
             // or subdirectories inside the tar collection subdirectory!
-            assert(entry->path.length() > te->path.length());
-            assert(!strncmp(entry->path.c_str(), te->path.c_str(), te->path.length()));
+            assert(entry->path()->depth() > te->path()->depth());
             
             if (entry->isDir()) {
-                dirs->addEntryLast(entry);                
+                te->tazFile()->addEntryLast(entry);
+            } else if (entry->isHardlink()) {
+            	te->tazFile()->addEntryFirst(entry);
             } else {
-                // Spread the files over the tars by the hash of the file name.
-                if (entry->blocked_size < smallcomp) {
-                    size_t o = entry->tarpath_hash % nst;
-                    curr = &te->small_tars[o];
-                    assert(curr->tar_contents == SMALL_FILES_TAR);
-                } else if (entry->blocked_size < mediumcomp) {
-                    size_t o = entry->tarpath_hash % nmt;
-                    curr = &te->medium_tars[o];
-                    assert(curr->tar_contents == MEDIUM_FILES_TAR);
-                } else {
-                    // Create the large files tar here.
-                    if (te->large_tars.count(entry->tarpath_hash) == 0) {
-                        te->large_tars[entry->tarpath_hash] = TarFile(SINGLE_LARGE_FILE_TAR,
-                                                              entry->tarpath_hash, false);
-                        curr = &te->large_tars[entry->tarpath_hash];
-                        te->num_tars++;
+                bool skip = false;
+
+                if (!skip) {
+                    if (entry->blockedSize() < smallcomp) {
+                        size_t o = entry->tarpathHash() % nst;
+                        curr = te->smallTar(o);
+                    } else if (entry->blockedSize() < mediumcomp) {
+                        size_t o = entry->tarpathHash() % nmt;
+                        curr = te->mediumTar(o);
                     } else {
-                        curr = &te->large_tars[entry->tarpath_hash];
-                    }
-                    assert(curr->tar_contents == SINGLE_LARGE_FILE_TAR);
-                } 
-                curr->addEntryLast(entry);
-            }            
+                        // Create the large files tar here.
+                        if (!te->hasLargeTar(entry->tarpathHash())) {
+                            te->createLargeTar(entry->tarpathHash());
+                            curr = te->largeTar(entry->tarpathHash());
+                        } else {
+                            curr = te->largeTar(entry->tarpathHash());
+                        } 
+                    } 
+                    curr->addEntryLast(entry);
+                }
+                
+            }
         }
 
+        string saving = humanReadable(hardlinksavings);
+        debug(HARDLINKS,"Saved %s bytes using hard links\n", saving.c_str());
+
         // Finalize the tar files and add them to the contents listing.
-        for (auto & t : te->large_tars) {
-            TarFile *tf = &t.second;
+        for (auto & t : te->largeTars()) {
+            TarFile *tf = t.second;
             tf->calculateSHA256Hash();
-            if (tf->tar_offset > dirs->volume_header->blocked_size) {
-                tf->size = tf->tar_offset;
-                debug("%s%s size became %zu\n", te->path.c_str(), tf->name.c_str(), tf->size);
-                te->files.push_back(tf->name);
+            if (tf->currentTarOffset() > te->tazFile()->volumeHeader()->blockedSize()) {
+                tf->fixSize();
+                debug(FORWARD,"%s%s size became %zu\n", te->path()->c_str(), tf->name().c_str(), tf->size());
+                te->appendFileName(tf->name());
             }
         }
-        for (auto & t : te->medium_tars) {
-            TarFile *tf = &t.second;
+        for (auto & t : te->mediumTars()) {
+            TarFile *tf = t.second;
             tf->calculateSHA256Hash();            
-            if (tf->tar_offset > dirs->volume_header->blocked_size) {
-                tf->size = tf->tar_offset;
-                debug("%s%s size became %zu\n", te->path.c_str(), tf->name.c_str(), tf->size);
-                te->files.push_back(tf->name);
+            if (tf->currentTarOffset() > te->tazFile()->volumeHeader()->blockedSize()) {
+                tf->fixSize();
+                debug(FORWARD,"%s%s size became %zu\n", te->path()->c_str(), tf->name().c_str(), tf->size());
+                te->appendFileName(tf->name());
             }
         }
-        for (auto & t : te->small_tars) {
-            TarFile *tf = &t.second;
+        for (auto & t : te->smallTars()) {
+            TarFile *tf = t.second;
             tf->calculateSHA256Hash();            
-            if (tf->tar_offset > dirs->volume_header->blocked_size) {
-                tf->size = tf->tar_offset;
-                debug("%s%s size became %zu\n", te->path.c_str(), tf->name.c_str(), tf->size);
-                te->files.push_back(tf->name);
+            if (tf->currentTarOffset() > te->tazFile()->volumeHeader()->blockedSize()) {
+                tf->fixSize();
+                debug(FORWARD,"%s%s size became %zu\n", te->path()->c_str(), tf->name().c_str(), tf->size());
+                te->appendFileName(tf->name());
             }
         }
 
         set<uid_t> uids;
         set<gid_t> gids;
-        for(auto & entry : te->entries) {
-            uids.insert(entry->sb.st_uid);
-            gids.insert(entry->sb.st_gid);
+        for(auto & entry : te->entries()) {
+            uids.insert(entry->stat()->st_uid);
+            gids.insert(entry->stat()->st_gid);
         }
         string null("\0",1);
         string listing;
@@ -487,7 +539,7 @@ size_t TarredFS::groupFilesIntoTars() {
         listing.append(null);
         size_t width = 3;
         string space(" ");
-        for(auto & entry : te->entries) {
+        for(auto & entry : te->entries()) {
             ssize_t diff = width - entry->tv_line_size.length();
             stringstream ss;            
             if (diff < 0) {
@@ -501,7 +553,7 @@ size_t TarredFS::groupFilesIntoTars() {
             entry->tv_line_size = ss.str()+entry->tv_line_size;
         }
         
-        for(auto & entry : te->entries) {
+        for(auto & entry : te->entries()) {
             // -r-------- fredrik/fredrik 745 1970-01-01 01:00 testing
             // drwxrwxr-x fredrik/fredrik   0 2016-11-25 00:52 autoconf/
             // -r-------- fredrik/fredrik   0 2016-11-25 11:23 libtar.so -> libtar.so.0.1
@@ -511,17 +563,21 @@ size_t TarredFS::groupFilesIntoTars() {
             listing.append(null);
             listing.append(entry->tv_line_right);
             listing.append(null);
-            listing.append(entry->tarpath);
+            listing.append(entry->tarpath()->path());
             listing.append(null);
-            if (entry->link.length() > 0) {
-                listing.append(" -> ");
-                listing.append(entry->link);
+            if (entry->link() != NULL) {
+                if (entry->isSymLink()) {
+                    listing.append(" -> ");
+                } else {
+                    listing.append(" link to ");
+                }
+                listing.append(entry->link()->path());
             }
             listing.append(null);
-            listing.append(entry->tar_file->name);
+            listing.append(entry->tarFile()->name());
             listing.append(null);
             stringstream ss;
-            ss << entry->tar_offset+entry->header_size;
+            ss << entry->tarOffset()+entry->headerSize();
             listing.append(ss.str());
             listing.append("\n");
             listing.append(null);
@@ -534,104 +590,126 @@ size_t TarredFS::groupFilesIntoTars() {
         sb.st_mode = S_IFREG | 0400;
         sb.st_nlink = 1;
         
-        TarEntry *list = new TarEntry("/tarredfs-contents", &sb, "");
+        TarEntry *list = new TarEntry(NULL, Path::lookup("tarredfs-contents"), &sb);
         list->setContent(listing);
-        dirs->addEntryFirst(list);                                   
-        dirs->size = dirs->tar_offset;
-        dirs->calculateSHA256Hash();        
+        te->tazFile()->addEntryFirst(list);                                   
+        te->tazFile()->fixSize();
+        te->tazFile()->calculateSHA256Hash();        
 
-        if (dirs->size > dirs->volume_header->blocked_size ) {
-            debug("%s%s size became %zu\n", te->path.c_str(), dirs->name.c_str(), dirs->size);
-            te->files.push_back(dirs->name);
-            te->dir_tar_in_use = true;
-            assert(dirs->offsets.size() > 0);
+        if (te->tazFile()->size() > te->tazFile()->volumeHeader()->blockedSize() ) {
+            debug(FORWARD,"%s%s size became %zu\n", te->path()->c_str(),
+                  te->tazFile()->name().c_str(), te->tazFile()->size());
+            te->appendFileName(te->tazFile()->name());
+            te->enableTazFile();
             has_dir = 1;
         }
 
-        num += has_dir+te->small_tars.size()+te->medium_tars.size()+te->large_tars.size();
+        num += has_dir+te->smallTars().size()+te->mediumTars().size()+te->largeTars().size();
     }
     return num;
 }
 
 void TarredFS::sortTarCollectionEntries() {
-    for (auto & p : tar_storage_dirs) {
-        TarEntry *te = p.first;
-        std::sort(te->entries.begin(), te->entries.end(),
-                  [](TarEntry *a, TarEntry *b)->bool {
-                      return TarSort::compare(a->path.c_str(), b->path.c_str());
-                  });
+    for (auto & p : tar_storage_directories) {
+        TarEntry *te = p.second;
+        te->sortEntries();
+
+        vector<TarEntry*> hard_links;
+
+        auto i = te->entries().begin();
+        while (i != te->entries().end()) {
+            if ((*i)->isHardLink()) {
+                i = te->entries().erase(i);
+                hard_links.push_back(*i);
+            } else {
+                ++i;
+            }
+        }
+
+        for (auto e : hard_links) {
+            te->entries().insert(te->entries().begin(),e);
+        }
     }
 }
 
-TarFile *TarredFS::findTarFromPath(string path) {
-    debug("Find tar from %s\n", path.c_str());
-    string n = basename(path);
-    string d = dirname(path);
+/** Iterate up in the directory tree and return the next storate directory */
+TarEntry *TarredFS::findNearestStorageDirectory(TarEntry *te) {
+    while (te != NULL) {
+        if (te->isStorageDir()) break;
+        te = te->parent();
+    }
+    return te;
+}
+
+TarFile *TarredFS::findTarFromPath(Path *path) {
+    string n = path->name()->literal();
+    string d = path->parent()->name()->literal();
 
     size_t l = n.length();
     if (l < 8 || l > 50 || n[0] != 't' || n[1] != 'a' || (n[2] != 'r' && n[2] != 'z' && n[2] != 'l' && n[2] != 'm') ||
         n[l-1] != 'r' || n[l-2] != 'a' || n[l-3] != 't' || n[l-4] != '.')
     {
-        debug("Not a tar file.\n");
+        debug(FORWARD, "Not a tar file.\n");
         return NULL;
     }
 
     const char t = n[2];    
-    TarEntry *te = directories[d];
+    TarEntry *te = directories[path->parent()];
     if (!te) {
-        debug("Not a directory >%s<\n",d.c_str()); 
+        debug(FORWARD,"Not a directory >%s<\n",d.c_str());
         return NULL;
     }
     string num = n.substr(3,l-7);
     size_t i = (size_t)strtol(num.c_str(), NULL, 16);
     if (t == 'l') {
-        if (te->large_tars.count(i) == 0) {
-            debug("No such large tar >%zx<\n", i);
+        if (te->largeTars().count(i) == 0) {
+            debug(FORWARD, "No such large tar >%zx<\n", i);
             return NULL;
         }
-        return &te->large_tars[i];
+        return te->largeTar(i);
     } else
     if (t == 'm') {
-        if (te->medium_tars.count(i) == 0) {
-            debug("No such medium tar >%zx<\n", i);
+        if (te->mediumTars().count(i) == 0) {
+            debug(FORWARD, "No such medium tar >%zx<\n", i);
             return NULL;
         }
-        return &te->medium_tars[i];
+        return te->mediumTar(i);
     } else
     if (t == 'r') {
-        if (te->small_tars.count(i) == 0) {
-            debug("No such small tar >%zx<\n", i);
+        if (te->smallTars().count(i) == 0) {
+            debug(FORWARD, "No such small tar >%zx<\n", i);
             return NULL;
         }
-        return &te->small_tars[i];
+        return te->smallTar(i);
     } else if (t == 'z') {
-        if (!te->dir_tar_in_use) {
-            debug("No such dir tar >%zx<\n", i);
+        if (!te->hasTazFile()) {
+            debug(FORWARD, "No such dir tar >%zx<\n", i);
             return NULL;
         }
-        return &te->dir_tar;
+        return te->tazFile();
     }
     // Should not get here.
     assert(0);
     return NULL;
 }
 
-int TarredFS::getattrCB(const char *path, struct stat *stbuf) {
+int TarredFS::getattrCB(const char *path_char_string, struct stat *stbuf) {
     pthread_mutex_lock(&global);
     
     memset(stbuf, 0, sizeof(struct stat));
-    debug("getattrCB >%s<\n", path);
-    if (path[0] == '/') {        
-        string p = path;
-        string dir_suffix = "";
-        if (p.length() > 1) {
-            dir_suffix = "/";
-        }
-        TarEntry *te = directories[p+dir_suffix];
+    debug(FORWARD,"getattrCB >%s<\n", path_char_string);
+    if (path_char_string[0] == '/') {        
+        string path_string = path_char_string;
+        Path *path = Path::lookup(path_string);
+        
+        TarEntry *te = directories[path];
         if (te) {
-            memcpy(stbuf, &te->sb, sizeof(*stbuf));
+            memcpy(stbuf, te->stat(), sizeof(*stbuf));
             stbuf->st_mode = S_IFDIR | 0500;
+            stbuf->st_nlink = 2;            
             stbuf->st_size = 0;
+            stbuf->st_blksize = 512;
+            stbuf->st_blocks = 0;
             goto ok;
         }
         
@@ -641,8 +719,14 @@ int TarredFS::getattrCB(const char *path, struct stat *stbuf) {
             stbuf->st_gid = getegid();
             stbuf->st_mode = S_IFREG | 0500;
             stbuf->st_nlink = 1;
-            stbuf->st_size = tar->size;
-            memcpy(&stbuf->st_mtim, &tar->mtim, sizeof(stbuf->st_mtim));
+            stbuf->st_size = tar->size();
+            stbuf->st_blksize = 512;
+            if (tar->size() > 0) {
+                stbuf->st_blocks = 1+(tar->size()/512);
+            } else {
+                stbuf->st_blocks = 0;
+            }
+            memcpy(&stbuf->st_mtim, tar->mtim(), sizeof(stbuf->st_mtim));
             goto ok;
         }
     }
@@ -655,22 +739,20 @@ ok:
     return 0;
 }
 
-int TarredFS::readdirCB(const char *path, void *buf, fuse_fill_dir_t filler,
+int TarredFS::readdirCB(const char *path_char_string, void *buf, fuse_fill_dir_t filler,
                         off_t offset, struct fuse_file_info *fi)
 {
 
-    debug("readdirCB >%s<\n", path);
+    debug(FORWARD,"readdirCB >%s<\n", path_char_string);
 
-    if (path[0] != '/') {
+    if (path_char_string[0] != '/') {
         return ENOENT;
     }
         
-    string p = path;
-    string dir_suffix = "";
-    if (p.length() > 1) {
-        dir_suffix = "/";
-    }
-    TarEntry *te = directories[p+dir_suffix];
+    string path_string = path_char_string;
+    Path *path = Path::lookup(path_string);
+
+    TarEntry *te = directories[path];
     if (!te) {
         return ENOENT;
     }
@@ -679,36 +761,39 @@ int TarredFS::readdirCB(const char *path, void *buf, fuse_fill_dir_t filler,
     
     filler(buf, ".", NULL, 0);
     filler(buf, "..", NULL, 0);
-    for (auto & e : te->dirs) {
+    for (auto & e : te->dirs()) {
         char filename[256];
-        snprintf(filename, 256, "%s", e->name.c_str());
+        snprintf(filename, 256, "%s", e->path()->name()->c_str());
         filler(buf, filename, NULL, 0);
-        debug( "    dir \"%s\"\n", filename);
+        debug(FORWARD, "    dir \"%s\"\n", filename);
     }
     
-    for (auto & f : te->files) {
+    for (auto & f : te->files()) {
         char filename[256];
         snprintf(filename, 256, "%s", f.c_str());
         filler(buf, filename, NULL, 0);
-        debug( "    file entry %s\n", filename);
+        debug(FORWARD, "    file entry %s\n", filename);
     }
     
     pthread_mutex_unlock(&global);   
     return 0;
 }
 
-int TarredFS::readCB(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
+int TarredFS::readCB(const char *path_char_string, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
     pthread_mutex_lock(&global);
     size_t org_size = size;
 
-    debug("readCB >%s< size %zu offset %zu\n", path, size, offset);
+    debug(FORWARD,"readCB >%s< size %zu offset %zu\n", path_char_string, size, offset);
+    string path_string = path_char_string;
+    Path *path = Path::lookup(path_string);
+    
     TarFile *tar = findTarFromPath(path);
     if (!tar) {
         goto err;
     }
 
-    if ((size_t)offset >= tar->size) {
+    if ((size_t)offset >= tar->size()) {
         goto zero;
     }
 
@@ -718,14 +803,14 @@ int TarredFS::readCB(const char *path, char *buf, size_t size, off_t offset, str
         size_t tar_offset = r.second;
         assert(te != NULL);
         size_t l =  te->copy(buf, size, offset - tar_offset);
-        debug("readCB copy size=%ju result=%ju\n", size, l);
+        debug(FORWARD, "readCB copy size=%ju result=%ju\n", size, l);
         size -= l;
         buf += l;
         offset += l;
         if (l==0) break;
     }
 
-    if (offset >= (ssize_t)(tar->size-T_BLOCKSIZE*2)) {
+    if (offset >= (ssize_t)(tar->size()-T_BLOCKSIZE*2)) {
         // Last two zero pages?
         size_t l = T_BLOCKSIZE;
         if (size < l) {
@@ -733,7 +818,7 @@ int TarredFS::readCB(const char *path, char *buf, size_t size, off_t offset, str
         }                         
         memset(buf,0,l);
         size -= l;
-        debug("readCB clearing last pages.");
+        debug(FORWARD, "readCB clearing last pages.");
     }
 
     pthread_mutex_unlock(&global);
@@ -747,4 +832,3 @@ zero:
     pthread_mutex_unlock(&global);
     return 0;
 }
-

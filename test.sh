@@ -258,7 +258,20 @@ if [ $do_test ]; then
     startFS standardTest
 fi
 
-setup basic07 "FIFO"
+setup basic07 "Hard link"
+if [ $do_test ]; then
+    echo HEJSAN > $root/test1
+    ln $root/test1 $root/link1
+    mkdir -p $root/alfa/beta
+    echo HEJSAN > $root/alfa/beta/test2
+    ln $root/alfa/beta/test2 $root/alfa/beta/link2
+    ln $root/alfa/beta/test2 $root/linkdeep
+    mkdir -p $root/gamma/epsilon
+    ln $root/alfa/beta/test2 $root/gamma/epsilon/test3
+    startFS standardTest
+fi
+
+setup basic08 "FIFO"
 if [ $do_test ]; then
     mkfifo $root/fifo1
     mkfifo $root/fifo2
@@ -275,7 +288,7 @@ function filterTest {
     stopFS
 }
 
-setup basic08 "Include exclude"
+setup basic09 "Include exclude"
 if [ $do_test ]; then
     echo HEJSAN > $root/Alfa
     mkdir -p $root/Beta
@@ -285,7 +298,7 @@ if [ $do_test ]; then
     startFS filterTest "-i Beta/ -x mm"
 fi
 
-setup basic09 "block and character devices (ie the whole /dev directory)"
+setup basic10 "block and character devices (ie the whole /dev directory)"
 if [ $do_test ]; then
     # Testing char and block devices are difficult since they
     # require you to be root. So lets just mount /dev and
@@ -294,7 +307,7 @@ if [ $do_test ]; then
     startFS devTest "-x shm -p 0"
 fi
 
-setup basic10 "check that nothing gets between the directory and its contents"
+setup basic11 "check that nothing gets between the directory and its contents"
 if [ $do_test ]; then
     # If skrifter.zip ends up after the skrifter directory abd before alfa,
     # then tar's logic for setting the last modified time of the directory will not work.
@@ -321,7 +334,7 @@ function mtimeTestPart1 {
 function mtimeTestPart2 {
     (cd $mount; find . -exec ls -ld \{\} \; > $dest)
     rc=$(diff -d $org $dest | grep -v ./beta/tar00000000.tar | tr -d '[:space:]')
-    if [ "$rc" != "3c3---" ]; then
+    if [ "$rc" != "6c6---" ]; then
         echo Failed changed mtime should affect tar mtime test! Check in $dir for more information.
         echo This test also fails, if the sort order of depthFirst is modified.
         exit
@@ -329,7 +342,7 @@ function mtimeTestPart2 {
     stopFS    
 }
 
-setup basic11 "Test last modified timestamp"
+setup basic12 "Test last modified timestamp"
 if [ $do_test ]; then
     mkdir -p $root/alfa
     mkdir -p $root/beta
@@ -342,7 +355,6 @@ if [ $do_test ]; then
 fi
 
 function checkBasicVirtualTars {
-    cat $log
     rc=$(cd $mount; find . -name "*.tar" | tr -d '[:space:]')
     if [ "$rc" != "./NNNNN/tar00000000.tar./NNNNN/tar00000001.tar./NNNNN/taz00000000.tar./taz00000000.tar" ]; then
         echo Virtual tars not created in the proper order! Check in $dir for more information.
@@ -351,16 +363,16 @@ function checkBasicVirtualTars {
     stopFS
 }
 
-setup basic12 "Test that sort order is right for tar collection dir"
+setup basic13 "Test that sort order is right for tar collection dir"
 if [ $do_test ]; then
     mkdir -p $root/NNNNN/SSSS
     dd bs=1024 count=6000 if=/dev/zero of=$root/NNNNN/RRRRR > /dev/null 2>&1
     dd bs=1024 count=1 if=/dev/zero of=$root/NNNNN/SSSS/SSSS > /dev/null 2>&1
     dd bs=1024 count=6000 if=/dev/zero of=$root/NNNNN/iiii > /dev/null 2>&1
-    startFS checkBasicVirtualTars "-v"
+    startFS checkBasicVirtualTars 
 fi
 
-setup basic13 "Test paths with spaces"
+setup basic14 "Test paths with spaces"
 if [ $do_test ]; then
     mkdir -p "$root/alfa beta/gamma"
     mkdir -p "$root/alfa beta/gam ma"
@@ -380,7 +392,7 @@ function checkExtractFile {
     stopFS
 }
 
-setup basic14 "Test single file untar"
+setup basic15 "Test single file untar"
 if [ $do_test ]; then
     mkdir -p "$root/alfa beta/gamma"
     mkdir -p "$root/alfa beta/gam ma"
@@ -412,14 +424,14 @@ function percentageTest {
     stopFS nook
 }
 
-setup basic15 "Test paths with percentages in them"
+setup basic16 "Test paths with percentages in them"
 if [ $do_test ]; then
     mkdir -p "$root/alfa"
     echo HEJSAN > "$root/alfa/p%25e2%2594%259c%25c3%2591vensf%25e2%2594%259c%25e2%2595%25a2.jpg"
     startFS percentageTest
 fi
 
-setup basic16 "Test small/medium/large tar files"
+setup basic17 "Test small/medium/large tar files"
 if [ $do_test ]; then
     for i in s{1..199}; do
         dd if=/dev/zero of="$root/$i" bs=1024 count=60 > /dev/null 2>&1
@@ -431,39 +443,6 @@ if [ $do_test ]; then
         dd if=/dev/zero of="$root/$i" bs=1024 count=10240 > /dev/null 2>&1
     done
     startFS standardTest 
-fi
-
-function noAvalancheTestPart1 {
-    (cd $mount; find . -exec ls -ld \{\} \; > $org)    
-    stopFS nook
-    dd if=/dev/zero of="$root/s200" bs=1024 count=60 > /dev/null 2>&1
-    startFS noAvalancheTestPart2
-}
-
-function noAvalancheTestPart2 {
-    (cd $mount; find . -exec ls -ld \{\} \; > $dest)
-    rc=$(diff -d $org $dest | grep -v ./tar00000001.tar | grep -v ./taz00000000.tar | tr -d '[:space:]')
-    if [ "$rc" != "7,8c7,8---" ]; then
-        echo ++$rc++
-        echo Failed no avalanche test should only affect a single tar! $ord $dest
-        echo This test depends on the default setting for target and trigger size.
-        exit
-    fi    
-    stopFS    
-}
-
-setup basic17 "Test that added file does not create avalanche"
-if [ $do_test ]; then
-    for i in s{1..199}; do
-        dd if=/dev/zero of="$root/$i" bs=1024 count=60 > /dev/null 2>&1
-    done
-    for i in m{1..49}; do
-        dd if=/dev/zero of="$root/$i" bs=1024 count=400 > /dev/null 2>&1
-    done
-    for i in l{1..2}; do
-        dd if=/dev/zero of="$root/$i" bs=1024 count=10240 > /dev/null 2>&1
-    done
-    startFS noAvalancheTestPart1
 fi
 
 function expectCaseConflict {
@@ -507,6 +486,59 @@ if [ $do_test ]; then
     mkdir -p $root/Alfa
     echo HEJSAN > $root/Alfa/a
     startFSExpectFail expectLocaleFailure "-p 1 -ta 0" LC_ALL=en_US.UTF-8
+fi
+
+function txTriggerTest {
+    if [ ! -f $mount/Alfa/snapshot_2016-12-30/taz00000000.tar ]; then
+        echo Expected the snapshot dir to be tarred!
+        exit
+    fi
+    untar
+    checkdiff
+    checkls-ld
+    
+    stopFS
+}
+
+setup basic21 "Test -tx to trigger tarred directories"
+if [ $do_test ]; then
+    mkdir -p $root/Alfa/snapshot_2016-12-30
+    echo HEJSAN > $root/Alfa/a
+    cp -a $root/Alfa/a $root/Alfa/snapshot_2016-12-30
+    startFS txTriggerTest "-tx snapshot_....-..-.." 
+fi
+
+function noAvalancheTestPart1 {
+    (cd $mount; find . -exec ls -ld \{\} \; > $org)    
+    stopFS nook
+    dd if=/dev/zero of="$root/s200" bs=1024 count=60 > /dev/null 2>&1
+    startFS noAvalancheTestPart2
+}
+
+function noAvalancheTestPart2 {
+    (cd $mount; find . -exec ls -ld \{\} \; > $dest)
+    rc=$(diff -d $org $dest | grep -v ./tar00000001.tar | grep -v ./taz00000000.tar | tr -d '[:space:]')
+    if [ "$rc" != "7,8c7,8---" ]; then
+        echo ++$rc++
+        echo Failed no avalanche test should only affect a single tar! $ord $dest
+        echo This test depends on the default setting for target and trigger size.
+        exit
+    fi    
+    stopFS    
+}
+
+setup distribution1 "Test that added file does not create avalanche"
+if [ $do_test ]; then
+    for i in s{1..199}; do
+        dd if=/dev/zero of="$root/$i" bs=1024 count=60 > /dev/null 2>&1
+    done
+    for i in m{1..49}; do
+        dd if=/dev/zero of="$root/$i" bs=1024 count=400 > /dev/null 2>&1
+    done
+    for i in l{1..2}; do
+        dd if=/dev/zero of="$root/$i" bs=1024 count=10240 > /dev/null 2>&1
+    done
+    startFS noAvalancheTestPart1
 fi
 
 setup libtar1 "Mount of libtar extract all default settings"
@@ -557,4 +589,4 @@ fi
 
 
 echo All tests succeeded!
-#rm -rf $tmpdir
+rm -rf $tmpdir

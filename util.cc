@@ -20,12 +20,20 @@
 #include"util.h"
 #include"log.h"
 
+#include<iostream>
 #include<string.h>
 #include<string>
 #include<sstream>
 #include<sys/stat.h>
 #include<pwd.h>
 #include<grp.h>
+#include<codecvt>
+#include<locale>
+#include<map>
+
+using namespace std;
+
+static ComponentId UTIL = registerLogComponent("util");
 
 #define KB 1024ull
 string humanReadable(size_t s)
@@ -132,27 +140,42 @@ size_t basepos(string &s) {
     return s.find_last_of('/');
 }
 
-string basename(string &s) {
-    assert(s.length()>0);
-    if (s == "/") {
-        return s;
-    }
-    return s.substr(s.find_last_of('/')+1);
-}
-
-string dirname(string &s) {
-    assert(s.length()>0);
-    if (s == "/") {
-        return s;
+string basename_(string &s) {
+    if (s.length() == 0 || s == "") {
+        return "";
     }
     size_t e = s.length()-1;
     if (s[e] == '/') {
-        assert(e>=2);
         e--;
     }
-    size_t p = s.find_last_of('/', e);
-    if (p == 0) return "/";
-    return s.substr(0,p+1);
+    size_t p = s.find_last_of('/',e);
+    return s.substr(p+1, e-p+1);
+}
+
+/**
+ * dirname_("/a") return "" ie the root
+ * dirname_("/a/") return "" ie the root
+ * dirname_("/a/b") return "/a" 
+ * dirname_("/a/b/") return "/a"
+ * dirname_("a/b") returns "a"
+ * dirname_("a/b/") returns "a"
+ * dirname_("") returns NULL
+ * dirname_("/") returns NULL
+ * dirname_("a") returns NULL
+ * dirname_("a/") returns NULL
+ */
+pair<string,bool> dirname_(string &s) {
+    // Drop trailing slashes!
+    if (s.length() > 0 && s.back() == '/') {
+        s = s.substr(0,s.length()-1);
+    }
+    if (s.length() == 0) {
+        return pair<string,bool>("",false);
+    }
+    size_t p = s.find_last_of('/');
+    if (p == string::npos) return pair<string,bool>("",false);
+    if (p == 0) return pair<string,bool>("", true);
+    return pair<string,bool>(s.substr(0,p), true);
 }
 
 bool depthFirstSort::compare(const char *a, const char *b) {
@@ -213,6 +236,44 @@ bool depthFirstSort::compare(const char *a, const char *b) {
     return 0;
 }
 
+#define NO_ANSWER 0
+#define YES_LESS_THAN 1
+#define YES_GREATER_THAN 2
+
+int compareSameLengthPaths(Path *a, Path *b) {
+    if (a == b) {
+        return NO_ANSWER;
+    }
+    assert(a->depth() == b->depth());
+    int rc = compareSameLengthPaths(a->parent(), b->parent());
+
+    if (rc == NO_ANSWER) {
+        if (a->name() == b->name()) {
+            return NO_ANSWER;
+        }
+        if (Atom::lessthan(a->name(), b->name())) {
+            return YES_LESS_THAN;
+        }
+        return YES_GREATER_THAN;
+    }
+    return rc;
+}
+
+bool depthFirstSortPath::lessthan(Path *a, Path *b) {
+    if (a == b) {
+        return false;
+    }
+    if (a->depth() > b->depth()) {
+        return true;
+    }
+    if (a->depth() < b->depth()) {
+        return false;
+    }
+
+    bool rc = compareSameLengthPaths(a,b) == YES_LESS_THAN; 
+    return rc;
+}
+
 bool TarSort::compare(const char *f, const char *t) {
     size_t from_len = strlen(f)+1; // Yes, compare the final null!
     size_t to_len = strlen(t)+1;        
@@ -231,18 +292,6 @@ bool TarSort::compare(const char *f, const char *t) {
         return 1;
     }
     return 0;
-}
-
-string commonPrefix(string a, string b)
-{
-    if (a.size() > b.size()) swap(a,b);
-    string tmp = string(a.begin(), mismatch(a.begin(),a.end(),b.begin()).first);
-    //fprintf(stderr, "Found >%s<\n", tmp.c_str());
-    if (tmp[tmp.length()-1] != '/') {        
-        tmp = tmp.substr(0,tmp.find_last_of('/')+1);
-        //  fprintf(stderr, "Removed trail >%s<\n", tmp.c_str());        
-    }
-    return tmp;
 }
 
 unsigned djb_hash(const char *key, int len)
@@ -345,7 +394,7 @@ string ownergroupString(uid_t uid, gid_t gid) {
             ss << uid;
         else {
             errno = rc;
-            error("Internal error getpwuid_r %d", errno);
+            error(UTIL, "Internal error getpwuid_r %d", errno);
         }
     } else {
         ss << pwd.pw_name;
@@ -361,7 +410,7 @@ string ownergroupString(uid_t uid, gid_t gid) {
             ss << gid;
         else {
             errno = rc;
-            error("Internal error getgrgid_r %d", errno);
+            error(UTIL, "Internal error getgrgid_r %d", errno);
         }
     } else {
         ss << grp.gr_name;
@@ -387,7 +436,6 @@ string eatTo(vector<char> &v, vector<char>::iterator &i, char c, size_t max) {
         max--;
     }
     if (max == 0 && *i != c) {
-        debug("eatTo reached max but no termination char found!\n");
         return "";
     }
     if (i != v.end()) {
@@ -414,3 +462,174 @@ string toHext(const char *b, size_t len) {
 
     return s;
 }
+
+std::locale const user_locale("");
+
+std::locale const *getLocale()
+{
+    return &user_locale;
+}
+
+std::wstring to_wstring(std::string const& s) {
+    std::wstring_convert<std::codecvt_utf8<wchar_t> > conv;
+    return conv.from_bytes(s);
+}
+
+std::string wto_string(std::wstring const& s) {
+    std::wstring_convert<std::codecvt_utf8<wchar_t> > conv;
+    return conv.to_bytes(s);
+}
+
+std::string tolowercase(std::string const& s) {
+    auto ss = to_wstring(s);
+    for (auto& c : ss) {
+        c = std::tolower(c, user_locale);
+    }
+    return wto_string(ss);
+}
+
+static map<string,Atom*> interned_atoms;
+
+Atom *Atom::lookup(string n) {
+    auto l = interned_atoms.find(n);
+    if (l != interned_atoms.end()) {
+        return l->second;
+    }
+    Atom *na = new Atom(n);
+    interned_atoms[n] = na;
+    return na;
+}
+
+bool Atom::lessthan(Atom *a, Atom *b) {
+    if (a == b) {
+        return 0;
+    }
+    // We are not interested in any particular locale dependent sort order here,
+    // byte-wise is good enough for the map keys.
+    int rc = strcmp(a->literal_.c_str(), b->literal_.c_str());
+    return rc < 0;
+}
+
+static map<string,Path*> interned_paths;
+
+Path *Path::lookup(string p) {
+    if (p.back() == '/') {
+        p = p.substr(0,p.length()-1);
+    }
+    auto pl = interned_paths.find(p);
+    if (pl != interned_paths.end()) {
+        return pl->second;
+    }
+    auto s = dirname_(p);
+    if (s.second) {
+        Path *parent = lookup(s.first);
+        Path *np = new Path(parent, Atom::lookup(basename_(p)));
+        interned_paths[p] = np;
+        return np;
+    }
+    Path *np = new Path(NULL, Atom::lookup(basename_(p)));
+    interned_paths[p] = np;
+    return np;
+}
+
+Path *Path::lookupRoot() {
+    return lookup("");
+}
+
+const char *Path::c_str() {
+    if (path_cache_ == NULL) {
+        string p = path();
+        path_cache_ = new char[p.length()+1];
+        memcpy(path_cache_, p.c_str(), p.length()+1);
+        path_cache_len_ = p.length();
+    }
+    return path_cache_;
+}
+
+size_t Path::c_str_len() {
+    if (path_cache_ == NULL) {
+        c_str();
+    }
+    return path_cache_len_;
+}
+
+deque<Path*> Path::nodes() {
+        deque<Path*> v;
+        Path *p = this;
+    while (p) {
+        v.push_front(p);
+        p = p->parent();
+    }
+    return v;
+}
+
+string Path::path() {
+    if (path_cache_) {
+        return string(path_cache_);
+    }
+
+    string rs;
+    int i=0;
+    auto v = nodes();
+    for (auto p : v) {
+        if (i > 0) rs += "/";
+        rs += p->name()->literal();
+        i++;
+    }
+    path_cache_ = new char[rs.length()+1];
+    memcpy(path_cache_, rs.c_str(), rs.length()+1);
+    path_cache_len_ = rs.length();
+    
+    return rs;
+}
+
+Path *Path::reparent(Path *parent) {
+    return new Path(parent, atom_);
+}
+
+Path* Path::subpath(int from, int len) {
+    if (len == 0) {
+        return NULL;
+    }
+    string rs;
+    auto v = nodes();
+    int i=0, to = v.size();
+    if (len != -1) {
+        to = from+len;
+    }
+    for (auto p : v) {
+        if (i>=from && i<to) {
+            if (i>from) rs += "/";
+            rs += p->name()->literal();
+        }
+        i++;
+    }
+    return lookup(rs);
+}
+
+Path* Path::prepend(Path *p) {
+    string rs = p->path() + "/" + path();
+    return lookup(rs);
+}
+
+Path* Path::commonPrefix(Path *a, Path *b) {
+    auto av = a->nodes();
+    auto bv = b->nodes();
+    auto ai = av.begin();
+    auto bi = bv.begin();
+    int i = 0;
+    
+    while (ai != av.end() && bi != bv.end() && (*ai)->name() == (*bi)->name()) {
+        i++;
+        ai++;
+        bi++;
+    }
+    return a->subpath(0, i);
+}
+
+Path::Initializer::Initializer() {
+    Atom *root = Atom::lookup("");
+    interned_paths[""] = new Path(NULL, root);
+}
+
+Path::Initializer Path::initializer_s;

@@ -54,35 +54,41 @@ struct TarredFS {
     pthread_mutex_t global;
     
     string root_dir;
+    Path *root_dir_path;
     string mount_dir;
+    Path *mount_dir_path;
 
     size_t target_target_tar_size = DEFAULT_TARGET_TAR_SIZE;
     size_t tar_trigger_size = DEFAULT_TAR_TRIGGER_SIZE;
     size_t target_split_tar_size = DEFAULT_SPLIT_TAR_SIZE;
     // The default setting is to trigger tars in each subdirectory below the root.
     // Even if the subdir does not qualify with enough data to create a min tar file.
-    // However setting this to 0 and setting trigger size to 0, puts all content in
+    // However setting this to 1 and setting trigger size to 0, puts all content in
     // tars directly below the mount dir, ie no subdirs, only tars.
-    int forced_tar_collection_dir_depth = 1;
+    int forced_tar_collection_dir_depth = 2;
     
-    map<string,TarEntry*,depthFirstSort> files;
-    map<TarEntry*,pair<size_t,size_t>> tar_storage_dirs;
-    map<string,TarEntry*> directories;
+    map<Path*,TarEntry*,depthFirstSortPath> files;
+    map<Path*,TarEntry*,depthFirstSortPath> tar_storage_directories;
+    map<Path*,TarEntry*> directories;
+    map<ino_t,TarEntry*> hard_links; // Only inodes for which st_nlink > 1
+    size_t hardlinksavings = 0;
     
     vector<pair<Filter,regex_t>> filters;
-
+    vector<regex_t> triggers;
+    
     int recurse(FileCB cb);
     int addTarEntry(const char *fpath, const struct stat *sb, struct FTW *ftwbuf);
     void findTarCollectionDirs();
-    void recurseAddDir(string path, TarEntry *direntry);
+    void recurseAddDir(Path *path, TarEntry *direntry);
     void addDirsToDirectories();
     void addEntriesToTarCollectionDirs();
     void pruneDirectories();
-
-    
+    void fixTarPathsAndHardLinks();    
     size_t groupFilesIntoTars();
     void sortTarCollectionEntries();
-    TarFile *findTarFromPath(string path);   
+    TarEntry *findNearestStorageDirectory(TarEntry *te);
+    
+    TarFile *findTarFromPath(Path *path);   
     int getattrCB(const char *path, struct stat *stbuf);
     int readdirCB(const char *path, void *buf, fuse_fill_dir_t filler,
                   off_t offset, struct fuse_file_info *fi);

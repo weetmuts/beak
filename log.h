@@ -21,17 +21,31 @@
 #define OK 0
 #define ERR 1
 
+#include<string>
+
+using namespace std;
+
 enum LogLevel { QUITE, INFO, VERBOSE, DEBUG };
+typedef int ComponentId;
 
 void setLogLevel(LogLevel l);
+void setLogComponents(const char *cs);
 LogLevel logLevel();
 void useSyslog(bool sl);
+ComponentId registerLogComponent(const char *component);
+void listLogComponents();
 
-void error(const char* fmt, ...);
-void failure(const char* fmt, ...);
-void warning(const char* fmt, ...);
-void debug(const char* fmt, ...);
-void verbose(const char* fmt, ...);
-void info(const char* fmt, ...);
+// A fatal program terminating error
+void error(ComponentId ci, const char* fmt, ...);
+// A serious failure that is always logged
+void failure(ComponentId ci, const char* fmt, ...);
+// A not serious failure that still should be logged
+void warning(ComponentId ci, const char* fmt, ...);
+// Debug logging
+void debug(ComponentId ci, const char* fmt, ...);
+// Verbose logging
+void verbose(ComponentId ci, const char* fmt, ...);
+// Startup messages and other information
+void info(ComponentId ci, const char* fmt, ...);
 
 #endif

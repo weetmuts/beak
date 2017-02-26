@@ -43,34 +43,26 @@ struct Taz {
 };
 
 struct Entry {
-    mode_t mode_bits;
-    time_t secs, nanos;
-    size_t size, offset;
-    string pathandfile;
-    string file;
-    string path;
-    string tar;
-    vector<Entry*> dir;
-    bool loaded;
-    string symlink;
     
     bool isLnk() { return (bool)S_ISLNK(mode_bits); }
     bool isDir() { return (bool)S_ISDIR(mode_bits); }
 
-    Entry(mode_t m, size_t s, size_t o, string f) : mode_bits(m), size(s), offset(o) {
-        if (f.length() > 1 && f.back()=='/') {
-            f = f.substr(0,f.length()-1);
-        }
-        pathandfile = f;
-        file = basename(f);
-        path = dirname(f);
-        if (path.length() > 1 && path.back() == '/') {
-            path = path.substr(0,path.length()-1);
-        }
-        loaded = false;
+    Entry(mode_t m, size_t s, size_t o, Path *p) :
+           mode_bits(m), size(s), offset(o), path(p) {
+      loaded = false;
     }
     
     Entry() { }
+
+    mode_t mode_bits;
+    time_t secs, nanos;
+    size_t size, offset;
+    Path *path;
+    string tar;
+    vector<Entry*> dir;
+    bool loaded;
+    string link;
+    bool is_sym_link;
 };
 
 struct ReverseTarredFS {
@@ -79,7 +71,7 @@ struct ReverseTarredFS {
     string root_dir;
     string mount_dir;
     
-    map<string,Entry> entries;
+    map<Path*,Entry> entries;
     map<string,Taz> tazs;
     
     int getattrCB(const char *path, struct stat *stbuf);
@@ -90,12 +82,9 @@ struct ReverseTarredFS {
     
     int parseTarredfsContent(vector<char> &v, string taz_path);
     void loadTaz(string taz, string path);
-    void loadCache(string path);
+    void loadCache(Path *path);
 
-    ReverseTarredFS() {
-        mode_t m = S_IFDIR | S_IRUSR | S_IXUSR;            
-        entries["/"] = Entry(m,0,0,"/");
-    }
+    ReverseTarredFS();
 };
 
 #endif
