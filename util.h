@@ -86,6 +86,7 @@ struct Path
 	{
 		return atom_;
 	}
+	Path *parentAtDepth(int i);
 	string path();
 	const char *c_str();
 	size_t c_str_len();
@@ -144,7 +145,11 @@ struct TarSort
 	// TEXTS/filter
 	// TEXTS/filter/alfa
 	// TEXTS/filter.zip
-	static bool compare(const char *f, const char *t);
+	static bool lessthan(Path *a, Path *b);
+	inline bool operator()(Path *a, Path *b)
+	{
+		return lessthan(a, b);
+	}
 };
 
 string commonPrefix(string a, string b);

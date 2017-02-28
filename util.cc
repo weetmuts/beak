@@ -42,6 +42,7 @@
 using namespace std;
 
 static ComponentId UTIL = registerLogComponent("util");
+static ComponentId TMP = registerLogComponent("tmp");
 
 #define KB 1024ull
 string humanReadable(size_t s)
@@ -267,38 +268,26 @@ bool depthFirstSortPath::lessthan(Path *a, Path *b)
  TEXTS/filter/alfa
  TEXTS/filter.zip
  */
-bool TarSort::compare(const char *f, const char *t)
+bool TarSort::lessthan(Path *a, Path *b)
 {
-	size_t from_len = strlen(f) + 1; // Yes, compare the final null!
-	size_t to_len = strlen(t) + 1;
-	for (size_t i = 0; i < from_len && i < to_len; ++i)
-	{
-		char x = f[i];
-		char y = t[i];
-		// We assume that no filename contains null bytes, apart from the string terminating null.
-		if (x == '/')
-		{
-			x = 0;
-		}
-		if (y == '/')
-		{
-			y = 0;
-		}
-		if (x == y)
-		{
-			continue;
-		}
-		if (x < y)
-			return 1;
-		if (x > y)
-			return 0;
-		// If equal continue...
+	if (a == b) {
+		// Same path!
+		return false;
 	}
-	if (from_len < to_len)
-	{
-		return 1;
+	int d = min(a->depth(), b->depth());
+	debug(TMP,"\n\nd=%d \n%s\n%s\n", d, a->c_str(), b->c_str());
+	Path *ap = a->parentAtDepth(d);
+	Path *bp = b->parentAtDepth(d);
+	debug(TMP,"\n%s\n%s\n", ap->c_str(), bp->c_str());
+	if (ap == bp) {
+		// Identical stem, one is simply deeper.
+		if (a->depth() < b->depth()) {
+			return true;
+		}
+		return false;
 	}
-	return 0;
+	// Stem is not identical, compare the contents.
+	return compareSameLengthPaths(ap, bp) == YES_LESS_THAN;
 }
 
 unsigned djb_hash(const char *key, int len)
@@ -679,6 +668,18 @@ deque<Path*> Path::nodes()
 		p = p->parent();
 	}
 	return v;
+}
+
+Path *Path::parentAtDepth(int i)
+{
+	int d = depth_;
+	Path *p = this;
+	assert(d >= i);
+	while (d > i && p) {
+		p = p->parent_;
+		d--;
+	}
+	return p;
 }
 
 string Path::path()

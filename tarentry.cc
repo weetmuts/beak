@@ -436,6 +436,6 @@ void TarEntry::addEntry(TarEntry *te) {
 void TarEntry::sortEntries() {
     std::sort(entries_.begin(), entries_.end(),
               [](TarEntry *a, TarEntry *b)->bool {
-                  return TarSort::compare(a->path()->c_str(), b->path()->c_str());
+                  return TarSort::lessthan(a->path(), b->path());
               });
 }
