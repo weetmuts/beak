@@ -92,12 +92,17 @@ struct TarredFS {
     int readdirCB(const char *path, void *buf, fuse_fill_dir_t filler,
                   off_t offset, struct fuse_file_info *fi);
     int readCB(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi);
+    void setTarListFile(string s);
+    void appendTarList(Path *p, TarFile *tf);
+    void saveTarListFile();
 
 private:
     size_t findNumTarsFromSize(size_t amount, size_t total_size);
     void calculateNumTars(TarEntry *te, size_t *nst, size_t *nmt, size_t *nlt,
                           size_t *sfs, size_t *mfs, size_t *lfs,
                           size_t *sc, size_t *mc);
+    Path *tar_list_file_ = NULL;
+    vector<string> tar_list_; // Contents to be stored in the tar_list_file
 };
 
 #endif

@@ -30,6 +30,7 @@
 #include <ctime>
 #include <iterator>
 #include <locale>
+#include <fstream>
 #include <set>
 #include <sstream>
 
@@ -498,6 +499,7 @@ size_t TarredFS::groupFilesIntoTars() {
                 tf->fixSize();
                 debug(FORWARD,"%s%s size became %zu\n", te->path()->c_str(), tf->name().c_str(), tf->size());
                 te->appendFileName(tf->name());
+                appendTarList(te->path(), tf);
             }
         }
         for (auto & t : te->mediumTars()) {
@@ -507,6 +509,7 @@ size_t TarredFS::groupFilesIntoTars() {
                 tf->fixSize();
                 debug(FORWARD,"%s%s size became %zu\n", te->path()->c_str(), tf->name().c_str(), tf->size());
                 te->appendFileName(tf->name());
+                appendTarList(te->path(), tf);
             }
         }
         for (auto & t : te->smallTars()) {
@@ -516,6 +519,7 @@ size_t TarredFS::groupFilesIntoTars() {
                 tf->fixSize();
                 debug(FORWARD,"%s%s size became %zu\n", te->path()->c_str(), tf->name().c_str(), tf->size());
                 te->appendFileName(tf->name());
+                appendTarList(te->path(), tf);
             }
         }
 
@@ -608,6 +612,7 @@ size_t TarredFS::groupFilesIntoTars() {
             debug(FORWARD,"%s%s size became %zu\n", te->path()->c_str(),
                   te->tazFile()->name().c_str(), te->tazFile()->size());
             te->appendFileName(te->tazFile()->name());
+            appendTarList(te->path(), te->tazFile());
             te->enableTazFile();
             has_dir = 1;
         }
@@ -647,6 +652,49 @@ TarEntry *TarredFS::findNearestStorageDirectory(TarEntry *te) {
         te = te->parent();
     }
     return te;
+}
+
+void TarredFS::setTarListFile(string s) {
+    tar_list_file_ = Path::lookup(s);
+    ofstream out;
+    out.open(tar_list_file_->path());
+    if (!out) {
+        error(FORWARD, "Could not open tar list file \"%s\"\n", tar_list_file_->c_str());
+    }
+    out << endl;
+    if (!out) {
+        error(FORWARD, "Could not write to tar list file \"%s\"\n", tar_list_file_->c_str());
+    }
+    out.close();
+}
+
+void TarredFS::appendTarList(Path *p, TarFile *tf) {
+    stringstream ss;    
+    ss << p->path();
+    ss << "/" << tf->name();
+    ss << " " << tf->size();
+    char datetime[17];
+    memset(datetime, 0, sizeof(datetime));
+    strftime(datetime, 17, "%Y-%m-%d %H:%M.%S", localtime(&tf->mtim()->tv_sec));
+    ss << " " << datetime;
+    char secs_and_nanos[32];
+    memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
+    snprintf(secs_and_nanos, 32, "%ju.%ju", tf->mtim()->tv_sec, tf->mtim()->tv_nsec);
+    ss << " " << secs_and_nanos;
+    ss << " " << tf->SHA256Hash();
+    
+    tar_list_.push_back(ss.str());
+}
+
+void TarredFS::saveTarListFile() {
+	if (tar_list_file_) {
+		ofstream out;
+		out.open(tar_list_file_->path());
+		for (auto & e : tar_list_) {
+			out << e << endl;
+		}
+		out.close();
+	}
 }
 
 TarFile *TarredFS::findTarFromPath(Path *path) {

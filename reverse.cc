@@ -87,7 +87,7 @@ int ReverseTarredFS::parseTarredfsContent(vector<char> &v, string tar_path)
 		}
 		Path *path = Path::lookup(filename);
 		string link = eatTo(v, i, 0, 1024);
-		bool is_sym_link;
+		bool is_sym_link = false;
 		if (link.length() > 4 && link.substr(0, 4) == " -> ")
 		{
 			link = link.substr(4);

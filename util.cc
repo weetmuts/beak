@@ -551,6 +551,20 @@ string toHext(const char *b, size_t len)
 	return s;
 }
 
+string toHex(const char *b, size_t len)
+{
+    string s;
+    char buf[3];
+    
+    for (size_t j = 0; j < len; j++)
+    {
+        memset(buf, 0, 3);
+        snprintf(buf, 2, "%02x", ((unsigned int) b[j]) & 255);
+        s += buf;
+    }
+    return s;
+}
+
 std::locale const user_locale("");
 
 std::locale const *getLocale()

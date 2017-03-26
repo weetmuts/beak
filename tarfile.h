@@ -32,66 +32,67 @@ using namespace std;
 
 enum TarContents
 {
-	DIR_TAR, SMALL_FILES_TAR, MEDIUM_FILES_TAR, SINGLE_LARGE_FILE_TAR
+    DIR_TAR, SMALL_FILES_TAR, MEDIUM_FILES_TAR, SINGLE_LARGE_FILE_TAR
 };
 
 struct TarFile
 {
-	TarFile()
-	{
-	}
-	TarFile(TarEntry *d, TarContents tc, int n, bool dirs);
-	string name()
-	{
-		return name_;
-	}
-	size_t size()
-	{
-		return size_;
-	}
-	void fixSize()
-	{
-		size_ = current_tar_offset_;
-	}
-	void addEntryLast(TarEntry *entry);
-	void addEntryFirst(TarEntry *entry);
-	void addVolumeHeader();
-	TarEntry *volumeHeader()
-	{
-		return volume_header_;
-	}
-	void finishHash();
-	pair<TarEntry*, size_t> findTarEntry(size_t offset);
+    TarFile()
+    {
+    }
+    TarFile(TarEntry *d, TarContents tc, int n, bool dirs);
+    string name()
+    {
+        return name_;
+    }
+    size_t size()
+    {
+        return size_;
+    }
+    void fixSize()
+    {
+        size_ = current_tar_offset_;
+    }
+    void addEntryLast(TarEntry *entry);
+    void addEntryFirst(TarEntry *entry);
+    void addVolumeHeader();
+    TarEntry *volumeHeader()
+    {
+        return volume_header_;
+    }
+    void finishHash();
+    pair<TarEntry*, size_t> findTarEntry(size_t offset);
 
-	void calculateSHA256Hash();
-	size_t currentTarOffset()
-	{
-		return current_tar_offset_;
-	}
-	struct timespec *mtim()
-	{
-		return &mtim_;
-	}
+    void calculateSHA256Hash();
+    string SHA256Hash() { return sha256_hash_; }
+    size_t currentTarOffset()
+    {
+        return current_tar_offset_;
+    }
+    struct timespec *mtim()
+    {
+        return &mtim_;
+    }
 
 private:
 
-	TarEntry *in_directory;
-	// A virtual tar can contain small files, medium files or a single large file.
-	TarContents tar_contents = SMALL_FILES_TAR;
+    TarEntry *in_directory;
+    // A virtual tar can contain small files, medium files or a single large file.
+    TarContents tar_contents = SMALL_FILES_TAR;
 
-	// Name of the tar, tar00000000.tar taz00000000.tar tal00000000.tar tam00000000.tar
-	string name_;
-	uint32_t hash;
-	bool hash_initialized = false;
-	size_t size_;
-	map<size_t, TarEntry*> contents;
-	vector<size_t> offsets;
-	size_t current_tar_offset_ = 0;
-	struct timespec mtim_;
-	TarEntry *volume_header_;
-	TarEntry *volume_contents;
-	TarEntry *volume_footer;
-
+    // Name of the tar, tar00000000.tar taz00000000.tar tal00000000.tar tam00000000.tar
+    string name_;
+    uint32_t hash;
+    bool hash_initialized = false;
+    size_t size_;
+    map<size_t, TarEntry*> contents;
+    vector<size_t> offsets;
+    size_t current_tar_offset_ = 0;
+    struct timespec mtim_;
+    TarEntry *volume_header_;
+    TarEntry *volume_contents;
+    TarEntry *volume_footer;
+    string sha256_hash_;
 };
 
 #endif

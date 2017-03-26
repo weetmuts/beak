@@ -165,5 +165,6 @@ void eraseArg(int i, int *argc, char **argv);
 
 string eatTo(vector<char> &v, vector<char>::iterator &i, char c, size_t max);
 
+string toHex(const char *b, size_t len);
 string toHext(const char *b, size_t len);
 #endif

@@ -202,4 +202,6 @@ void TarFile::calculateSHA256Hash()
 	SHA256_Final((unsigned char*) hash, &sha256);
 	// Copy the binary hash into the volume header name.
 	volume_header_->injectHash(hash, SHA256_DIGEST_LENGTH);
+
+        sha256_hash_ = toHex(hash, SHA256_DIGEST_LENGTH);
 }
