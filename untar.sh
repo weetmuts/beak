@@ -121,7 +121,7 @@ fi
 
 root="$(realpath $2)"
 # Find the tar files
-(cd "$root" && find . -type f -regextype awk -regex ".*/ta[rmlz][0-9a-z][0-9a-z][0-9a-z][0-9a-z][0-9a-z][0-9a-z][0-9a-z][0-9a-z]\.tar${ext}" | sed 's/^\.\///' | sort) > "$dir/aa"
+(cd "$root" && find . -type f -regextype awk -regex ".*/ta[rmlz]_[0-9a-z]+_[0-9]+\.[0-9]+_[0-9]+\.tar${ext}" | sed 's/^\.\///' | sort) > "$dir/aa"
 cat "$dir/aa" | tr -c -d '/\n' | tr / a > "$dir/bb"
 # Sort them on the number of slashes, ie handle the
 # deepest directories first, finish with the root

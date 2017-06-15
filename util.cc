@@ -44,7 +44,10 @@ using namespace std;
 static ComponentId UTIL = registerLogComponent("util");
 static ComponentId TMP = registerLogComponent("tmp");
 
-#define KB 1024ull
+char separator = 0;
+string separator_string = string("\0",1);
+
+#define KB 1024ul
 string humanReadable(size_t s)
 {
 	if (s < KB)
@@ -506,24 +509,33 @@ void eraseArg(int i, int *argc, char **argv)
 	(*argc)--;
 }
 
-string eatTo(vector<char> &v, vector<char>::iterator &i, char c, size_t max)
+string eatTo(vector<char> &v, vector<char>::iterator &i, int c, size_t max, bool *eof, bool *err)
 {
 	string s;
 
-	while (max > 0 && i != v.end() && *i != c)
+        *eof = false;
+        *err = false;
+	while (max > 0 && i != v.end() && (c == -1 || *i != c))
 	{
 		s += *i;
 		i++;
 		max--;
 	}
-	if (max == 0 && *i != c)
+	if (c != -1 && *i != c)
 	{
-		return "";
+            *err = true;
+            if (i == v.end()) {
+                *eof = true;
+            }
+            return "";
 	}
 	if (i != v.end())
 	{
 		i++;
 	}
+        if (i == v.end()) {
+            *eof = true;
+        }
 	return s;
 }
 
@@ -781,3 +793,4 @@ Path::Initializer::Initializer()
 }
 
 Path::Initializer Path::initializer_s;
+

@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2016 Fredrik Öhrström
+ Copyright (C) 2016-2017 Fredrik Öhrström
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -51,7 +51,7 @@ void printHelp(const char *app)
                     "  -i pattern       only paths matching regex pattern are included\n"
                     "  -x pattern       paths matching regex pattern are excluded\n"
                     "  -s [num],[rps]   set -ta and -tr automatically based on you upload bandwidth\n"
-                    "                     num bytes per second and rps requests per second\n"
+                    "                   num bytes per second and rps requests per second\n"
                     "  -p [num]         force all directories at depth [num] to contain tars\n"
                     "                   0 is the root, 1 is the first subdirectory level\n"
                     "                   the default is 1.\n"
@@ -61,13 +61,13 @@ void printHelp(const char *app)
                     "                   exceeds [num], default 20M\n"
                     "  -tx pattern      trigger tar generation if the path matches the regex pattern\n"
                     "  -tl file         store a list of all generated tars in this file\n"
-                    "  -ln              create hard links between files with identical name, size\n"
-                    "                   and nano second mtime. Must be replaced with reflinks or\n"
-                    "                   otherwise dereferenced in a post processing step when untaring.\n"
                     "  -f               foreground, ie do not start daemon\n"
                     "  -r   --reverse   mount a tarredfs directory and present the original files\n"
+                    "  -g [date]        mount this archived date inside the tarredfs, can be relative\n"
+                    "                   needs not be exact '5 days ago' '2017-01-01'\n"
+                    "                   '@0' is the latest archive '@1' the second latest and so on.\n"
                     "  -v   --verbose   detailed output, use twice for more\n"
-                    "  -l [a][,b][,c]   enable verbose logging for the listed components\n"
+                    "  -l [a][,b][,c]   enable debug logging for the listed components\n"
                     "  -ll              list available logging components\n"
                     "  -d   --fuse-debug enable fuse debug output, this trigger foreground mode\n"
                     "  -q   --quiet     quite mode\n"
@@ -91,6 +91,7 @@ void parseForwardOptions(int *argc, char **argv, TarredFS *tfs,
         }
         else if (!strcmp(argv[i], "-l"))
         {
+            setLogLevel(DEBUG);
             setLogComponents(argv[i + 1]);
             eraseArg(i, argc, argv);
             eraseArg(i, argc, argv);
@@ -230,8 +231,9 @@ void parseForwardOptions(int *argc, char **argv, TarredFS *tfs,
             size_t bw, rqs;
             std::vector<char> data(arg.begin(), arg.end());
             auto j = data.begin();
-            string bws = eatTo(data, j, ',', 64);
-            string rqss = eatTo(data, j, 0, 64);
+            bool eof, err;
+            string bws = eatTo(data, j, ',', 64, &eof, &err);
+            string rqss = eatTo(data, j, -1, 64, &eof, &err);
             int rc1 = parseHumanReadable(bws, &bw);
             int rc2 = parseHumanReadable(rqss, &rqs);
             if (rc1)
@@ -246,8 +248,7 @@ void parseForwardOptions(int *argc, char **argv, TarredFS *tfs,
                         "Cannot set -s number of requests per second because \"%s\" is not a proper number\n",
                         rqss.c_str());
             }
-            tfs->target_target_tar_size = roundoffHumanReadable(
-                    bw / (rqs * 10));
+            tfs->target_target_tar_size = roundoffHumanReadable(bw / (rqs * 10));
             tfs->tar_trigger_size = tfs->target_target_tar_size * 2;
             string ta = humanReadable(tfs->target_target_tar_size);
             string tr = humanReadable(tfs->tar_trigger_size);
@@ -305,6 +306,13 @@ void parseReverseOptions(int *argc, char **argv, ReverseTarredFS *tfs,
         else if (!strncmp(argv[i], "-d", 2))
         {
             setLogLevel(DEBUG);
+        }
+        else if (!strncmp(argv[i], "-g", 2))
+        {
+            tfs->setGeneration(argv[i + 1]);
+            eraseArg(i, argc, argv);
+            eraseArg(i, argc, argv);
+            i--;
         }
         else if (!strncmp(argv[i], "-v", 2))
         {
@@ -508,19 +516,35 @@ int reversemain(int argc, char *argv[])
         exit(1);
     }
 
-    // Check that there is a taz00000000.tar file in the root dir.
-    struct stat sb;
-    string taz = reverse_fs.root_dir + "/taz00000000.tar";
-    int rc = stat(taz.c_str(), &sb);
-    if (rc || !S_ISREG(sb.st_mode))
-    {
-        // Not a tarredfs filesystem!
+    vector<string> versions;
+    reverse_fs.checkVersions(Path::lookup(reverse_fs.root_dir), &versions);
+
+    if (versions.size() == 0) {
         error(MAIN, "main",
                 "Not a tarredfs filesystem! "
                         "Could not find a taz00000000.tar file in the root directory!\n");
     }
+    if (versions.size() > 1) {
+        printf("Multiple versions: (use -g to select one)\n");
+        int g = 0;
+        for (auto s : versions) {
+            printf("@%d %s\n", g, s.c_str());
+            g++;
+        }
+        printf("\n");
+        exit(1);
+    }
+    string name = versions[0];
+    
+    // Check that there is a taz file in the root dir.
+    struct stat sb;
+    string taz = reverse_fs.root_dir + "/" + name;
+    int rc = stat(taz.c_str(), &sb);
+    if (rc || !S_ISREG(sb.st_mode))
+    {
+    }
 
-    reverse_fs.loadCache(Path::lookupRoot());
+    reverse_fs.loadCache(Path::lookupRoot(), Path::lookup(taz));
     Entry &e = reverse_fs.entries[Path::lookupRoot()];
     time_t s = 0, n = 0;
 

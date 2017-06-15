@@ -28,6 +28,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <iterator>
+#include <openssl/sha.h>
 #include <sstream>
 
 #include "tarfile.h"
@@ -55,7 +56,7 @@ TarEntry::TarEntry(Path *ap, Path *p, const struct stat *b, bool header)
     num_long_link_blocks = 0;
     num_header_blocks = 1;
     tarpath_ = path_;
-
+    hash_calculated_ = false;
     name_ = p->name();
 
     // Allocate the TAR object here. It is kept alive forever, until unmount.
@@ -110,10 +111,9 @@ TarEntry::TarEntry(Path *ap, Path *p, const struct stat *b, bool header)
 
     updateSizes();
 
-    string null("\0",1);
     if (!header) {
         stringstream ss;
-        ss << permissionString(sb_.st_mode) << null << sb_.st_uid << "/" << sb_.st_gid;
+        ss << permissionString(sb_.st_mode) << separator_string << sb_.st_uid << "/" << sb_.st_gid;
         tv_line_left = ss.str();
 
         ss.str("");
@@ -125,14 +125,14 @@ TarEntry::TarEntry(Path *ap, Path *p, const struct stat *b, bool header)
         tv_line_size = ss.str();
 
         ss.str("");
-        char datetime[17];
+        char datetime[20];
         memset(datetime, 0, sizeof(datetime));
-        strftime(datetime, 17, "%Y-%m-%d %H:%M.%S", localtime(&sb_.st_mtime));
+        strftime(datetime, 20, "%Y-%m-%d %H:%M.%S", localtime(&sb_.st_mtime));
         ss << datetime;
-        ss << null;
+        ss << separator_string;
         char secs_and_nanos[32];
         memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
-        snprintf(secs_and_nanos, 32, "%ju.%ju", sb_.st_mtim.tv_sec, sb_.st_mtim.tv_nsec);
+        snprintf(secs_and_nanos, 32, "%012ju.%09ju", sb_.st_mtim.tv_sec, sb_.st_mtim.tv_nsec);
         ss << secs_and_nanos;
         tv_line_right = ss.str();
     }
@@ -404,13 +404,14 @@ TarEntry *TarEntry::newVolumeHeader() {
     TarEntry *header = new TarEntry(Path::lookup(""), Path::lookup(""), &sb, true);
     memcpy(header->tar_->th_buf.name, "tarredfs", 9);
     header->tar_->th_buf.typeflag = GNU_VOLHDR_TYPE;
+    header->name_ = Atom::lookup("VolHead");
     return header;
 }
 
 void TarEntry::secsAndNanos(char *buf, size_t len)
 {
     memset(buf, 0, len);
-    snprintf(buf, len, "%ju.%ju", sb_.st_mtim.tv_sec, sb_.st_mtim.tv_nsec);
+    snprintf(buf, len, "%012ju.%09ju", sb_.st_mtim.tv_sec, sb_.st_mtim.tv_nsec);
 }
 
 void TarEntry::injectHash(const char *buf, size_t len)
@@ -439,3 +440,138 @@ void TarEntry::sortEntries() {
                   return TarSort::lessthan(a->path(), b->path());
               });
 }
+
+string TarEntry::headerHash() {
+    if (!hash_calculated_) {
+        SHA256_CTX sha256;
+        SHA256_Init(&sha256);
+        
+        size_t len = headerSize();
+        assert(len <= 512 * 5);
+        char buf[len];
+        memset(buf, 0x42, len);
+        TarEntry *te = this;
+        size_t rc = te->copy(buf, len, 0);
+        assert(rc == len);
+        // Update the header hash with the exact header bits.
+        SHA256_Update(&sha256, buf, len);
+        // Update the header hash with seconds and nanoseconds.
+        char secs_and_nanos[32];
+        te->secsAndNanos(secs_and_nanos, 32);
+        SHA256_Update(&sha256, secs_and_nanos, strlen(secs_and_nanos));
+        SHA256_Final((unsigned char*) header_hash_, &sha256);
+        hash_calculated_ = true;
+    }
+    return toHex(header_hash_, SHA256_DIGEST_LENGTH);
+}
+
+string TarEntry::contentHash() {
+    return "0";
+}
+
+void cookEntry(string *listing, TarEntry *entry) {
+    
+    // -r-------- fredrik/fredrik 745 1970-01-01 01:00 testing
+    // drwxrwxr-x fredrik/fredrik   0 2016-11-25 00:52 autoconf/
+    // -r-------- fredrik/fredrik   0 2016-11-25 11:23 libtar.so -> libtar.so.0.1
+    listing->append(entry->tv_line_left);            
+    listing->append(separator_string);
+    listing->append(entry->tv_line_size);
+    listing->append(separator_string);
+    listing->append(entry->tv_line_right);
+    listing->append(separator_string);
+    listing->append(entry->tarpath()->path());
+    listing->append(separator_string);
+    if (entry->link() != NULL) {
+        if (entry->isSymLink()) {
+            listing->append(" -> ");
+        } else {
+            listing->append(" link to ");
+        }
+        listing->append(entry->link()->path());
+    } else {
+        listing->append(" ");
+    }
+    listing->append(separator_string);
+    listing->append(entry->tarFile()->name());
+    listing->append(separator_string);
+    stringstream ss;
+    ss << entry->tarOffset()+entry->headerSize();
+    listing->append(ss.str());
+    listing->append(separator_string);
+    listing->append(entry->contentHash());
+    listing->append(separator_string);
+    listing->append(entry->headerHash());
+    listing->append("\n");
+    listing->append(separator_string);
+}
+
+bool eatEntry(vector<char> &v, vector<char>::iterator &i, string &tar_path,
+              mode_t *mode, size_t *size, size_t *offset, string *tar, Path **path,
+              string *link, bool *is_sym_link, time_t *secs, time_t *nanos, bool *eof, bool *err)
+{
+    string permission = eatTo(v, i, separator, 32, eof, err);
+    if (*err || *eof) return false;
+
+    *mode = stringToPermission(permission);
+    if (*mode == 0) {
+        *err = true;
+        return false;
+    }
+
+    string uidgid = eatTo(v, i, separator, 32, eof, err);
+    if (*err || *eof) return false;
+    string si = eatTo(v, i, separator, 32, eof, err);
+    if (*err || *eof) return false;
+    *size = atol(si.c_str());
+
+    string datetime = eatTo(v, i, separator, 32, eof, err);
+    if (*err || *eof) return false;
+    string secs_and_nanos = eatTo(v, i, separator, 64, eof, err);
+    if (*err || *eof) return false;
+
+    // Extract secs and nanos from string.
+    std::vector<char> sn(secs_and_nanos.begin(), secs_and_nanos.end());
+    auto j = sn.begin();
+    string se = eatTo(sn, j, '.', 64, eof, err);
+    if (*err || *eof) return false;
+    string na = eatTo(sn, j, -1, 64, eof, err);
+    if (*err) return false; // Expect eof here!
+    *secs = atol(se.c_str());
+    *nanos = atol(na.c_str());
+
+    string filename = tar_path + eatTo(v, i, separator, 1024, eof, err);
+    if (*err || *eof) return false;
+    if (filename.length() > 1 && filename.back() == '/')
+    {
+        filename = filename.substr(0, filename.length() - 1);
+    }
+    *path = Path::lookup(filename);
+    *link = eatTo(v, i, separator, 1024, eof, err);
+    if (*err || *eof) return false;
+    *is_sym_link = false;
+    if (link->length() > 4 && link->substr(0, 4) == " -> ")
+    {
+        *link = link->substr(4);
+        *size = link->length();
+        *is_sym_link = true;
+    }
+    else if (link->length() > 9 && link->substr(0, 9) == " link to ")
+    {
+        *link = link->substr(9);
+        *size = link->length();
+        *is_sym_link = false;
+    }
+    *tar = tar_path + eatTo(v, i, separator, 1024, eof, err);
+    if (*err || *eof) return false;
+    string off = eatTo(v, i, separator, 32, eof, err);
+    *offset = atol(off.c_str());
+    if (*err || *eof) return false;
+    string content_hash = eatTo(v, i, separator, 40, eof, err);
+    if (*err || *eof) return false;
+    string header_hash = eatTo(v, i, separator, 40, eof, err);
+    if (*err) return false; // Accept eof here!
+    return true;
+}
+                
+

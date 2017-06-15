@@ -26,8 +26,13 @@
 #include <cstdio>
 #include <cstdlib>
 #include <iterator>
+#include <regex.h>
+#include<dirent.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #include "log.h"
+#include "tarentry.h"
 
 using namespace std;
 
@@ -42,76 +47,57 @@ ReverseTarredFS::ReverseTarredFS()
 int ReverseTarredFS::parseTarredfsContent(vector<char> &v, string tar_path)
 {
 	auto i = v.begin();
-	string header = eatTo(v, i, 0, 30 * 1024 * 1024);
+        auto ii = i;
+
+        bool eof, err;
+	string header = eatTo(v, i, separator, 30 * 1024 * 1024, &eof, &err);
 
 	std::vector<char> data(header.begin(), header.end());
 	auto j = data.begin();
 
-	string type = eatTo(data, j, '\n', 64);
-	string uid = eatTo(data, j, '\n', 10 * 1024 * 1024); // Accept up to a ~million uniq uids
-	string gid = eatTo(data, j, '\n', 10 * 1024 * 1024); // Accept up to a ~million uniq gids
+	string type = eatTo(data, j, '\n', 64, &eof, &err);
+	string uid = eatTo(data, j, '\n', 10 * 1024 * 1024, &eof, &err); // Accept up to a ~million uniq uids
+	string gid = eatTo(data, j, '\n', 10 * 1024 * 1024, &eof, &err); // Accept up to a ~million uniq gids
 
 	if (type != "#tarredfs 0.1")
 	{
-		debug(REVERSE,
-				"Type was not \"#tarredfs 0.1\" as expected! It was \"%s\"\n",
-				type.c_str());
+            failure(REVERSE,
+                    "Type was not \"#tarredfs 0.1\" as expected! It was \"%s\"\n",
+                    type.c_str());
 		return ERR;
 	}
 
 	vector<Entry*> es;
 
-	while (i != v.end())
+        eof = false;        
+	while (i != v.end() && !eof)
 	{
-		string permission = eatTo(v, i, 0, 32);
-		mode_t m = stringToPermission(permission);
-		if (m == 0)
-			break;
+            mode_t mode;
+            size_t size;
+            size_t offset;
+            string tar;            
+            Path *path;
+            string link;
+            bool is_sym_link;
+            time_t secs;
+            time_t nanos;
 
-		string uidgid = eatTo(v, i, 0, 32);
-		string size = eatTo(v, i, 0, 32);
-		size_t s = atol(size.c_str());
-
-		string datetime = eatTo(v, i, 0, 32);
-		string secs_and_nanos = eatTo(v, i, 0, 64);
-
-		std::vector<char> sn(secs_and_nanos.begin(), secs_and_nanos.end());
-		auto j = sn.begin();
-		string se = eatTo(sn, j, '.', 64);
-		string na = eatTo(sn, j, 0, 64);
-
-		string filename = tar_path + eatTo(v, i, 0, 1024);
-		if (filename.length() > 1 && filename.back() == '/')
-		{
-			filename = filename.substr(0, filename.length() - 1);
-		}
-		Path *path = Path::lookup(filename);
-		string link = eatTo(v, i, 0, 1024);
-		bool is_sym_link = false;
-		if (link.length() > 4 && link.substr(0, 4) == " -> ")
-		{
-			link = link.substr(4);
-			s = link.length();
-			is_sym_link = true;
-		}
-		else if (link.length() > 9 && link.substr(0, 9) == " link to ")
-		{
-			link = link.substr(9);
-			s = link.length();
-			is_sym_link = false;
-		}
-		string tar = tar_path + eatTo(v, i, 0, 1024);
-		string offset = eatTo(v, i, 0, 32);
-		size_t o = atol(offset.c_str());
-
-		entries[path] = Entry(m, s, o, path);
-		Entry *e = &entries[path];
-		e->link = link;
-		e->is_sym_link = is_sym_link;
-		e->secs = atol(se.c_str());
-		e->nanos = atol(na.c_str());
-		e->tar = tar;
-		es.push_back(e);
+            ii = i;
+            bool got_entry = eatEntry(v, i, tar_path, &mode, &size, &offset,
+                                      &tar, &path, &link, &is_sym_link, &secs, &nanos, &eof, &err);
+            if (err) {
+                failure(REVERSE, "Could not parse tarredfs-contents file in %s\n>%s<\n", tar_path.c_str(), ii);
+                break;
+            }            
+            if (!got_entry) break;
+            entries[path] = Entry(mode, size, offset, path);
+            Entry *e = &entries[path];
+            e->link = link;
+            e->is_sym_link = is_sym_link;
+            e->secs = secs;
+            e->nanos = nanos;
+            e->tar = tar;
+            es.push_back(e);
 	}
 
 	for (auto i : es)
@@ -121,7 +107,7 @@ int ReverseTarredFS::parseTarredfsContent(vector<char> &v, string tar_path)
 		Path *dir = i->path->parent();
 		if (entries.count(dir) == 0)
 		{
-			loadCache(dir);
+                    loadCache(dir, 0);
 		}
 		Entry *d = &entries[dir];
 		d->dir.push_back(i);
@@ -228,7 +214,7 @@ void ReverseTarredFS::loadTaz(string taz_path, string path)
 		}
 		buf.insert(buf.end(), block, block + k);
 	}
-
+        buf.resize(size);
 	rc = parseTarredfsContent(buf, path);
 	if (rc)
 	{
@@ -258,9 +244,8 @@ void ReverseTarredFS::loadTaz(string taz_path, string path)
 	return;
 }
 
-void ReverseTarredFS::loadCache(Path *path)
+void ReverseTarredFS::loadCache(Path *path, Path *taz)
 {
-	string taz;
 	struct stat sb;
 	Path *opath = path;
 
@@ -269,18 +254,17 @@ void ReverseTarredFS::loadCache(Path *path)
 	for (;;)
 	{
 		string c;
-		taz = root_dir + path->path() + "/taz00000000.tar";
-		debug(REVERSE, "Looking for cache %s\n", taz.c_str());
-		int rc = stat(taz.c_str(), &sb);
+		debug(REVERSE, "Looking for cache %s\n", taz->c_str());
+		int rc = stat(taz->c_str(), &sb);
 		if (!rc && S_ISREG(sb.st_mode))
 		{
 			// Found a taz file!
-			loadTaz(taz, path->path());
+                        loadTaz(taz->path(), path->path());
 			if (entries.count(path) == 1)
 			{
 				// Success
 				debug(REVERSE, "Found %s in taz %s\n", path->c_str(),
-						taz.c_str());
+						taz->c_str());
 				return;
 			}
 			if (path != opath)
@@ -288,7 +272,7 @@ void ReverseTarredFS::loadCache(Path *path)
 				// The file, if it exists should have been found here. Therefore we
 				// conclude that the file does not exist.
 				debug(REVERSE, "NOT found %s in taz %s\n", path->c_str(),
-						taz.c_str());
+						taz->c_str());
 				return;
 			}
 		}
@@ -316,7 +300,7 @@ int ReverseTarredFS::getattrCB(const char *path_char_string, struct stat *stbuf)
 
 		if (entries.count(path) == 0)
 		{
-			loadCache(path);
+                    loadCache(path, 0);
 		}
 		if (entries.count(path) == 0)
 		{
@@ -369,7 +353,7 @@ int ReverseTarredFS::readdirCB(const char *path_char_string, void *buf,
 
 		if (entries.count(path) == 0)
 		{
-			loadCache(path);
+                    loadCache(path, 0);
 		}
 		if (entries.count(path) == 0)
 		{
@@ -381,7 +365,7 @@ int ReverseTarredFS::readdirCB(const char *path_char_string, void *buf,
 		Entry &e = entries[path];
 		if (!e.loaded)
 		{
-			loadCache(path);
+                    loadCache(path, 0);
 		}
 		if (e.isDir())
 		{
@@ -420,7 +404,7 @@ int ReverseTarredFS::readlinkCB(const char *path_char_string, char *buf,
 
 		if (entries.count(path) == 0)
 		{
-			loadCache(path);
+                    loadCache(path, 0);
 		}
 		if (entries.count(path) == 0)
 		{
@@ -470,7 +454,7 @@ int ReverseTarredFS::readCB(const char *path_char_string, char *buf,
 
 		if (entries.count(path) == 0)
 		{
-			loadCache(path);
+                    loadCache(path, 0);
 		}
 		if (entries.count(path) == 0)
 		{
@@ -528,4 +512,35 @@ int ReverseTarredFS::readCB(const char *path_char_string, char *buf,
 		return -ENOENT;
 	}
 }
+
+
+void ReverseTarredFS::checkVersions(Path *path, vector<string> *versions)
+{
+    regex_t re;
+    int rc = regcomp(&re, "taz_[0-9a-z]+_[0-9]+\\.[0-9]+_[0-9]+\\.tar", REG_EXTENDED | REG_NOSUB);
+    assert(!rc);
+    
+    DIR *dp = NULL;
+    struct dirent *dptr = NULL;
+
+    if (NULL == (dp = opendir(path->c_str())))
+    {
+        return;
+    }
+    while(NULL != (dptr = readdir(dp)) )
+    {
+        int miss = regexec(&re, dptr->d_name, (size_t) 0, NULL, 0);
+        if (!miss) {
+            versions->push_back(dptr->d_name);
+        }
+    }
+    closedir(dp);
+}
+
+void ReverseTarredFS::setGeneration(string g) {
+    generation_ = g;
+}
+
+
+
 

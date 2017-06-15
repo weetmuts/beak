@@ -23,6 +23,8 @@
 #include <map>
 #include <string>
 
+#include "util.h"
+
 using namespace std;
 
 typedef int (*FileCB)(const char *,const struct stat *,int,struct FTW *);
@@ -41,18 +43,26 @@ typedef Entry *EntryP;
 enum Target { FROM, TO };
 
 struct DiffTarredFS {
-    Path *from_dir;
-    Path *to_dir;
-
-    map<Path*,EntryP,depthFirstSortPath> from_files;
-    map<Path*,EntryP,depthFirstSortPath> to_files;
-
     int recurse(Target t, FileCB cb);
     int addFromFile(const char *fpath, const struct stat *sb, struct FTW *ftwbuf);
     int addToFile(const char *fpath, const struct stat *sb, struct FTW *ftwbuf);
     int addFile(Target t, const char *fpath, const struct stat *sb, struct FTW *ftwbuf);
+    int addLinesFromFile(Target t, Path *p);
     void compare();
 
+    Path *fromDir() { return from_dir; }
+    Path *toDir() { return to_dir; }
+    void setFromDir(Path *p) { from_dir = p; }
+    void setToDir(Path *p) { to_dir = p; }
+    void setListMode() { list_mode_ = true; }
+private:
+    bool list_mode_ = false;
+    Path *from_dir;
+    Path *to_dir;
+        
+    map<Path*,EntryP,depthFirstSortPath> from_files;
+    map<Path*,EntryP,depthFirstSortPath> to_files;
+    
 };
 
 #endif

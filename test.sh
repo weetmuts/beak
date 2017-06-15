@@ -202,7 +202,7 @@ function fifoTest {
 }
 
 function devTest {
-    $THIS_DIR/integrity-test.sh -dd "$dir" -f "! -name '*shm*'" /dev "$mount"
+    $THIS_DIR/integrity-test.sh -dd "$dir" -f "! -path '*shm*'" /dev "$mount"
     if [ $? -ne 0 ]; then
         echo Failed file attributes diff for $1! Check in $dir for more information.
         exit
@@ -324,17 +324,54 @@ if [ $do_test ]; then
     startFS standardTest
 fi
 
+function timestampHashTest1 {
+    rc1=$(ls $mount/TJO/tar*.tar)
+    stopFS nook
+    touch -d "2017-01-01 01:01:01.1235" $root/TJO/alfa
+    startFS timestampHashTest2
+}
+
+function timestampHashTest2 {
+    rc2=$(ls $mount/TJO/tar*.tar)
+    if [ "$rc1" = "$rc2" ]; then
+        echo "$rc1" "$rc2"
+        echo Change in timestamp should change the virtual tar file hash!
+        exit
+    fi
+    rc=$(basename "$rc2")
+    if [ "$rc" != "tar_3a3cee970b264dd3a5ca439bb745433f_001483228861.123500000_1024.tar" ]; then
+        echo "$rc"
+        echo The file hash SHOULD BE tar_3a3cee970b264dd3a5ca439bb745433f_001483228861.123500000.tar!
+        echo It is not!
+        exit
+    fi    
+    stopFS
+}
+
+setup basic11a "check that timestamps influence file hash"
+if [ $do_test ]; then
+    mkdir -p $root/TJO
+    touch -d "2017-01-01 01:01:01.1234" $root/TJO/alfa
+    startFS timestampHashTest1
+fi
+
 function mtimeTestPart1 {
     (cd $mount; find . -exec ls -ld \{\} \; > $org)    
     stopFS nook
-    touch $root/beta/zz
+    touch -d "2015-03-03 05:03:03.1234" $root/beta/zz
     startFS mtimeTestPart2
 }
 
 function mtimeTestPart2 {
     (cd $mount; find . -exec ls -ld \{\} \; > $dest)
-    rc=$(diff -d $org $dest | grep -v ./beta/tar00000000.tar | tr -d '[:space:]')
-    if [ "$rc" != "6c6---" ]; then
+    rc=$(diff -d $org $dest | \
+                grep -v beta/tar_a54fb4d2ce390e702203f948a16a72e3_001425348183.123400000_2560.tar | \
+                grep -v beta/tar_1c1b772a7abf4ab8588383b63c27f1d4_001425355383.123400000_2560.tar | \
+                grep -v beta/taz_be5b0bffa9073e03af4611bc13ab6a6c_001425348183.123400000_1536.tar | \
+                grep -v beta/taz_be5b0bffa9073e03af4611bc13ab6a6c_001425355383.123400000_1536.tar | \
+                tr -d '[:space:]')
+    if [ "$rc" != "6,7c6,7---" ]; then
+        echo "$rc"
         echo Failed changed mtime should affect tar mtime test! Check in $dir for more information.
         echo This test also fails, if the sort order of depthFirst is modified.
         exit
@@ -350,13 +387,14 @@ if [ $do_test ]; then
     echo HEJSAN > $root/alfa/yy
     echo HEJSAN > $root/beta/zz
     echo HEJSAN > $root/beta/ww
-    touch -d "2 hours ago" $root/alfa/* $root/beta/* $root/alfa $root/beta
+    touch -d "2015-03-03 03:03:03.1234" $root/alfa/* $root/beta/* $root/alfa $root/beta
     startFS mtimeTestPart1
 fi
 
 function checkBasicVirtualTars {
     rc=$(cd $mount; find . -name "*.tar" | tr -d '[:space:]')
-    if [ "$rc" != "./NNNNN/tar00000000.tar./NNNNN/tar00000001.tar./NNNNN/taz00000000.tar./taz00000000.tar" ]; then
+    if [ "$rc" != "./NNNNN/tar_9f514b38eaa4baa43543adcc7527eb82_001425348183.123400000_12289536.tar./NNNNN/tar_a2df5f4f07bc51c82a19b6f1f6b29f5a_001425348183.123400000_2048.tar./NNNNN/taz_92ed41d0b723183a5ab2c50247528edc_001425348183.123400000_2560.tar./taz_ed1bf1b5212f5aefbe98c70569ccf33e_001425348183.123400000_2048.tar" ]; then
+        echo "$rc"       
         echo Virtual tars not created in the proper order! Check in $dir for more information.
         exit
     fi
@@ -369,6 +407,8 @@ if [ $do_test ]; then
     dd bs=1024 count=6000 if=/dev/zero of=$root/NNNNN/RRRRR > /dev/null 2>&1
     dd bs=1024 count=1 if=/dev/zero of=$root/NNNNN/SSSS/SSSS > /dev/null 2>&1
     dd bs=1024 count=6000 if=/dev/zero of=$root/NNNNN/iiii > /dev/null 2>&1
+    touch -d "2015-03-03 03:03:03.1234" $root/NNNNN/SSSS $root/NNNNN/SSSS/* $root/NNNNN $root/NNNNN/* 
+    
     startFS checkBasicVirtualTars 
 fi
 
@@ -512,33 +552,41 @@ function noAvalancheTestPart1 {
     (cd $mount; find . -exec ls -ld \{\} \; > $org)    
     stopFS nook
     dd if=/dev/zero of="$root/s200" bs=1024 count=60 > /dev/null 2>&1
-    startFS noAvalancheTestPart2
+    touch -d "2015-03-03 04:03:03.1234" "$root/s200"
+    startFS noAvalancheTestPart2 "-ta 1M -tr 1M"
 }
 
 function noAvalancheTestPart2 {
     (cd $mount; find . -exec ls -ld \{\} \; > $dest)
-    rc=$(diff -d $org $dest | grep -v ./tar00000001.tar | grep -v ./taz00000000.tar | tr -d '[:space:]')
-    if [ "$rc" != "7,8c7,8---" ]; then
-        echo ++$rc++
-        echo Failed no avalanche test should only affect a single tar! $ord $dest
+    rc=$(diff -d $org $dest | \
+                grep -v tar_63a540c2902e2e340ced308c7ee92043_001425348183.123400000_658432.tar | \
+                grep -v tar_e68f010490292b31706f8d264728a20c_001425351783.123400000_720384.tar | \
+                grep -v taz_bcf2752c824ce7b7ad5f99777723379d_001425348183.123400000_49664.tar | \
+                grep -v taz_93da68569796dac852d580ea542139d3_001425351783.123400000_49664.tar | tr -d '[:space:]')
+    if [ "$rc" != "9c9---36c36---" ]; then
+        echo "$rc"
+        echo Failed no avalanche test should only affect a single content tar and the taz file! 
         echo This test depends on the default setting for target and trigger size.
         exit
     fi    
-    stopFS    
+    stopFS
 }
 
 setup distribution1 "Test that added file does not create avalanche"
 if [ $do_test ]; then
     for i in s{1..199}; do
         dd if=/dev/zero of="$root/$i" bs=1024 count=60 > /dev/null 2>&1
+        touch -d "2015-03-03 03:03:03.1234" "$root/$i"        
     done
     for i in m{1..49}; do
         dd if=/dev/zero of="$root/$i" bs=1024 count=400 > /dev/null 2>&1
+        touch -d "2015-03-03 03:03:03.1234" "$root/$i"
     done
     for i in l{1..2}; do
         dd if=/dev/zero of="$root/$i" bs=1024 count=10240 > /dev/null 2>&1
+        touch -d "2015-03-03 03:03:03.1234" "$root/$i"
     done
-    startFS noAvalancheTestPart1
+    startFS noAvalancheTestPart1 "-ta 1M -tr 1M"
 fi
 
 setup libtar1 "Mount of libtar extract all default settings"
@@ -587,6 +635,19 @@ if [ $do_test ]; then
     startTwoFS compareTwo
 fi
 
+setup diff1 "Compare directories!"
+if [ $do_test ]; then
+    mkdir -p "$root/alfa beta/gamma"
+    mkdir -p "$check/alfa beta/gamma"
+    echo HEJSAN1 > "$root/alfa beta/gamma/delta"
+    echo HEJSAN2 > "$root/alfa beta/gamma/x"
+    echo HEJSAN3 > "$root/alfa beta/gamma/y"
+    cp -a "$root/"* "$check"
+    echo HEJSAN1 > "$check/alfa beta/z"    
+    rm "$check/alfa beta/gamma/x"
+    ./build/diff "$root" "$check"
+fi
 
-echo All tests succeeded!
-rm -rf $tmpdir
+
+#echo All tests succeeded!
+#rm -rf $tmpdir

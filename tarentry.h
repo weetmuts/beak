@@ -22,6 +22,7 @@
 #include <sys/stat.h>
 #include <cstdint>
 #include <map>
+#include <openssl/sha.h>
 #include <string>
 #include <vector>
 
@@ -158,6 +159,18 @@ struct TarEntry
 	{
 		return large_tars_.count(hash) > 0;
 	}
+	TarFile *smallHashTar(string i)
+	{
+		return small_hash_tars_[i];
+	}
+	TarFile *mediumHashTar(string i)
+	{
+            return medium_hash_tars_[i];
+	}
+	TarFile *largeHashTar(string i)
+	{
+		return large_hash_tars_[i];
+	}
 	map<size_t, TarFile*>& smallTars()
 	{
 		return small_tars_;
@@ -169,6 +182,18 @@ struct TarEntry
 	map<size_t, TarFile*>& largeTars()
 	{
 		return large_tars_;
+	}
+	map<string, TarFile*>& smallHashTars()
+	{
+		return small_hash_tars_;
+	}
+	map<string, TarFile*>& mediumHashTars()
+	{
+		return medium_hash_tars_;
+	}
+	map<string, TarFile*>& largeHashTars()
+	{
+		return large_hash_tars_;
 	}
 
 	void registerParent(TarEntry *p);
@@ -199,6 +224,9 @@ struct TarEntry
 
 	static TarEntry *newVolumeHeader();
 
+        char *headerHashArray() { if (!hash_calculated_) { headerHash(); } return &(this->header_hash_[0]); }
+        string headerHash();
+        string contentHash();
 	// This is a re-construction of how the entry would be listed by "tar tv"
 	// tv_line_left is accessbits, ownership
 	// tv_line_size is the size, to be left padded with space
@@ -246,12 +274,26 @@ private:
 	map<size_t, TarFile*> small_tars_;  // Small file tars in side this TarEntry
 	map<size_t, TarFile*> medium_tars_; // Medium file tars in side this TarEntry
 	map<size_t, TarFile*> large_tars_;  // Large file tars in side this TarEntry
+        map<string,TarFile*> small_hash_tars_;
+        map<string,TarFile*> medium_hash_tars_;
+        map<string,TarFile*> large_hash_tars_;
 	vector<TarEntry*> entries_; // The contents stored in the tar files.
 
 	TarEntry *tar_collection_dir = NULL; // This entry is stored in this tar collection dir.
 	bool is_added_to_directory_ = false;
 	bool virtual_file = false;
 	string content;
+
+        bool hash_calculated_;
+    	char header_hash_[SHA256_DIGEST_LENGTH];
 };
+
+void cookEntry(string *listing, TarEntry *entry);
+
+bool eatEntry(vector<char> &v, vector<char>::iterator &i, string &tar_path,
+              mode_t *mode, size_t *size, size_t *offset, string *tar, Path **path,
+              string *link, bool *is_sym_link, time_t *secs, time_t *nanos,
+              bool *eof, bool *err);
+
 
 #endif

@@ -97,9 +97,14 @@ struct ReverseTarredFS
 
 	int parseTarredfsContent(vector<char> &v, string taz_path);
 	void loadTaz(string taz, string path);
-	void loadCache(Path *path);
-
+        void loadCache(Path *path, Path *taz);
+        void checkVersions(Path *path, vector<string> *versions);
+        void setGeneration(string g);
 	ReverseTarredFS();
+
+    private:
+
+    string generation_;
 };
 
 #endif

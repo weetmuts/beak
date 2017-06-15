@@ -4,7 +4,7 @@ $(shell mkdir -p build)
 LIBTAR_A:=libtar/lib/.libs/libtar.a
 LIBTAR_SOURCES:=$(shell find libtar -name "*.c" -o -name "*.h")
 
-CXXFLAGS := -O -g  -Wall -fmessage-length=0 -std=c++11 -Wno-unused-function \
+CXXFLAGS := -O0 -g  -Wall -fmessage-length=0 -std=c++11 -Wno-unused-function \
 	"-DTARREDFS_VERSION=\"0.1\"" -DFUSE_USE_VERSION=26 \
         -Ilibtar/lib -Ilibtar/listhash -I/usr/include \
         `pkg-config fuse --cflags` 
@@ -14,19 +14,20 @@ HEADERS := $(wildcard *.h)
 build/%.o: %.cc $(HEADERS)
 	g++ $(CXXFLAGS) $< -c -o $@
 
-OBJS :=		build/util.o build/log.o build/tarfile.o build/tarentry.o build/forward.o  build/reverse.o build/main.o 
-
+TARREDFS_OBJS := build/util.o build/log.o build/tarfile.o build/tarentry.o build/forward.o  build/reverse.o build/main.o
+DIFF_OBJS := build/util.o build/log.o build/diff.o 
 
 LIBS =
 
-TARGET =	tarredfs
-
-all: build/$(TARGET) \
+all: build/tarredfs build/diff \
 	build/tarredfs-untar build/tarredfs-pack \
 	build/tarredfs-compare build/tarredfs-integrity-test
 
-build/$(TARGET): $(OBJS) $(LIBTAR_A)
-	$(CXX) -o build/$(TARGET) $(OBJS) $(LIBS) $(LIBTAR_A) `pkg-config fuse --libs`  `pkg-config openssl --libs`
+build/tarredfs: $(TARREDFS_OBJS) $(LIBTAR_A)
+	$(CXX) -o build/tarredfs $(TARREDFS_OBJS) $(LIBS) $(LIBTAR_A) `pkg-config fuse --libs`  `pkg-config openssl --libs`
+
+build/diff: $(DIFF_OBJS)
+	$(CXX) -o build/diff $(DIFF_OBJS) $(LIBS) 
 
 build/tarredfs-untar: untar.sh
 	cp untar.sh build/tarredfs-untar
@@ -61,6 +62,8 @@ clean-all:
 	rm -rf build/* *~
 
 clean:
-	rm -f $(OBJS) $(TARGET) *~
+	rm -f $(TARREDFS_OBJS) $(DIFF_OBJS) build/tarredfs build/diff \
+	build/tarredfs-untar build/tarredfs-pack \
+	build/tarredfs-compare build/tarredfs-integrity-test *~
 
 .PHONY: clean clean-all

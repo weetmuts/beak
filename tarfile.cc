@@ -24,6 +24,7 @@
 #include <cstdio>
 #include <functional>
 #include <iterator>
+#include <sstream>
 
 #include "log.h"
 #include "tarentry.h"
@@ -37,33 +38,13 @@ TarFile::TarFile(TarEntry *d, TarContents tc, int n, bool dirs)
 	in_directory = d;
 	tar_contents = tc;
 	memset(&mtim_, 0, sizeof(mtim_));
-	char c;
+	char c = chartype();
 	assert(
 			(dirs && tar_contents == DIR_TAR)
 					|| (!dirs && tar_contents != DIR_TAR));
-	if (tar_contents == DIR_TAR)
-	{
-		c = 'z';
-	}
-	else if (tar_contents == SMALL_FILES_TAR)
-	{
-		c = 'r';
-	}
-	else if (tar_contents == MEDIUM_FILES_TAR)
-	{
-		c = 'm';
-	}
-	else
-	{
-		// For large files, the n is a hash of the file name.
-		// Normally a single tar stores a single file.
-		// But, more than one large file might end up in the same tar, if the 32 bit hash collide,
-		// that is ok.
-		c = 'l';
-		hash = n;
-	}
 	char buffer[256];
 	snprintf(buffer, sizeof(buffer), "ta%c%08x.tar", c, n);
+        // This is a temporary name! It will be overwritten when the hash is finalized!
 	name_ = buffer;
 	addVolumeHeader();
 }
@@ -174,34 +155,54 @@ void TarFile::calculateSHA256Hash()
 
 	// SHA256 all headers, including the first Volume label header with
 	// empty name and empty checksum.
-	int i = 0;
 	for (auto & a : contents)
 	{
-		size_t len = a.second->headerSize();
-		assert(len <= 512 * 5);
-		char buf[len];
-		memset(buf, 0x42, len);
-		TarEntry *te = a.second;
-		size_t rc = te->copy(buf, len, 0);
-		assert(rc == len);
-		// Update the hash with the exact header bits.
-		SHA256_Update(&sha256, buf, len);
-		if (logLevel() == DEBUG)
-		{
-			string s = toHext(buf, len);
-			debug(HASHING, "-%d-%s-%ju----------\n%s\n", i, name_.c_str(),
-					a.first, s.c_str());
-		}
-		i++;
-		// Update the hash with seconds and nanoseconds.
-		char secs_and_nanos[32];
-		te->secsAndNanos(secs_and_nanos, 32);
-		debug(HASHING, "++++%s++++++++++\n", secs_and_nanos);
-		SHA256_Update(&sha256, secs_and_nanos, strlen(secs_and_nanos));
+            size_t len = a.second->headerSize();
+            assert(len <= 512 * 5);
+            TarEntry *te = a.second;
+            debug(HASHING,"   %s %s\n", te->tarpath()->c_str(), te->headerHash().c_str());
+            SHA256_Update(&sha256, te->headerHashArray(), SHA256_DIGEST_LENGTH);
 	}
 	SHA256_Final((unsigned char*) hash, &sha256);
 	// Copy the binary hash into the volume header name.
 	volume_header_->injectHash(hash, SHA256_DIGEST_LENGTH);
 
         sha256_hash_ = toHex(hash, SHA256_DIGEST_LENGTH);
+
+        char sizes[32];
+        memset(sizes, 0, sizeof(sizes));
+        snprintf(sizes, 32, "%zu", size());
+        
+        char secs_and_nanos[32];
+        memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
+        snprintf(secs_and_nanos, 32, "%012ju.%09ju", mtim()->tv_sec, mtim()->tv_nsec);
+        
+	char buffer[256];
+	snprintf(buffer, sizeof(buffer), "ta%c_%s_%s_%s.tar", chartype(), sha256_hash_.c_str(), secs_and_nanos, sizes);
+	name_ = buffer;
+
+        debug(HASHING,"Tarfile %s\n\n", name_.c_str());
 }
+
+string TarFile::line(Path *p)
+{
+    stringstream ss;
+
+    ss << p->path();
+    ss << "/" << name();
+    ss << separator << size();
+
+    char secs_and_nanos[32];
+    memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
+    snprintf(secs_and_nanos, 32, "%012ju.%09ju", mtim()->tv_sec, mtim()->tv_nsec);
+    ss << separator << secs_and_nanos;
+    
+    char datetime[20];
+    memset(datetime, 0, sizeof(datetime));
+    strftime(datetime, 20, "%Y-%m-%d %H:%M.%S", localtime(&mtim()->tv_sec));
+    ss << separator << datetime << endl << separator; 
+    
+    return ss.str();
+}
+    
+

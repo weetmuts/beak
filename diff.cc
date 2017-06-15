@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2016 Fredrik Öhrström
+    Copyright (C) 2016-2017 Fredrik Öhrström
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -24,6 +24,10 @@
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fstream>
+#include <unistd.h>
 #include <utility>
 
 #include "log.h"
@@ -43,7 +47,7 @@ bool Entry::same(Entry *e) {
 }
 
 int DiffTarredFS::recurse(Target t, FileCB cb) {
-    string s = (t==FROM)? from_dir : to_dir;
+    string s = (t==FROM)? from_dir->path() : to_dir->path();
 
     // Recurse into the root dir. Maximum 256 levels deep.
     // Look at symbolic links (ie do not follow them) so that
@@ -67,32 +71,38 @@ int DiffTarredFS::addToFile(const char *fpath, const struct stat *sb, struct FTW
 
 int DiffTarredFS::addFile(Target t, const char *fpath, const struct stat *sb, struct FTW *ftwbuf) {
 
-    size_t len = strlen(fpath);
-    string root;
-
+    Path *p = Path::lookup(fpath);
+    Path *root = to_dir;
     if (t == FROM) {
         root = from_dir;
-    } else {
-        root = to_dir;
     }
-    // Skip root_dir path.
-    const char *pp;
-    if (len > root.length()) {
-        // We are in a subdirectory of the root.
-        pp = fpath+root.length();
-    } else {
-        pp = "";
-    }
+    Path *pp = p->subpath(root->depth());
 
     if(!S_ISDIR(sb->st_mode)) {
-        string p = pp;
         if (t == FROM) {
-            from_files[p] = new Entry(sb);
+            from_files[pp] = new Entry(sb);
         } else {
-            to_files[p] = new Entry(sb);
+            to_files[pp] = new Entry(sb);
         }
     }
 
+    return 0;
+}
+
+int DiffTarredFS::addLinesFromFile(Target t, Path *p) {
+    vector<char> buf;
+
+    ifstream is (p->path(), ifstream::binary);
+    if (is) {
+        is.seekg (0, is.end);
+        size_t length = is.tellg();
+        is.seekg (0, is.beg);
+        char *tmp = new char[length];
+        is.read (tmp,length);
+        is.close();
+        buf.insert(buf.end(), tmp, tmp+length);
+        delete[] tmp;
+    }
     return 0;
 }
 
@@ -123,25 +133,37 @@ void DiffTarredFS::compare() {
 
     for (auto i : added) {
         string s = humanReadable(i.second->sb.st_size);
-        printf("Added %s %s\n", i.first->c_str(), s.c_str());
+        if (!list_mode_) {
+            printf("Added %s %s\n", i.first->c_str(), s.c_str());
+        }
         size_added += i.second->sb.st_size;
     }
     for (auto i : changed) {
         string s = humanReadable(i.second->sb.st_size);
-        printf("Changed %s %s\n", i.first->c_str(), s.c_str());
+        if (!list_mode_) {
+            printf("Changed %s %s\n", i.first->c_str(), s.c_str());
+        } else {
+            printf("%s\n", i.first->c_str());
+        }
         size_changed += i.second->sb.st_size;
     }
     for (auto i : deleted) {
         string s = humanReadable(i.second->sb.st_size);
-        printf("Deleted %s %s\n", i.first->c_str(), s.c_str());
+        if (!list_mode_) {
+            printf("Deleted %s %s\n", i.first->c_str(), s.c_str());
+        } else {
+            printf("%s\n", i.first->c_str());
+        }
         size_deleted += i.second->sb.st_size;
     }
 
-    string up = humanReadable(size_added + size_changed);
-    string del = humanReadable(size_deleted);
-    printf("Uploading %s\n", up.c_str());
-    if (size_deleted != 0) {
-        printf("Deleting %s\n", del.c_str());
+    if (!list_mode_) {
+        string up = humanReadable(size_added + size_changed);
+        string del = humanReadable(size_deleted);
+        printf("Uploading %s\n", up.c_str());
+        if (size_deleted != 0) {
+            printf("Deleting %s\n", del.c_str());
+        }
     }
 }
 
@@ -160,10 +182,11 @@ template<DiffTarredFS*fs> struct AddToFile {
 
 void printDiffHelp(const char *app) {
     fprintf(stdout,
-            "usage: %s [oldDirectory] [newDirectory]\n"
+            "usage: %s [-h] [-l] [oldDirectory] [newDirectory]\n"
             "\n"
             "general options:\n"
             "    -h   --help      print help\n"
+            "    -l               list old files being changed\n"
             "\n"
             , app);
 }
@@ -185,14 +208,46 @@ int main(int argc, char **argv) {
         printDiffHelp(argv[0]);
         exit(0);
     }
-    diff_fs.from_dir = Path::lookup(real(argv[1]));
-    diff_fs.to_dir = Path::lookup(real(argv[2]));
 
-    AddFromFile<&diff_fs> aff;
-    AddToFile<&diff_fs> atf;
+    for (int i = 1; argv[i] != 0; ++i)
+    {
+        if (!strcmp(argv[i], "-h"))
+        {
+            printDiffHelp(argv[0]);
+            exit(1);
+        }
+        else if (!strcmp(argv[i], "-l"))
+        {
+            diff_fs.setListMode();
+            eraseArg(i, &argc, argv);
+            i--;
+        }
+    }
+    
+    diff_fs.setFromDir(Path::lookup(real(argv[1])));
+    diff_fs.setToDir(Path::lookup(real(argv[2])));
 
-    diff_fs.recurse(FROM, aff.add);
-    diff_fs.recurse(TO, atf.add);
+    struct stat fs,ts;
+    int rcf = stat(diff_fs.fromDir()->c_str(), &fs);
+    int rct = stat(diff_fs.toDir()->c_str(), &ts);
+    if (rcf) {
+        error(DIFF, "Could not stat \"%s\"\n", diff_fs.fromDir()->c_str());
+    }
+    if (rct) {
+        error(DIFF, "Could not stat \"%s\"\n", diff_fs.toDir()->c_str());
+    }
+    if (S_ISDIR(fs.st_mode) && S_ISDIR(ts.st_mode)) {
+        AddFromFile<&diff_fs> aff;
+        AddToFile<&diff_fs> atf;
+
+        diff_fs.recurse(FROM, aff.add);
+        diff_fs.recurse(TO, atf.add);
+    } else if (S_ISREG(fs.st_mode) && S_ISREG(ts.st_mode)) {
+        diff_fs.addLinesFromFile(FROM, diff_fs.fromDir());
+        diff_fs.addLinesFromFile(TO, diff_fs.toDir());
+    } else {
+        error(DIFF, "Comparison must be between two files or two directories.");
+    }
 
     diff_fs.compare();
 }

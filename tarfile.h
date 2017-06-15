@@ -26,6 +26,8 @@
 #include <utility>
 #include <vector>
 
+#include "util.h"
+
 struct TarEntry;
 
 using namespace std;
@@ -73,7 +75,19 @@ struct TarFile
     {
         return &mtim_;
     }
+    string line(Path *p);
 
+    char chartype() {
+        switch (tar_contents) {
+        case DIR_TAR: return 'z';
+        case SMALL_FILES_TAR: return 'r';
+        case MEDIUM_FILES_TAR: return 'm';
+        case SINGLE_LARGE_FILE_TAR: return 'l';
+        }
+        return 0;
+    }
+
+    
 private:
 
     TarEntry *in_directory;

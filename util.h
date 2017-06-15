@@ -37,6 +37,9 @@ wstring to_wstring(std::string const& s);
 string wto_string(std::wstring const& s);
 string tolowercase(std::string const& s);
 std::locale const *getLocale();
+    
+extern char separator;
+extern string separator_string;
 
 struct Atom
 {
@@ -131,7 +134,7 @@ struct depthFirstSortPath
 	// TEXTS/filter
 	// TEXTS/filter.zip
 	static bool lessthan(Path *f, Path *t);
-	inline bool operator()(Path *a, Path *b)
+	inline bool operator()(Path *a, Path *b) const
 	{
 		return lessthan(a, b);
 	}
@@ -146,7 +149,7 @@ struct TarSort
 	// TEXTS/filter/alfa
 	// TEXTS/filter.zip
 	static bool lessthan(Path *a, Path *b);
-	inline bool operator()(Path *a, Path *b)
+	inline bool operator()(Path *a, Path *b) const
 	{
 		return lessthan(a, b);
 	}
@@ -163,8 +166,14 @@ string ownergroupString(uid_t uid, gid_t gid);
 
 void eraseArg(int i, int *argc, char **argv);
 
-string eatTo(vector<char> &v, vector<char>::iterator &i, char c, size_t max);
+// Eat characters from the vector v, iterating using i, until the end char c is found.
+// If end char == -1, then do not expect any end char, get all until eof.
+// If the end char is not found, return error.
+// If the maximum length is reached without finding the end char, return error.
+string eatTo(vector<char> &v, vector<char>::iterator &i, int c, size_t max, bool *eof, bool *err);
 
 string toHex(const char *b, size_t len);
 string toHext(const char *b, size_t len);
+
+
 #endif
