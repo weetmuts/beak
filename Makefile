@@ -24,10 +24,11 @@ all: build/tarredfs build/diff \
 	build/tarredfs-compare build/tarredfs-integrity-test
 
 build/tarredfs: $(TARREDFS_OBJS) $(LIBTAR_A)
-	$(CXX) -o build/tarredfs $(TARREDFS_OBJS) $(LIBS) $(LIBTAR_A) `pkg-config fuse --libs`  `pkg-config openssl --libs`
+	$(CXX) -o build/tarredfs $(TARREDFS_OBJS) $(LIBS) $(LIBTAR_A) \
+	`pkg-config fuse --libs`  `pkg-config openssl --libs` `pkg-config zlib --libs`
 
 build/diff: $(DIFF_OBJS)
-	$(CXX) -o build/diff $(DIFF_OBJS) $(LIBS) 
+	$(CXX) -o build/diff $(DIFF_OBJS) $(LIBS) `pkg-config zlib --libs`
 
 build/tarredfs-untar: untar.sh
 	cp untar.sh build/tarredfs-untar

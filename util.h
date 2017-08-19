@@ -37,7 +37,13 @@ wstring to_wstring(std::string const& s);
 string wto_string(std::wstring const& s);
 string tolowercase(std::string const& s);
 std::locale const *getLocale();
-    
+void captureStartTime();
+bool isInTheFuture(struct timespec *tm);
+string timeAgo(struct timespec *tm);
+
+int gzipit(string *from, vector<unsigned char> *to);
+int gunzipit(vector<char> *from, vector<char> *to);
+  
 extern char separator;
 extern string separator_string;
 
@@ -89,6 +95,7 @@ struct Path
 	{
 		return atom_;
 	}
+        Path *appendName(Atom *n);
 	Path *parentAtDepth(int i);
 	string path();
 	const char *c_str();
@@ -106,8 +113,18 @@ struct Path
 	Path *prepend(Path *p);
 	bool isRoot()
 	{
-		return depth_ == 1 && atom_->c_str_len() == 0;
+            return depth_ == 1 && atom_->c_str_len() == 0;
 	}
+        bool isBelowOrEqual(Path *p) {
+            if (depth_ < p->depth_) {
+                return false;
+            }
+            Path *t = this;
+            while (t != NULL && t != p) {
+                t = t->parent_;
+            }
+            return (t == p);
+        }
 
 private:
 
@@ -175,5 +192,8 @@ string eatTo(vector<char> &v, vector<char>::iterator &i, int c, size_t max, bool
 string toHex(const char *b, size_t len);
 string toHext(const char *b, size_t len);
 
+
+void toLittleEndian(uint16_t *t);
+void toLittleEndian(uint32_t *t);
 
 #endif

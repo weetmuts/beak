@@ -37,11 +37,10 @@ using namespace std;
 struct TarEntry
 {
 
-	TarEntry()
-	{
-	}
-	TarEntry(Path *abspath, Path *path, const struct stat *b, bool header =
-			false);
+    TarEntry(size_t size);
+    TarEntry(Path *abspath, Path *path, const struct stat *b,
+             bool header = false);
+    
 	Path *path()
 	{
 		return path_;
@@ -97,7 +96,7 @@ struct TarEntry
 	}
 
 	void calculateTarpath(Path *storage_dir);
-	void setContent(string c);
+	void setContent(vector<unsigned char> &c);
 	size_t copy(char *buf, size_t size, size_t from);
 	const bool isDir();
 	const bool isHardlink();
@@ -109,13 +108,22 @@ struct TarEntry
 	void updateMtim(struct timespec *mtim);
 	void registerTarFile(TarFile *tf, size_t o);
 	void registerTazFile();
+    	void registerGzFile();
 	void enableTazFile()
 	{
 		taz_file_in_use_ = true;
 	}
+	void enableGzFile()
+	{
+		gz_file_in_use_ = true;
+	}
 	bool hasTazFile()
 	{
 		return taz_file_in_use_;
+	}
+	bool hasGzFile()
+	{
+		return gz_file_in_use_;
 	}
 	TarFile *tarFile()
 	{
@@ -124,6 +132,10 @@ struct TarEntry
 	TarFile *tazFile()
 	{
 		return taz_file_;
+	}
+	TarFile *gzFile()
+	{
+		return gz_file_;
 	}
 	size_t tarOffset()
 	{
@@ -143,6 +155,7 @@ struct TarEntry
 	void createMediumTar(int i);
 	void createLargeTar(uint32_t hash);
 
+        vector<TarFile*> &tars() { return tars_; }
 	TarFile *smallTar(int i)
 	{
 		return small_tars_[i];
@@ -258,7 +271,6 @@ private:
 	struct stat sb_;
 	TarFile *tar_file_;
 	size_t tar_offset_;
-	size_t size;
 	size_t blocked_size_;
 	size_t disk_size;
 
@@ -271,6 +283,9 @@ private:
 	vector<string> files_; // Files to be listed inside this TarEntry (ie the virtual tar files..)
 	TarFile *taz_file_;
 	bool taz_file_in_use_ = false;
+	TarFile *gz_file_;
+	bool gz_file_in_use_ = false;
+        vector<TarFile*> tars_; // All tars including the taz.
 	map<size_t, TarFile*> small_tars_;  // Small file tars in side this TarEntry
 	map<size_t, TarFile*> medium_tars_; // Medium file tars in side this TarEntry
 	map<size_t, TarFile*> large_tars_;  // Large file tars in side this TarEntry
@@ -281,8 +296,8 @@ private:
 
 	TarEntry *tar_collection_dir = NULL; // This entry is stored in this tar collection dir.
 	bool is_added_to_directory_ = false;
-	bool virtual_file = false;
-	string content;
+        bool virtual_file_ = false;
+        vector<unsigned char> content;
 
         bool hash_calculated_;
     	char header_hash_[SHA256_DIGEST_LENGTH];
@@ -290,7 +305,7 @@ private:
 
 void cookEntry(string *listing, TarEntry *entry);
 
-bool eatEntry(vector<char> &v, vector<char>::iterator &i, string &tar_path,
+bool eatEntry(vector<char> &v, vector<char>::iterator &i, Path *dir_to_prepend,
               mode_t *mode, size_t *size, size_t *offset, string *tar, Path **path,
               string *link, bool *is_sym_link, time_t *secs, time_t *nanos,
               bool *eof, bool *err);

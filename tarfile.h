@@ -25,6 +25,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <openssl/sha.h>
 
 #include "util.h"
 
@@ -34,7 +35,7 @@ using namespace std;
 
 enum TarContents
 {
-    DIR_TAR, SMALL_FILES_TAR, MEDIUM_FILES_TAR, SINGLE_LARGE_FILE_TAR
+    REG_FILE, DIR_TAR, SMALL_FILES_TAR, MEDIUM_FILES_TAR, SINGLE_LARGE_FILE_TAR
 };
 
 struct TarFile
@@ -42,10 +43,13 @@ struct TarFile
     TarFile()
     {
     }
-    TarFile(TarEntry *d, TarContents tc, int n, bool dirs);
+    TarFile(TarEntry *d, TarContents tc, int n, bool has_header);
     string name()
     {
         return name_;
+    }
+    Path* path() {
+        return path_;
     }
     size_t size()
     {
@@ -66,7 +70,12 @@ struct TarFile
     pair<TarEntry*, size_t> findTarEntry(size_t offset);
 
     void calculateSHA256Hash();
-    string SHA256Hash() { return sha256_hash_; }
+    void calculateSHA256Hash(vector<TarFile*> &tars);
+    void fixName();
+    void setName(string s);
+    string SHA256Hash() { return sha256_hash_string_; }
+    char *sha256() { return sha256_hash_; }
+    
     size_t currentTarOffset()
     {
         return current_tar_offset_;
@@ -75,10 +84,13 @@ struct TarFile
     {
         return &mtim_;
     }
+    void updateMtim(struct timespec *mtim);
+
     string line(Path *p);
 
     char chartype() {
         switch (tar_contents) {
+        case REG_FILE: return 'x';
         case DIR_TAR: return 'z';
         case SMALL_FILES_TAR: return 'r';
         case MEDIUM_FILES_TAR: return 'm';
@@ -90,23 +102,25 @@ struct TarFile
     
 private:
 
-    TarEntry *in_directory;
+    TarEntry *in_directory_;
     // A virtual tar can contain small files, medium files or a single large file.
     TarContents tar_contents = SMALL_FILES_TAR;
 
     // Name of the tar, tar00000000.tar taz00000000.tar tal00000000.tar tam00000000.tar
     string name_;
+    Path *path_;
     uint32_t hash;
     bool hash_initialized = false;
     size_t size_;
-    map<size_t, TarEntry*> contents;
+    map<size_t, TarEntry*> contents_;
     vector<size_t> offsets;
     size_t current_tar_offset_ = 0;
     struct timespec mtim_;
     TarEntry *volume_header_;
     TarEntry *volume_contents;
     TarEntry *volume_footer;
-    string sha256_hash_;
+    char sha256_hash_[SHA256_DIGEST_LENGTH];    
+    string sha256_hash_string_;
 };
 
 #endif

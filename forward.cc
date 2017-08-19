@@ -33,6 +33,8 @@
 #include <fstream>
 #include <set>
 #include <sstream>
+#include <zlib.h>
+
 
 #include "log.h"
 #include "tarfile.h"
@@ -41,6 +43,12 @@ using namespace std;
 
 ComponentId FORWARD = registerLogComponent("forward");
 ComponentId HARDLINKS = registerLogComponent("hardlinks");
+
+TarredFS::TarredFS() {
+    int rc = regcomp(&file_name_regex,
+    "([rmlxzRMLZX])01_([0-9]+)\\.([0-9]+)_([0-9]+)_([0-9a-fA-F]+)_([0-9a-fA-F]+)\\.(tar|gz|TAR|GZ)", REG_EXTENDED);
+    assert(!rc);
+}
 
 int TarredFS::recurse(FileCB cb) {
     // Recurse into the root dir. Maximum 256 levels deep.
@@ -274,7 +282,7 @@ void TarredFS::pruneDirectories() {
             //    /Development/programs/src
             // We are doing this check on the remaining directories after the tar collection dirs have
             // been selected. Thus a lot of case conflicts can be handled inside the tars.
-            // Typically all file name conflicts are handled.
+            // All file name conflicts are handled.
             string dlc = tolowercase(d.first->path());
             if (paths_lowercase.count(dlc) > 0) {
                 error(FORWARD, "Case conflict for:\n%s\n%s\n", d.first->c_str(), paths_lowercase[dlc].c_str());
@@ -440,6 +448,7 @@ size_t TarredFS::groupFilesIntoTars() {
 
         // This is the taz file that store sub directories for this tar collection dir.
         te->registerTazFile();
+        te->registerGzFile();
         size_t has_dir = 0;
 
         // Order of creation: l m r z
@@ -484,7 +493,6 @@ size_t TarredFS::groupFilesIntoTars() {
                     }
                     curr->addEntryLast(entry);
                 }
-
             }
         }
 
@@ -496,6 +504,7 @@ size_t TarredFS::groupFilesIntoTars() {
             TarFile *tf = t.second;
             tf->fixSize();
             tf->calculateSHA256Hash();
+            tf->fixName();
             if (tf->currentTarOffset() > te->tazFile()->volumeHeader()->blockedSize()) {
                 debug(FORWARD,"%s%s size became %zu\n", te->path()->c_str(), tf->name().c_str(), tf->size());
                 te->appendFileName(tf->name());
@@ -507,6 +516,7 @@ size_t TarredFS::groupFilesIntoTars() {
             TarFile *tf = t.second;
             tf->fixSize();
             tf->calculateSHA256Hash();
+            tf->fixName();
             if (tf->currentTarOffset() > te->tazFile()->volumeHeader()->blockedSize()) {
                 debug(FORWARD,"%s%s size became %zu\n", te->path()->c_str(), tf->name().c_str(), tf->size());
                 te->appendFileName(tf->name());
@@ -518,6 +528,7 @@ size_t TarredFS::groupFilesIntoTars() {
             TarFile *tf = t.second;
             tf->fixSize();
             tf->calculateSHA256Hash();
+            tf->fixName();
             if (tf->currentTarOffset() > te->tazFile()->volumeHeader()->blockedSize()) {
                 debug(FORWARD,"%s%s size became %zu\n", te->path()->c_str(), tf->name().c_str(), tf->size());
                 te->appendFileName(tf->name());
@@ -526,6 +537,10 @@ size_t TarredFS::groupFilesIntoTars() {
             }
         }
 
+        te->tazFile()->fixSize();
+        te->tazFile()->calculateSHA256Hash();
+        te->tazFile()->fixName();       
+        
         set<uid_t> uids;
         set<gid_t> gids;
         for(auto & entry : te->entries()) {
@@ -533,25 +548,32 @@ size_t TarredFS::groupFilesIntoTars() {
             gids.insert(entry->stat()->st_gid);
         }
 
-        string listing;
-        listing.append("#tarredfs " TARREDFS_VERSION "\n");
-        listing.append("#uids");
+        string gzfile_contents;
+        gzfile_contents.append("#tarredfs " TARREDFS_VERSION "\n");
+        gzfile_contents.append("#message ");
+        gzfile_contents.append(message_);
+        gzfile_contents.append("\n");
+        gzfile_contents.append("#uids");
         for (auto & x : uids) {
             stringstream ss;
             ss << x;
-            listing.append(" ");
-            listing.append(ss.str());
+            gzfile_contents.append(" ");
+            gzfile_contents.append(ss.str());
         }
-        listing.append("\n");
-        listing.append("#gids");
+        gzfile_contents.append("\n");
+        gzfile_contents.append("#gids");
         for (auto & x : gids) {
             stringstream ss;
             ss << x;
-            listing.append(" ");
-            listing.append(ss.str());
+            gzfile_contents.append(" ");
+            gzfile_contents.append(ss.str());
         }
-        listing.append("\n");
-        listing.append(separator_string);
+        gzfile_contents.append("\n");
+        gzfile_contents.append("#files ");
+        gzfile_contents.append(to_string(te->entries().size()));
+        gzfile_contents.append("\n");
+        gzfile_contents.append(separator_string);
+
         size_t width = 3;
         string space(" ");
         for(auto & entry : te->entries()) {
@@ -569,32 +591,62 @@ size_t TarredFS::groupFilesIntoTars() {
         }
 
         for(auto & entry : te->entries()) {
-            cookEntry(&listing, entry);
-            // Make sure the tazfile timestamp is the latest changed timestamp of all included tars.
-            entry->updateMtim(te->tazFile()->mtim());
+            cookEntry(&gzfile_contents, entry);
+            // Make sure the gzfile timestamp is the latest
+            // changed timestamp of all included entries!
+            entry->updateMtim(te->gzFile()->mtim());
         }
-        struct stat sb;
-        memset(&sb, 0, sizeof(sb));
-        sb.st_size = listing.length();
-        sb.st_uid = geteuid();
-        sb.st_gid = getegid();
-        sb.st_mode = S_IFREG | 0400;
-        sb.st_nlink = 1;
 
-        TarEntry *list = new TarEntry(NULL, Path::lookup("tarredfs-contents"), &sb);
-        list->setContent(listing);
-        te->tazFile()->addEntryFirst(list);
-        te->tazFile()->fixSize();
-        te->tazFile()->calculateSHA256Hash();
+        vector<TarFile*> tars;
+        for (auto & st : tar_storage_directories) {
+            TarEntry *ste = st.second;
+            bool b = ste->path()->isBelowOrEqual(te->path());
+            if (b) {
+                for (auto & tf : ste->tars()) {
+                    if (tf->volumeHeader() == NULL || tf->size() > tf->volumeHeader()->blockedSize() ) {
+                        tars.push_back(tf);
+                        // Make sure the gzfile timestamp is the latest
+                        // of all subtars as well.
+                        tf->updateMtim(te->gzFile()->mtim());
+                    }
+                }
+            }
+        }
+
+        te->gzFile()->calculateSHA256Hash(tars);
+        te->gzFile()->fixName();
+
+        gzfile_contents.append("#tars ");
+        gzfile_contents.append(to_string(tars.size()));
+        gzfile_contents.append("\n");
+        gzfile_contents.append(separator_string);
+        for (auto & tf : tars) {
+            gzfile_contents.append(tf->path()->c_str());
+            gzfile_contents.append("\n");
+            gzfile_contents.append(separator_string);
+        }
+                
+        vector<unsigned char> compressed_gzfile_contents;
+        gzipit(&gzfile_contents, &compressed_gzfile_contents);
+
+        TarEntry *dirs = new TarEntry(compressed_gzfile_contents.size());
+        dirs->setContent(compressed_gzfile_contents);
+        te->gzFile()->addEntryLast(dirs);        
+        te->gzFile()->fixSize();
 
         if (te->tazFile()->size() > te->tazFile()->volumeHeader()->blockedSize() ) {
+            
             debug(FORWARD,"%s%s size became %zu\n", te->path()->c_str(),
                   te->tazFile()->name().c_str(), te->tazFile()->size());
+
             te->appendFileName(te->tazFile()->name());
             appendTarList(te->path(), te->tazFile());
             te->enableTazFile();
             has_dir = 1;
         }
+        te->appendFileName(te->gzFile()->name());
+        appendTarList(te->path(), te->gzFile());
+        te->enableGzFile();
 
         num += has_dir+te->smallTars().size()+te->mediumTars().size()+te->largeTars().size();
     }
@@ -667,23 +719,34 @@ void TarredFS::saveTarListFile() {
 
 TarFile *TarredFS::findTarFromPath(Path *path) {
     string n = path->name()->literal();
+    const char *nn = n.c_str();
     string d = path->parent()->name()->literal();
 
-    size_t l = n.length();
-    if (l < 8 || l > 150 || n[0] != 't' || n[1] != 'a' || (n[2] != 'r' && n[2] != 'z' && n[2] != 'l' && n[2] != 'm') ||
-        n[l-1] != 'r' || n[l-2] != 'a' || n[l-3] != 't' || n[l-4] != '.')
-    {
+    // File names:
+    // (r)01_(001501080787).(579054757)_(1119232)_(3b5e4ec7fe38d0f9846947207a0ea44c)_(0).(tar)
+    regmatch_t pmatch[8];
+    int err = regexec(&file_name_regex, nn, 8, pmatch, 0);
+    if (err) {
         debug(FORWARD, "Not a tar file.\n");
         return NULL;
     }
 
-    const char t = n[2];
+    const char t = nn[pmatch[1].rm_so];
     TarEntry *te = directories[path->parent()];
     if (!te) {
         debug(FORWARD,"Not a directory >%s<\n",d.c_str());
         return NULL;
     }
-    string hash = n.substr(4,32);
+    string type = n.substr(pmatch[7].rm_so,pmatch[7].rm_eo-pmatch[7].rm_so);
+    string hash = n.substr(pmatch[5].rm_so,pmatch[5].rm_eo-pmatch[5].rm_so);
+    debug(FORWARD, "Type is %s\n", type.c_str());
+    if (type == "gz") {
+        if (!te->hasGzFile()) {
+            debug(FORWARD, "No such gz file >%s<\n", hash.c_str());
+            return NULL;
+        }
+        return te->gzFile();
+    } else
     if (t == 'l') {
         if (te->largeHashTars().count(hash) == 0) {
             debug(FORWARD, "No such large tar >%s<\n", hash.c_str());
@@ -816,6 +879,7 @@ int TarredFS::readCB(const char *path_char_string, char *buf, size_t size, off_t
         goto err;
     }
 
+    fprintf(stderr, "TAR %s\n", tar->name().c_str());
     if ((size_t)offset >= tar->size()) {
         goto zero;
     }

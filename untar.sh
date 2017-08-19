@@ -63,6 +63,7 @@ cmd=''
 verbose=''
 extract=''
 ext=''
+gen=''
 
 while [[ $1 =~ -.* ]]
 do
@@ -70,8 +71,13 @@ do
         -d) debug='true'
             shift ;;
     esac
-    case $2 in
+    case $1 in
         -c) check='true'
+            shift ;;
+    esac
+    case $1 in
+        -g) gen="$2"
+            shift
             shift ;;
     esac
 done
@@ -99,7 +105,7 @@ esac
 case $1 in
     *a*)
         cmd=${cmd}a
-        ext='(\.xz|\.gz|\.bz2|)$'
+        ext='{.xz,.gz,.bz2,}'
         ;;
 esac
 
@@ -120,8 +126,43 @@ if [ "$3" != "" ]; then
 fi
 
 root="$(realpath $2)"
+
+numgzs=$(ls "$root"/x01*.gz | sort -r | wc | tr -s ' ' | cut -f 2 -d ' ')
+
+if [ "$numgzs" = "0" ]; then
+    echo No tarredfs found in "$root"
+    exit
+fi
+
+if [ "$numgzs" = "1" ]; then
+    if [ "$gen" != "" ] && [ "$gen" != "@0" ] ; then
+        echo Only generation @0 exists!
+        exit
+    fi
+    generation=$(echo "$root"/x01*.gz)
+else
+    ls "$root"/x01*.gz | sort -r > "$dir/generations"
+    if [ "$gen" = "" ]; then
+        echo More than one tarredfs generation found!
+        echo Select a generation using -g
+        n=0
+        while IFS='' read i; do
+            msg=$(gunzip -c "$i" | head -2 | grep \#message | sed 's/#message //')
+            secs=$(echo "$i" | sed "s/.*x01_\([0-9]\+\).*/\1/")
+            dat=$(date --date "@$secs")
+            echo -e "@$n\t$dat\t$msg"
+            n=$((n+1))
+        done <"$dir/generations"
+        exit
+    else
+        gen="${gen##@}"
+        gen=$((gen+1))
+        generation=$(sed -n ${gen}p "$dir/generations")
+    fi    
+fi
+
 # Find the tar files
-(cd "$root" && find . -type f -regextype awk -regex ".*/ta[rmlz]_[0-9a-z]+_[0-9]+\.[0-9]+_[0-9]+\.tar${ext}" | sed 's/^\.\///' | sort) > "$dir/aa"
+gunzip -c "$generation" | tr -d '\0' | grep -A5000 -m1 \#tars | grep -v x01 | grep -v \#tars | sed 's/^\///' > "$dir/aa"
 cat "$dir/aa" | tr -c -d '/\n' | tr / a > "$dir/bb"
 # Sort them on the number of slashes, ie handle the
 # deepest directories first, finish with the root
@@ -129,7 +170,7 @@ cat "$dir/aa" | tr -c -d '/\n' | tr / a > "$dir/bb"
 paste "$dir/bb" "$dir/aa" | LC_COLLATE=en_US.UTF8 sort | cut -f 2- > "$dir/cc"
 
 # Iterate over the tar files and extract them
-# in the corresponding directory
+# in the corresponding directory. Read store a line at a time from $dir/cc into $tar_file
 while IFS='' read tar_file; do
     # Extract directory in which the tar file resides.
     tar_dir="$(dirname "$tar_file")"
@@ -137,7 +178,7 @@ while IFS='' read tar_file; do
     tar_dir_prefix="${tar_dir#.}"
     if [ "$tar_dir_prefix" != "" ]; then
         # Make sure prefix ends with a slash.
-        tar_dir_prefix="$tar_dir_prefix/"
+        tar_dir_prefix="$tar_dir_prefix"/
     fi
     try_tar='true'
     if [ "$extract_this" != "" ]; then
@@ -154,33 +195,38 @@ while IFS='' read tar_file; do
         fi
     fi
 
-    if [ "$verbose" = "true" ]; then
+    file=$(echo "$root/$tar_file"*)
+    if [ ! -f "$file" ]; then
+        echo Error file "$file" does not exist!
+        exit
+    fi
 
-        CMD="tar ${cmd}f \"$root/$tar_file\" --exclude='tarredfs-contents' \"$ex\" $ignore_errs"
+    if [ "$verbose" = "true" ]; then
+        CMD="tar ${cmd}f \"$file\" \"$ex\" $ignore_errs"
         if [ "$try_tar" == "true" ]; then            
             pushDir
             if [ "$debug" == "true" ]; then echo "$CMD"; fi
             eval $CMD > $dir/tmplist
             popDir
             if [ "$?" == "0" ]; then
-                echo Tarredfs: tar ${cmd}f "$tar_file" --exclude='tarredfs-contents' "$ex"
+                echo Tarredfs: tar ${cmd}f \"$file\" \"$ex\"
             fi
             # Insert the tar_dir path as a prefix of the tar contents.
-            awk '{p=match($0," [0-9][0-9]:[0-9][0-9] "); print substr($0,0,p+6)"'"$tar_dir"'/"substr($0,p+7)}' $dir/tmplist
+            awk '{p=match($0," [0-9][0-9]:[0-9][0-9] "); print substr($0,0,p+6)"'" $tar_dir"'/"substr($0,p+7)}' $dir/tmplist
             rm $dir/tmplist
         else
-            if [ "$debug" == "true" ]; then echo Skipping "$root/$tar_file"; fi
+            if [ "$debug" == "true" ]; then echo Skipping "$file"; fi
         fi
 
     else
         if [ "$try_tar" == "true" ]; then
-            CMD="tar ${cmd}f \"$root/$tar_file\" --exclude='tarredfs-contents' \"$ex\" $ignore_errs"
+            CMD="tar ${cmd}f \"$file\" \"$ex\" $ignore_errs"
             pushDir
             if [ "$debug" == "true" ]; then echo "$CMD"; fi
             eval $CMD
             popDir
             if [ "$?" != "0" ] && [ "$ignore_errs" == "" ]; then
-                echo Failed when executing: tar ${cmd}f "$root/$tar_file"
+                echo Failed when executing: tar ${cmd}f \"$file\"
                 exit
             fi
         else

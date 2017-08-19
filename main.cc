@@ -48,6 +48,7 @@ void printHelp(const char *app)
                     "general options:\n"
                     "  -h   --help      print help\n"
                     "  -V   --version   print version\n"
+                    "  -m message       store a message in the tarredfs\n"
                     "  -i pattern       only paths matching regex pattern are included\n"
                     "  -x pattern       paths matching regex pattern are excluded\n"
                     "  -s [num],[rps]   set -ta and -tr automatically based on you upload bandwidth\n"
@@ -125,6 +126,14 @@ void parseForwardOptions(int *argc, char **argv, TarredFS *tfs,
             argvs[2] = 0;
             fuse_main(2, argvs, tarredfs_ops, NULL);
             exit(1);
+        }
+        else if (!strcmp(argv[i], "-m"))
+        {
+            tfs->setMessage(argv[i+1]);
+            debug(MAIN, "Message \"%s\"\n", argv[i + 1]);
+            eraseArg(i, argc, argv);
+            eraseArg(i, argc, argv);
+            i--;
         }
         else if (!strcmp(argv[i], "-i") || !strcmp(argv[i], "--include"))
         {
@@ -303,6 +312,19 @@ void parseReverseOptions(int *argc, char **argv, ReverseTarredFS *tfs,
             printHelp(argv[0]);
             exit(1);
         }
+        else if (!strcmp(argv[i], "-ll"))
+        {
+            listLogComponents();
+            exit(1);
+        }
+        else if (!strcmp(argv[i], "-l"))
+        {
+            setLogLevel(DEBUG);
+            setLogComponents(argv[i + 1]);
+            eraseArg(i, argc, argv);
+            eraseArg(i, argc, argv);
+            i--;
+        }
         else if (!strncmp(argv[i], "-d", 2))
         {
             setLogLevel(DEBUG);
@@ -330,7 +352,7 @@ void parseReverseOptions(int *argc, char **argv, ReverseTarredFS *tfs,
 
         if (argv[i][0] != '-')
         {
-            if (tfs->root_dir.empty())
+            if (tfs->rootDir() == NULL)
             {
                 char tmp[PATH_MAX];
                 const char *rc = realpath(argv[i], tmp);
@@ -339,12 +361,12 @@ void parseReverseOptions(int *argc, char **argv, ReverseTarredFS *tfs,
                     error(MAIN, "Could not find real path for %s\n", argv[i]);
                 }
                 assert(rc == tmp);
-                tfs->root_dir = tmp;
+                tfs->setRootDir(Path::lookup(tmp));
                 // Erase the rootDir from argv.
                 eraseArg(i, argc, argv);
                 i--;
             }
-            else if (tfs->mount_dir.empty())
+            else if (tfs->mountDir() == NULL)
             {
                 char tmp[PATH_MAX];
                 const char *rc = realpath(argv[i], tmp);
@@ -354,7 +376,7 @@ void parseReverseOptions(int *argc, char **argv, ReverseTarredFS *tfs,
                             "Could not find real path for %s\nExisting mount here?\n",
                             argv[i]);
                 }
-                tfs->mount_dir = tmp;
+                tfs->setMountDir(Path::lookup(tmp));
             }
         }
     }
@@ -406,7 +428,8 @@ int open_callback(const char *path, struct fuse_file_info *fi)
 
 int main(int argc, char *argv[])
 {
-
+    captureStartTime();
+    
     if (argc > 1 && (!strcmp(argv[1], "--reverse") || !strcmp(argv[1], "-r")))
     {
         eraseArg(1, &argc, argv);
@@ -510,45 +533,60 @@ int reversemain(int argc, char *argv[])
     reverse_tarredfs_ops.readdir = ReverseReaddir<&reverse_fs>::cb;
     reverse_tarredfs_ops.readlink = ReverseReadlink<&reverse_fs>::cb;
 
-    if (reverse_fs.root_dir.empty() || reverse_fs.mount_dir.empty())
+    if (reverse_fs.rootDir() == NULL || reverse_fs.mountDir() == NULL)
     {
         printHelp(argv[0]);
         exit(1);
     }
 
-    vector<string> versions;
-    reverse_fs.checkVersions(Path::lookup(reverse_fs.root_dir), &versions);
+    vector<Version> versions;
+    reverse_fs.checkVersions(reverse_fs.rootDir(), &versions);
 
     if (versions.size() == 0) {
         error(MAIN, "main",
                 "Not a tarredfs filesystem! "
-                        "Could not find a taz00000000.tar file in the root directory!\n");
+                        "Could not find a x01 tar file in the root directory!\n");
     }
-    if (versions.size() > 1) {
+    int gen = reverse_fs.getGeneration();
+    if (versions.size() > 1 && gen == -1) {
         printf("Multiple versions: (use -g to select one)\n");
-        int g = 0;
         for (auto s : versions) {
-            printf("@%d %s\n", g, s.c_str());
-            g++;
+            printf("@%d   %-15s %s\n", s.key, s.ago.c_str(), s.datetime.c_str());
         }
         printf("\n");
         exit(1);
     }
-    string name = versions[0];
+    if (gen == -1) { gen = 0; }
     
-    // Check that there is a taz file in the root dir.
+    string name = versions[gen].filename;
+
+    // Check that it is a proper file.
     struct stat sb;
-    string taz = reverse_fs.root_dir + "/" + name;
-    int rc = stat(taz.c_str(), &sb);
+    Path *gz = Path::lookup(reverse_fs.rootDir()->path() + "/" + name);
+
+    int rc = stat(gz->c_str(), &sb);
     if (rc || !S_ISREG(sb.st_mode))
     {
+        error(MAIN, "Not a regular file %s\n", gz->c_str());
     }
 
-    reverse_fs.loadCache(Path::lookupRoot(), Path::lookup(taz));
-    Entry &e = reverse_fs.entries[Path::lookupRoot()];
-    time_t s = 0, n = 0;
+    // Populate the list of all tars from the root x01 gz file.
+    bool ok = reverse_fs.loadGz(gz, Path::lookupRoot());
+    if (!ok) {
+        error(MAIN, "Fatal error, could not load root x01 file!\n");
+    }
 
-    for (auto i : e.dir)
+    // Populate the root directory with its contents.
+    reverse_fs.loadCache(Path::lookupRoot());
+
+    Entry *e = reverse_fs.findEntry(Path::lookupRoot());
+    assert(e != NULL);
+
+    // Look for the youngest timestamp inside root to
+    // be used as the timestamp for the root directory.
+    // The root directory is by definition not defined inside gz file.
+    time_t s = 0, n = 0;
+    for (auto i : e->dir)
     {
         if (i->secs > s || (i->secs == s && i->nanos > n))
         {
@@ -556,8 +594,8 @@ int reversemain(int argc, char *argv[])
             n = i->nanos;
         }
     }
-    e.secs = s;
-    e.nanos = n;
+    e->secs = s;
+    e->nanos = n;
 
     return fuse_main(argc, argv, &reverse_tarredfs_ops, NULL);
 }

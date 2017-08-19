@@ -22,6 +22,8 @@
 #include <stddef.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <linux/memfd.h>
+#include <sys/syscall.h>
 #include <sys/time.h>
 #include <cassert>
 #include <cctype>
@@ -36,6 +38,7 @@
 #include <map>
 #include <sstream>
 #include <utility>
+#include <zlib.h>
 
 #include "log.h"
 
@@ -584,6 +587,62 @@ std::locale const *getLocale()
 	return &user_locale;
 }
 
+static struct timespec start_time_;
+
+void captureStartTime() {
+    clock_gettime(CLOCK_REALTIME, &start_time_);
+}
+
+bool isInTheFuture(struct timespec *tm)
+{
+    // What happens with summer and winter time changes?    
+    return tm->tv_sec > start_time_.tv_sec ||
+        (tm->tv_sec == start_time_.tv_sec && tm->tv_nsec > start_time_.tv_nsec);
+}
+
+string timeAgo(struct timespec *tm)
+{
+    if (start_time_.tv_sec == tm->tv_sec &&
+        start_time_.tv_nsec == tm->tv_nsec) {
+        return "Now";
+    }
+    string msg = "ago";
+    time_t diff = start_time_.tv_sec - tm->tv_sec;
+
+    if (start_time_.tv_sec < tm->tv_sec ||
+        (start_time_.tv_sec == tm->tv_sec &&
+         start_time_.tv_nsec < tm->tv_nsec)) {
+        // Time is in the future
+        msg = "in the future";
+        diff = tm->tv_sec - start_time_.tv_sec;
+    } 
+
+    if (diff == 0) {
+        return "Less than a second "+msg;
+    }
+    if (diff < 60) {
+        return "Less than a minute "+msg;
+    }
+    if (diff < 60*60) {
+        int minutes = diff/60;
+        return to_string(minutes)+" minutes "+msg;
+    }
+    if (diff < 60*60*24) {
+        int hours = diff/(60*60);
+        return to_string(hours)+" hours "+msg;
+    }
+    if (diff < 60*60*24*7) {
+        int days = diff/(60*60*24);
+        return to_string(days)+" days "+msg;
+    }
+    if (diff < 60*60*24*7*4) {
+        int weeks = diff/(60*60*24*7);
+        return to_string(weeks)+" weeks "+msg;
+    }
+    int months = diff/(60*60*24*7*4);
+    return to_string(months)+" months "+msg;
+}
+
 std::wstring to_wstring(std::string const& s)
 {
 	std::wstring_convert<std::codecvt_utf8<wchar_t> > conv;
@@ -636,26 +695,27 @@ static map<string, Path*> interned_paths;
 
 Path *Path::lookup(string p)
 {
-	if (p.back() == '/')
-	{
-		p = p.substr(0, p.length() - 1);
-	}
-	auto pl = interned_paths.find(p);
-	if (pl != interned_paths.end())
-	{
-		return pl->second;
-	}
-	auto s = dirname_(p);
-	if (s.second)
-	{
-		Path *parent = lookup(s.first);
-		Path *np = new Path(parent, Atom::lookup(basename_(p)));
-		interned_paths[p] = np;
-		return np;
-	}
-	Path *np = new Path(NULL, Atom::lookup(basename_(p)));
-	interned_paths[p] = np;
-	return np;
+    if (p.back() == '/')
+    {
+        p = p.substr(0, p.length() - 1);
+    }
+    assert(p.back() != '\n');
+    auto pl = interned_paths.find(p);
+    if (pl != interned_paths.end())
+    {
+        return pl->second;
+    }
+    auto s = dirname_(p);
+    if (s.second)
+    {
+        Path *parent = lookup(s.first);
+        Path *np = new Path(parent, Atom::lookup(basename_(p)));
+        interned_paths[p] = np;
+        return np;
+    }
+    Path *np = new Path(NULL, Atom::lookup(basename_(p)));
+    interned_paths[p] = np;
+    return np;
 }
 
 Path *Path::lookupRoot()
@@ -694,6 +754,11 @@ deque<Path*> Path::nodes()
 		p = p->parent();
 	}
 	return v;
+}
+
+Path *Path::appendName(Atom *n) {
+    string s = path()+"/"+n->literal();
+    return lookup(s);    
 }
 
 Path *Path::parentAtDepth(int i)
@@ -765,8 +830,14 @@ Path* Path::subpath(int from, int len)
 
 Path* Path::prepend(Path *p)
 {
-	string rs = p->path() + "/" + path();
-	return lookup(rs);
+    string concat;
+    if (p->path().front() == '/' && path().front() == '/') {
+        concat = p->path() + path();
+    } else {
+        concat = p->path() + "/" + path();
+    }
+    Path *pa = lookup(concat);
+    return pa;
 }
 
 Path* Path::commonPrefix(Path *a, Path *b)
@@ -794,3 +865,112 @@ Path::Initializer::Initializer()
 
 Path::Initializer Path::initializer_s;
 
+
+void toLittleEndian(uint16_t *t)
+{}
+
+void toLittleEndian(uint32_t *t)
+{}
+
+#pragma pack(push, 1)
+
+struct GZipHeader {
+  char magic_header[2]; // 0x1f 0x8b
+  char compression_method; 
+  // 0: store (copied)
+  //  1: compress
+  //  2: pack
+  //  3: lzh
+  //  4..7: reserved
+  //  8: deflate
+  char flags;
+  // bit 0 set: file probably ascii text
+  // bit 1 set: continuation of multi-part gzip file, part number present
+  // bit 2 set: extra field present
+  // bit 3 set: original file name present
+  // bit 4 set: file comment present
+  // bit 5 set: file is encrypted, encryption header present
+  // bit 6,7:   reserved
+  char mtim[4]; // file modification time in Unix format
+  char extra_flags; // extra flags (depend on compression method)
+  char os_type; // 3 = Unix
+};
+
+#pragma pack(pop)
+
+int gzipit(string *from, vector<unsigned char> *to)
+{
+    int fd = syscall(SYS_memfd_create, "tarredfs-contents.gz", 0);
+    int fdd = dup(fd);
+    gzFile gzf = gzdopen(fdd, "w");
+    gzwrite(gzf, from->c_str(), from->length());
+    gzclose(gzf);
+    
+    size_t len = lseek(fd, 0, SEEK_END);
+    //assert(from->length()  == 0 || len < 10+8+2*from->length()); // The gzip header is 10, crc32+isize is 8
+    lseek(fd, 0, SEEK_SET);
+    
+    to->resize(len);
+    read(fd, &(*to)[0], len);
+    close(fd);
+
+    return OK;
+}
+
+int gunzipit(vector<char> *from, vector<char> *to)
+{
+    int fd = syscall(SYS_memfd_create, "tarredfs-subparts.gz", 0);
+    write(fd, &(*from)[0], from->size());
+
+    lseek(fd, 0, SEEK_SET);       
+    int fdd = dup(fd);
+    char buf[4096];
+    int n = 0;
+    gzFile gzf = gzdopen(fdd, "r");
+    do {
+        n = gzread(gzf, buf, sizeof(buf));
+        if (n == -1) break;
+        to->insert(to->end(), buf, buf+n);
+    } while (n==sizeof(buf));
+    gzclose(gzf);
+    close(fd);
+    
+    return OK;
+}
+
+/*    
+  const unsigned char *cstr = reinterpret_cast<const unsigned char*>(from->c_str());
+  size_t cstrlen = strlen(from->c_str());
+  
+  unsigned long bufsize = compressBound(cstrlen);
+  unsigned char *buf = new unsigned char[bufsize];
+  int rc = compress2(buf, &bufsize, cstr, cstrlen,1);
+
+  printf("%d >%*s<\n", (int)cstrlen, (int)cstrlen, cstr);
+  
+  assert(rc == Z_OK);
+
+  struct GZipHeader header;
+  
+  assert(sizeof(GZipHeader)==10);
+  memset(&header, 0, sizeof(GZipHeader));
+  header.magic_header[0] = 0x1f;
+  header.magic_header[1] = 0x8b;
+  header.compression_method = 8;
+  header.os_type = 3;
+  
+  to->clear();
+  uint32_t isize  = (uint32_t)cstrlen;
+  to->resize(bufsize+sizeof(GZipHeader)+sizeof(isize));
+  
+  memcpy(&(*to)[0],&header, sizeof(GZipHeader));
+  memcpy(&(*to)[0]+sizeof(GZipHeader),buf, bufsize);
+
+  toLittleEndian(&isize);
+  memcpy(&(*to)[0]+sizeof(GZipHeader)+bufsize, &isize, sizeof(isize));
+  
+  delete [] buf;
+  return OK;
+}
+
+*/

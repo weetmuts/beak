@@ -24,6 +24,7 @@
 #include <stddef.h>
 #include <sys/types.h>
 #include <map>
+#include <regex.h>
 #include <string>
 #include <utility>
 #include <vector>
@@ -95,7 +96,10 @@ struct TarredFS {
     void setTarListFile(string s);
     void appendTarList(Path *p, TarFile *tf);
     void saveTarListFile();
+    void setMessage(string m) { message_ = m; }
 
+    TarredFS();
+  
 private:
     size_t findNumTarsFromSize(size_t amount, size_t total_size);
     void calculateNumTars(TarEntry *te, size_t *nst, size_t *nmt, size_t *nlt,
@@ -103,6 +107,8 @@ private:
                           size_t *sc, size_t *mc);
     Path *tar_list_file_ = NULL;
     vector<string> tar_list_; // Contents to be stored in the tar_list_file
+    regex_t file_name_regex;
+    string message_;
 };
 
 #endif

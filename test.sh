@@ -85,6 +85,23 @@ function startFS {
     fi        
 }
 
+function startFSArchive {
+    run="$1"
+    extra="$2"
+    if [ -z "$test" ]; then
+        ./build/tarredfs -r $extra $packed $check > $log
+        ${run}
+    else
+        if [ -z "$gdb" ]; then
+            (sleep 2; eval ${run}) &
+            ./build/tarredfs -r -d $extra $packed $check 2>&1 | tee $log &
+        else
+            (sleep 3; eval ${run}) &
+            gdb -ex=r --args ./build/tarredfs -r -d $extra $packed $check 
+        fi        
+    fi        
+}
+
 function startFSExpectFail {
     run="$1"
     extra="$2"
@@ -106,6 +123,17 @@ function startFSExpectFail {
 function stopFS {
     (cd $mount; find . -exec ls -ld \{\} \; >> $log)
     fusermount -u $mount
+    if [ -n "$test" ]; then
+        sleep 2
+    fi
+    if [ "$1" != "nook" ]; then
+        echo OK
+    fi
+}
+
+function stopFSArchive {
+    (cd $mount; find . -exec ls -ld \{\} \; >> $log)
+    fusermount -u $check
     if [ -n "$test" ]; then
         sleep 2
     fi
@@ -155,7 +183,7 @@ function untar {
 }
 
 function pack {
-    (cd "$packed"; $THIS_DIR/pack.sh xz "$mount") >> "$log" 2>&1
+    (cd "$dir"; $THIS_DIR/pack.sh gzip "$mount" "$packed") >> "$log" 2>&1
 }
 
 function untarpacked {
@@ -202,7 +230,7 @@ function fifoTest {
 }
 
 function devTest {
-    $THIS_DIR/integrity-test.sh -dd "$dir" -f "! -path '*shm*'" /dev "$mount"
+    $THIS_DIR/integrity-test.sh -dd "$dir" -f "! -path '*shm*' -a ! -path '*tty*'" /dev "$mount"
     if [ $? -ne 0 ]; then
         echo Failed file attributes diff for $1! Check in $dir for more information.
         exit
@@ -304,7 +332,7 @@ if [ $do_test ]; then
     # require you to be root. So lets just mount /dev and
     # just list the contents of the tars!
     root=/dev
-    startFS devTest "-x shm -p 0"
+    startFS devTest "-x shm -x tty -p 0"
 fi
 
 setup basic11 "check that nothing gets between the directory and its contents"
@@ -325,23 +353,23 @@ if [ $do_test ]; then
 fi
 
 function timestampHashTest1 {
-    rc1=$(ls $mount/TJO/tar*.tar)
+    rc1=$(ls $mount/TJO/r*.tar)
     stopFS nook
     touch -d "2017-01-01 01:01:01.1235" $root/TJO/alfa
     startFS timestampHashTest2
 }
 
 function timestampHashTest2 {
-    rc2=$(ls $mount/TJO/tar*.tar)
+    rc2=$(ls $mount/TJO/r*.tar)
     if [ "$rc1" = "$rc2" ]; then
         echo "$rc1" "$rc2"
         echo Change in timestamp should change the virtual tar file hash!
         exit
     fi
     rc=$(basename "$rc2")
-    if [ "$rc" != "tar_3a3cee970b264dd3a5ca439bb745433f_001483228861.123500000_1024.tar" ]; then
+    if [ "$rc" != "r01_001483228861.123500000_1024_3a3cee970b264dd3a5ca439bb745433f_0.tar" ]; then
         echo "$rc"
-        echo The file hash SHOULD BE tar_3a3cee970b264dd3a5ca439bb745433f_001483228861.123500000.tar!
+        echo The file name SHOULD BE r01_001483228861.123500000_1024_3a3cee970b264dd3a5ca439bb745433f_0.tar!
         echo It is not!
         exit
     fi    
@@ -358,25 +386,33 @@ fi
 function mtimeTestPart1 {
     (cd $mount; find . -exec ls -ld \{\} \; > $org)    
     stopFS nook
-    touch -d "2015-03-03 05:03:03.1234" $root/beta/zz
+    touch -d "2015-03-03 03:03:03.1235" $root/beta/zz
     startFS mtimeTestPart2
 }
 
 function mtimeTestPart2 {
     (cd $mount; find . -exec ls -ld \{\} \; > $dest)
-    rc=$(diff -d $org $dest | \
-                grep -v beta/tar_a54fb4d2ce390e702203f948a16a72e3_001425348183.123400000_2560.tar | \
-                grep -v beta/tar_1c1b772a7abf4ab8588383b63c27f1d4_001425355383.123400000_2560.tar | \
-                grep -v beta/taz_be5b0bffa9073e03af4611bc13ab6a6c_001425348183.123400000_1536.tar | \
-                grep -v beta/taz_be5b0bffa9073e03af4611bc13ab6a6c_001425355383.123400000_1536.tar | \
-                tr -d '[:space:]')
-    if [ "$rc" != "6,7c6,7---" ]; then
-        echo "$rc"
-        echo Failed changed mtime should affect tar mtime test! Check in $dir for more information.
-        echo This test also fails, if the sort order of depthFirst is modified.
+    cat $org | sed 's/.01_00.*//' > ${org}.1
+    cat $dest | sed 's/.01_00.*//' > ${dest}.1
+    rc=$(diff -d ${org}.1 ${dest}.1)
+
+    if [ "$rc" != "" ]; then
+        echo "****$rc****"
+        echo Comparison should be empty since the nanoseconds do not show in ls -ld.
         exit
-    fi    
-    stopFS    
+    fi
+
+    cat $org  | sed '/\(alfa\|\.\/z01\)/! s/1234.*/1235/' > ${org}.2
+    cat $dest | sed '/\(alfa\|\.\/z01\)/! s/1235.*/1235/' > ${dest}.2
+    rc=$(diff -d ${org}.2 ${dest}.2)
+    
+    if [ "$rc" != "" ]; then
+        echo "****$rc****"
+        echo Comparison should be empty since we adjusted the 1234 nanos to 12345
+        echo and cut away the hashes that are expected to change.
+        exit
+    fi
+    stopFS
 }
 
 setup basic12 "Test last modified timestamp"
@@ -391,26 +427,16 @@ if [ $do_test ]; then
     startFS mtimeTestPart1
 fi
 
-function checkBasicVirtualTars {
-    rc=$(cd $mount; find . -name "*.tar" | tr -d '[:space:]')
-    if [ "$rc" != "./NNNNN/tar_9f514b38eaa4baa43543adcc7527eb82_001425348183.123400000_12289536.tar./NNNNN/tar_a2df5f4f07bc51c82a19b6f1f6b29f5a_001425348183.123400000_2048.tar./NNNNN/taz_92ed41d0b723183a5ab2c50247528edc_001425348183.123400000_2560.tar./taz_ed1bf1b5212f5aefbe98c70569ccf33e_001425348183.123400000_2048.tar" ]; then
-        echo "$rc"       
-        echo Virtual tars not created in the proper order! Check in $dir for more information.
-        exit
-    fi
-    stopFS
-}
-
-setup basic13 "Test that sort order is right for tar collection dir"
-if [ $do_test ]; then
-    mkdir -p $root/NNNNN/SSSS
-    dd bs=1024 count=6000 if=/dev/zero of=$root/NNNNN/RRRRR > /dev/null 2>&1
-    dd bs=1024 count=1 if=/dev/zero of=$root/NNNNN/SSSS/SSSS > /dev/null 2>&1
-    dd bs=1024 count=6000 if=/dev/zero of=$root/NNNNN/iiii > /dev/null 2>&1
-    touch -d "2015-03-03 03:03:03.1234" $root/NNNNN/SSSS $root/NNNNN/SSSS/* $root/NNNNN $root/NNNNN/* 
-    
-    startFS checkBasicVirtualTars 
-fi
+#setup basic13 "Test that sort order is right for tar collection dir"
+#if [ $do_test ]; then
+#    mkdir -p $root/NNNNN/SSSS
+#    dd bs=1024 count=6000 if=/dev/zero of=$root/NNNNN/RRRRR > /dev/null 2>&1
+#    dd bs=1024 count=1 if=/dev/zero of=$root/NNNNN/SSSS/SSSS > /dev/null 2>&1
+#    dd bs=1024 count=6000 if=/dev/zero of=$root/NNNNN/iiii > /dev/null 2>&1
+#    touch -d "2015-03-03 03:03:03.1234" $root/NNNNN/SSSS $root/NNNNN/SSSS/* $root/NNNNN $root/NNNNN/* 
+#    
+#    startFS checkBasicVirtualTars 
+#fi
 
 setup basic14 "Test paths with spaces"
 if [ $do_test ]; then
@@ -529,8 +555,8 @@ if [ $do_test ]; then
 fi
 
 function txTriggerTest {
-    if [ ! -f $mount/Alfa/snapshot_2016-12-30/taz00000000.tar ]; then
-        echo Expected the snapshot dir to be tarred!
+    if [ ! -f $mount/Alfa/snapshot_2016-12-30/x01_*.gz ]; then
+        echo Expected the snapshot dir to be tarred! Check in $dir for more information.
         exit
     fi
     untar
@@ -552,23 +578,23 @@ function noAvalancheTestPart1 {
     (cd $mount; find . -exec ls -ld \{\} \; > $org)    
     stopFS nook
     dd if=/dev/zero of="$root/s200" bs=1024 count=60 > /dev/null 2>&1
-    touch -d "2015-03-03 04:03:03.1234" "$root/s200"
+    touch -d "2015-03-03 03:03:03.1235" "$root/s200"
     startFS noAvalancheTestPart2 "-ta 1M -tr 1M"
 }
 
 function noAvalancheTestPart2 {
     (cd $mount; find . -exec ls -ld \{\} \; > $dest)
-    rc=$(diff -d $org $dest | \
-                grep -v tar_63a540c2902e2e340ced308c7ee92043_001425348183.123400000_658432.tar | \
-                grep -v tar_e68f010490292b31706f8d264728a20c_001425351783.123400000_720384.tar | \
-                grep -v taz_bcf2752c824ce7b7ad5f99777723379d_001425348183.123400000_49664.tar | \
-                grep -v taz_93da68569796dac852d580ea542139d3_001425351783.123400000_49664.tar | tr -d '[:space:]')
-    if [ "$rc" != "9c9---36c36---" ]; then
-        echo "$rc"
-        echo Failed no avalanche test should only affect a single content tar and the taz file! 
-        echo This test depends on the default setting for target and trigger size.
-        exit
-    fi    
+    diff $org $dest | grep \< > ${org}.1
+    diff $org $dest | grep \> > ${org}.2
+
+    al=$(wc -l ${org}.1 | cut -f 1 -d ' ')
+    bl=$(wc -l ${org}.2 | cut -f 1 -d ' ')
+
+    if [ "$al $bl" != "2 2" ]; then
+        echo Wrong number of files changed!
+        echo Check in $dir for more information.
+    fi
+
     stopFS
 }
 
@@ -633,6 +659,45 @@ setup reverse1 "Forward mount of libtar, Reverse mount back!"
 if [ $do_test ]; then
     cp -a libtar $root
     startTwoFS compareTwo
+fi
+
+
+function generationTestPart1 {
+    cp -r "$mount"/* "$packed"
+    chmod -R u+w "$packed"/*
+    stopFS nook
+    dd if=/dev/zero of="$root/s200" bs=1024 count=60 > /dev/null 2>&1
+    startFS generationTestPart2
+}
+
+function generationTestPart2 {
+    cp -r "$mount"/* "$packed"
+    chmod -R u+w "$packed"/*    
+    stopFS nook
+    startFSArchive generationTestPart3 "-g @0"
+}
+
+function generationTestPart3 {
+    if [ ! -f "$check/s200" ]; then
+        echo Error s200 should be there since we mount the latest generation.
+        exit
+    fi
+    stopFSArchive nook
+    startFSArchive generationTestPart4 "-g @1"
+}
+
+function generationTestPart4 {
+    if [ -f "$check/s200" ]; then
+        echo Error s200 should NOT be there since we mount the previous generation.
+        exit
+    fi
+    stopFSArchive
+}
+
+setup generation1 "Test that generations work"
+if [ $do_test ]; then
+    cp -a libtar "$root"
+    startFS generationTestPart1
 fi
 
 setup diff1 "Compare directories!"

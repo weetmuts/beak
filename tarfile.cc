@@ -33,20 +33,16 @@
 ComponentId TARFILE = registerLogComponent("tarfile");
 ComponentId HASHING = registerLogComponent("hashing");
 
-TarFile::TarFile(TarEntry *d, TarContents tc, int n, bool dirs)
+TarFile::TarFile(TarEntry *d, TarContents tc, int n, bool has_header)
 {
-	in_directory = d;
-	tar_contents = tc;
-	memset(&mtim_, 0, sizeof(mtim_));
-	char c = chartype();
-	assert(
-			(dirs && tar_contents == DIR_TAR)
-					|| (!dirs && tar_contents != DIR_TAR));
-	char buffer[256];
-	snprintf(buffer, sizeof(buffer), "ta%c%08x.tar", c, n);
-        // This is a temporary name! It will be overwritten when the hash is finalized!
-	name_ = buffer;
-	addVolumeHeader();
+    path_ = Path::lookupRoot();
+    in_directory_ = d;
+    tar_contents = tc;
+    memset(&mtim_, 0, sizeof(mtim_));
+    // This is a temporary name! It will be overwritten when the hash is finalized!
+    name_ = "";
+    volume_header_ = NULL;
+    if (has_header) addVolumeHeader();
 }
 
 void TarFile::addEntryLast(TarEntry *entry)
@@ -54,7 +50,7 @@ void TarFile::addEntryLast(TarEntry *entry)
 	entry->updateMtim(&mtim_);
 
 	entry->registerTarFile(this, current_tar_offset_);
-	contents[current_tar_offset_] = entry;
+	contents_[current_tar_offset_] = entry;
 	offsets.push_back(current_tar_offset_);
 	debug(TARFILE, "    %s    Added %s at %zu\n", name_.c_str(),
 			entry->path()->c_str(), current_tar_offset_);
@@ -84,7 +80,7 @@ void TarFile::addEntryFirst(TarEntry *entry)
 		newc[0] = entry;
 		newo.push_back(0);
 	}
-	for (auto & a : contents)
+	for (auto & a : contents_)
 	{
 		if (a.second != volume_header_)
 		{
@@ -99,7 +95,7 @@ void TarFile::addEntryFirst(TarEntry *entry)
 			//fprintf(stderr, "%s Not moving %s from %ju\n", name.c_str(), a.second->name.c_str(), a.first);
 		}
 	}
-	contents = newc;
+	contents_ = newc;
 	offsets = newo;
 
 	debug(TARFILE, "    %s    Added FIRST %s at %zu with blocked size %zu\n",
@@ -141,7 +137,7 @@ pair<TarEntry*, size_t> TarFile::findTarEntry(size_t offset)
 		i--;
 		o = *i;
 	}
-	TarEntry *te = contents[o];
+	TarEntry *te = contents_[o];
 
 	debug(TARFILE, "Found it %s\n", te->path()->c_str());
 	return pair<TarEntry*, size_t>(te, o);
@@ -149,26 +145,46 @@ pair<TarEntry*, size_t> TarFile::findTarEntry(size_t offset)
 
 void TarFile::calculateSHA256Hash()
 {
-	char hash[SHA256_DIGEST_LENGTH];
+    SHA256_CTX sha256;
+    SHA256_Init(&sha256);
+    
+    debug(HASHING,"Calculating hash for %s\n", path()->c_str());
+    // SHA256 all headers, including the first Volume label header with
+    // empty name and empty checksum.
+    for (auto & a : contents_)
+    {
+        size_t len = a.second->headerSize();
+        assert(len <= 512 * 5);
+        TarEntry *te = a.second;
+        debug(HASHING,"   %s %s\n", te->tarpath()->c_str(), te->headerHash().c_str());
+        SHA256_Update(&sha256, te->headerHashArray(), SHA256_DIGEST_LENGTH);
+    }
+    SHA256_Final((unsigned char*) sha256_hash_, &sha256);
+    // Copy the binary hash into the volume header name.
+    volume_header_->injectHash(sha256_hash_, SHA256_DIGEST_LENGTH);
+    sha256_hash_string_ = toHex(sha256_hash_, SHA256_DIGEST_LENGTH);
+    debug(HASHING, "Final hash %s\n", sha256_hash_string_.c_str());
+}
+
+void TarFile::calculateSHA256Hash(vector<TarFile*> &tars)
+{
+    size_ = 0;
 	SHA256_CTX sha256;
 	SHA256_Init(&sha256);
 
-	// SHA256 all headers, including the first Volume label header with
-	// empty name and empty checksum.
-	for (auto & a : contents)
+        debug(HASHING,"Calculating hash for gzfile %s\n", path()->c_str());
+	// SHA256 all tarfile hashes! This is the hash of this state!
+	for (auto & tf : tars)
 	{
-            size_t len = a.second->headerSize();
-            assert(len <= 512 * 5);
-            TarEntry *te = a.second;
-            debug(HASHING,"   %s %s\n", te->tarpath()->c_str(), te->headerHash().c_str());
-            SHA256_Update(&sha256, te->headerHashArray(), SHA256_DIGEST_LENGTH);
+            debug(HASHING,"   %s %s\n", tf->path()->c_str(), tf->SHA256Hash().c_str());
+            SHA256_Update(&sha256, tf->sha256(), SHA256_DIGEST_LENGTH);
 	}
-	SHA256_Final((unsigned char*) hash, &sha256);
-	// Copy the binary hash into the volume header name.
-	volume_header_->injectHash(hash, SHA256_DIGEST_LENGTH);
+	SHA256_Final((unsigned char*) sha256_hash_, &sha256);
+        sha256_hash_string_ = toHex(sha256_hash_, SHA256_DIGEST_LENGTH);
+        debug(HASHING, "Final hash %s\n", sha256_hash_string_.c_str());
+}
 
-        sha256_hash_ = toHex(hash, SHA256_DIGEST_LENGTH);
-
+void TarFile::fixName() {        
         char sizes[32];
         memset(sizes, 0, sizeof(sizes));
         snprintf(sizes, 32, "%zu", size());
@@ -178,10 +194,23 @@ void TarFile::calculateSHA256Hash()
         snprintf(secs_and_nanos, 32, "%012ju.%09ju", mtim()->tv_sec, mtim()->tv_nsec);
         
 	char buffer[256];
-	snprintf(buffer, sizeof(buffer), "ta%c_%s_%s_%s.tar", chartype(), sha256_hash_.c_str(), secs_and_nanos, sizes);
+        char gztype[] = "gz";
+        char tartype[] = "tar";
+        char *type = tartype;
+        if (chartype() == 'x') {
+            type = gztype;
+        }
+	snprintf(buffer, sizeof(buffer), "%c01_%s_%s_%s_0.%s",
+                 chartype(), secs_and_nanos, sizes, sha256_hash_string_.c_str(), type);
 	name_ = buffer;
+        path_ = in_directory_->path()->appendName(Atom::lookup(name_));
+            
+        debug(HASHING,"Fix name of tarfile to %s\n\n", name_.c_str());
+}
 
-        debug(HASHING,"Tarfile %s\n\n", name_.c_str());
+void TarFile::setName(string s) {
+    name_ = s;
+    path_ = in_directory_->path()->appendName(Atom::lookup(name_));
 }
 
 string TarFile::line(Path *p)
@@ -204,5 +233,16 @@ string TarFile::line(Path *p)
     
     return ss.str();
 }
-    
+
+void TarFile::updateMtim(struct timespec *mtim) {
+    if (isInTheFuture(&mtim_)) {
+        fprintf(stderr, "Virtual tarfile %s has a future timestamp! Ignoring the timstamp.\n", path()->c_str());
+    } else {    
+        if (mtim_.tv_sec > mtim->tv_sec ||
+            (mtim_.tv_sec == mtim->tv_sec && mtim_.tv_nsec > mtim->tv_nsec)) {
+            memcpy(mtim, &mtim_, sizeof(*mtim));
+        }
+    }
+}
+   
 

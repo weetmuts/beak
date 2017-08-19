@@ -96,12 +96,12 @@ then
         | perl ${PERL_PREFIX}format_find.pl $root > $dir/test_root.txt
     
     # Find all files listed in the tar files below mount.
-    ${UNTAR} tv $mount | perl ${PERL_PREFIX}format_tar.pl > $dir/test_mount.txt
+    ${UNTAR} tv $mount | perl ${PERL_PREFIX}format_tar.pl > $dir/test_tar.txt
     
     sort $dir/test_root.txt > $dir/test_root_sorted.txt
-    sort $dir/test_mount.txt > $dir/test_mount_sorted.txt
+    sort $dir/test_tar.txt > $dir/test_tar_sorted.txt
     
-    diff $dir/test_root_sorted.txt $dir/test_mount_sorted.txt
+    diff $dir/test_root_sorted.txt $dir/test_tar_sorted.txt
     if [ "$?" = "0" ]; then
         echo OK
     else

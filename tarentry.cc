@@ -30,6 +30,7 @@
 #include <iterator>
 #include <openssl/sha.h>
 #include <sstream>
+#include <zlib.h>
 
 #include "tarfile.h"
 #include "log.h"
@@ -42,11 +43,38 @@ static ComponentId HARDLINKS = registerLogComponent("hardlinks");
 
 bool sanityCheck(const char *x, const char *y);
 
+TarEntry::TarEntry(size_t size)
+{
+    abspath_ = Path::lookupRoot();
+    path_ = Path::lookupRoot();
+    memset(&sb_, 0, sizeof(sb_));
+    sb_.st_size = size;
+    link_ = NULL;
+    taz_file_in_use_ = false;
+    children_size_ = 0;
+    parent_ = NULL;
+    is_tar_storage_dir_ = false;
+    num_long_path_blocks = 0;
+    num_long_link_blocks = 0;
+    num_header_blocks = 0;
+    tarpath_ = path_;
+    hash_calculated_ = false;
+    name_ = Atom::lookup("");
+
+    header_size_ = num_header_blocks = 0;
+    disk_size = sb_.st_size;
+    // Round size to nearest 512 byte boundary
+    children_size_ = blocked_size_ = (size%T_BLOCKSIZE==0)?size:(size+T_BLOCKSIZE-(size%T_BLOCKSIZE));
+
+    debug(TARENTRY, "Regular File Entry added size %ju blocked size %ju!\n", disk_size,
+          blocked_size_);
+}
+
 TarEntry::TarEntry(Path *ap, Path *p, const struct stat *b, bool header)
 {
     abspath_ = ap;
     path_ = p;
-    sb_ =*b;
+    sb_ = *b;
     link_ = NULL;
     taz_file_in_use_ = false;
     children_size_ = 0;
@@ -147,15 +175,25 @@ void TarEntry::calculateTarpath(Path *storage_dir) {
     assert(sanityCheck(tarpath_->c_str(), th_get_pathname(tar_)));
 }
 
-void TarEntry::createSmallTar(int i) { small_tars_[i] = new TarFile(this, SMALL_FILES_TAR, i, false); }
-void TarEntry::createMediumTar(int i) { medium_tars_[i] = new TarFile(this, MEDIUM_FILES_TAR, i, false); }
-void TarEntry::createLargeTar(uint32_t hash) { large_tars_[hash] = new TarFile(this, SINGLE_LARGE_FILE_TAR,
-                                                                 hash, false); }
+void TarEntry::createSmallTar(int i) {
+    small_tars_[i] = new TarFile(this, SMALL_FILES_TAR, i, true);
+    tars_.push_back(small_tars_[i]);
+}
+void TarEntry::createMediumTar(int i) {
+    medium_tars_[i] = new TarFile(this, MEDIUM_FILES_TAR, i, true);
+    tars_.push_back(medium_tars_[i]);
+}
+void TarEntry::createLargeTar(uint32_t hash) {
+    large_tars_[hash] = new TarFile(this, SINGLE_LARGE_FILE_TAR, hash, true);
+    tars_.push_back(large_tars_[hash]);
+}
 
 size_t TarEntry::copy(char *buf, size_t size, size_t from) {
     size_t copied = 0;
-    debug(TARENTRY, "Copying max %zu from %zu\n", size, from);
+    debug(TARENTRY, "Copying from %s\n", name_->c_str());
     if (size > 0 && from < header_size_) {
+        debug(TARENTRY, "Copying max %zu from %zu, now inside header (header size=%ju)\n", size, from,
+              header_size_);
         char tmp[header_size_];
         memset(tmp, 0, header_size_);
         int p = 0;
@@ -224,20 +262,21 @@ size_t TarEntry::copy(char *buf, size_t size, size_t from) {
     }
 
     if (size > 0 && copied < blocked_size_ && from >= header_size_ && from < blocked_size_) {
-        if (virtual_file) {
-            debug(TARENTRY, "reading from tar_list size=%ju copied=%ju blocked_size=%ju from=%ju header_size=%ju\n",
+        debug(TARENTRY, "Copying max %zu from %zu\n now in content", size, from);
+        if (virtual_file_) {
+            debug(TARENTRY, "Reading from virtual file size=%ju copied=%ju blocked_size=%ju from=%ju header_size=%ju\n",
                   size, copied, blocked_size_, from, header_size_);
             size_t off = from - header_size_;
-            size_t len = content.length()-off;
+            size_t len = content.size()-off;
             if (len > size) {
                 len = size;
             }
-            memcpy(buf, content.c_str()+off, len);
+            memcpy(buf, &content[0]+off, len);
             size -= len;
             buf += len;
             copied += len;
         } else {
-            debug(TARENTRY, "reading from file size=%ju copied=%ju blocked_size=%ju from=%ju header_size=%ju\n",
+            debug(TARENTRY, "Reading from file size=%ju copied=%ju blocked_size=%ju from=%ju header_size=%ju\n",
                   size, copied, blocked_size_, from, header_size_);
             // Read from file
             int fd = open(abspath_->c_str(), O_RDONLY);
@@ -301,13 +340,14 @@ bool sanityCheck(const char *x, const char *y) {
     return true;
 }
 
-void TarEntry::setContent(string c) {
+void TarEntry::setContent(vector<unsigned char> &c) {
     content = c;
-    virtual_file = true;
+    virtual_file_ = true;
+    assert((size_t)sb_.st_size == c.size());
 }
 
 void TarEntry::updateSizes() {
-    header_size_ = size = num_header_blocks*T_BLOCKSIZE;
+    size_t size = header_size_ = num_header_blocks*T_BLOCKSIZE;
     if (TH_ISREG(tar_)) {
         // Directories, symbolic links and fifos have no content in the tar.
         // Only add the size from actual files with content here.
@@ -379,9 +419,13 @@ void TarEntry::copyEntryToNewParent(TarEntry *entry, TarEntry *parent) {
  * Update the mtim argument with this entry's mtim, if this entry is younger.
  */
 void TarEntry::updateMtim(struct timespec *mtim) {
-    if (sb_.st_mtim.tv_sec > mtim->tv_sec ||
-        (sb_.st_mtim.tv_sec == mtim->tv_sec && sb_.st_mtim.tv_nsec > mtim->tv_nsec)) {
-        memcpy(mtim, &sb_.st_mtim, sizeof(*mtim));
+    if (isInTheFuture(&sb_.st_mtim)) {
+        fprintf(stderr, "Entry %s has a future timestamp! Ignoring the timstamp.\n", path()->c_str());
+    } else {
+        if (sb_.st_mtim.tv_sec > mtim->tv_sec ||
+            (sb_.st_mtim.tv_sec == mtim->tv_sec && sb_.st_mtim.tv_nsec > mtim->tv_nsec)) {
+            memcpy(mtim, &sb_.st_mtim, sizeof(*mtim));
+        }
     }
 }
 
@@ -392,6 +436,12 @@ void TarEntry::registerTarFile(TarFile *tf, size_t o) {
 
 void TarEntry::registerTazFile() {
     taz_file_ = new TarFile(this, DIR_TAR, 0, true);
+    tars_.push_back(taz_file_);
+}
+
+void TarEntry::registerGzFile() {
+    gz_file_ = new TarFile(this, REG_FILE, 0, false);
+    tars_.push_back(gz_file_);
 }
 
 void TarEntry::registerParent(TarEntry *p) {
@@ -506,7 +556,7 @@ void cookEntry(string *listing, TarEntry *entry) {
     listing->append(separator_string);
 }
 
-bool eatEntry(vector<char> &v, vector<char>::iterator &i, string &tar_path,
+bool eatEntry(vector<char> &v, vector<char>::iterator &i, Path *dir_to_prepend,
               mode_t *mode, size_t *size, size_t *offset, string *tar, Path **path,
               string *link, bool *is_sym_link, time_t *secs, time_t *nanos, bool *eof, bool *err)
 {
@@ -540,7 +590,7 @@ bool eatEntry(vector<char> &v, vector<char>::iterator &i, string &tar_path,
     *secs = atol(se.c_str());
     *nanos = atol(na.c_str());
 
-    string filename = tar_path + eatTo(v, i, separator, 1024, eof, err);
+    string filename = dir_to_prepend->path() + "/" + eatTo(v, i, separator, 1024, eof, err);
     if (*err || *eof) return false;
     if (filename.length() > 1 && filename.back() == '/')
     {
@@ -562,7 +612,7 @@ bool eatEntry(vector<char> &v, vector<char>::iterator &i, string &tar_path,
         *size = link->length();
         *is_sym_link = false;
     }
-    *tar = tar_path + eatTo(v, i, separator, 1024, eof, err);
+    *tar = dir_to_prepend->path() + "/" + eatTo(v, i, separator, 1024, eof, err);
     if (*err || *eof) return false;
     string off = eatTo(v, i, separator, 32, eof, err);
     *offset = atol(off.c_str());

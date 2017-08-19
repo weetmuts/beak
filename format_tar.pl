@@ -4,7 +4,7 @@ while (<STDIN>) {
         if ($_ =~ m/V---------/) {
         } else {
             if (my($bi,$ow,$si,$da,$ti,$fi) = $_ =~ m/([dlcbrwxt-]{10}) +(\S+\/\S+) +([\d,]+) +(\d\d\d\d-\d\d-\d\d) (\d\d:\d\d) (.*)/) {
-                
+
                 $fi =~ s/^\.\///;
                 if ($fi ne ".") {
                     $fi =~ s/\\\\/\\/g;

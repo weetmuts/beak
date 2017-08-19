@@ -24,6 +24,7 @@
 #include <sys/stat.h>
 #include <ctime>
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -32,79 +33,78 @@
 
 using namespace std;
 
-struct Taz
-{
-	TAR *tar;
-
-	Taz(TAR *tar_) :
-			tar(tar_)
-	{
-	}
-	Taz()
-	{
-	}
-};
-
 struct Entry
 {
+    bool isLnk() {
+        return (bool) S_ISLNK(mode_bits);
+    }
+    bool isDir() {
+        return (bool) S_ISDIR(mode_bits);
+    }
+    
+    Entry(mode_t m, size_t s, size_t o, Path *p) :
+    mode_bits(m), size(s), offset(o), path(p) {
+	
+        loaded = false;
+    }
+    
+    Entry() { }
 
-	bool isLnk()
-	{
-		return (bool) S_ISLNK(mode_bits);
-	}
-	bool isDir()
-	{
-		return (bool) S_ISDIR(mode_bits);
-	}
+    mode_t mode_bits;
+    time_t secs, nanos;
+    size_t size, offset;
+    Path *path;
+    string tar;
+    vector<Entry*> dir;
+    string link;
+    bool is_sym_link;
+    bool loaded;
+};
 
-	Entry(mode_t m, size_t s, size_t o, Path *p) :
-			mode_bits(m), size(s), offset(o), path(p)
-	{
-		loaded = false;
-	}
-
-	Entry()
-	{
-	}
-
-	mode_t mode_bits;
-	time_t secs, nanos;
-	size_t size, offset;
-	Path *path;
-	string tar;
-	vector<Entry*> dir;
-	bool loaded;
-	string link;
-	bool is_sym_link;
+struct Version {
+    int key;
+    struct timespec ts;
+    string ago;
+    string datetime;
+    string filename;
 };
 
 struct ReverseTarredFS
 {
-	pthread_mutex_t global;
+    pthread_mutex_t global;
+    
+    Entry *findEntry(Path *path);
+    int getattrCB(const char *path, struct stat *stbuf);
+    int readdirCB(const char *path, void *buf, fuse_fill_dir_t filler,
+                  off_t offset, struct fuse_file_info *fi);
+    int readCB(const char *path, char *buf, size_t size, off_t offset,
+               struct fuse_file_info *fi);
+    int readlinkCB(const char *path, char *buf, size_t s);
+    
+    int parseTarredfsContent(vector<char> &v, vector<char>::iterator &i, Path *dir_to_prepend);
+    int parseTarredfsTars(vector<char> &v, vector<char>::iterator &i);
+    bool loadGz(Path *gz, Path *dir_to_prepend);
+    void loadCache(Path *path);
+    void checkVersions(Path *path, vector<Version> *versions);
+    void setGeneration(string g);
+    int getGeneration() { return generation_ ; }
+    ReverseTarredFS();
 
-	string root_dir;
-	string mount_dir;
-
-	map<Path*, Entry> entries;
-	map<string, Taz> tazs;
-
-	int getattrCB(const char *path, struct stat *stbuf);
-	int readdirCB(const char *path, void *buf, fuse_fill_dir_t filler,
-			off_t offset, struct fuse_file_info *fi);
-	int readCB(const char *path, char *buf, size_t size, off_t offset,
-			struct fuse_file_info *fi);
-	int readlinkCB(const char *path, char *buf, size_t s);
-
-	int parseTarredfsContent(vector<char> &v, string taz_path);
-	void loadTaz(string taz, string path);
-        void loadCache(Path *path, Path *taz);
-        void checkVersions(Path *path, vector<string> *versions);
-        void setGeneration(string g);
-	ReverseTarredFS();
-
+    Path *rootDir() { return root_dir_; }
+    Path *mountDir() { return mount_dir_; }
+    void setRootDir(Path *p) { root_dir_ = p; }
+    void setMountDir(Path *p) { mount_dir_ = p; }
+    
     private:
 
-    string generation_;
+    Path *root_dir_;
+    Path *mount_dir_;
+
+    map<Path*,Entry> entries_;   
+    map<Path*,vector<Path*>> tarredfs_files_;
+    map<Path*,Path*> gz_files_;
+    set<Path*> loaded_gz_files_;
+    int generation_;
 };
 
 #endif

@@ -16,13 +16,31 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+dir=$(mktemp -d /tmp/tarredfs_packXXXXXXXX)
+
+function finish {
+    if [ "$debug" == "" ]
+    then
+        # Remove the currently compressed/copied file.
+        # Since compression/copying was interrupted, it might
+        # be incompleted.
+        if [ "$done" != "true" ]; then
+            rm -f "$to" "$to$ext"
+            rm -rf $dir
+        fi
+    else
+        echo Not removing $dir
+    fi
+}
+trap finish EXIT
+
 function Help() {
     echo
-    echo Usage: tarredfs-pack [xz\|gzip\|bzip2] [DirWithTars]
+    echo Usage: tarredfs-pack [xz\|gzip\|bzip2] [DirWithTars] [DirWithPackedTars]
     echo
     echo Example:
-    echo tarredfs-pack xz /Mirror/Storage
-    echo tarredfs-pack gzip /Mirror/Storage/Articles
+    echo tarredfs-pack xz /Mirror/Storage /Mirror/CompressedStorage
+    echo tarredfs-pack gzip /Mirror/Storage/Articles /home/CompressedBackup
     exit
 }
 
@@ -43,23 +61,33 @@ case $1 in
         ;;
 esac
 
-if [ "$cmd" = "" ] || [ "$2" = "" ]; then
+if [ "$cmd" = "" ] || [ "$2" = "" ] || [ "$3" = "" ]; then
     Help
 fi
 
-root=$(realpath $2)
-# Find the tar files
-(cd $root && find . -name "ta[rz]*tar" | sed 's/^\.\///' | sort) > /tmp/aa
-cat /tmp/aa | tr -c -d '/\n' | tr / a > /tmp/bb
-# Sort them on the number of slashes, ie handle the
-# deepest directories first, finish with the root
-# (replaced / with a to make sort work)
-paste /tmp/bb /tmp/aa | sort | cut -f 2- > /tmp/cc
-# Iterate over the tar files and extract them
-# in the corresponding directory
-while read p; do
-    parent="$(dirname "$p")"
-    mkdir -p "$parent"
-    $cmd --verbose -c "$root/$p" > "$p$ext"
-done </tmp/cc
+srcdir=$(realpath $2)
+destdir=$(realpath $3)
 
+# Find the tar files
+(find $srcdir -regextype grep -regex ".*/[rzx]01_.*\.\(tar\|gz\)"  | sort) > "$dir/aa"
+
+while read from; do
+    to="$destdir${from##$srcdir}"
+    parent="${to%/*}"
+    mkdir -p "$parent"
+    extension="${to##*.}"
+    if [ "$extension" = "tar" ]; then
+        if [ ! -f "$to$ext" ]; then
+            filename="${from##$srcdir/}"
+            (cd "$srcdir" ; $cmd --verbose -c "$filename" > "$to$ext" ;
+             touch -r "$filename" "$to$ext" ;
+             chmod --reference="$filename" "$to$ext")
+        fi
+    else
+        if [ ! -f "$to" ]; then        
+            cp -a "$from" "$to"
+        fi
+    fi
+done <"$dir/aa"
+
+done=true
