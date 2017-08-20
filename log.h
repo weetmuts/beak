@@ -26,7 +26,12 @@ using namespace std;
 
 enum LogLevel
 {
-	QUITE, INFO, VERBOSE, DEBUG
+    // Errors and failures are always printed.
+    QUITEQUITE, // No info, no warnings
+    QUITE,      // No info, but display warnings
+    INFO,       // Normal mode
+    VERBOSE,    // Verbose information
+    DEBUG       // Debug information
 };
 typedef int ComponentId;
 
@@ -39,15 +44,34 @@ void listLogComponents();
 
 // A fatal program terminating error
 void error(ComponentId ci, const char* fmt, ...);
+
 // A serious failure that is always logged
 void failure(ComponentId ci, const char* fmt, ...);
-// A not serious failure that still should be logged
-void warning(ComponentId ci, const char* fmt, ...);
-// Debug logging
-void debug(ComponentId ci, const char* fmt, ...);
-// Verbose logging
-void verbose(ComponentId ci, const char* fmt, ...);
+
 // Startup messages and other information
+// Silenced with: -q
 void info(ComponentId ci, const char* fmt, ...);
+
+// A not serious failure that still should be logged.
+// Silenced with: -q -q
+void warning(ComponentId ci, const char* fmt, ...);
+
+extern bool debug_logging_;
+
+// Debug logging
+// Enabled with: -v -v
+#define debug(args...) {if(debug_logging_){logDebug(args);}}
+void logDebug(ComponentId ci, const char* fmt, ...);
+// The macro is used to avoid evaluating complex argument fed to the debug printout,
+// when not running with debug enabled.
+
+extern bool verbose_logging_;
+
+// Verbose logging
+// Enabled with: -v
+#define verbose(args...) {if(verbose_logging_){logVerbose(args);}}
+void logVerbose(ComponentId ci, const char* fmt, ...);
+// The macro is used to avoid evaluating complex argument fed to the verbose printout,
+// when not running with verbose enabled.
 
 #endif

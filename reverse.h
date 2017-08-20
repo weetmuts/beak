@@ -51,7 +51,8 @@ struct Entry
     Entry() { }
 
     mode_t mode_bits;
-    time_t secs, nanos;
+    time_t msecs, asecs, csecs;
+    long   mnanos, ananos, cnanos;
     size_t size, offset;
     Path *path;
     string tar;

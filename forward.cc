@@ -283,11 +283,11 @@ void TarredFS::pruneDirectories() {
             // We are doing this check on the remaining directories after the tar collection dirs have
             // been selected. Thus a lot of case conflicts can be handled inside the tars.
             // All file name conflicts are handled.
-            string dlc = tolowercase(d.first->path());
+            string dlc = tolowercase(d.first->str());
             if (paths_lowercase.count(dlc) > 0) {
                 error(FORWARD, "Case conflict for:\n%s\n%s\n", d.first->c_str(), paths_lowercase[dlc].c_str());
             }
-            paths_lowercase[dlc] = d.first->path();
+            paths_lowercase[dlc] = d.first->str();
         }
     }
     // The root directory is always a tar collection dir.
@@ -434,6 +434,11 @@ void TarredFS::fixTarPathsAndHardLinks() {
 size_t TarredFS::groupFilesIntoTars() {
     size_t num = 0;
 
+    for (auto & e : files) {
+        TarEntry *te = e.second;
+        te->calculateHash();
+    }
+    
     for (auto & e : tar_storage_directories) {
         TarEntry *te = e.second;
 
@@ -503,42 +508,42 @@ size_t TarredFS::groupFilesIntoTars() {
         for (auto & t : te->largeTars()) {
             TarFile *tf = t.second;
             tf->fixSize();
-            tf->calculateSHA256Hash();
+            tf->calculateHash();
             tf->fixName();
             if (tf->currentTarOffset() > te->tazFile()->volumeHeader()->blockedSize()) {
                 debug(FORWARD,"%s%s size became %zu\n", te->path()->c_str(), tf->name().c_str(), tf->size());
                 te->appendFileName(tf->name());
                 appendTarList(te->path(), tf);
-                te->largeHashTars()[tf->SHA256Hash()] = tf;
+                te->largeHashTars()[tf->hash()] = tf;
             }
         }
         for (auto & t : te->mediumTars()) {
             TarFile *tf = t.second;
             tf->fixSize();
-            tf->calculateSHA256Hash();
+            tf->calculateHash();
             tf->fixName();
             if (tf->currentTarOffset() > te->tazFile()->volumeHeader()->blockedSize()) {
                 debug(FORWARD,"%s%s size became %zu\n", te->path()->c_str(), tf->name().c_str(), tf->size());
                 te->appendFileName(tf->name());
                 appendTarList(te->path(), tf);
-                te->mediumHashTars()[tf->SHA256Hash()] = tf;
+                te->mediumHashTars()[tf->hash()] = tf;
             }
         }
         for (auto & t : te->smallTars()) {
             TarFile *tf = t.second;
             tf->fixSize();
-            tf->calculateSHA256Hash();
+            tf->calculateHash();
             tf->fixName();
             if (tf->currentTarOffset() > te->tazFile()->volumeHeader()->blockedSize()) {
                 debug(FORWARD,"%s%s size became %zu\n", te->path()->c_str(), tf->name().c_str(), tf->size());
                 te->appendFileName(tf->name());
                 appendTarList(te->path(), tf);
-                te->smallHashTars()[tf->SHA256Hash()] = tf;
+                te->smallHashTars()[tf->hash()] = tf;
             }
         }
 
         te->tazFile()->fixSize();
-        te->tazFile()->calculateSHA256Hash();
+        te->tazFile()->calculateHash();
         te->tazFile()->fixName();       
         
         set<uid_t> uids;
@@ -613,7 +618,8 @@ size_t TarredFS::groupFilesIntoTars() {
             }
         }
 
-        te->gzFile()->calculateSHA256Hash(tars);
+        // Hash the hashes of all the other tar and gz files.
+        te->gzFile()->calculateHash(tars, gzfile_contents);
         te->gzFile()->fixName();
 
         gzfile_contents.append("#tars ");
@@ -688,7 +694,7 @@ TarEntry *TarredFS::findNearestStorageDirectory(TarEntry *te) {
 void TarredFS::setTarListFile(string s) {
     tar_list_file_ = Path::lookup(s);
     ofstream out;
-    out.open(tar_list_file_->path());
+    out.open(tar_list_file_->str());
     if (!out) {
         error(FORWARD, "Could not open tar list file \"%s\"\n", tar_list_file_->c_str());
     }
@@ -708,7 +714,7 @@ void TarredFS::saveTarListFile() {
     
     if (tar_list_file_) {
         ofstream out;        
-        out.open(tar_list_file_->path());
+        out.open(tar_list_file_->str());
         out << "#tarredfs 0.1 list" << endl << separator;
         for (auto & e : tar_list_) {
             out << e;
@@ -718,9 +724,9 @@ void TarredFS::saveTarListFile() {
 }
 
 TarFile *TarredFS::findTarFromPath(Path *path) {
-    string n = path->name()->literal();
+    string n = path->name()->str();
     const char *nn = n.c_str();
-    string d = path->parent()->name()->literal();
+    string d = path->parent()->name()->str();
 
     // File names:
     // (r)01_(001501080787).(579054757)_(1119232)_(3b5e4ec7fe38d0f9846947207a0ea44c)_(0).(tar)
@@ -738,38 +744,42 @@ TarFile *TarredFS::findTarFromPath(Path *path) {
         return NULL;
     }
     string type = n.substr(pmatch[7].rm_so,pmatch[7].rm_eo-pmatch[7].rm_so);
-    string hash = n.substr(pmatch[5].rm_so,pmatch[5].rm_eo-pmatch[5].rm_so);
+    string hash_string = n.substr(pmatch[5].rm_so,pmatch[5].rm_eo-pmatch[5].rm_so);
+    vector<char> hash;
+    hex2bin(hash_string, &hash);
+
+    debug(FORWARD, "Hash >%s< hash len %d >%s<\n", hash_string.c_str(), hash.size(), toHex(hash).c_str());
     debug(FORWARD, "Type is %s\n", type.c_str());
     if (type == "gz") {
         if (!te->hasGzFile()) {
-            debug(FORWARD, "No such gz file >%s<\n", hash.c_str());
+            debug(FORWARD, "No such gz file >%s<\n", toHex(hash).c_str());
             return NULL;
         }
         return te->gzFile();
     } else
     if (t == 'l') {
         if (te->largeHashTars().count(hash) == 0) {
-            debug(FORWARD, "No such large tar >%s<\n", hash.c_str());
+            debug(FORWARD, "No such large tar >%s<\n", toHex(hash).c_str());
             return NULL;
         }
         return te->largeHashTar(hash);
     } else
     if (t == 'm') {
         if (te->mediumHashTars().count(hash) == 0) {
-            debug(FORWARD, "No such medium tar >%s<\n", hash.c_str());
+            debug(FORWARD, "No such medium tar >%s<\n", toHex(hash).c_str());
             return NULL;
         }
         return te->mediumHashTar(hash);
     } else
     if (t == 'r') {
         if (te->smallHashTars().count(hash) == 0) {
-            debug(FORWARD, "No such small tar >%s<\n", hash.c_str());
+            debug(FORWARD, "No such small tar >%s<\n", toHex(hash).c_str());
             return NULL;
         }
         return te->smallHashTar(hash);
     } else if (t == 'z') {
         if (!te->hasTazFile()) {
-            debug(FORWARD, "No such dir tar >%s<\n", hash.c_str());
+            debug(FORWARD, "No such dir tar >%s<\n", toHex(hash).c_str());
             return NULL;
         }
         return te->tazFile();

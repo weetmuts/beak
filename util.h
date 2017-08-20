@@ -49,98 +49,91 @@ extern string separator_string;
 
 struct Atom
 {
-	static Atom *lookup(string literal);
-	static bool lessthan(Atom *a, Atom *b);
+    static Atom *lookup(string literal);
+    static bool lessthan(Atom *a, Atom *b);
+    
+    string &str() {
+        return literal_;
+    }
+    const char *c_str()
+    {
+        return literal_.c_str();
+    }
+    size_t c_str_len()
+    {
+        return literal_.length();
+    }
 
-	string literal()
-	{
-		return literal_;
-	}
-	const char *c_str()
-	{
-		return literal_.c_str();
-	}
-	size_t c_str_len()
-	{
-		return literal_.length();
-	}
+    private:
 
-private:
-
-	Atom(string n) :
-			literal_(n)
-	{
-	}
-	string literal_;
+    Atom(string n) : literal_(n) { }
+    string literal_;
 };
 
 struct Path
 {
-	struct Initializer
+    struct Initializer
+    {
+        Initializer();
+    };
+    static Initializer initializer_s;
+    
+    static Path *lookup(string p);
+    static Path *lookupRoot();
+    static Path *store(string p);
+    static Path *commonPrefix(Path *a, Path *b);
+    
+    Path *parent()
 	{
-		Initializer();
-	};
-	static Initializer initializer_s;
-
-	static Path *lookup(string p);
-	static Path *lookupRoot();
-	static Path *store(string p);
-	static Path *commonPrefix(Path *a, Path *b);
-
-	Path *parent()
-	{
-		return parent_;
+            return parent_;
 	}
-	Atom *name()
+    Atom *name()
 	{
-		return atom_;
+            return atom_;
 	}
-        Path *appendName(Atom *n);
-	Path *parentAtDepth(int i);
-	string path();
-	const char *c_str();
-	size_t c_str_len();
-	// The root aka "/" aka "" has depth 1
-	// "/Hello" has depth 2
-	// "Hello" has depth 1
-	// "Hello/There" has depth 2
-	// "/Hello/There" has depth 3
-	int depth()
-	{
-		return depth_;
-	}
-	Path *subpath(int from, int len = -1);
-	Path *prepend(Path *p);
-	bool isRoot()
-	{
-            return depth_ == 1 && atom_->c_str_len() == 0;
-	}
-        bool isBelowOrEqual(Path *p) {
-            if (depth_ < p->depth_) {
-                return false;
-            }
-            Path *t = this;
-            while (t != NULL && t != p) {
-                t = t->parent_;
-            }
-            return (t == p);
+    Path *appendName(Atom *n);
+    Path *parentAtDepth(int i);
+    string &str() { return path_cache_; }
+    const char *c_str() { return &path_cache_[0]; }
+    size_t c_str_len() { return path_cache_.length(); }
+    
+    // The root aka "/" aka "" has depth 1
+    // "/Hello" has depth 2
+    // "Hello" has depth 1
+    // "Hello/There" has depth 2
+    // "/Hello/There" has depth 3
+    int depth() {
+        return depth_;
+    }
+    Path *subpath(int from, int len = -1);
+    Path *prepend(Path *p);
+    bool isRoot() {
+        return depth_ == 1 && atom_->c_str_len() == 0;
+    }
+    bool isBelowOrEqual(Path *p) {
+        if (depth_ < p->depth_) {
+            return false;
         }
-
+        Path *t = this;
+        while (t != NULL && t != p) {
+            t = t->parent_;
+        }
+        return (t == p);
+    }
+    
 private:
 
-	Path(Path *p, Atom *n) :
-			parent_(p), atom_(n), depth_((p) ? p->depth_ + 1 : 1), path_cache_(
-					NULL), path_cache_len_(0)
-	{
+    Path(Path *p, Atom *n, string &path) :
+    parent_(p), atom_(n), depth_((p) ? p->depth_ + 1 : 1),
+        path_cache_(path) {
 	}
-	Path *parent_;
-	Atom *atom_;
-	int depth_;
-	char *path_cache_;
-	size_t path_cache_len_;
-
-	deque<Path*> nodes();
-	Path *reparent(Path *p);
+    Path *parent_;
+    Atom *atom_;
+    int depth_;
+    string path_cache_;
+    
+    deque<Path*> nodes();
+    Path *reparent(Path *p);
 };
 
 struct depthFirstSortPath
@@ -189,11 +182,18 @@ void eraseArg(int i, int *argc, char **argv);
 // If the maximum length is reached without finding the end char, return error.
 string eatTo(vector<char> &v, vector<char>::iterator &i, int c, size_t max, bool *eof, bool *err);
 
+// Translate binary buffer with printable strings to ascii
+// with non-printabled escaped as such: \xC0 \xFF \xEE
+string toHexAndText(const char *b, size_t len);
+string toHexAndText(vector<char> &b);
+
+// Translate binary buffer to lower case hex string: aa01ffc0ffee
 string toHex(const char *b, size_t len);
-string toHext(const char *b, size_t len);
+string toHex(vector<char> &b);
 
+// Translate hex string to binary vector.
+void hex2bin(string s, vector<char> *target);
 
-void toLittleEndian(uint16_t *t);
-void toLittleEndian(uint32_t *t);
+void fixEndian(long *t);
 
 #endif

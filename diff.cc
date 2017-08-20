@@ -47,7 +47,7 @@ bool Entry::same(Entry *e) {
 }
 
 int DiffTarredFS::recurse(Target t, FileCB cb) {
-    string s = (t==FROM)? from_dir->path() : to_dir->path();
+    string s = (t==FROM)? from_dir->str(): to_dir->str();
 
     // Recurse into the root dir. Maximum 256 levels deep.
     // Look at symbolic links (ie do not follow them) so that
@@ -92,7 +92,7 @@ int DiffTarredFS::addFile(Target t, const char *fpath, const struct stat *sb, st
 int DiffTarredFS::addLinesFromFile(Target t, Path *p) {
     vector<char> buf;
 
-    ifstream is (p->path(), ifstream::binary);
+    ifstream is (p->str(), ifstream::binary);
     if (is) {
         is.seekg (0, is.end);
         size_t length = is.tellg();

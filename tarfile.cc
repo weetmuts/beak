@@ -35,6 +35,7 @@ ComponentId HASHING = registerLogComponent("hashing");
 
 TarFile::TarFile(TarEntry *d, TarContents tc, int n, bool has_header)
 {
+    size_ = 0;
     path_ = Path::lookupRoot();
     in_directory_ = d;
     tar_contents = tc;
@@ -143,45 +144,55 @@ pair<TarEntry*, size_t> TarFile::findTarEntry(size_t offset)
 	return pair<TarEntry*, size_t>(te, o);
 }
 
-void TarFile::calculateSHA256Hash()
+void TarFile::calculateHash()
 {
-    SHA256_CTX sha256;
-    SHA256_Init(&sha256);
-    
-    debug(HASHING,"Calculating hash for %s\n", path()->c_str());
-    // SHA256 all headers, including the first Volume label header with
-    // empty name and empty checksum.
-    for (auto & a : contents_)
-    {
-        size_t len = a.second->headerSize();
-        assert(len <= 512 * 5);
-        TarEntry *te = a.second;
-        debug(HASHING,"   %s %s\n", te->tarpath()->c_str(), te->headerHash().c_str());
-        SHA256_Update(&sha256, te->headerHashArray(), SHA256_DIGEST_LENGTH);
-    }
-    SHA256_Final((unsigned char*) sha256_hash_, &sha256);
-    // Copy the binary hash into the volume header name.
-    volume_header_->injectHash(sha256_hash_, SHA256_DIGEST_LENGTH);
-    sha256_hash_string_ = toHex(sha256_hash_, SHA256_DIGEST_LENGTH);
-    debug(HASHING, "Final hash %s\n", sha256_hash_string_.c_str());
+    calculateSHA256Hash();
 }
 
-void TarFile::calculateSHA256Hash(vector<TarFile*> &tars)
+void TarFile::calculateHash(vector<TarFile*> &tars, string &content)
 {
-    size_ = 0;
-	SHA256_CTX sha256;
-	SHA256_Init(&sha256);
+    calculateSHA256Hash(tars, content);
+}
 
-        debug(HASHING,"Calculating hash for gzfile %s\n", path()->c_str());
-	// SHA256 all tarfile hashes! This is the hash of this state!
-	for (auto & tf : tars)
-	{
-            debug(HASHING,"   %s %s\n", tf->path()->c_str(), tf->SHA256Hash().c_str());
-            SHA256_Update(&sha256, tf->sha256(), SHA256_DIGEST_LENGTH);
-	}
-	SHA256_Final((unsigned char*) sha256_hash_, &sha256);
-        sha256_hash_string_ = toHex(sha256_hash_, SHA256_DIGEST_LENGTH);
-        debug(HASHING, "Final hash %s\n", sha256_hash_string_.c_str());
+vector<char> &TarFile::hash() {
+    return sha256_hash_;
+}
+
+void TarFile::calculateSHA256Hash()
+{
+    SHA256_CTX sha256ctx;
+    SHA256_Init(&sha256ctx);
+    
+    for (auto & a : contents_)
+    {
+        TarEntry *te = a.second;
+        SHA256_Update(&sha256ctx, &te->hash()[0], te->hash().size());
+    }
+    sha256_hash_.resize(SHA256_DIGEST_LENGTH);
+    SHA256_Final((unsigned char*)&sha256_hash_[0], &sha256ctx);
+
+    // Copy the binary hash into the volume header name.
+    volume_header_->injectHash(&sha256_hash_[0], sha256_hash_.size());
+}
+
+void TarFile::calculateSHA256Hash(vector<TarFile*> &tars, string &content)
+{
+    SHA256_CTX sha256ctx;
+    SHA256_Init(&sha256ctx);
+    
+    // SHA256 all other tar and gz file hashes! This is the hash of this state!
+    for (auto & tf : tars)
+    {
+        if (tf == this) continue;
+        
+        SHA256_Update(&sha256ctx, &tf->hash()[0], tf->hash().size());
+    }
+
+    // SHA256 the detailed file listing too!
+    SHA256_Update(&sha256ctx, &content[0], content.length());
+    
+    sha256_hash_.resize(SHA256_DIGEST_LENGTH);
+    SHA256_Final((unsigned char*)&sha256_hash_[0], &sha256ctx);
 }
 
 void TarFile::fixName() {        
@@ -201,7 +212,7 @@ void TarFile::fixName() {
             type = gztype;
         }
 	snprintf(buffer, sizeof(buffer), "%c01_%s_%s_%s_0.%s",
-                 chartype(), secs_and_nanos, sizes, sha256_hash_string_.c_str(), type);
+                 chartype(), secs_and_nanos, sizes, toHex(hash()).c_str(), type);
 	name_ = buffer;
         path_ = in_directory_->path()->appendName(Atom::lookup(name_));
             
@@ -217,7 +228,7 @@ string TarFile::line(Path *p)
 {
     stringstream ss;
 
-    ss << p->path();
+    ss << p->str();
     ss << "/" << name();
     ss << separator << size();
 

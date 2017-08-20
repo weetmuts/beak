@@ -352,37 +352,6 @@ if [ $do_test ]; then
     startFS standardTest
 fi
 
-function timestampHashTest1 {
-    rc1=$(ls $mount/TJO/r*.tar)
-    stopFS nook
-    touch -d "2017-01-01 01:01:01.1235" $root/TJO/alfa
-    startFS timestampHashTest2
-}
-
-function timestampHashTest2 {
-    rc2=$(ls $mount/TJO/r*.tar)
-    if [ "$rc1" = "$rc2" ]; then
-        echo "$rc1" "$rc2"
-        echo Change in timestamp should change the virtual tar file hash!
-        exit
-    fi
-    rc=$(basename "$rc2")
-    if [ "$rc" != "r01_001483228861.123500000_1024_3a3cee970b264dd3a5ca439bb745433f_0.tar" ]; then
-        echo "$rc"
-        echo The file name SHOULD BE r01_001483228861.123500000_1024_3a3cee970b264dd3a5ca439bb745433f_0.tar!
-        echo It is not!
-        exit
-    fi    
-    stopFS
-}
-
-setup basic11a "check that timestamps influence file hash"
-if [ $do_test ]; then
-    mkdir -p $root/TJO
-    touch -d "2017-01-01 01:01:01.1234" $root/TJO/alfa
-    startFS timestampHashTest1
-fi
-
 function mtimeTestPart1 {
     (cd $mount; find . -exec ls -ld \{\} \; > $org)    
     stopFS nook
@@ -427,16 +396,38 @@ if [ $do_test ]; then
     startFS mtimeTestPart1
 fi
 
-#setup basic13 "Test that sort order is right for tar collection dir"
-#if [ $do_test ]; then
-#    mkdir -p $root/NNNNN/SSSS
-#    dd bs=1024 count=6000 if=/dev/zero of=$root/NNNNN/RRRRR > /dev/null 2>&1
-#    dd bs=1024 count=1 if=/dev/zero of=$root/NNNNN/SSSS/SSSS > /dev/null 2>&1
-#    dd bs=1024 count=6000 if=/dev/zero of=$root/NNNNN/iiii > /dev/null 2>&1
-#    touch -d "2015-03-03 03:03:03.1234" $root/NNNNN/SSSS $root/NNNNN/SSSS/* $root/NNNNN $root/NNNNN/* 
-#    
-#    startFS checkBasicVirtualTars 
-#fi
+
+function timestampHashTest1 {
+    rc1=$(ls $mount/TJO/r*.tar)
+    stopFS nook
+    touch -d "2015-03-03 03:03:03.1235" $root/TJO/alfa
+    startFS timestampHashTest2
+}
+
+function timestampHashTest2 {
+    rc2=$(ls $mount/TJO/r*.tar)
+    if [ "$rc1" = "$rc2" ]; then
+        echo "$rc1"
+        echo Change in timestamp should change the virtual tar file name!
+        exit
+    fi
+    rcc1=$(echo "$rc1" | sed 's/.*_1024_\(.*\)_0.tar/\1/')    
+    rcc2=$(echo "$rc2" | sed 's/.*_1024_\(.*\)_0.tar/\1/')
+    if [ "$rcc1" = "$rcc2" ]; then
+        echo The hashes should be different!
+        echo **$rcc1** **$rcc2**
+        echo Check in $dir for more information.
+        exit
+    fi
+    stopFS
+}
+
+setup basic13 "check that timestamps influence file hash"
+if [ $do_test ]; then
+    mkdir -p $root/TJO
+    touch -d "2015-03-03 03:03:03.1234" $root/TJO/alfa
+    startFS timestampHashTest1
+fi
 
 setup basic14 "Test paths with spaces"
 if [ $do_test ]; then

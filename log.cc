@@ -38,6 +38,9 @@ static set<int> log_components;
 static int num_components = 0;
 static const char *all_components[64];
 
+bool debug_logging_ = false;
+bool verbose_logging_ = false;
+
 static int findComponent(const char *c) {
 	for (int i=0; i<num_components; ++i) {
 		if (!strcmp(c, all_components[i])) {
@@ -70,6 +73,13 @@ void listLogComponents()
 
 void setLogLevel(LogLevel l) {
 	log_level = l;
+        if (log_level == VERBOSE) {
+            verbose_logging_ = true;
+        }
+        if (log_level == DEBUG) {
+            verbose_logging_ = true;
+            debug_logging_ = true;
+        }        
 }
 
 void setLogComponents(const char *cs) {
@@ -120,7 +130,7 @@ void failure(ComponentId ci, const char* fmt, ...) {
         vsyslog(LOG_ERR, fmt, args);
     }
     va_end(args);
-    if (!log_level == QUITE) {
+    if (log_level != QUITEQUITE) {
         va_start(args, fmt);
         vfprintf(stderr, fmt, args);
         va_end(args);
@@ -128,18 +138,20 @@ void failure(ComponentId ci, const char* fmt, ...) {
 }
 
 void warning(ComponentId ci, const char* fmt, ...) {
-    va_list args;
-    if (use_syslog) {
+    if (log_level > QUITEQUITE) {
+        va_list args;
+        if (use_syslog) {
+            va_start(args, fmt);
+            vsyslog(LOG_INFO, fmt, args);
+            va_end(args);
+        }
         va_start(args, fmt);
-        vsyslog(LOG_INFO, fmt, args);
+        vfprintf(stdout, fmt, args);
         va_end(args);
     }
-    va_start(args, fmt);
-    vfprintf(stdout, fmt, args);
-    va_end(args);
 }
 
-void debug(ComponentId ci, const char* fmt, ...) {
+void logDebug(ComponentId ci, const char* fmt, ...) {
     if (log_level == DEBUG &&
     		(log_components.size()==0 ||
     		 log_components.count(ci) == 1)) {
@@ -154,7 +166,7 @@ void debug(ComponentId ci, const char* fmt, ...) {
     }
 }
 
-void verbose(ComponentId ci, const char* fmt, ...) {
+void logVerbose(ComponentId ci, const char* fmt, ...) {
     if (log_level >= VERBOSE &&
     		(log_components.size()==0 ||
     		 log_components.count(ci) == 1)) {

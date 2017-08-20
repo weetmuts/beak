@@ -91,14 +91,18 @@ int ReverseTarredFS::parseTarredfsContent(vector<char> &v, vector<char>::iterato
         Path *path;
         string link;
         bool is_sym_link;
-        time_t secs;
-        time_t nanos;
+        time_t msecs, asecs, csecs;
+        long mnanos, ananos, cnanos;
         
         ii = i;
         bool got_entry = eatEntry(v, i, dir_to_prepend, &mode, &size, &offset,
-                                  &tar, &path, &link, &is_sym_link, &secs, &nanos, &eof, &err);
+                                  &tar, &path, &link, &is_sym_link,
+                                  &msecs, &mnanos,
+                                  &asecs, &ananos,
+                                  &csecs, &cnanos,
+                                  &eof, &err);
         if (err) {
-            failure(REVERSE, "Could not parse tarredfs-contents file in %s\n>%s<\n",
+            failure(REVERSE, "Could not parse tarredfs-contents file in >%s<\n>%s<\n",
                     dir_to_prepend->c_str(), ii);
             break;
         }            
@@ -108,8 +112,12 @@ int ReverseTarredFS::parseTarredfsContent(vector<char> &v, vector<char>::iterato
         Entry *e = &entries_[path];
         e->link = link;
         e->is_sym_link = is_sym_link;
-        e->secs = secs;
-        e->nanos = nanos;
+        e->msecs = msecs;
+        e->mnanos = mnanos;
+        e->asecs = asecs;
+        e->ananos = ananos;
+        e->csecs = csecs;
+        e->cnanos = cnanos;
         e->tar = tar;
         es.push_back(e);
         num_files--;
@@ -325,8 +333,12 @@ int ReverseTarredFS::getattrCB(const char *path_char_string, struct stat *stbuf)
         stbuf->st_size = e->size;
         stbuf->st_uid = geteuid();
         stbuf->st_gid = getegid();
-        stbuf->st_mtim.tv_sec = e->secs;
-        stbuf->st_mtim.tv_nsec = e->nanos;
+        stbuf->st_mtim.tv_sec = e->msecs;
+        stbuf->st_mtim.tv_nsec = e->mnanos;
+        stbuf->st_atim.tv_sec = e->asecs;
+        stbuf->st_atim.tv_nsec = e->ananos;
+        stbuf->st_ctim.tv_sec = e->csecs;
+        stbuf->st_ctim.tv_nsec = e->cnanos;
         goto ok;
     }
     
@@ -335,8 +347,12 @@ int ReverseTarredFS::getattrCB(const char *path_char_string, struct stat *stbuf)
     stbuf->st_size = e->size;
     stbuf->st_uid = geteuid();
     stbuf->st_gid = getegid();
-    stbuf->st_mtim.tv_sec = e->secs;
-    stbuf->st_mtim.tv_nsec = e->nanos;
+    stbuf->st_mtim.tv_sec = e->msecs;
+    stbuf->st_mtim.tv_nsec = e->mnanos;
+    stbuf->st_atim.tv_sec = e->asecs;
+    stbuf->st_atim.tv_nsec = e->ananos;
+    stbuf->st_ctim.tv_sec = e->csecs;
+    stbuf->st_ctim.tv_nsec = e->cnanos;
     goto ok;
 
     err:
@@ -445,7 +461,7 @@ int ReverseTarredFS::readCB(const char *path_char_string, char *buf,
     e = findEntry(path);
     if (!e) goto err;
 
-    tar = rootDir()->path() + e->tar;
+    tar = rootDir()->str() + e->tar;
 
     if (offset > e->size)
     {

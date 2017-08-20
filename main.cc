@@ -562,7 +562,7 @@ int reversemain(int argc, char *argv[])
 
     // Check that it is a proper file.
     struct stat sb;
-    Path *gz = Path::lookup(reverse_fs.rootDir()->path() + "/" + name);
+    Path *gz = Path::lookup(reverse_fs.rootDir()->str() + "/" + name);
 
     int rc = stat(gz->c_str(), &sb);
     if (rc || !S_ISREG(sb.st_mode))
@@ -588,14 +588,14 @@ int reversemain(int argc, char *argv[])
     time_t s = 0, n = 0;
     for (auto i : e->dir)
     {
-        if (i->secs > s || (i->secs == s && i->nanos > n))
+        if (i->msecs > s || (i->msecs == s && i->mnanos > n))
         {
-            s = i->secs;
-            n = i->nanos;
+            s = i->msecs;
+            n = i->mnanos;
         }
     }
-    e->secs = s;
-    e->nanos = n;
+    e->msecs = s;
+    e->mnanos = n;
 
     return fuse_main(argc, argv, &reverse_tarredfs_ops, NULL);
 }

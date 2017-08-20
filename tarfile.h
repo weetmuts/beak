@@ -69,12 +69,12 @@ struct TarFile
     void finishHash();
     pair<TarEntry*, size_t> findTarEntry(size_t offset);
 
-    void calculateSHA256Hash();
-    void calculateSHA256Hash(vector<TarFile*> &tars);
+    void calculateHash();
+    void calculateHash(vector<TarFile*> &tars, string &contents);
+    vector<char> &hash();
+    
     void fixName();
     void setName(string s);
-    string SHA256Hash() { return sha256_hash_string_; }
-    char *sha256() { return sha256_hash_; }
     
     size_t currentTarOffset()
     {
@@ -109,7 +109,7 @@ private:
     // Name of the tar, tar00000000.tar taz00000000.tar tal00000000.tar tam00000000.tar
     string name_;
     Path *path_;
-    uint32_t hash;
+    uint32_t hash_;
     bool hash_initialized = false;
     size_t size_;
     map<size_t, TarEntry*> contents_;
@@ -119,8 +119,11 @@ private:
     TarEntry *volume_header_;
     TarEntry *volume_contents;
     TarEntry *volume_footer;
-    char sha256_hash_[SHA256_DIGEST_LENGTH];    
-    string sha256_hash_string_;
+
+    void calculateSHA256Hash();
+    void calculateSHA256Hash(vector<TarFile*> &tars, string &content);
+    
+    vector<char> sha256_hash_;
 };
 
 #endif
