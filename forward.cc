@@ -510,7 +510,7 @@ size_t TarredFS::groupFilesIntoTars() {
             tf->fixSize();
             tf->calculateHash();
             tf->fixName();
-            if (tf->currentTarOffset() > te->tazFile()->volumeHeader()->blockedSize()) {
+            if (tf->currentTarOffset() > 0) {
                 debug(FORWARD,"%s%s size became %zu\n", te->path()->c_str(), tf->name().c_str(), tf->size());
                 te->appendFileName(tf->name());
                 appendTarList(te->path(), tf);
@@ -522,7 +522,7 @@ size_t TarredFS::groupFilesIntoTars() {
             tf->fixSize();
             tf->calculateHash();
             tf->fixName();
-            if (tf->currentTarOffset() > te->tazFile()->volumeHeader()->blockedSize()) {
+            if (tf->currentTarOffset() > 0) {
                 debug(FORWARD,"%s%s size became %zu\n", te->path()->c_str(), tf->name().c_str(), tf->size());
                 te->appendFileName(tf->name());
                 appendTarList(te->path(), tf);
@@ -534,7 +534,7 @@ size_t TarredFS::groupFilesIntoTars() {
             tf->fixSize();
             tf->calculateHash();
             tf->fixName();
-            if (tf->currentTarOffset() > te->tazFile()->volumeHeader()->blockedSize()) {
+            if (tf->currentTarOffset() > 0) {
                 debug(FORWARD,"%s%s size became %zu\n", te->path()->c_str(), tf->name().c_str(), tf->size());
                 te->appendFileName(tf->name());
                 appendTarList(te->path(), tf);
@@ -608,7 +608,7 @@ size_t TarredFS::groupFilesIntoTars() {
             bool b = ste->path()->isBelowOrEqual(te->path());
             if (b) {
                 for (auto & tf : ste->tars()) {
-                    if (tf->volumeHeader() == NULL || tf->size() > tf->volumeHeader()->blockedSize() ) {
+                    if (tf->size() > 0 ) {
                         tars.push_back(tf);
                         // Make sure the gzfile timestamp is the latest
                         // of all subtars as well.
@@ -640,7 +640,7 @@ size_t TarredFS::groupFilesIntoTars() {
         te->gzFile()->addEntryLast(dirs);        
         te->gzFile()->fixSize();
 
-        if (te->tazFile()->size() > te->tazFile()->volumeHeader()->blockedSize() ) {
+        if (te->tazFile()->size() > 0 ) {
             
             debug(FORWARD,"%s%s size became %zu\n", te->path()->c_str(),
                   te->tazFile()->name().c_str(), te->tazFile()->size());

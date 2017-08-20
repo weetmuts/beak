@@ -190,15 +190,15 @@ void TarEntry::calculateTarpath(Path *storage_dir) {
 }
 
 void TarEntry::createSmallTar(int i) {
-    small_tars_[i] = new TarFile(this, SMALL_FILES_TAR, i, true);
+    small_tars_[i] = new TarFile(this, SMALL_FILES_TAR, i);
     tars_.push_back(small_tars_[i]);
 }
 void TarEntry::createMediumTar(int i) {
-    medium_tars_[i] = new TarFile(this, MEDIUM_FILES_TAR, i, true);
+    medium_tars_[i] = new TarFile(this, MEDIUM_FILES_TAR, i);
     tars_.push_back(medium_tars_[i]);
 }
 void TarEntry::createLargeTar(uint32_t hash) {
-    large_tars_[hash] = new TarFile(this, SINGLE_LARGE_FILE_TAR, hash, true);
+    large_tars_[hash] = new TarFile(this, SINGLE_LARGE_FILE_TAR, hash);
     tars_.push_back(large_tars_[hash]);
 }
 
@@ -449,12 +449,12 @@ void TarEntry::registerTarFile(TarFile *tf, size_t o) {
 }
 
 void TarEntry::registerTazFile() {
-    taz_file_ = new TarFile(this, DIR_TAR, 0, true);
+    taz_file_ = new TarFile(this, DIR_TAR, 0);
     tars_.push_back(taz_file_);
 }
 
 void TarEntry::registerGzFile() {
-    gz_file_ = new TarFile(this, REG_FILE, 0, false);
+    gz_file_ = new TarFile(this, REG_FILE, 0);
     tars_.push_back(gz_file_);
 }
 
@@ -463,6 +463,7 @@ void TarEntry::registerParent(TarEntry *p) {
 }
 
 TarEntry *TarEntry::newVolumeHeader() {
+    assert(0);
     struct stat sb;
     memset(&sb, 0, sizeof(sb));
     TarEntry *header = new TarEntry(Path::lookup(""), Path::lookup(""), &sb, true);

@@ -43,7 +43,7 @@ struct TarFile
     TarFile()
     {
     }
-    TarFile(TarEntry *d, TarContents tc, int n, bool has_header);
+    TarFile(TarEntry *d, TarContents tc, int n);
     string name()
     {
         return name_;
@@ -61,11 +61,7 @@ struct TarFile
     }
     void addEntryLast(TarEntry *entry);
     void addEntryFirst(TarEntry *entry);
-    void addVolumeHeader();
-    TarEntry *volumeHeader()
-    {
-        return volume_header_;
-    }
+
     void finishHash();
     pair<TarEntry*, size_t> findTarEntry(size_t offset);
 
@@ -116,9 +112,6 @@ private:
     vector<size_t> offsets;
     size_t current_tar_offset_ = 0;
     struct timespec mtim_;
-    TarEntry *volume_header_;
-    TarEntry *volume_contents;
-    TarEntry *volume_footer;
 
     void calculateSHA256Hash();
     void calculateSHA256Hash(vector<TarFile*> &tars, string &content);

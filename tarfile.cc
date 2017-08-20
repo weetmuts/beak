@@ -33,7 +33,7 @@
 ComponentId TARFILE = registerLogComponent("tarfile");
 ComponentId HASHING = registerLogComponent("hashing");
 
-TarFile::TarFile(TarEntry *d, TarContents tc, int n, bool has_header)
+TarFile::TarFile(TarEntry *d, TarContents tc, int n)
 {
     size_ = 0;
     path_ = Path::lookupRoot();
@@ -42,106 +42,73 @@ TarFile::TarFile(TarEntry *d, TarContents tc, int n, bool has_header)
     memset(&mtim_, 0, sizeof(mtim_));
     // This is a temporary name! It will be overwritten when the hash is finalized!
     name_ = "";
-    volume_header_ = NULL;
-    if (has_header) addVolumeHeader();
 }
 
 void TarFile::addEntryLast(TarEntry *entry)
 {
-	entry->updateMtim(&mtim_);
+    entry->updateMtim(&mtim_);
 
-	entry->registerTarFile(this, current_tar_offset_);
-	contents_[current_tar_offset_] = entry;
-	offsets.push_back(current_tar_offset_);
-	debug(TARFILE, "    %s    Added %s at %zu\n", name_.c_str(),
-			entry->path()->c_str(), current_tar_offset_);
-	current_tar_offset_ += entry->blockedSize();
+    entry->registerTarFile(this, current_tar_offset_);
+    contents_[current_tar_offset_] = entry;
+    offsets.push_back(current_tar_offset_);
+    debug(TARFILE, "    %s    Added %s at %zu\n", name_.c_str(),
+          entry->path()->c_str(), current_tar_offset_);
+    current_tar_offset_ += entry->blockedSize();
 }
 
 void TarFile::addEntryFirst(TarEntry *entry)
 {
-	entry->updateMtim(&mtim_);
+    entry->updateMtim(&mtim_);
+    
+    entry->registerTarFile(this, 0);
+    map<size_t, TarEntry*> newc;
+    vector<size_t> newo;
 
-	entry->registerTarFile(this, 0);
-	map<size_t, TarEntry*> newc;
-	vector<size_t> newo;
-	size_t start = 0;
+    newc[0] = entry;
+    newo.push_back(0);
+    entry->registerTarFile(this, 0);
 
-	if (volume_header_)
-	{
-		newc[0] = volume_header_;
-		newo.push_back(0);
-		start = volume_header_->blockedSize();
-		newc[start] = entry;
-		newo.push_back(start);
-		entry->registerTarFile(this, start);
-	}
-	else
-	{
-		newc[0] = entry;
-		newo.push_back(0);
-	}
-	for (auto & a : contents_)
-	{
-		if (a.second != volume_header_)
-		{
-			size_t o = a.first + entry->blockedSize();
-			newc[o] = a.second;
-			newo.push_back(o);
-			a.second->registerTarFile(this, o);
-			//fprintf(stderr, "%s Moving %s from %ju to offset %ju\n", name.c_str(), a.second->name.c_str(), a.first, o);
-		}
-		else
-		{
-			//fprintf(stderr, "%s Not moving %s from %ju\n", name.c_str(), a.second->name.c_str(), a.first);
-		}
-	}
-	contents_ = newc;
-	offsets = newo;
-
-	debug(TARFILE, "    %s    Added FIRST %s at %zu with blocked size %zu\n",
-			name_.c_str(), entry->path()->c_str(), current_tar_offset_,
-			entry->blockedSize());
-	current_tar_offset_ += entry->blockedSize();
-
-	if (tar_contents == SINGLE_LARGE_FILE_TAR)
-	{
-		//assert(hash == entry->tarpathHash());
-	}
-}
-
-void TarFile::addVolumeHeader()
-{
-	TarEntry *header = TarEntry::newVolumeHeader();
-	addEntryLast(header);
-	volume_header_ = header;
+    for (auto & a : contents_)
+    {
+        size_t o = a.first + entry->blockedSize();
+        newc[o] = a.second;
+        newo.push_back(o);
+        a.second->registerTarFile(this, o);
+    }
+    contents_ = newc;
+    offsets = newo;
+    
+    debug(TARFILE, "    %s    Added FIRST %s at %zu with blocked size %zu\n",
+          name_.c_str(), entry->path()->c_str(), current_tar_offset_,
+          entry->blockedSize());
+    current_tar_offset_ += entry->blockedSize();    
 }
 
 pair<TarEntry*, size_t> TarFile::findTarEntry(size_t offset)
 {
-	if (offset > size_)
-	{
-		return pair<TarEntry*, size_t>(NULL, 0);
-	}
-	debug(TARFILE, "tarfile", "Looking for offset %zu\n", offset);
-	size_t o = 0;
-
-	vector<size_t>::iterator i = lower_bound(offsets.begin(), offsets.end(),
-			offset, less_equal<size_t>());
-
-	if (i == offsets.end())
-	{
-		o = *offsets.rbegin();
-	}
-	else
-	{
-		i--;
-		o = *i;
-	}
-	TarEntry *te = contents_[o];
-
-	debug(TARFILE, "Found it %s\n", te->path()->c_str());
-	return pair<TarEntry*, size_t>(te, o);
+    if (offset > size_)
+    {
+        return pair<TarEntry*, size_t>(NULL, 0);
+    }
+    debug(TARFILE, "tarfile", "Looking for offset %zu\n", offset);
+    size_t o = 0;
+    
+    vector<size_t>::iterator i = lower_bound(offsets.begin(), offsets.end(),
+                                             offset, less_equal<size_t>());
+    
+    if (i == offsets.end())
+    {
+        o = *offsets.rbegin();
+    }
+    else
+    {
+        i--;
+        o = *i;
+    }
+    TarEntry *te = contents_[o];
+    
+    debug(TARFILE, "Found it %s\n", te->path()->c_str());
+    return pair<TarEntry*, size_t>(te, o);
 }
 
 void TarFile::calculateHash()
@@ -170,9 +137,6 @@ void TarFile::calculateSHA256Hash()
     }
     sha256_hash_.resize(SHA256_DIGEST_LENGTH);
     SHA256_Final((unsigned char*)&sha256_hash_[0], &sha256ctx);
-
-    // Copy the binary hash into the volume header name.
-    volume_header_->injectHash(&sha256_hash_[0], sha256_hash_.size());
 }
 
 void TarFile::calculateSHA256Hash(vector<TarFile*> &tars, string &content)
