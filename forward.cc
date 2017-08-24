@@ -44,17 +44,25 @@ using namespace std;
 ComponentId FORWARD = registerLogComponent("forward");
 ComponentId HARDLINKS = registerLogComponent("hardlinks");
 
-TarredFS::TarredFS() {
+ForwardTarredFS::ForwardTarredFS() {
     int rc = regcomp(&file_name_regex,
     "([rmlxzRMLZX])01_([0-9]+)\\.([0-9]+)_([0-9]+)_([0-9a-fA-F]+)_([0-9a-fA-F]+)\\.(tar|gz|TAR|GZ)", REG_EXTENDED);
     assert(!rc);
 }
 
-int TarredFS::recurse(FileCB cb) {
+thread_local ForwardTarredFS *current_fs;
+
+static int addEntry(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf)
+{
+    return current_fs->addTarEntry(fpath, sb, ftwbuf);
+}
+
+int ForwardTarredFS::recurse() {
     // Recurse into the root dir. Maximum 256 levels deep.
     // Look at symbolic links (ie do not follow them) so that
     // we can store the links in the tar file.
-    int rc = nftw(root_dir.c_str(), cb, 256, FTW_PHYS|FTW_DEPTH);
+    current_fs = this;
+    int rc = nftw(root_dir.c_str(), addEntry, 256, FTW_PHYS|FTW_DEPTH);
 
     if (rc  == -1) {
         error(FORWARD,"Could not scan files");
@@ -63,7 +71,7 @@ int TarredFS::recurse(FileCB cb) {
     return 0;
 }
 
-int TarredFS::addTarEntry(const char *p, const struct stat *sb, struct FTW *ftwbuf)
+int ForwardTarredFS::addTarEntry(const char *p, const struct stat *sb, struct FTW *ftwbuf)
 {
     Path *abspath = Path::lookup(p);
     Path *path = abspath->subpath(root_dir_path->depth());
@@ -127,7 +135,7 @@ int TarredFS::addTarEntry(const char *p, const struct stat *sb, struct FTW *ftwb
     return 0;
 }
 
-void TarredFS::findTarCollectionDirs() {
+void ForwardTarredFS::findTarCollectionDirs() {
     // Accumulate blocked sizes into children_size in the parent.
     // Set the parent pointer.
     for(auto & e : files) {
@@ -177,7 +185,7 @@ void TarredFS::findTarCollectionDirs() {
     }
 }
 
-void TarredFS::recurseAddDir(Path *path, TarEntry *direntry) {
+void ForwardTarredFS::recurseAddDir(Path *path, TarEntry *direntry) {
     if (direntry->isAddedToDir() || path->isRoot()) {
         // Stop if the direntry is already added to a parent.
         // Stop at the root.
@@ -194,7 +202,7 @@ void TarredFS::recurseAddDir(Path *path, TarEntry *direntry) {
     }
 }
 
-void TarredFS::addDirsToDirectories() {
+void ForwardTarredFS::addDirsToDirectories() {
     // Find all directories that are tar collection dirs
     // and make sure they can be listed in all the parent
     // directories down to the root. Even if those intermediate
@@ -224,7 +232,7 @@ void TarredFS::addDirsToDirectories() {
     }
 }
 
-void TarredFS::addEntriesToTarCollectionDirs() {
+void ForwardTarredFS::addEntriesToTarCollectionDirs() {
     for(auto & e : files) {
         Path *path = e.first;
         TarEntry *dir = NULL;
@@ -247,7 +255,7 @@ void TarredFS::addEntriesToTarCollectionDirs() {
     }
 }
 
-void TarredFS::pruneDirectories() {
+void ForwardTarredFS::pruneDirectories() {
     set<Path*> paths;
     map<string,string> paths_lowercase;
 
@@ -302,7 +310,7 @@ void TarredFS::pruneDirectories() {
     }
 }
 
-size_t TarredFS::findNumTarsFromSize(size_t amount, size_t total_size) {
+size_t ForwardTarredFS::findNumTarsFromSize(size_t amount, size_t total_size) {
     // We have 128M of data
     // The amount (= min tar size) is 10M, how many tars?
     // 1 -> 10
@@ -320,7 +328,7 @@ size_t TarredFS::findNumTarsFromSize(size_t amount, size_t total_size) {
     return n;
 }
 
-void TarredFS::calculateNumTars(TarEntry *te,
+void ForwardTarredFS::calculateNumTars(TarEntry *te,
                                 size_t *nst, size_t *nmt, size_t *nlt,
                                 size_t *sfs, size_t *mfs, size_t *lfs,
                                 size_t *sc, size_t *mc)
@@ -386,7 +394,7 @@ void TarredFS::calculateNumTars(TarEntry *te,
     }
 }
 
-void TarredFS::fixTarPathsAndHardLinks() {
+void ForwardTarredFS::fixTarPathsAndHardLinks() {
     for (auto & e : tar_storage_directories) {
         TarEntry *te = e.second;
         vector<pair<TarEntry*,TarEntry*>> to_be_moved;
@@ -431,7 +439,7 @@ void TarredFS::fixTarPathsAndHardLinks() {
 
 }
 
-size_t TarredFS::groupFilesIntoTars() {
+size_t ForwardTarredFS::groupFilesIntoTars() {
     size_t num = 0;
 
     for (auto & e : files) {
@@ -513,7 +521,6 @@ size_t TarredFS::groupFilesIntoTars() {
             if (tf->currentTarOffset() > 0) {
                 debug(FORWARD,"%s%s size became %zu\n", te->path()->c_str(), tf->name().c_str(), tf->size());
                 te->appendFileName(tf->name());
-                appendTarList(te->path(), tf);
                 te->largeHashTars()[tf->hash()] = tf;
             }
         }
@@ -525,7 +532,6 @@ size_t TarredFS::groupFilesIntoTars() {
             if (tf->currentTarOffset() > 0) {
                 debug(FORWARD,"%s%s size became %zu\n", te->path()->c_str(), tf->name().c_str(), tf->size());
                 te->appendFileName(tf->name());
-                appendTarList(te->path(), tf);
                 te->mediumHashTars()[tf->hash()] = tf;
             }
         }
@@ -537,7 +543,6 @@ size_t TarredFS::groupFilesIntoTars() {
             if (tf->currentTarOffset() > 0) {
                 debug(FORWARD,"%s%s size became %zu\n", te->path()->c_str(), tf->name().c_str(), tf->size());
                 te->appendFileName(tf->name());
-                appendTarList(te->path(), tf);
                 te->smallHashTars()[tf->hash()] = tf;
             }
         }
@@ -574,6 +579,7 @@ size_t TarredFS::groupFilesIntoTars() {
             gzfile_contents.append(ss.str());
         }
         gzfile_contents.append("\n");
+        //gzfile_contents.append("#columns permissions uid/gid mtime_readable mtime_secs.nanos atime_secs.nanos ctime_secs.nanos filename link_information tar_file_name offset_inside_tar content_hash header_hash\n");
         gzfile_contents.append("#files ");
         gzfile_contents.append(to_string(te->entries().size()));
         gzfile_contents.append("\n");
@@ -622,6 +628,7 @@ size_t TarredFS::groupFilesIntoTars() {
         te->gzFile()->calculateHash(tars, gzfile_contents);
         te->gzFile()->fixName();
 
+        //gzfile_contents.append("#columns tar_path\n");
         gzfile_contents.append("#tars ");
         gzfile_contents.append(to_string(tars.size()));
         gzfile_contents.append("\n");
@@ -646,12 +653,10 @@ size_t TarredFS::groupFilesIntoTars() {
                   te->tazFile()->name().c_str(), te->tazFile()->size());
 
             te->appendFileName(te->tazFile()->name());
-            appendTarList(te->path(), te->tazFile());
             te->enableTazFile();
             has_dir = 1;
         }
         te->appendFileName(te->gzFile()->name());
-        appendTarList(te->path(), te->gzFile());
         te->enableGzFile();
 
         num += has_dir+te->smallTars().size()+te->mediumTars().size()+te->largeTars().size();
@@ -659,7 +664,7 @@ size_t TarredFS::groupFilesIntoTars() {
     return num;
 }
 
-void TarredFS::sortTarCollectionEntries() {
+void ForwardTarredFS::sortTarCollectionEntries() {
     for (auto & p : tar_storage_directories) {
         TarEntry *te = p.second;
         te->sortEntries();
@@ -683,7 +688,7 @@ void TarredFS::sortTarCollectionEntries() {
 }
 
 /** Iterate up in the directory tree and return the next storate directory */
-TarEntry *TarredFS::findNearestStorageDirectory(TarEntry *te) {
+TarEntry *ForwardTarredFS::findNearestStorageDirectory(TarEntry *te) {
     while (te != NULL) {
         if (te->isStorageDir()) break;
         te = te->parent();
@@ -691,39 +696,8 @@ TarEntry *TarredFS::findNearestStorageDirectory(TarEntry *te) {
     return te;
 }
 
-void TarredFS::setTarListFile(string s) {
-    tar_list_file_ = Path::lookup(s);
-    ofstream out;
-    out.open(tar_list_file_->str());
-    if (!out) {
-        error(FORWARD, "Could not open tar list file \"%s\"\n", tar_list_file_->c_str());
-    }
-    out << endl;
-    if (!out) {
-        error(FORWARD, "Could not write to tar list file \"%s\"\n", tar_list_file_->c_str());
-    }
-    out.close();
-}
 
-void TarredFS::appendTarList(Path *p, TarFile *tf) {    
-    tar_list_.push_back(tf->line(p));
-}
-
-void TarredFS::saveTarListFile() {
-    string null("\0",1);
-    
-    if (tar_list_file_) {
-        ofstream out;        
-        out.open(tar_list_file_->str());
-        out << "#tarredfs 0.1 list" << endl << separator;
-        for (auto & e : tar_list_) {
-            out << e;
-        }
-        out.close();
-    }
-}
-
-TarFile *TarredFS::findTarFromPath(Path *path) {
+TarFile *ForwardTarredFS::findTarFromPath(Path *path) {
     string n = path->name()->str();
     const char *nn = n.c_str();
     string d = path->parent()->name()->str();
@@ -789,7 +763,7 @@ TarFile *TarredFS::findTarFromPath(Path *path) {
     return NULL;
 }
 
-int TarredFS::getattrCB(const char *path_char_string, struct stat *stbuf) {
+int ForwardTarredFS::getattrCB(const char *path_char_string, struct stat *stbuf) {
     pthread_mutex_lock(&global);
 
     memset(stbuf, 0, sizeof(struct stat));
@@ -835,7 +809,7 @@ ok:
     return 0;
 }
 
-int TarredFS::readdirCB(const char *path_char_string, void *buf, fuse_fill_dir_t filler,
+int ForwardTarredFS::readdirCB(const char *path_char_string, void *buf, fuse_fill_dir_t filler,
                         off_t offset, struct fuse_file_info *fi)
 {
 
@@ -875,7 +849,7 @@ int TarredFS::readdirCB(const char *path_char_string, void *buf, fuse_fill_dir_t
     return 0;
 }
 
-int TarredFS::readCB(const char *path_char_string, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
+int ForwardTarredFS::readCB(const char *path_char_string, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
     pthread_mutex_lock(&global);
     size_t org_size = size;
@@ -889,7 +863,6 @@ int TarredFS::readCB(const char *path_char_string, char *buf, size_t size, off_t
         goto err;
     }
 
-    fprintf(stderr, "TAR %s\n", tar->name().c_str());
     if ((size_t)offset >= tar->size()) {
         goto zero;
     }

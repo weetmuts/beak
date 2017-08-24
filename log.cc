@@ -42,61 +42,74 @@ bool debug_logging_ = false;
 bool verbose_logging_ = false;
 
 static int findComponent(const char *c) {
-	for (int i=0; i<num_components; ++i) {
-		if (!strcmp(c, all_components[i])) {
-			return i;
-		}
-	}
-	return -1;
+    for (int i=0; i<num_components; ++i) {
+        if (!strcmp(c, all_components[i])) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+static void logAll() {
+    for (int i=0; i<num_components; ++i) {
+        log_components.insert(i);
+    }
 }
 
 ComponentId registerLogComponent(const char *component) {
-	int c = findComponent(component);
-	if (c >= 0) {
-		return c;
-	}
-	all_components[num_components] = component;
-	return num_components++;
+    int c = findComponent(component);
+    if (c >= 0) {
+        return c;
+    }
+    all_components[num_components] = component;
+    return num_components++;
 }
 
 void listLogComponents()
 {
-	vector<string> c;
-	for (int i=0; i<num_components; ++i) {
-		c.push_back(all_components[i]);
-	}
-	std::sort(c.begin(), c.end());
-	for (auto & s : c) {
-		printf("%s\n", s.c_str());
-	}
+    vector<string> c;
+    for (int i=0; i<num_components; ++i) {
+        c.push_back(all_components[i]);
+    }
+    std::sort(c.begin(), c.end());
+    for (auto & s : c) {
+        printf("%s\n", s.c_str());
+    }
 }
 
 void setLogLevel(LogLevel l) {
-	log_level = l;
-        if (log_level == VERBOSE) {
-            verbose_logging_ = true;
-        }
-        if (log_level == DEBUG) {
-            verbose_logging_ = true;
-            debug_logging_ = true;
-        }        
+    log_level = l;
+    if (log_level == VERBOSE) {
+        verbose_logging_ = true;
+    }
+    if (log_level == DEBUG) {
+        verbose_logging_ = true;
+        debug_logging_ = true;
+    }        
 }
 
 void setLogComponents(const char *cs) {
-	string components = cs;
-	int c;
+    string components = cs;
+    int c;
     size_t p = 0, pp;
+
+    if (components == "all") {
+        logAll();
+        return;
+    }
     while (p < components.length()) {
         pp = components.find(',', p);
         if (pp == string::npos) {
-        	const char *co = components.substr(p).c_str();
-        	c = findComponent(co);
-        	log_components.insert(c);
+            const char *co = components.substr(p).c_str();
+            c = findComponent(co);
+            if (c == -1) error(0,"No such log component: \"%s\"\n", co);
+            log_components.insert(c);
             break;
         } else {
-        	const char *co = components.substr(p, pp).c_str();
-        	c = findComponent(co);
-        	log_components.insert(c);
+            const char *co = components.substr(p, pp-p).c_str();
+            c = findComponent(co);
+            if (c == -1) error(0,"No such log component: \"%s\"\n", co);
+            log_components.insert(c);
         }
         p = pp+1;
     }
@@ -130,25 +143,21 @@ void failure(ComponentId ci, const char* fmt, ...) {
         vsyslog(LOG_ERR, fmt, args);
     }
     va_end(args);
-    if (log_level != QUITEQUITE) {
-        va_start(args, fmt);
-        vfprintf(stderr, fmt, args);
-        va_end(args);
-    }
+    va_start(args, fmt);
+    vfprintf(stderr, fmt, args);
+    va_end(args);
 }
 
 void warning(ComponentId ci, const char* fmt, ...) {
-    if (log_level > QUITEQUITE) {
-        va_list args;
-        if (use_syslog) {
-            va_start(args, fmt);
-            vsyslog(LOG_INFO, fmt, args);
-            va_end(args);
-        }
+    va_list args;
+    if (use_syslog) {
         va_start(args, fmt);
-        vfprintf(stdout, fmt, args);
+        vsyslog(LOG_INFO, fmt, args);
         va_end(args);
     }
+    va_start(args, fmt);
+    vfprintf(stdout, fmt, args);
+    va_end(args);
 }
 
 void logDebug(ComponentId ci, const char* fmt, ...) {

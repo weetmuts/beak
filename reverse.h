@@ -44,7 +44,9 @@ struct Entry
     
     Entry(mode_t m, size_t s, size_t o, Path *p) :
     mode_bits(m), size(s), offset(o), path(p) {
-	
+        msecs = asecs = csecs = 0;
+        mnanos = ananos = cnanos = 0;
+        is_sym_link = false;
         loaded = false;
     }
     
@@ -62,19 +64,31 @@ struct Entry
     bool loaded;
 };
 
-struct Version {
+enum PointInTimeFormat {
+    absolute_point,
+    relative_point,
+    both_point
+};
+
+struct PointInTime {
     int key;
     struct timespec ts;
     string ago;
     string datetime;
+    string direntry;
     string filename;
+
+    map<Path*,Entry> entries_;   
+    map<Path*,Path*> gz_files_;
+    set<Path*> loaded_gz_files_;
 };
 
 struct ReverseTarredFS
 {
     pthread_mutex_t global;
     
-    Entry *findEntry(Path *path);
+    Entry *findEntry(PointInTime *point, Path *path);
+
     int getattrCB(const char *path, struct stat *stbuf);
     int readdirCB(const char *path, void *buf, fuse_fill_dir_t filler,
                   off_t offset, struct fuse_file_info *fi);
@@ -82,13 +96,17 @@ struct ReverseTarredFS
                struct fuse_file_info *fi);
     int readlinkCB(const char *path, char *buf, size_t s);
     
-    int parseTarredfsContent(vector<char> &v, vector<char>::iterator &i, Path *dir_to_prepend);
-    int parseTarredfsTars(vector<char> &v, vector<char>::iterator &i);
-    bool loadGz(Path *gz, Path *dir_to_prepend);
-    void loadCache(Path *path);
-    void checkVersions(Path *path, vector<Version> *versions);
-    void setGeneration(string g);
-    int getGeneration() { return generation_ ; }
+    int parseTarredfsContent(PointInTime *point, vector<char> &v, vector<char>::iterator &i,
+                             Path *dir_to_prepend);
+    int parseTarredfsTars(PointInTime *point, vector<char> &v, vector<char>::iterator &i);
+    bool loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend);
+    void loadCache(PointInTime *point, Path *path);
+
+    bool lookForPointsInTime(PointInTimeFormat f, Path *src);
+    vector<PointInTime> &history() { return history_; }
+    PointInTime *findPointInTime(string s);    
+    bool setPointInTime(string g);
+    
     ReverseTarredFS();
 
     Path *rootDir() { return root_dir_; }
@@ -101,11 +119,10 @@ struct ReverseTarredFS
     Path *root_dir_;
     Path *mount_dir_;
 
-    map<Path*,Entry> entries_;   
-    map<Path*,vector<Path*>> tarredfs_files_;
-    map<Path*,Path*> gz_files_;
-    set<Path*> loaded_gz_files_;
-    int generation_;
+    vector<PointInTime> history_;
+    map<string,PointInTime*> points_in_time_;
+    PointInTime *single_point_in_time_;
+    PointInTime *most_recent_point_in_time_;
 };
 
 #endif

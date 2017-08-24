@@ -1,4 +1,15 @@
 # tarredfs
+Beak is a mirroring-backup-rotation-retention tool that is designed to co-exist
+with the (cloud) storage of your choice and allow push/pull to share the backups
+between multiple client computers.
+
+There is no need for an active server, merely a storage location (local or remote).
+
+See the home page for installation, usage, documentation, changelog
+and configuration walkthroughs.
+
+http://nivelleringslikaren.eu/beak/
+
 Tarredfs, a libfuse filesystem that renders your files in virtual tar files.
 by Fredrik Öhrström oehrstroem@gmail.com
 

@@ -27,7 +27,6 @@ using namespace std;
 enum LogLevel
 {
     // Errors and failures are always printed.
-    QUITEQUITE, // No info, no warnings
     QUITE,      // No info, but display warnings
     INFO,       // Normal mode
     VERBOSE,    // Verbose information

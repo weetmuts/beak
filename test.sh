@@ -22,7 +22,7 @@
 # You can run a single test: test.sh test6
 # You can run a single test using gdb: test.sh test6 gdb
 
-tmpdir=$(mktemp -d /tmp/tarredfs_testXXXXXXXX)
+tmpdir=$(mktemp -d /tmp/beak_testXXXXXXXX)
 dir=""
 root=""
 mount=""
@@ -72,15 +72,15 @@ function startFS {
     run="$1"
     extra="$2"
     if [ -z "$test" ]; then
-        ./build/tarredfs $extra $root $mount > $log
+        ./build/beak mount $extra $root $mount > $log
         ${run}
     else
         if [ -z "$gdb" ]; then
             (sleep 2; eval ${run}) &
-            ./build/tarredfs -d $extra $root $mount 2>&1 | tee $log &
+            ./build/beak mount -d $extra $root $mount 2>&1 | tee $log &
         else
             (sleep 3; eval ${run}) &
-            gdb -ex=r --args ./build/tarredfs -d $extra $root $mount 
+            gdb -ex=r --args ./build/beak mount -d $extra $root $mount 
         fi        
     fi        
 }
@@ -89,15 +89,15 @@ function startFSArchive {
     run="$1"
     extra="$2"
     if [ -z "$test" ]; then
-        ./build/tarredfs -r $extra $packed $check > $log
+        ./build/beak mount $extra $packed $check > $log
         ${run}
     else
         if [ -z "$gdb" ]; then
             (sleep 2; eval ${run}) &
-            ./build/tarredfs -r -d $extra $packed $check 2>&1 | tee $log &
+            ./build/beak mount -d $extra $packed $check 2>&1 | tee $log &
         else
             (sleep 3; eval ${run}) &
-            gdb -ex=r --args ./build/tarredfs -r -d $extra $packed $check 
+            gdb -ex=r --args ./build/beak mount -d $extra $packed $check 
         fi        
     fi        
 }
@@ -107,15 +107,15 @@ function startFSExpectFail {
     extra="$2"
     env="$3"
     if [ -z "$test" ]; then
-        "$env" ./build/tarredfs $extra $root $mount > $log 2>&1
+        "$env" ./build/beak mount $extra $root $mount > $log 2>&1
         ${run}
     else
         if [ -z "$gdb" ]; then
             (sleep 2; eval ${run}) &
-            "$env" ./build/tarredfs -d $extra $root $mount 2>&1 | tee $log &
+            "$env" ./build/beak mount -d $extra $root $mount 2>&1 | tee $log &
         else
             (sleep 3; eval ${run}) &
-            gdb -ex=r --args "$env" ./build/tarredfs -d $extra $root $mount 
+            gdb -ex=r --args "$env" ./build/beak mount -d $extra $root $mount 
         fi        
     fi        
 }
@@ -147,20 +147,20 @@ function startTwoFS {
     extra="$2"
     extrareverse="$3"
     if [ -z "$test" ]; then
-        ./build/tarredfs $extra $root $mount > $log
+        ./build/beak mount $extra $root $mount > $log
         sleep 2
-        ./build/tarredfs --reverse $extrareverse $mount $mountreverse > $log
+        ./build/beak mount $extrareverse $mount $mountreverse > $log
         ${run}
     else
         if [ -z "$gdb" ]; then
             (sleep 4; eval ${run}) &
-            ./build/tarredfs $extra $root $mount 2>&1 | tee $log &
-            ./build/tarredfs --reverse -d $extrareverse $mount $mountreverse 2>&1 | tee $logreverse &
+            ./build/beak mount $extra $root $mount 2>&1 | tee $log &
+            ./build/beak mount -d $extrareverse $mount $mountreverse 2>&1 | tee $logreverse &
         else
             (sleep 5; eval ${run}) &
-            ./build/tarredfs $extra $root $mount > $log
+            ./build/beak mount $extra $root $mount > $log
             sleep 2
-            gdb -ex=r --args ./build/tarredfs --reverse -d $extrareverse $mount $mountreverse 
+            gdb -ex=r --args ./build/beak mount -d $extrareverse $mount $mountreverse 
         fi        
     fi        
 }
@@ -332,7 +332,7 @@ if [ $do_test ]; then
     # require you to be root. So lets just mount /dev and
     # just list the contents of the tars!
     root=/dev
-    startFS devTest "-x shm -x tty -p 0"
+    startFS devTest "-x shm -x tty -d 0"
 fi
 
 setup basic11 "check that nothing gets between the directory and its contents"
@@ -504,7 +504,7 @@ fi
 
 function expectCaseConflict {
     if [ "$?" == "0" ]; then
-        echo Expected tarredfs to fail startup!
+        echo Expected beak to fail startup!
         stopFS nook
         exit
     fi
@@ -517,7 +517,7 @@ if [ $do_test ]; then
     mkdir -p $root/alfa
     echo HEJSAN > $root/Alfa/a
     echo HEJSAN > $root/alfa/b
-    startFSExpectFail expectCaseConflict "-p 1 -ta 0"
+    startFSExpectFail expectCaseConflict "-d 1 -ta 0"
 fi
 
 setup basic19 "Test that case conflicts can be hidden inside tars"
@@ -526,12 +526,12 @@ if [ $do_test ]; then
     mkdir -p $root/alfa
     echo HEJSAN > $root/Alfa/a
     echo HEJSAN > $root/alfa/b
-    startFS standardTest "-p 0 -ta 1G"
+    startFS standardTest "-d 0 -ta 1G"
 fi
 
 function expectLocaleFailure {
     if [ "$?" == "0" ]; then
-        echo Expected tarredfs to fail startup!
+        echo Expected beak to fail startup!
         stopFS nook
         exit
     fi
@@ -542,7 +542,7 @@ setup basic20 "Test that LC_ALL=C fails"
 if [ $do_test ]; then
     mkdir -p $root/Alfa
     echo HEJSAN > $root/Alfa/a
-    startFSExpectFail expectLocaleFailure "-p 1 -ta 0" LC_ALL=en_US.UTF-8
+    startFSExpectFail expectLocaleFailure "-d 1 -ta 0" LC_ALL=en_US.UTF-8
 fi
 
 function txTriggerTest {
@@ -618,22 +618,16 @@ if [ $do_test ]; then
     startFS standardPackedTest
 fi
 
-setup options1 "Mount of libtar -p 0 -ta 1G" 
+setup options1 "Mount of libtar -d 0 -ta 1G" 
 if [ $do_test ]; then
     cp -a libtar $root
-    startFS standardTest "-p 0 -ta 1G"
+    startFS standardTest "-d 0 -ta 1G"
 fi
 
-setup options2 "Mount of libtar -p 0 -ta 1K -tr 1K" 
+setup options2 "Mount of libtar -d 0 -ta 1K -tr 1K" 
 if [ $do_test ]; then
     cp -a libtar $root
-    startFS standardTest "-p 0 -ta 1K -tr 1K"
-fi
-
-setup options3 "Mount of libtar -s 10M,2" 
-if [ $do_test ]; then
-    cp -a libtar $root
-    startFS standardTest "-s 10M,2"
+    startFS standardTest "-d 0 -ta 1K -tr 1K"
 fi
 
 function compareTwo {
@@ -649,7 +643,7 @@ function compareTwo {
 setup reverse1 "Forward mount of libtar, Reverse mount back!"
 if [ $do_test ]; then
     cp -a libtar $root
-    startTwoFS compareTwo
+    startTwoFS compareTwo "" "-p @0"
 fi
 
 
@@ -665,7 +659,7 @@ function generationTestPart2 {
     cp -r "$mount"/* "$packed"
     chmod -R u+w "$packed"/*    
     stopFS nook
-    startFSArchive generationTestPart3 "-g @0"
+    startFSArchive generationTestPart3 "-p @0"
 }
 
 function generationTestPart3 {
@@ -674,7 +668,7 @@ function generationTestPart3 {
         exit
     fi
     stopFSArchive nook
-    startFSArchive generationTestPart4 "-g @1"
+    startFSArchive generationTestPart4 "-p @1"
 }
 
 function generationTestPart4 {

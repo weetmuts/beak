@@ -14,17 +14,28 @@ HEADERS := $(wildcard *.h)
 build/%.o: %.cc $(HEADERS)
 	g++ $(CXXFLAGS) $< -c -o $@
 
-TARREDFS_OBJS := build/util.o build/log.o build/tarfile.o build/tarentry.o build/forward.o  build/reverse.o build/main.o
+BEAK_OBJS := \
+build/beak.o \
+build/forward.o \
+build/help.o \
+build/log.o \
+build/main.o \
+build/reverse.o \
+build/tarentry.o \
+build/tarfile.o \
+build/util.o \
+
+
 DIFF_OBJS := build/util.o build/log.o build/diff.o 
 
 LIBS =
 
-all: build/tarredfs build/diff \
+all: build/beak build/diff \
 	build/tarredfs-untar build/tarredfs-pack \
 	build/tarredfs-compare build/tarredfs-integrity-test
 
-build/tarredfs: $(TARREDFS_OBJS) $(LIBTAR_A)
-	$(CXX) -o build/tarredfs $(TARREDFS_OBJS) $(LIBS) $(LIBTAR_A) \
+build/beak: $(BEAK_OBJS) $(LIBTAR_A)
+	$(CXX) -o build/beak $(BEAK_OBJS) $(LIBS) $(LIBTAR_A) \
 	`pkg-config fuse --libs`  `pkg-config openssl --libs` `pkg-config zlib --libs`
 
 build/diff: $(DIFF_OBJS)
@@ -51,7 +62,7 @@ $(LIBTAR_A): $(LIBTAR_SOURCES)
 
 install:
 	echo Installing into /usr/local/bin
-	cp build/tarredfs /usr/local/bin
+	cp build/beak /usr/local/bin
 	cp build/tarredfs-* /usr/local/bin
 	mkdir -p /usr/local/lib/tarredfs
 	cp format_find.pl /usr/local/lib/tarredfs/format_find.pl
@@ -63,7 +74,7 @@ clean-all:
 	rm -rf build/* *~
 
 clean:
-	rm -f $(TARREDFS_OBJS) $(DIFF_OBJS) build/tarredfs build/diff \
+	rm -f $(BEAK_OBJS) $(DIFF_OBJS) build/beak build/diff \
 	build/tarredfs-untar build/tarredfs-pack \
 	build/tarredfs-compare build/tarredfs-integrity-test *~
 

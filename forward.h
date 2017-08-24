@@ -50,7 +50,7 @@ typedef int (*GetAttrCB)(const char*, struct stat*);
 typedef int (*ReaddirCB)(const char*,void*,fuse_fill_dir_t,off_t,struct fuse_file_info*);
 typedef int (*ReadCB)(const char *,char *,size_t,off_t,struct fuse_file_info *);
 
-struct TarredFS {
+struct ForwardTarredFS {
     pthread_mutex_t global;
 
     string root_dir;
@@ -76,7 +76,7 @@ struct TarredFS {
     vector<pair<Filter,regex_t>> filters;
     vector<regex_t> triggers;
 
-    int recurse(FileCB cb);
+    int recurse();
     int addTarEntry(const char *fpath, const struct stat *sb, struct FTW *ftwbuf);
     void findTarCollectionDirs();
     void recurseAddDir(Path *path, TarEntry *direntry);
@@ -93,12 +93,9 @@ struct TarredFS {
     int readdirCB(const char *path, void *buf, fuse_fill_dir_t filler,
                   off_t offset, struct fuse_file_info *fi);
     int readCB(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi);
-    void setTarListFile(string s);
-    void appendTarList(Path *p, TarFile *tf);
-    void saveTarListFile();
     void setMessage(string m) { message_ = m; }
 
-    TarredFS();
+    ForwardTarredFS();
   
 private:
     size_t findNumTarsFromSize(size_t amount, size_t total_size);
