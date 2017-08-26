@@ -618,16 +618,40 @@ if [ $do_test ]; then
     startFS standardPackedTest
 fi
 
+function expectOneBigR01Tar {
+    untar
+    checkdiff
+    checkls-ld
+    num=$(find $mount -name "r01*.tar" | wc --lines)
+    if [ "$num" != "1" ]; then
+        echo Expected a single big r01 tar! Check in $dir for more information.
+        exit
+    fi        
+    stopFS
+}
+
 setup options1 "Mount of libtar -d 0 -ta 1G" 
 if [ $do_test ]; then
     cp -a libtar $root
-    startFS standardTest "-d 0 -ta 1G"
+    startFS expectOneBigR01Tar "-d 0 -ta 1G"
 fi
 
-setup options2 "Mount of libtar -d 0 -ta 1K -tr 1K" 
+function expect8R01Tar {
+    untar
+    checkdiff
+    checkls-ld
+    num=$(find $mount -name "r01*.tar" | wc --lines)
+    if [ "$num" != "8" ]; then
+        echo Expected 8 r01 tar! Check in $dir for more information.
+        exit
+    fi        
+    stopFS
+}
+
+setup options2 "Mount of libtar -d 0 -ta 1M -tr 1G" 
 if [ $do_test ]; then
     cp -a libtar $root
-    startFS standardTest "-d 0 -ta 1K -tr 1K"
+    startFS expect8R01Tar "-d 0 -ta 1M -tr 1G"
 fi
 
 function compareTwo {

@@ -79,7 +79,8 @@ LIST_OF_OPTIONS
 struct Options {
     Path *src;
     Path *dst;
-#define X(shortname,name,type,requirevalue,info) type name;
+
+#define X(shortname,name,type,requirevalue,info) type name; bool name##_supplied;
 LIST_OF_OPTIONS
 #undef X
 

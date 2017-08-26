@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
     beak->argsToVector(argc, argv, &args);
 
     Command cmd;
-    Options settings;
+    Options settings{};
     beak->parseCommandLine(&args, &cmd, &settings);
     bool has_history = beak->lookForPointsInTime(&settings);
     

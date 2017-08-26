@@ -236,8 +236,8 @@ string BeakImplementation::argsToVector(int argc, char **argv, vector<string> *a
 }
 
 int BeakImplementation::parseCommandLine(vector<string> *args, Command *cmd, Options *settings)
-{    
-    memset(settings, 0, sizeof(*settings));
+{
+    memset(settings, 0, sizeof(*settings)); // Note! Contents can be set to zero!
     settings->help_me_on_this_cmd = nosuch_cmd;
     settings->fuse_args.push_back("beak"); // Application name
     settings->depth = 2; // Default value
@@ -327,31 +327,30 @@ int BeakImplementation::parseCommandLine(vector<string> *args, Command *cmd, Opt
                 break;
             case targetsize_option:
             {
-                size_t s;
-                int rc = parseHumanReadable(value.c_str(), &s);
+                size_t parsed_size;
+                int rc = parseHumanReadable(value.c_str(), &parsed_size);
                 if (rc)
                 {
                     error(COMMANDLINE,
                           "Cannot set target size because \"%s\" is not a proper number (e.g. 1,2K,3M,4G,5T)\n",
                           value.c_str());
                 }
+                settings->targetsize = parsed_size;
+                settings->targetsize_supplied = true;
             }
             break;
             case triggersize_option:
             {
-                size_t s;
-                int rc = parseHumanReadable(value.c_str(), &s);
+                size_t parsed_size;
+                int rc = parseHumanReadable(value.c_str(), &parsed_size);
                 if (rc)
                 {
                     error(COMMANDLINE,
                           "Cannot set trigger size because \"%s\" is not a proper number (e.g. 1,2K,3M,4G,5T)\n",
                           value.c_str());
                 }
-                forward_fs.target_target_tar_size = s;
-                forward_fs.tar_trigger_size = s * 2;
-                debug(COMMANDLINE, "main",
-                      "Target tar min size and trigger size \"%zu\"\n",
-                      forward_fs.target_target_tar_size);
+                settings->triggersize = parsed_size;
+                settings->triggersize_supplied = true;                
             }
             break;
             case triggerregex_option:
@@ -541,17 +540,16 @@ int BeakImplementation::mountForward(Options *settings)
         setLogLevel(DEBUG);
     }
 
-    if (settings->targetsize != 0) {
-        forward_fs.target_target_tar_size = settings->targetsize;
-        if (settings->triggersize == 0) {
-            forward_fs.tar_trigger_size = settings->targetsize * 2;
-        } else {
-            forward_fs.tar_trigger_size = settings->triggersize;
-        }
-    } else {
+    if (!settings->targetsize_supplied) {
         // Default settings
         forward_fs.target_target_tar_size = 10*1024*1024;
-        forward_fs.tar_trigger_size =   2 * 10*1024*1024;
+    } else {
+        forward_fs.target_target_tar_size = settings->targetsize;
+    }        
+    if (!settings->triggersize_supplied) {
+        forward_fs.tar_trigger_size = forward_fs.target_target_tar_size * 2;
+    } else {
+        forward_fs.tar_trigger_size = settings->triggersize;
     }
 
     for (auto &e : settings->triggerregex) {
@@ -565,8 +563,9 @@ int BeakImplementation::mountForward(Options *settings)
     }
     
     debug(COMMANDLINE, "main",
-          "Target tar min size and trigger size \"%zu\"\n",
-          forward_fs.target_target_tar_size);
+          "Target tar size \"%zu\"\nTarget trigger size %zu\n",
+          forward_fs.target_target_tar_size,
+          forward_fs.tar_trigger_size);
     
     info(MAIN, "Scanning %s\n", forward_fs.root_dir.c_str());
     uint64_t start = clockGetTime();
