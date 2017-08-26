@@ -248,6 +248,10 @@ int BeakImplementation::parseCommandLine(vector<string> *args, Command *cmd, Opt
     *cmd = parseCommand((*args)[0]);
 
     if (*cmd == nosuch_cmd) {
+        if ((*args)[0] == "") {
+            *cmd = help_cmd;
+            return false;
+        }
         fprintf(stderr, "No such command \"%s\"\n", (*args)[0].c_str());
         return false;        
     }

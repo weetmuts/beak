@@ -9,7 +9,7 @@ CXXFLAGS := -O0 -g  -Wall -fmessage-length=0 -std=c++11 -Wno-unused-function \
         -Ilibtar/lib -Ilibtar/listhash -I/usr/include \
         `pkg-config fuse --cflags` 
 
-HEADERS := $(wildcard *.h)
+HEADERS := $(wildcard *.h) libtar/listhash/libtar_listhash.h
 
 build/%.o: %.cc $(HEADERS)
 	g++ $(CXXFLAGS) $< -c -o $@
@@ -57,7 +57,7 @@ build/tarredfs-integrity-test: integrity-test.sh
 	cp integrity-test.sh build/tarredfs-integrity-test
 	chmod a+x build/tarredfs-integrity-test
 
-$(LIBTAR_A): $(LIBTAR_SOURCES)
+libtar/listhash/libtar_listhash.h $(LIBTAR_A): $(LIBTAR_SOURCES) 
 	(cd libtar; autoreconf --force --install; ./configure ; make)
 
 install:
