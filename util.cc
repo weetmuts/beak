@@ -279,10 +279,8 @@ bool TarSort::lessthan(Path *a, Path *b)
         return false;
     }
     int d = min(a->depth(), b->depth());
-    debug(TMP,"\n\nd=%d \n%s\n%s\n", d, a->c_str(), b->c_str());
     Path *ap = a->parentAtDepth(d);
     Path *bp = b->parentAtDepth(d);
-    debug(TMP,"\n%s\n%s\n", ap->c_str(), bp->c_str());
     if (ap == bp) {
         // Identical stem, one is simply deeper.
         if (a->depth() < b->depth()) {
@@ -886,6 +884,23 @@ Path::Initializer::Initializer()
 
 Path::Initializer Path::initializer_s;
 
+/*
+bool Path::splitInto(size_t name_len, Path **name, size_t prefix_len, Path **prefx)
+{
+    char *s = c_str();
+    char *e = c_str()+c_str_len();
+
+    while (e > s && *e != '/') {
+	e--;
+    }
+    size_t nlen = c_str_len() - (e-s);
+    // Ouch, filename did not fit in the name field...
+    if (nlen > name_len) return false;
+    
+    while (e > s) {
+    }
+}
+*/
 void toLittleEndian(uint16_t *t)
 {}
 

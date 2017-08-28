@@ -26,7 +26,7 @@
 #include <string>
 #include <vector>
 
-#include "libtar/lib/libtar.h"
+#include "tar.h"
 
 struct Atom;
 struct Path;
@@ -41,64 +41,71 @@ struct TarEntry
     TarEntry(Path *abspath, Path *path, const struct stat *b,
              bool header = false);
     
-    Path *path() {
+    Path *path()
+    {
         return path_;
     }
     Path *tarpath()
-	{
-            return tarpath_;
-	}
+    {
+	return tarpath_;
+    }
     uint32_t tarpathHash()
-	{
-            return tarpath_hash_;
-	}
+    {
+	return tarpath_hash_;
+    }
     Path *link()
-	{
-            return link_;
-	}
-    bool isSymLink()
-	{
-            return TH_ISSYM(tar_);
-	}
+    {
+	return link_;
+    }
+    bool isRegularFile()
+    {
+	return S_ISREG(sb_.st_mode);
+    }
+    bool isDir()
+    {
+	return S_ISDIR(sb_.st_mode);
+    }
+    bool isSymbolicLink()
+    {
+	return S_ISLNK(sb_.st_mode);
+    }
     bool isHardLink()
-	{
-            return TH_ISLNK(tar_);
-	}
+    {
+	return is_hard_linked_;
+    }
     
     TarEntry *parent()
-	{
-            return parent_;
-	}
+    {
+	return parent_;
+    }
     size_t blockedSize()
-	{
-            return blocked_size_;
-	}
+    {
+	return blocked_size_;
+    }
     size_t headerSize()
-	{
-            return header_size_;
-	}
+    {
+	return header_size_;
+    }
     size_t childrenSize()
-	{
-            return children_size_;
-	}
+    {
+	return children_size_;
+    }
     struct stat *stat()
-	{
-            return &sb_;
-	}
+    {
+	return &sb_;
+    }
     bool isStorageDir()
-	{
-            return is_tar_storage_dir_;
-	}
+    {
+	return is_tar_storage_dir_;
+    }
     bool isAddedToDir()
-	{
-            return is_added_to_directory_;
-	}
+    {
+	return is_added_to_directory_;
+    }
     
     void calculateTarpath(Path *storage_dir);
     void setContent(vector<unsigned char> &c);
     size_t copy(char *buf, size_t size, size_t from);
-    const bool isDir();
-    const bool isHardlink();
     void updateSizes();
     void rewriteIntoHardLink(TarEntry *target);
     bool fixHardLink(Path *storage_dir);
@@ -234,9 +241,6 @@ struct TarEntry
             files_.push_back(name);
 	}
     
-    static TarEntry *newVolumeHeader();
-    
-
     void calculateHash();
     vector<char> &hash();
     
@@ -248,9 +252,6 @@ struct TarEntry
     
     private:
     
-    int num_long_path_blocks;
-    int num_long_link_blocks;
-    int num_header_blocks;
     size_t header_size_;
     
     // Full path and name, to read the file from the underlying file system.
@@ -269,15 +270,15 @@ struct TarEntry
     Path *link_;
     
     struct stat sb_;
+    bool is_hard_linked_;
     TarFile *tar_file_;
     size_t tar_offset_;
     size_t blocked_size_;
-    size_t disk_size;
     
     // If this is a directory, then all children sizes are summed here.
     size_t children_size_;
     TarEntry *parent_;
-    TAR *tar_;
+    //TarHeader tar_;
     bool is_tar_storage_dir_;
     vector<TarEntry*> dirs_; // Directories to be listed inside this TarEntry
     vector<string> files_; // Files to be listed inside this TarEntry (ie the virtual tar files..)

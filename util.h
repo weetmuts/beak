@@ -96,7 +96,7 @@ struct Path
     string &str() { return path_cache_; }
     const char *c_str() { return &path_cache_[0]; }
     size_t c_str_len() { return path_cache_.length(); }
-    
+
     // The root aka "/" aka "" has depth 1
     // "/Hello" has depth 2
     // "Hello" has depth 1
@@ -109,6 +109,13 @@ struct Path
     Path *prepend(Path *p);
     bool isRoot() {
         return depth_ == 1 && atom_->c_str_len() == 0;
+    }
+    Path *unRoot() {
+	if (isRoot()) return NULL;
+	if (c_str()[0] != '/') {
+	    return this;
+	}
+	return subpath(1);
     }
     bool isBelowOrEqual(Path *p) {
         if (depth_ < p->depth_) {

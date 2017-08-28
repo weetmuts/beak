@@ -19,7 +19,6 @@
 
 #include <asm-generic/errno-base.h>
 #include <ftw.h>
-#include <libtar.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -43,7 +42,7 @@ using namespace std;
 
 ComponentId FORWARD = registerLogComponent("forward");
 ComponentId HARDLINKS = registerLogComponent("hardlinks");
-
+ComponentId FUSE = registerLogComponent("fuse");
 ForwardTarredFS::ForwardTarredFS() {
     int rc = regcomp(&file_name_regex,
     "([rmlxzRMLZX])01_([0-9]+)\\.([0-9]+)_([0-9]+)_([0-9a-fA-F]+)_([0-9a-fA-F]+)\\.(tar|gz|TAR|GZ)", REG_EXTENDED);
@@ -103,10 +102,9 @@ int ForwardTarredFS::addTarEntry(const char *p, const struct stat *sb, struct FT
     }
 
 
+    // Creation and storage of entry.
     TarEntry *te = new TarEntry(abspath, path, sb);
-    // Store in files, for fast lookup from file path.
     files[te->path()] = te;
-    assert(files[te->path()] == te);
 
     if (te->isDir()) {
         // Storing the path in the lookup
@@ -114,7 +112,7 @@ int ForwardTarredFS::addTarEntry(const char *p, const struct stat *sb, struct FT
         debug(FORWARD, "Added directory >%s<\n", te->path()->c_str());
     }
 
-    if (!te->isDir() && sb->st_nlink > 1 ) {
+    if (!te->isDir() && sb->st_nlink > 1) {
         debug(HARDLINKS, "Found hard link '%s' to inode %ju\n",
               te->path()->c_str(), sb->st_ino);
         TarEntry *prev = hard_links[sb->st_ino];
@@ -403,7 +401,7 @@ void ForwardTarredFS::fixTarPathsAndHardLinks() {
             TarEntry *entry = e;
             // This will remove the prefix (ie path outside of tar) and update the hash.
             entry->calculateTarpath(te->path());
-
+	    
             if (entry->isHardLink()) {
                 debug(HARDLINKS, "Found hardlink from >%s< to >%s<\n", entry->path()->c_str(), te->path()->c_str());
 
@@ -412,7 +410,7 @@ void ForwardTarredFS::fixTarPathsAndHardLinks() {
                     // The hard link must be pushed closer to the directory tree root!
                     TarEntry *parent = findNearestStorageDirectory(te->parent());
                     if (parent == NULL) {
-                        error(HARDLINKS,"Cound not find higher storage directory from >%s<\n", te->parent()->path()->c_str());
+                        error(HARDLINKS,"Cound not find higher storage directory from >%s<\n", te->parent()?te->parent()->path()->c_str():"?");
                     }
                     debug(HARDLINKS, "Moving >%s< from >%s< to >%s<\n", entry->path()->c_str(), te->path()->c_str(), parent->path()->c_str());
                     to_be_moved.push_back(pair<TarEntry*,TarEntry*>(entry,parent));
@@ -483,7 +481,7 @@ size_t ForwardTarredFS::groupFilesIntoTars() {
 
             if (entry->isDir()) {
                 te->tazFile()->addEntryLast(entry);
-            } else if (entry->isHardlink()) {
+            } else if (entry->isHardLink()) {
             	te->tazFile()->addEntryFirst(entry);
             } else {
                 bool skip = false;
@@ -707,7 +705,7 @@ TarFile *ForwardTarredFS::findTarFromPath(Path *path) {
     regmatch_t pmatch[8];
     int err = regexec(&file_name_regex, nn, 8, pmatch, 0);
     if (err) {
-        debug(FORWARD, "Not a tar file.\n");
+        debug(FORWARD, "Not a proper file >%s<.\n", path->c_str());
         return NULL;
     }
 
@@ -767,7 +765,7 @@ int ForwardTarredFS::getattrCB(const char *path_char_string, struct stat *stbuf)
     pthread_mutex_lock(&global);
 
     memset(stbuf, 0, sizeof(struct stat));
-    debug(FORWARD,"getattrCB >%s<\n", path_char_string);
+    debug(FUSE,"getattrCB >%s<\n", path_char_string);
     if (path_char_string[0] == '/') {
         string path_string = path_char_string;
         Path *path = Path::lookup(path_string);
@@ -813,7 +811,7 @@ int ForwardTarredFS::readdirCB(const char *path_char_string, void *buf, fuse_fil
                         off_t offset, struct fuse_file_info *fi)
 {
 
-    debug(FORWARD,"readdirCB >%s<\n", path_char_string);
+    debug(FUSE,"readdirCB >%s<\n", path_char_string);
 
     if (path_char_string[0] != '/') {
         return ENOENT;
@@ -835,14 +833,12 @@ int ForwardTarredFS::readdirCB(const char *path_char_string, void *buf, fuse_fil
         char filename[256];
         snprintf(filename, 256, "%s", e->path()->name()->c_str());
         filler(buf, filename, NULL, 0);
-        debug(FORWARD, "    dir \"%s\"\n", filename);
     }
 
     for (auto & f : te->files()) {
         char filename[256];
         snprintf(filename, 256, "%s", f.c_str());
         filler(buf, filename, NULL, 0);
-        debug(FORWARD, "    file entry %s\n", filename);
     }
 
     pthread_mutex_unlock(&global);
@@ -854,7 +850,7 @@ int ForwardTarredFS::readCB(const char *path_char_string, char *buf, size_t size
     pthread_mutex_lock(&global);
     size_t org_size = size;
 
-    debug(FORWARD,"readCB >%s< size %zu offset %zu\n", path_char_string, size, offset);
+    debug(FUSE,"readCB >%s< size %zu offset %zu\n", path_char_string, size, offset);
     string path_string = path_char_string;
     Path *path = Path::lookup(path_string);
 

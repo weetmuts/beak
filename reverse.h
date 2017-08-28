@@ -28,7 +28,7 @@
 #include <string>
 #include <vector>
 
-#include "libtar/lib/libtar.h"
+#include "tar.h"
 #include "util.h"
 
 using namespace std;

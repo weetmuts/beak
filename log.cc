@@ -167,8 +167,10 @@ void logDebug(ComponentId ci, const char* fmt, ...) {
         va_list args;
         va_start(args, fmt);
         if (use_syslog) {
+	    syslog(LOG_INFO, "%s: ", all_components[ci]);
             vsyslog(LOG_DEBUG, fmt, args);
         } else {
+	    fprintf(stdout, "%s: ", all_components[ci]);	    
             vfprintf(stdout, fmt, args);
         }
         va_end(args);
@@ -181,10 +183,12 @@ void logVerbose(ComponentId ci, const char* fmt, ...) {
     		 log_components.count(ci) == 1)) {
         va_list args;
         if (use_syslog) {
-            va_start(args, fmt);
+	    syslog(LOG_INFO, "%s: ", all_components[ci]);
+	    va_start(args, fmt);
             vsyslog(LOG_INFO, fmt, args);
             va_end(args);
         }
+        fprintf(stdout, "%s: ", all_components[ci]);
         va_start(args, fmt);
         vfprintf(stdout, fmt, args);
         va_end(args);

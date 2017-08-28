@@ -40,7 +40,6 @@ using namespace std;
 
 static ComponentId TARENTRY = registerLogComponent("tarentry");
 static ComponentId HARDLINKS = registerLogComponent("hardlinks");
-static ComponentId HASHING = registerLogComponent("hashing");
 
 bool sanityCheck(const char *x, const char *y);
 
@@ -51,26 +50,22 @@ TarEntry::TarEntry(size_t size)
 
     memset(&sb_, 0, sizeof(sb_));
     sb_.st_size = size;
+    is_hard_linked_ = false;
 
     link_ = NULL;
     taz_file_in_use_ = false;
     children_size_ = 0;
     parent_ = NULL;
     is_tar_storage_dir_ = false;
-    num_long_path_blocks = 0;
-    num_long_link_blocks = 0;
-    num_header_blocks = 0;
     tarpath_ = path_;
     name_ = Atom::lookup("");
 
-    header_size_ = num_header_blocks = 0;
-    disk_size = sb_.st_size;
+    header_size_ = 0;
 
     // Round size to nearest 512 byte boundary
     children_size_ = blocked_size_ = (size%T_BLOCKSIZE==0)?size:(size+T_BLOCKSIZE-(size%T_BLOCKSIZE));
 
-    debug(TARENTRY, "Regular File Entry added size %ju blocked size %ju!\n", disk_size,
-          blocked_size_);
+    debug(TARENTRY, "Regular File Entry added size %ju blocked size %ju!\n", sb_.st_size, blocked_size_);
 }
 
 TarEntry::TarEntry(Path *ap, Path *p, const struct stat *b, bool header)
@@ -78,36 +73,22 @@ TarEntry::TarEntry(Path *ap, Path *p, const struct stat *b, bool header)
     abspath_ = ap;
     path_ = p;
     sb_ = *b;
+    is_hard_linked_ = false;
     link_ = NULL;
     taz_file_in_use_ = false;
     children_size_ = 0;
     parent_ = NULL;
     is_tar_storage_dir_ = false;
-    num_long_path_blocks = 0;
-    num_long_link_blocks = 0;
-    num_header_blocks = 1;
     tarpath_ = path_;
     name_ = p->name();
 
-    // Allocate the TAR object here. It is kept alive forever, until unmount.
-    tar_fdopen(&tar_, 0, "", NULL, 0, O_CREAT, 0);
-    tar_->options |= TAR_GNU;
-    int rc = th_set_from_stat(tar_, &sb_);
-    if (rc & TH_COULD_NOT_SET_MTIME) {
-        error(TARENTRY, "Could not set last modified time in tar for file: %s\n", abspath_->c_str());
-    }
-    if (rc & TH_COULD_NOT_SET_SIZE) {
-        error(TARENTRY, "Could not set size in tar for file: %s\n", abspath_->c_str());
-    }
-    th_set_path(tar_, tarpath_->c_str());
-
-    if (TH_ISSYM(tar_))
+    if (isSymbolicLink())
     {
         char destination[PATH_MAX];
         ssize_t l = readlink(abspath_->c_str(), destination, sizeof(destination));
         if (l < 0) {
-            error(TARENTRY, "Could not read link >%s< in underlying filesystem err %d\n", abspath_->c_str(), errno);
-
+            error(TARENTRY, "Could not read link >%s< in underlying filesystem err %d\n",
+		  abspath_->c_str(), errno);	   
             return;
         }
         if (l >= PATH_MAX) {
@@ -115,28 +96,7 @@ TarEntry::TarEntry(Path *ap, Path *p, const struct stat *b, bool header)
         }
         destination[l] = '\0';
         link_ = Path::lookup(destination);
-        th_set_link(tar_, destination);
         debug(TARENTRY, "Found link from %s to %s\n", abspath_->c_str(), destination);
-
-        if (tar_->th_buf.gnu_longlink != NULL) {
-            // We needed to use gnu long links, aka an extra header block
-            // plus at least one block for the file name. A link target path longer than 512
-            // bytes will need a third block etc
-            num_long_link_blocks = 2 + strlen(destination)/T_BLOCKSIZE;
-            num_header_blocks += num_long_link_blocks;
-            debug(TARENTRY, "Added %ju blocks for long link header for %s\n", num_long_link_blocks, destination);
-        }
-    }
-
-    th_finish(tar_);
-
-    if (tar_->th_buf.gnu_longname != NULL) {
-        // We needed to use gnu long names, aka an extra header block
-        // plus at least one block for the file name. A path longer than 512
-        // bytes will need a third block etc
-        num_long_path_blocks = 2 + tarpath_->c_str_len()/T_BLOCKSIZE;
-        num_header_blocks += num_long_path_blocks;
-        debug(TARENTRY, "Added %ju blocks for long path header for %s\n", num_long_path_blocks, path_->c_str());
     }
 
     updateSizes();
@@ -147,7 +107,7 @@ TarEntry::TarEntry(Path *ap, Path *p, const struct stat *b, bool header)
         tv_line_left = ss.str();
 
         ss.str("");
-        if (TH_ISSYM(tar_)) {
+        if (isSymbolicLink()) {
             ss << 0;
         } else {
             ss << sb_.st_size;
@@ -183,10 +143,10 @@ TarEntry::TarEntry(Path *ap, Path *p, const struct stat *b, bool header)
 
 void TarEntry::calculateTarpath(Path *storage_dir) {
     tarpath_ = path_->subpath(storage_dir->depth());
-    th_set_path(tar_, tarpath_->c_str());
-    th_finish(tar_);
+    //tar_.setPath(tarpath_->str());
+    //tar_.calculateChecksum();
     tarpath_hash_ = hashString(tarpath_->str());
-    assert(sanityCheck(tarpath_->c_str(), th_get_pathname(tar_)));
+    //assert(sanityCheck(tarpath_->c_str(), th_get_pathname(tar_)));
 }
 
 void TarEntry::createSmallTar(int i) {
@@ -205,62 +165,52 @@ void TarEntry::createLargeTar(uint32_t hash) {
 size_t TarEntry::copy(char *buf, size_t size, size_t from) {
     size_t copied = 0;
     debug(TARENTRY, "Copying from %s\n", name_->c_str());
+
     if (size > 0 && from < header_size_) {
         debug(TARENTRY, "Copying max %zu from %zu, now inside header (header size=%ju)\n", size, from,
               header_size_);
+
         char tmp[header_size_];
         memset(tmp, 0, header_size_);
         int p = 0;
 
-        if (num_long_link_blocks > 0) {
-            char tmp_type = tar_->th_buf.typeflag;
-            size_t tmp_size = th_get_size(tar_);
+	if (is_hard_linked_) {
+	    fprintf(stderr, "GURKA\n");
+	}
+	TarHeader th(&sb_, tarpath_, link_, is_hard_linked_);
+	
+        if (th.numLongLinkBlocks() > 0)
+	{
+	    TarHeader llh;
+            llh.setLongLinkType(&th);
+	    llh.setSize(link_->c_str_len());
+            llh.calculateChecksum();
 
-            // Re-use the proper header! Just change the type and size!
-            tar_->th_buf.typeflag = GNU_LONGLINK_TYPE;
-            th_set_size(tar_, link_->c_str_len());
-            th_finish(tar_);
-
-            memcpy(tmp+p, &tar_->th_buf, T_BLOCKSIZE);
-
-            // Reset the header!
-            tar_->th_buf.typeflag = tmp_type;
-            th_set_size(tar_, tmp_size);
-            th_finish(tar_);
-
+	    memcpy(tmp+p, llh.buf(), T_BLOCKSIZE);
             memcpy(tmp+p+T_BLOCKSIZE, link_->c_str(), link_->c_str_len());
-            p += num_long_link_blocks*T_BLOCKSIZE;
+            p += th.numLongLinkBlocks()*T_BLOCKSIZE;
             debug(TARENTRY, "Wrote long link header for %s\n", link_->c_str());
         }
 
-        if (num_long_path_blocks > 0) {
-            char tmp_type = tar_->th_buf.typeflag;
-            size_t tmp_size = th_get_size(tar_);
+        if (th.numLongPathBlocks() > 0)
+	{
+	    TarHeader lph;
+            lph.setLongPathType(&th);
+	    lph.setSize(tarpath_->c_str_len()+1);
+            lph.calculateChecksum();
 
-            // Re-use the proper header! Just change the type and size!
-            tar_->th_buf.typeflag = GNU_LONGNAME_TYPE;
-            // Why can gnu_longname suddenly by 0?
-            // Its because we remove the prefix of the path when finishing up the tars!
-            // It was long, but now its short. Alas, we do not reshuffle the offset in the tar, yet.
-            // So store a short name in the longname.
-            assert(tar_->th_buf.gnu_longname == 0 || tarpath_->c_str_len() == strlen(tar_->th_buf.gnu_longname));
-            th_set_size(tar_, tarpath_->c_str_len());
-            th_finish(tar_);
-
-            memcpy(tmp+p, &tar_->th_buf, T_BLOCKSIZE);
-
-            // Reset the header!
-            tar_->th_buf.typeflag = tmp_type;
-            th_set_size(tar_, tmp_size);
-            th_finish(tar_);
-
+	    memcpy(tmp+p, lph.buf(), T_BLOCKSIZE);
             memcpy(tmp+p+T_BLOCKSIZE, tarpath_->c_str(), tarpath_->c_str_len());
-            p += num_long_path_blocks*T_BLOCKSIZE;
-            debug(TARENTRY, "Wrote long path header for %s\n", path_->c_str());
+            p += th.numLongPathBlocks()*T_BLOCKSIZE;
+            debug(TARENTRY, "Wrote long path header for %s\n", tarpath_->c_str());
         }
 
-        memcpy(tmp+p, &tar_->th_buf, T_BLOCKSIZE);
+        memcpy(tmp+p, th.buf(), T_BLOCKSIZE);
 
+	if (is_hard_linked_) {
+	    debug(HARDLINKS, "Copying hard link header out! %s\n", path_->c_str())
+	}
+	
         // Copy the header out
         size_t len = header_size_-from;
         if (len > size) {
@@ -276,7 +226,9 @@ size_t TarEntry::copy(char *buf, size_t size, size_t from) {
     }
 
     if (size > 0 && copied < blocked_size_ && from >= header_size_ && from < blocked_size_) {
-        debug(TARENTRY, "Copying max %zu from %zu\n now in content", size, from);
+        debug(TARENTRY, "Copying max %zu from %zu from content %s\n"
+	      "with blocked_size=%zu header_size=%zu hard?=%d\n", size, from, tarpath_->c_str(), blocked_size_, header_size_,
+	    is_hard_linked_);
         if (virtual_file_) {
             debug(TARENTRY, "Reading from virtual file size=%ju copied=%ju blocked_size=%ju from=%ju header_size=%ju\n",
                   size, copied, blocked_size_, from, header_size_);
@@ -321,14 +273,6 @@ size_t TarEntry::copy(char *buf, size_t size, size_t from) {
     return copied;
 }
 
-const bool TarEntry::isDir() {
-    return TH_ISDIR(tar_);
-}
-
-const bool TarEntry::isHardlink() {
-    return TH_ISLNK(tar_);
-}
-
 bool sanityCheck(const char *x, const char *y) {
     if (strcmp(x,y)) {
         if (x[0] == 0 && y[0] == '.' && y[1] == 0) {
@@ -361,34 +305,39 @@ void TarEntry::setContent(vector<unsigned char> &c) {
 }
 
 void TarEntry::updateSizes() {
-    size_t size = header_size_ = num_header_blocks*T_BLOCKSIZE;
-    if (TH_ISREG(tar_)) {
+    size_t size = header_size_ = TarHeader::calculateSize(&sb_, tarpath_, link_, is_hard_linked_);
+    if (isRegularFile() && !is_hard_linked_) {
         // Directories, symbolic links and fifos have no content in the tar.
         // Only add the size from actual files with content here.
         size += sb_.st_size;
     }
-    disk_size = sb_.st_size;
     // Round size to nearest 512 byte boundary
     children_size_ = blocked_size_ = (size%T_BLOCKSIZE==0)?size:(size+T_BLOCKSIZE-(size%T_BLOCKSIZE));
 
+    assert(!is_hard_linked_ || size == T_BLOCKSIZE);
     assert(header_size_ >= T_BLOCKSIZE &&  size >= header_size_ && blocked_size_ >= size);
-    assert(TH_ISREG(tar_) || size == header_size_);
+    //assert(TH_ISREG(tar_) || size == header_size_);
 //    assert(TH_ISDIR(tar_) || TH_ISSYM(tar_) || TH_ISFIFO(tar_) || TH_ISCHR(tar_) || TH_ISBLK(tar_) || th_get_size(tar_) == (size_t)sb.st_size);
 }
 
 void TarEntry::rewriteIntoHardLink(TarEntry *target) {
     link_ = target->tarpath_;
-    tar_->th_buf.typeflag = LNKTYPE;
-    assert(this->isHardLink());
+    is_hard_linked_ = true;
+    updateSizes();
+    assert(isHardLink());
 }
 
-bool TarEntry::fixHardLink(Path *storage_dir) {
-    assert(tar_->th_buf.typeflag == LNKTYPE);
-
+bool TarEntry::fixHardLink(Path *storage_dir)
+{
     debug(HARDLINKS, "Fix hardlink >%s< to >%s< within storage >%s<\n", path_->c_str(), link_->c_str(), storage_dir->c_str());
 
-    num_header_blocks -= num_long_link_blocks;
-
+    if (storage_dir == Path::lookupRoot())
+    {
+	debug(HARDLINKS, "Nothing to do!\n");
+	return true;
+    }
+    //num_header_blocks -= num_long_link_blocks;
+    
     Path *common = Path::commonPrefix(storage_dir, link_);
     debug(HARDLINKS, "COMMON PREFIX >%s< >%s< = >%s<\n", storage_dir->c_str(), link_->c_str(), common?common->c_str():"NULL");
     if (common == NULL || common->depth() < storage_dir->depth()) {
@@ -396,10 +345,13 @@ bool TarEntry::fixHardLink(Path *storage_dir) {
     	// This hardlink needs to be pushed upwards, into a tar on a higher level!
     	return false;
     }
-
-    Path *l = link_->subpath(storage_dir->depth());
-    debug(HARDLINKS, "CUT LINK >%s< to >%s<\n", link_->c_str(), l->c_str());
-    th_set_link(tar_, l->c_str());
+    else {
+	Path *l = link_->subpath(storage_dir->depth());
+	debug(HARDLINKS, "CUT LINK >%s< to >%s<\n", link_->c_str(), l->c_str());
+	link_ = l;
+    }
+    //tar_.setHardLink(l->c_str());
+    /*
     if (tar_->th_buf.gnu_longlink != NULL) {
         // We needed to use gnu long links, aka an extra header block
         // plus at least one block for the file name. A link target path longer than 512
@@ -409,8 +361,8 @@ bool TarEntry::fixHardLink(Path *storage_dir) {
         debug(HARDLINKS, "Added %ju blocks for long link header for %s\n",
               num_long_link_blocks, tarpath_->c_str(), l->c_str());
     }
-
-    th_finish(tar_);
+    */
+    //tar_.calculateChecksum();
     updateSizes();
     debug(HARDLINKS, "Updated hardlink %s to %s\n", tarpath_->c_str(), link_->c_str());
     return true;
@@ -462,17 +414,6 @@ void TarEntry::registerParent(TarEntry *p) {
     parent_ = p;
 }
 
-TarEntry *TarEntry::newVolumeHeader() {
-    assert(0);
-    struct stat sb;
-    memset(&sb, 0, sizeof(sb));
-    TarEntry *header = new TarEntry(Path::lookup(""), Path::lookup(""), &sb, true);
-    memcpy(header->tar_->th_buf.name, "tarredfs", 9);
-    header->tar_->th_buf.typeflag = GNU_VOLHDR_TYPE;
-    header->name_ = Atom::lookup("VolHead");
-    return header;
-}
-
 void TarEntry::secsAndNanos(char *buf, size_t len)
 {
     memset(buf, 0, len);
@@ -482,8 +423,8 @@ void TarEntry::secsAndNanos(char *buf, size_t len)
 void TarEntry::injectHash(const char *buf, size_t len)
 {
     assert(len<90);
-    memcpy(tar_->th_buf.name+9, buf, len);
-    th_finish(tar_);
+    //memcpy(tar_->th_buf.name+9, buf, len);
+    //tar_.calculateChecksum();
 }
 
 void TarEntry::addChildrenSize(size_t s)
@@ -553,7 +494,7 @@ void cookEntry(string *listing, TarEntry *entry) {
     listing->append(entry->tarpath()->str());
     listing->append(separator_string);
     if (entry->link() != NULL) {
-        if (entry->isSymLink()) {
+        if (entry->isSymbolicLink()) {
             listing->append(" -> ");
         } else {
             listing->append(" link to ");
