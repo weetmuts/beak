@@ -34,6 +34,7 @@ org=""
 dest=""
 do_test=""
 
+prefix="$(echo build/*)"
 test=$1
 gdb=$2
 
@@ -72,15 +73,15 @@ function startFS {
     run="$1"
     extra="$2"
     if [ -z "$test" ]; then
-        ./build/beak mount $extra $root $mount > $log
+        ./${prefix}/beak mount $extra $root $mount > $log
         ${run}
     else
         if [ -z "$gdb" ]; then
             (sleep 2; eval ${run}) &
-            ./build/beak mount -d $extra $root $mount 2>&1 | tee $log &
+            ./${prefix}/beak mount -d $extra $root $mount 2>&1 | tee $log &
         else
             (sleep 3; eval ${run}) &
-            gdb -ex=r --args ./build/beak mount -d $extra $root $mount 
+            gdb -ex=r --args ./${prefix}/beak mount -d $extra $root $mount 
         fi        
     fi        
 }
@@ -89,15 +90,15 @@ function startFSArchive {
     run="$1"
     extra="$2"
     if [ -z "$test" ]; then
-        ./build/beak mount $extra $packed $check > $log
+        ./${prefix}/beak mount $extra $packed $check > $log
         ${run}
     else
         if [ -z "$gdb" ]; then
             (sleep 2; eval ${run}) &
-            ./build/beak mount -d $extra $packed $check 2>&1 | tee $log &
+            ./${prefix}/beak mount -d $extra $packed $check 2>&1 | tee $log &
         else
             (sleep 3; eval ${run}) &
-            gdb -ex=r --args ./build/beak mount -d $extra $packed $check 
+            gdb -ex=r --args ./${prefix}/beak mount -d $extra $packed $check 
         fi        
     fi        
 }
@@ -107,15 +108,15 @@ function startFSExpectFail {
     extra="$2"
     env="$3"
     if [ -z "$test" ]; then
-        "$env" ./build/beak mount $extra $root $mount > $log 2>&1
+        "$env" ./${prefix}/beak mount $extra $root $mount > $log 2>&1
         ${run}
     else
         if [ -z "$gdb" ]; then
             (sleep 2; eval ${run}) &
-            "$env" ./build/beak mount -d $extra $root $mount 2>&1 | tee $log &
+            "$env" ./${prefix}/beak mount -d $extra $root $mount 2>&1 | tee $log &
         else
             (sleep 3; eval ${run}) &
-            gdb -ex=r --args "$env" ./build/beak mount -d $extra $root $mount 
+            gdb -ex=r --args "$env" ./${prefix}/beak mount -d $extra $root $mount 
         fi        
     fi        
 }
@@ -147,20 +148,20 @@ function startTwoFS {
     extra="$2"
     extrareverse="$3"
     if [ -z "$test" ]; then
-        ./build/beak mount $extra $root $mount > $log
+        ./${prefix}/beak mount $extra $root $mount > $log
         sleep 2
-        ./build/beak mount $extrareverse $mount $mountreverse > $log
+        ./${prefix}/beak mount $extrareverse $mount $mountreverse > $log
         ${run}
     else
         if [ -z "$gdb" ]; then
             (sleep 4; eval ${run}) &
-            ./build/beak mount $extra $root $mount 2>&1 | tee $log &
-            ./build/beak mount -d $extrareverse $mount $mountreverse 2>&1 | tee $logreverse &
+            ./${prefix}/beak mount $extra $root $mount 2>&1 | tee $log &
+            ./${prefix}/beak mount -d $extrareverse $mount $mountreverse 2>&1 | tee $logreverse &
         else
             (sleep 5; eval ${run}) &
-            ./build/beak mount $extra $root $mount > $log
+            ./${prefix}/beak mount $extra $root $mount > $log
             sleep 2
-            gdb -ex=r --args ./build/beak mount -d $extrareverse $mount $mountreverse 
+            gdb -ex=r --args ./${prefix}/beak mount -d $extrareverse $mount $mountreverse 
         fi        
     fi        
 }
@@ -608,13 +609,13 @@ fi
 
 setup libtar1 "Mount of libtar extract all default settings"
 if [ $do_test ]; then
-    cp -a libtar $root
+    cp -r . $root
     startFS standardTest
 fi
 
 setup libtar2 "Mount of libtar, pack using xz, decompress and untar."
 if [ $do_test ]; then
-    cp -a libtar $root
+    cp -r . $root
     startFS standardPackedTest
 fi
 
@@ -632,7 +633,7 @@ function expectOneBigR01Tar {
 
 setup options1 "Mount of libtar -d 0 -ta 1G" 
 if [ $do_test ]; then
-    cp -a libtar $root
+    cp -r . $root
     startFS expectOneBigR01Tar "-d 0 -ta 1G"
 fi
 
@@ -650,7 +651,7 @@ function expect8R01Tar {
 
 setup options2 "Mount of libtar -d 0 -ta 1M -tr 1G" 
 if [ $do_test ]; then
-    cp -a libtar $root
+    cp -r . $root
     startFS expect8R01Tar "-d 0 -ta 1M -tr 1G"
 fi
 
@@ -666,7 +667,7 @@ function compareTwo {
 
 setup reverse1 "Forward mount of libtar, Reverse mount back!"
 if [ $do_test ]; then
-    cp -a libtar $root
+    cp -r . $root
     startTwoFS compareTwo "" "-p @0"
 fi
 
@@ -705,7 +706,7 @@ function generationTestPart4 {
 
 setup generation1 "Test that generations work"
 if [ $do_test ]; then
-    cp -a libtar "$root"
+    cp -r . "$root"
     startFS generationTestPart1
 fi
 
@@ -719,7 +720,7 @@ if [ $do_test ]; then
     cp -a "$root/"* "$check"
     echo HEJSAN1 > "$check/alfa beta/z"    
     rm "$check/alfa beta/gamma/x"
-    ./build/diff "$root" "$check"
+    ./${prefix}/diff "$root" "$check"
 fi
 
 

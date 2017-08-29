@@ -557,7 +557,7 @@ size_t ForwardTarredFS::groupFilesIntoTars() {
         }
 
         string gzfile_contents;
-        gzfile_contents.append("#tarredfs " TARREDFS_VERSION "\n");
+        gzfile_contents.append("#tarredfs " XSTR(TARREDFS_VERSION) "\n");
         gzfile_contents.append("#message ");
         gzfile_contents.append(message_);
         gzfile_contents.append("\n");

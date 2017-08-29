@@ -534,9 +534,10 @@ int ReverseTarredFS::readCB(const char *path_char_string, char *buf,
     
     PointInTime *point = single_point_in_time_;
     if (!point) {
-        point = findPointInTime(path->subpath(2,1)->str());
+        Path *pnt_dir = path->subpath(1,1);
+        point = findPointInTime(pnt_dir->str());
         if (!point) goto err;
-        path = path->subpath(3);
+        path = path->subpath(2)->prepend(Path::lookupRoot());
     }
     
     e = findEntry(point, path);

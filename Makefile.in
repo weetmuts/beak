@@ -1,0 +1,2 @@
+SPEC:=@OUTPUT_ROOT@/spec.gmk
+include @SRC_ROOT@/Main.gmk

@@ -57,6 +57,11 @@ can run an integrity test for 120 seconds, where it first performs a compare and
 * Test: `make test`
 * Install: `sudo make install` Installs in /usr/local/bin
 
+./configure --build=i686-pc-linux-gnu --host=
+
+Supported builds: x86_64-linux-gnu
+Supported hosts: x86_64-linux-gnu x86_64-w64-mingw32 arm-linux-gnueabihf
+
 # Dependencies
 
 A copy of libtar is included because there are a few bug fixes necessary for long file names etc. 

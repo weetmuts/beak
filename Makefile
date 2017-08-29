@@ -1,82 +1,33 @@
+# Copyright (C) 2017 Fredrik Öhrström
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# 
 
-$(shell mkdir -p build)
+# Establish the source directory where this makefile resides.
+ifeq ($(filter /%,$(lastword $(MAKEFILE_LIST))),)
+  makefile_path:=$(CURDIR)/$(lastword $(MAKEFILE_LIST))
+else
+  makefile_path:=$(lastword $(MAKEFILE_LIST))
+endif
+root_dir:=$(dir $(makefile_path))
 
-#LIBTAR_A:=libtar/lib/.libs/libtar.a
-#LIBTAR_SOURCES:=$(shell find libtar -name "*.c" -o -name "*.h")
+SPEC:=$(wildcard build/*/spec.gmk)
 
-CXXFLAGS := -O0 -g  -Wall -fmessage-length=0 -std=c++11 -Wno-unused-function \
-	"-DTARREDFS_VERSION=\"0.1\"" -DFUSE_USE_VERSION=26 \
-        -Ilibtar/lib -Ilibtar/listhash -I/usr/include \
-        `pkg-config fuse --cflags` 
-
-HEADERS := $(wildcard *.h) 
-
-build/%.o: %.cc $(HEADERS)
-	g++ $(CXXFLAGS) $< -c -o $@
-
-BEAK_OBJS := \
-build/beak.o \
-build/forward.o \
-build/help.o \
-build/log.o \
-build/main.o \
-build/reverse.o \
-build/tar.o \
-build/tarentry.o \
-build/tarfile.o \
-build/util.o \
-
-
-DIFF_OBJS := build/util.o build/log.o build/diff.o 
-
-LIBS =
-
-all: build/beak build/diff \
-	build/tarredfs-untar build/tarredfs-pack \
-	build/tarredfs-compare build/tarredfs-integrity-test
-
-build/beak: $(BEAK_OBJS)
-	$(CXX) -o build/beak $(BEAK_OBJS) $(LIBS) \
-	`pkg-config fuse --libs`  `pkg-config openssl --libs` `pkg-config zlib --libs`
-
-build/diff: $(DIFF_OBJS)
-	$(CXX) -o build/diff $(DIFF_OBJS) $(LIBS) `pkg-config zlib --libs`
-
-build/tarredfs-untar: untar.sh
-	cp untar.sh build/tarredfs-untar
-	chmod a+x build/tarredfs-untar
-
-build/tarredfs-pack: pack.sh
-	cp pack.sh build/tarredfs-pack
-	chmod a+x build/tarredfs-pack
-
-build/tarredfs-compare: compare.sh
-	cp compare.sh build/tarredfs-compare
-	chmod a+x build/tarredfs-compare
-
-build/tarredfs-integrity-test: integrity-test.sh
-	cp integrity-test.sh build/tarredfs-integrity-test
-	chmod a+x build/tarredfs-integrity-test
-
-#libtar/listhash/libtar_listhash.h $(LIBTAR_A): $(LIBTAR_SOURCES) 
-#	(cd libtar; autoreconf --force --install; ./configure ; make)
-
-install:
-	echo Installing into /usr/local/bin
-	cp build/beak /usr/local/bin
-	cp build/tarredfs-* /usr/local/bin
-	mkdir -p /usr/local/lib/tarredfs
-	cp format_find.pl /usr/local/lib/tarredfs/format_find.pl
-	cp format_tar.pl /usr/local/lib/tarredfs/format_tar.pl
-	cp tarredfs.1 /usr/local/share/man/man1
-
-clean-all:
-	(cd libtar; make clean)
-	rm -rf build/* *~
-
-clean:
-	rm -f $(BEAK_OBJS) $(DIFF_OBJS) build/beak build/diff \
-	build/tarredfs-untar build/tarredfs-pack \
-	build/tarredfs-compare build/tarredfs-integrity-test *~
-
-.PHONY: clean clean-all
+ifeq ($(words $(SPEC)),1)
+    # Only one configuration exists, thus we built that one.
+    include $(SPEC)
+    include $(root_dir)/Main.gmk
+else
+      $(err You have more than one configuration. Run make from the build directory of your choice!
+endif

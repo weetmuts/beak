@@ -57,6 +57,6 @@ void printHelp(Beak *beak, Command cmd)
 
 void printVersion(Beak *beak)
 {
-    fprintf(stdout, "tarredfs " TARREDFS_VERSION "\n");
+    fprintf(stdout, "tarredfs " XSTR(TARREDFS_VERSION) "\n");
 }
 

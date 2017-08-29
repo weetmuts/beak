@@ -27,6 +27,9 @@
 
 using namespace std;
 
+#define XSTR(s) STR(s)
+#define STR(s) #s
+
 string humanReadable(size_t s);
 size_t roundoffHumanReadable(size_t s);
 int parseHumanReadable(string s, size_t *out);

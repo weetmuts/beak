@@ -1,0 +1,72 @@
+
+# SPEC is already included!
+
+HEADERS:=$(wildcard $(SRC_ROOT)/*.h) 
+
+$(OUTPUT_ROOT)/%.o: $(SRC_ROOT)/%.cc $(HEADERS)
+	$(CXX) $(CXXFLAGS) $< -c -o $@
+
+BEAK_OBJS := \
+$(OUTPUT_ROOT)/beak.o \
+$(OUTPUT_ROOT)/forward.o \
+$(OUTPUT_ROOT)/help.o \
+$(OUTPUT_ROOT)/log.o \
+$(OUTPUT_ROOT)/main.o \
+$(OUTPUT_ROOT)/reverse.o \
+$(OUTPUT_ROOT)/tar.o \
+$(OUTPUT_ROOT)/tarentry.o \
+$(OUTPUT_ROOT)/tarfile.o \
+$(OUTPUT_ROOT)/util.o \
+
+
+DIFF_OBJS := $(OUTPUT_ROOT)/util.o $(OUTPUT_ROOT)/log.o $(OUTPUT_ROOT)/diff.o 
+
+LIBS =
+
+all: $(OUTPUT_ROOT)/beak $(OUTPUT_ROOT)/diff \
+	$(OUTPUT_ROOT)/tarredfs-untar $(OUTPUT_ROOT)/tarredfs-pack \
+	$(OUTPUT_ROOT)/tarredfs-compare $(OUTPUT_ROOT)/tarredfs-integrity-test
+
+$(OUTPUT_ROOT)/beak: $(BEAK_OBJS)
+	$(CXX) -o $(OUTPUT_ROOT)/beak $(BEAK_OBJS) $(LIBS) \
+	`pkg-config fuse --libs`  `pkg-config openssl --libs` `pkg-config zlib --libs`
+
+$(OUTPUT_ROOT)/diff: $(DIFF_OBJS)
+	$(CXX) -o $(OUTPUT_ROOT)/diff $(DIFF_OBJS) $(LIBS) `pkg-config zlib --libs`
+
+$(OUTPUT_ROOT)/tarredfs-untar: untar.sh
+	cp untar.sh $(OUTPUT_ROOT)/tarredfs-untar
+	chmod a+x $(OUTPUT_ROOT)/tarredfs-untar
+
+$(OUTPUT_ROOT)/tarredfs-pack: pack.sh
+	cp pack.sh $(OUTPUT_ROOT)/tarredfs-pack
+	chmod a+x $(OUTPUT_ROOT)/tarredfs-pack
+
+$(OUTPUT_ROOT)/tarredfs-compare: compare.sh
+	cp compare.sh $(OUTPUT_ROOT)/tarredfs-compare
+	chmod a+x $(OUTPUT_ROOT)/tarredfs-compare
+
+$(OUTPUT_ROOT)/tarredfs-integrity-test: integrity-test.sh
+	cp integrity-test.sh $(OUTPUT_ROOT)/tarredfs-integrity-test
+	chmod a+x $(OUTPUT_ROOT)/tarredfs-integrity-test
+
+install:
+	echo Installing into /usr/local/bin
+	cp $(OUTPUT_ROOT)/beak /usr/local/bin
+	cp $(OUTPUT_ROOT)/tarredfs-* /usr/local/bin
+	mkdir -p /usr/local/lib/tarredfs
+	cp format_find.pl /usr/local/lib/tarredfs/format_find.pl
+	cp format_tar.pl /usr/local/lib/tarredfs/format_tar.pl
+	cp tarredfs.1 /usr/local/share/man/man1
+
+# Clean all, then you have to re-configure.
+clean-all:
+	rm -rf $(OUTPUT_ROOT)
+
+# Clean remove build artifacts, but keep configuration.
+clean:
+	rm -f $(BEAK_OBJS) $(DIFF_OBJS) $(OUTPUT_ROOT)/beak $(OUTPUT_ROOT)/diff \
+	$(OUTPUT_ROOT)/tarredfs-untar $(OUTPUT_ROOT)/tarredfs-pack \
+	$(OUTPUT_ROOT)/tarredfs-compare $(OUTPUT_ROOT)/tarredfs-integrity-test *~
+
+.PHONY: clean clean-all
