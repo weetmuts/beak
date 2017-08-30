@@ -23,6 +23,7 @@
 # You can run a single test using gdb: test.sh test6 gdb
 
 tmpdir=$(mktemp -d /tmp/beak_testXXXXXXXX)
+
 dir=""
 root=""
 mount=""
@@ -609,13 +610,13 @@ fi
 
 setup libtar1 "Mount of libtar extract all default settings"
 if [ $do_test ]; then
-    cp -r . $root
+    ./generate_filesystem.sh $root 5 10
     startFS standardTest
 fi
 
 setup libtar2 "Mount of libtar, pack using xz, decompress and untar."
 if [ $do_test ]; then
-    cp -r . $root
+    ./generate_filesystem.sh $root 5 10
     startFS standardPackedTest
 fi
 
@@ -633,7 +634,7 @@ function expectOneBigR01Tar {
 
 setup options1 "Mount of libtar -d 0 -ta 1G" 
 if [ $do_test ]; then
-    cp -r . $root
+    ./generate_filesystem.sh $root 5 10
     startFS expectOneBigR01Tar "-d 0 -ta 1G"
 fi
 
@@ -651,7 +652,7 @@ function expect8R01Tar {
 
 setup options2 "Mount of libtar -d 0 -ta 1M -tr 1G" 
 if [ $do_test ]; then
-    cp -r . $root
+    ./generate_filesystem.sh $root 5 10
     startFS expect8R01Tar "-d 0 -ta 1M -tr 1G"
 fi
 
@@ -667,47 +668,49 @@ function compareTwo {
 
 setup reverse1 "Forward mount of libtar, Reverse mount back!"
 if [ $do_test ]; then
-    cp -r . $root
+    ./generate_filesystem.sh $root 5 10
     startTwoFS compareTwo "" "-p @0"
 fi
 
 
-function generationTestPart1 {
+function pointInTimeTestPart1 {
     cp -r "$mount"/* "$packed"
     chmod -R u+w "$packed"/*
     stopFS nook
     dd if=/dev/zero of="$root/s200" bs=1024 count=60 > /dev/null 2>&1
-    startFS generationTestPart2
+    startFS pointInTimeTestPart2
 }
 
-function generationTestPart2 {
+function pointInTimeTestPart2 {
     cp -r "$mount"/* "$packed"
     chmod -R u+w "$packed"/*    
     stopFS nook
-    startFSArchive generationTestPart3 "-p @0"
+    startFSArchive pointInTimeTestPart3 "-p @0"
 }
 
-function generationTestPart3 {
+function pointInTimeTestPart3 {
     if [ ! -f "$check/s200" ]; then
-        echo Error s200 should be there since we mount the latest generation.
+        echo Error s200 should be there since we mount the latest pointInTime.
+        echo Check in $dir for more information.        
         exit
     fi
     stopFSArchive nook
-    startFSArchive generationTestPart4 "-p @1"
+    startFSArchive pointInTimeTestPart4 "-p @1"
 }
 
-function generationTestPart4 {
+function pointInTimeTestPart4 {
     if [ -f "$check/s200" ]; then
-        echo Error s200 should NOT be there since we mount the previous generation.
+        echo Error s200 should NOT be there since we mount the previous pointInTime.
+        echo Check in $dir for more information.
         exit
     fi
     stopFSArchive
 }
 
-setup generation1 "Test that generations work"
+setup pointInTime1 "Test that pointInTimes work"
 if [ $do_test ]; then
-    cp -r . "$root"
-    startFS generationTestPart1
+    ./generate_filesystem.sh $root 3
+    startFS pointInTimeTestPart1
 fi
 
 setup diff1 "Compare directories!"
