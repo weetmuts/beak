@@ -62,8 +62,7 @@ can run an integrity test for 120 seconds, where it first performs a compare and
 Supported builds: x86_64-linux-gnu
 Supported hosts: x86_64-linux-gnu x86_64-w64-mingw32 arm-linux-gnueabihf
 
-# Dependencies
+# Cross compiling
 
-A copy of libtar is included because there are a few bug fixes necessary for long file names etc. 
 
-The usual build dependencies for c++ builds on debian based systems.
+./configure --host=x86_64-w64-mingw32 --with

@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2016-2017 Fredrik Öhrström
+ Copyright (C) 2017 Fredrik Öhrström
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -15,9 +15,13 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "defs.h"
-#include "log.h"
-#include "beak.h"
+#include "nofuse.h"
 
-void printHelp(Beak *beak, Command cmd);
-void printVersion(Beak *beak);
+FuseContext *fuse_get_context() {
+    return NULL;
+}
+
+int fuse_main(int argc, char **argv, fuse_operations *op, void *user_data)
+{
+    return 0;
+}

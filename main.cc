@@ -21,7 +21,7 @@
 
 int main(int argc, char *argv[])
 {
-    Beak *beak = newBeak();
+    auto beak = newBeak();
     int rc = 0;
     
     beak->captureStartTime();
@@ -64,10 +64,10 @@ int main(int argc, char *argv[])
         rc = beak->status(&settings);
         break;
     case version_cmd:
-        printVersion(beak);
+        printVersion(beak.get());
         break;
     case help_cmd:
-        printHelp(beak, settings.help_me_on_this_cmd);
+        printHelp(beak.get(), settings.help_me_on_this_cmd);
         break;
     case nosuch_cmd:
         break;

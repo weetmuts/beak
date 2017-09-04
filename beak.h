@@ -18,9 +18,11 @@
 #ifndef BEAK_H
 #define BEAK_H
 
+#include "defs.h"
 #include "forward.h"
 #include "reverse.h"
 
+#include<memory>
 #include<string>
 #include<vector>
 
@@ -50,7 +52,7 @@ LIST_OF_COMMANDS
     X(fd,fusedebug,bool,false,"Enable fuse debug mode, this also triggers foreground.") \
     X(ff,forceforward,bool,false,"Force forward mount of backup directory," \
                                  "if you want to backup your backup files!")  \
-    X(i,include,vector<string>,true,"Only paths matching regex are inluded. E.g. -i '.*\\.c'") \
+    X(i,include,vector<string>,true,"Only paths matching glob are inluded. E.g. -i '.*\\.c'") \
     X(l,log,string,true,"Log debug messages for these parts. E.g. --log=reverse,hashing") \
     X(p,pointintime,string,true,"When mounting an archive pick this point in time only.\n" \
       "                       -p @0 is always the most recent. -p @1 the second most recent.\n" \
@@ -61,12 +63,12 @@ LIST_OF_COMMANDS
       "                      Default is 10M.")    \
     X(tr,triggersize,size_t,true,"Trigger tar generation in dir at size. E.g. -tr 40M\n" \
       "                      Default is 20M.")    \
-    X(tx,triggerregex,vector<string>,true,"Trigger tar generation in dir if path matches regex. " \
+    X(tx,triggerglob,vector<string>,true,"Trigger tar generation in dir if path matches glob. " \
                                           "E.g. -tx 'work/project_.*'\n" \
       "                      Default is 20M.")    \
     X(q,quite,bool,false,"Silence information output.")             \
     X(v,verbose,bool,false,"More detailed information.")            \
-    X(x,exclude,vector<string>,true,"Paths matching regex are excluded. E.g. -exclude='.*\\.c'") \
+    X(x,exclude,vector<string>,true,"Paths matching glob are excluded. E.g. -exclude='.*\\.c'") \
     X(nso,nosuch,bool,false,"No such option")    
         
     
@@ -110,7 +112,7 @@ struct Beak {
     virtual void printOptions() = 0;
 };
 
-Beak *newBeak();
+std::unique_ptr<Beak> newBeak();
 
 
 

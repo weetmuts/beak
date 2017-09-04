@@ -588,15 +588,23 @@ ac_subst_vars='LTLIBOBJS
 LIBOBJS
 LDFLAGS
 CXXFLAGS
-CCFLAGS
+CFLAGS
+ZLIB_LIBS
+ZLIB_CFLAGS
+OPENSSL_LIBS
+OPENSSL_CFLAGS
 FUSE_LIBS
 FUSE_CFLAGS
+NOFUSE_OBJS
 LD
 CXX
 CC
 OUTPUT_ROOT
 SRC_ROOT
 CONF_NAME
+PATH_SEP
+PLATFORM_CFLAGS
+PLATFORM
 host_os
 host_vendor
 host_cpu
@@ -647,6 +655,9 @@ SHELL'
 ac_subst_files=''
 ac_user_opts='
 enable_option_checking
+enable_fuse
+with_openssl
+with_zlib
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1271,6 +1282,22 @@ if test -n "$ac_init_help"; then
    esac
   cat <<\_ACEOF
 
+Optional Features:
+  --disable-option-checking  ignore unrecognized --enable/--with options
+  --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
+  --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
+  --disable-fuse          disable libfuse (mount will not work) [enabled]
+
+Optional Packages:
+  --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
+  --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
+  --with-openssl          specify prefix directory for the openssl package
+                          (expecting the libraries under PATH and the headers
+                          under PATH/include)
+  --with-zlib             specify prefix directory for the zlib package
+                          (expecting the libraries under PATH and the headers
+                          under PATH)
+
 Report bugs to <oehrstroem@gmail.com>.
 BEAK home page: <http://nivelleringslikaren.eu/beak>.
 _ACEOF
@@ -1808,6 +1835,19 @@ DEBUG_LEVEL=debug
 CONF_NAME="${host_cpu}-${host_vendor}-${host_os}-${DEBUG_LEVEL}"
 OUTPUT_ROOT="$SRC_ROOT/build/${CONF_NAME}"
 
+
+
+
+if test "${host_vendor}" = "w64"; then
+   PLATFORM=WINAPI
+   PATH_SEP=';'
+   PLATFORM_CFLAGS=""
+else
+   PLATFORM=POSIX
+   PATH_SEP:=':'
+   PLATFORM_CFLAGS="-DUSE_SYSLOG"
+fi
+
 mkdir -p "$OUTPUT_ROOT"
 if test ! -d "$OUTPUT_ROOT"; then
     as_fn_error $? "Could not create build directory $OUTPUT_ROOT" "$LINENO" 5
@@ -2114,18 +2154,95 @@ else
 fi
 
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for fuse" >&5
+$as_echo_n "checking for fuse... " >&6; }
 
-
-if pkg-config fuse; then
-   FUSE_CFLAGS=`pkg-config --cflags fuse`
-   FUSE_LIBS=`pkg-config --libs fuse`
+# Check whether --enable-fuse was given.
+if test "${enable_fuse+set}" = set; then :
+  enableval=$enable_fuse; ENABLE_FUSE=${enable_fuse}
 else
-   as_fn_error $? "Please install libfuse-dev" "$LINENO" 5
+  ENABLE_FUSE=yes
 fi
 
-CXXFLAGS="-O0 -g  -Wall -fmessage-length=0 -std=c++11 -Wno-unused-function \
-	-DTARREDFS_VERSION=0.1 -DFUSE_USE_VERSION=26 \
-        -Ilibtar/lib -Ilibtar/listhash -I/usr/include ${FUSE_CFLAGS}"
+
+
+
+
+
+if test "x$ENABLE_FUSE" = xyes; then
+    if pkg-config fuse; then
+       NOFUSE_OBJS=""
+       FUSE_CFLAGS="-DFUSE_USE_VERSION=26 $(pkg-config --cflags fuse)"
+       FUSE_LIBS="$(pkg-config --libs fuse)"
+    else
+       as_fn_error $? "Please install libfuse-dev" "$LINENO" 5
+    fi
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: found" >&5
+$as_echo "found" >&6; }
+else
+    NOFUSE_OBJS="${OUTPUT_ROOT}/nofuse.o"
+    FUSE_CFLAGS=""
+    FUSE_LIBS=""
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: explicitly disabled" >&5
+$as_echo "explicitly disabled" >&6; }
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for openssl" >&5
+$as_echo_n "checking for openssl... " >&6; }
+
+# Check whether --with-openssl was given.
+if test "${with_openssl+set}" = set; then :
+  withval=$with_openssl;
+fi
+
+
+#x${with_openssl}
+#x86_64-w64-mingw32-g++ -I../openssl-1.0.2l/include/ test.cc ../openssl-1.0.2l/libcrypto.a
+
+if test "x${with_openssl}" = "x"; then
+    OPENSSL_CFLAGS="$(pkg-config openssl --cflags)"
+    OPENSSL_LIBS="$(pkg-config openssl --libs)"
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: found" >&5
+$as_echo "found" >&6; }
+else
+    OPENSSL_CFLAGS="-I${with_openssl}/include"
+    OPENSSL_LIBS="${with_openssl}/libcrypto.a"
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: using ${with_openssl}" >&5
+$as_echo "using ${with_openssl}" >&6; }
+fi
+
+
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for zlib" >&5
+$as_echo_n "checking for zlib... " >&6; }
+
+# Check whether --with-zlib was given.
+if test "${with_zlib+set}" = set; then :
+  withval=$with_zlib;
+fi
+
+
+if test "x${with_zlib}" = "x"; then
+    ZLIB_CFLAGS="$(pkg-config zlib --cflags)"
+    ZLIB_LIBS="$(pkg-config zlib --libs)"
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: found" >&5
+$as_echo "found" >&6; }
+else
+    ZLIB_CFLAGS="-I${with_zlib}"
+    ZLIB_LIBS="${with_zlib}/libz.a"
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: using ${with_zlib}" >&5
+$as_echo "using ${with_zlib}" >&6; }
+fi
+
+
+
+
+CXXFLAGS="-D${PLATFORM} -O0 -g -Wall -fmessage-length=0 -std=c++11 -Wno-unused-function -DTARREDFS_VERSION=0.1"
+
+CFLAGS=""
+
+LDFLAGS="-g"
 
 
 
@@ -2133,9 +2250,6 @@ CXXFLAGS="-O0 -g  -Wall -fmessage-length=0 -std=c++11 -Wno-unused-function \
 
 
 
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: Output root $OUTPUT_ROOT host=$host build=$build" >&5
-$as_echo "$as_me: Output root $OUTPUT_ROOT host=$host build=$build" >&6;}
 
 ac_config_files="$ac_config_files $OUTPUT_ROOT/spec.gmk:$SRC_ROOT/spec.gmk.in"
 

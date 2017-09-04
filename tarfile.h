@@ -38,6 +38,18 @@ enum TarContents
     REG_FILE, DIR_TAR, SMALL_FILES_TAR, MEDIUM_FILES_TAR, SINGLE_LARGE_FILE_TAR
 };
 
+
+struct TarFileName {
+    TarContents type;
+    int version;
+    time_t secs;
+    long nsecs;
+    size_t size;
+    string header_hash;
+    string content_hash;
+    string suffix;
+};
+
 struct TarFile
 {
     TarFile()
@@ -95,6 +107,18 @@ struct TarFile
         return 0;
     }
 
+    static bool typeFromChar(char c, TarContents *tc) {
+        switch (c) {
+        case 'x': *tc = REG_FILE; return true;
+        case 'z': *tc = DIR_TAR; return true;
+        case 'r': *tc = SMALL_FILES_TAR; return true;
+        case 'm': *tc = MEDIUM_FILES_TAR; return true;
+        case 'l': *tc = SINGLE_LARGE_FILE_TAR; return true;
+        }
+        return false;
+    }
+    
+    static bool parseFileName(string &name, TarFileName *c);
     
 private:
 

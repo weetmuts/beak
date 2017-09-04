@@ -18,13 +18,19 @@
 #ifndef FORWARD_H
 #define FORWARD_H
 
+#include "defs.h"
+#include "glob.h"
+
+
+#ifdef FUSE_USE_VERSION
 #include <fuse/fuse.h>
+#else
+#include "nofuse.h"
+#endif
 #include <pthread.h>
-#include <regex.h>
 #include <stddef.h>
 #include <sys/types.h>
 #include <map>
-#include <regex.h>
 #include <string>
 #include <utility>
 #include <vector>
@@ -73,8 +79,8 @@ struct ForwardTarredFS {
     map<ino_t,TarEntry*> hard_links; // Only inodes for which st_nlink > 1
     size_t hardlinksavings = 0;
 
-    vector<pair<Filter,regex_t>> filters;
-    vector<regex_t> triggers;
+    vector<pair<Filter,glob_t>> filters;
+    vector<glob_t> triggers;
 
     int recurse();
     int addTarEntry(const char *fpath, const struct stat *sb, struct FTW *ftwbuf);
@@ -104,7 +110,6 @@ private:
                           size_t *sc, size_t *mc);
     Path *tar_list_file_ = NULL;
     vector<string> tar_list_; // Contents to be stored in the tar_list_file
-    regex_t file_name_regex;
     string message_;
 };
 

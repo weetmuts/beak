@@ -29,5 +29,5 @@ ifeq ($(words $(SPEC)),1)
     include $(SPEC)
     include $(root_dir)/Main.gmk
 else
-      $(err You have more than one configuration. Run make from the build directory of your choice!
+      $(error You have more than one configuration. Run make from the build directory of your choice!)
 endif

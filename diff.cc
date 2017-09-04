@@ -15,6 +15,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+/*
 #include "diff.h"
 
 #include <assert.h>
@@ -26,7 +27,6 @@
 #include <ctime>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <fstream>
 #include <unistd.h>
 #include <utility>
 
@@ -90,6 +90,7 @@ int DiffTarredFS::addFile(Target t, const char *fpath, const struct stat *sb, st
 }
 
 int DiffTarredFS::addLinesFromFile(Target t, Path *p) {
+
     vector<char> buf;
 
     ifstream is (p->str(), ifstream::binary);
@@ -102,7 +103,7 @@ int DiffTarredFS::addLinesFromFile(Target t, Path *p) {
         is.close();
         buf.insert(buf.end(), tmp, tmp+length);
         delete[] tmp;
-    }
+        }
     return 0;
 }
 
@@ -202,7 +203,7 @@ string real(const char *p) {
 }
 
 
-int main(int argc, char **argv) {
+int diffmain(int argc, char **argv) {
 
     if (argc < 3) {
         printDiffHelp(argv[0]);
@@ -251,3 +252,4 @@ int main(int argc, char **argv) {
 
     diff_fs.compare();
 }
+*/

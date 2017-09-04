@@ -1,2 +1,3 @@
 SPEC:=@OUTPUT_ROOT@/spec.gmk
+include $(SPEC)
 include @SRC_ROOT@/Main.gmk

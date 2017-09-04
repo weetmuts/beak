@@ -44,9 +44,6 @@ ComponentId FORWARD = registerLogComponent("forward");
 ComponentId HARDLINKS = registerLogComponent("hardlinks");
 ComponentId FUSE = registerLogComponent("fuse");
 ForwardTarredFS::ForwardTarredFS() {
-    int rc = regcomp(&file_name_regex,
-    "([rmlxzRMLZX])01_([0-9]+)\\.([0-9]+)_([0-9]+)_([0-9a-fA-F]+)_([0-9a-fA-F]+)\\.(tar|gz|TAR|GZ)", REG_EXTENDED);
-    assert(!rc);
 }
 
 thread_local ForwardTarredFS *current_fs;
@@ -87,7 +84,8 @@ int ForwardTarredFS::addTarEntry(const char *p, const struct stat *sb, struct FT
 
     int status = 0;
     for (auto & p : filters) {
-        int rc = regexec(&p.second, name, (size_t) 0, NULL, 0);
+        bool match  = globexec(&p.second, name);
+        int rc = (match)?0:1;
         if (p.first.type == INCLUDE) {
             status |= rc;
         } else {
@@ -158,9 +156,9 @@ void ForwardTarredFS::findTarCollectionDirs() {
                                  te->path()->depth() == forced_tar_collection_dir_depth);
 
             debug(FORWARD, "TARS >%s< %d gentars? %d\n", te->path()->c_str(), te->path()->depth(), must_generate_tars);
-            for (auto &re : triggers) {
-                int rc = regexec(&re, te->path()->c_str(), (size_t) 0, NULL, 0);
-                if (rc == 0) {
+            for (auto &g : triggers) {
+                bool match = globexec(&g, te->path()->c_str());
+                if (match) {
                     must_generate_tars = true;
                     break;
                 }
@@ -694,62 +692,59 @@ TarEntry *ForwardTarredFS::findNearestStorageDirectory(TarEntry *te) {
     return te;
 }
 
-
 TarFile *ForwardTarredFS::findTarFromPath(Path *path) {
+    bool ok;
     string n = path->name()->str();
-    const char *nn = n.c_str();
     string d = path->parent()->name()->str();
 
     // File names:
     // (r)01_(001501080787).(579054757)_(1119232)_(3b5e4ec7fe38d0f9846947207a0ea44c)_(0).(tar)
-    regmatch_t pmatch[8];
-    int err = regexec(&file_name_regex, nn, 8, pmatch, 0);
-    if (err) {
-        debug(FORWARD, "Not a proper file >%s<.\n", path->c_str());
-        return NULL;
-    }
 
-    const char t = nn[pmatch[1].rm_so];
     TarEntry *te = directories[path->parent()];
     if (!te) {
         debug(FORWARD,"Not a directory >%s<\n",d.c_str());
         return NULL;
     }
-    string type = n.substr(pmatch[7].rm_so,pmatch[7].rm_eo-pmatch[7].rm_so);
-    string hash_string = n.substr(pmatch[5].rm_so,pmatch[5].rm_eo-pmatch[5].rm_so);
+    TarFileName tfn;
+    ok = TarFile::parseFileName(n, &tfn);
+    if (!ok) {
+        debug(FORWARD,"Not a proper file name: \"%s\"\n", n.c_str());
+        return NULL;
+    }
     vector<char> hash;
-    hex2bin(hash_string, &hash);
+    hex2bin(tfn.header_hash, &hash);
 
-    debug(FORWARD, "Hash >%s< hash len %d >%s<\n", hash_string.c_str(), hash.size(), toHex(hash).c_str());
-    debug(FORWARD, "Type is %s\n", type.c_str());
-    if (type == "gz") {
+    debug(FORWARD, "Hash >%s< hash len %d >%s<\n", tfn.header_hash.c_str(), hash.size(), toHex(hash).c_str());
+    debug(FORWARD, "Type is %d suffix is %s \n", tfn.type, tfn.suffix);
+
+    if (tfn.type == REG_FILE && tfn.suffix == "gz") {
         if (!te->hasGzFile()) {
             debug(FORWARD, "No such gz file >%s<\n", toHex(hash).c_str());
             return NULL;
         }
         return te->gzFile();
     } else
-    if (t == 'l') {
+    if (tfn.type == SINGLE_LARGE_FILE_TAR) {
         if (te->largeHashTars().count(hash) == 0) {
             debug(FORWARD, "No such large tar >%s<\n", toHex(hash).c_str());
             return NULL;
         }
         return te->largeHashTar(hash);
     } else
-    if (t == 'm') {
+    if (tfn.type == MEDIUM_FILES_TAR) {
         if (te->mediumHashTars().count(hash) == 0) {
             debug(FORWARD, "No such medium tar >%s<\n", toHex(hash).c_str());
             return NULL;
         }
         return te->mediumHashTar(hash);
     } else
-    if (t == 'r') {
+    if (tfn.type == SMALL_FILES_TAR) {
         if (te->smallHashTars().count(hash) == 0) {
             debug(FORWARD, "No such small tar >%s<\n", toHex(hash).c_str());
             return NULL;
         }
         return te->smallHashTar(hash);
-    } else if (t == 'z') {
+    } else if (tfn.type == DIR_TAR) {
         if (!te->hasTazFile()) {
             debug(FORWARD, "No such dir tar >%s<\n", toHex(hash).c_str());
             return NULL;

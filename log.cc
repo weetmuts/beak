@@ -20,7 +20,11 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <string.h>
+
+#ifdef USE_SYSLOG
 #include <syslog.h>
+#endif
+
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -40,6 +44,14 @@ static const char *all_components[64];
 
 bool debug_logging_ = false;
 bool verbose_logging_ = false;
+
+#ifndef USE_SYSLOG
+#define LOG_INFO 1
+#define LOG_ERR 2
+#define LOG_DEBUG 3
+void syslog(int l, const char* fmt, ...) { }
+void vsyslog(int l, const char* fmt, ...) { }
+#endif
 
 static int findComponent(const char *c) {
     for (int i=0; i<num_components; ++i) {

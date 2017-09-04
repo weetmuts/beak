@@ -16,6 +16,7 @@
  */
 
 #include "reverse.h"
+#include "tarfile.h"
 
 #include <algorithm>
 #include <asm-generic/errno-base.h>
@@ -27,7 +28,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <iterator>
-#include <regex.h>
 #include <dirent.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -593,10 +593,7 @@ int ReverseTarredFS::readCB(const char *path_char_string, char *buf,
 
 bool ReverseTarredFS::lookForPointsInTime(PointInTimeFormat f, Path *path)
 {
-    regex_t re;
-    int rc = regcomp(&re, "x01_([0-9]+)\\.([0-9]+)_[0-9]+_[0-9a-z]+_[0-9a-z]+\\.gz", REG_EXTENDED);
-    assert(!rc);
-
+    bool ok;
     if (path == NULL) return false;
     
     DIR *dp = NULL;
@@ -608,29 +605,20 @@ bool ReverseTarredFS::lookForPointsInTime(PointInTimeFormat f, Path *path)
     }
     while(NULL != (dptr = readdir(dp)) )
     {
-        regmatch_t pmatch[3];
-        int miss = regexec(&re, dptr->d_name, (size_t)3, pmatch, 0);
-        if (!miss) {
-            string secs = "0";
-            string nanos = "0";
-            if (pmatch[1].rm_so != -1) {
-                secs = string(dptr->d_name + pmatch[1].rm_so,
-                              pmatch[1].rm_eo-pmatch[1].rm_so);
-            }
-            if (pmatch[2].rm_so != -1) {
-                nanos = string(dptr->d_name + pmatch[2].rm_so,
-                              pmatch[2].rm_eo-pmatch[2].rm_so);
-            }
+        TarFileName tfn;
+        string fn(dptr->d_name);
+        ok = TarFile::parseFileName(fn, &tfn);
+        if (ok) {
             PointInTime p;
-            p.ts.tv_sec = atol(secs.c_str());
-            p.ts.tv_nsec = atol(nanos.c_str());
+            p.ts.tv_sec = tfn.secs;
+            p.ts.tv_nsec = tfn.nsecs;
             char datetime[20];
             memset(datetime, 0, sizeof(datetime));
             strftime(datetime, 20, "%Y-%m-%d %H:%M", localtime(&p.ts.tv_sec));
 
             p.ago = timeAgo(&p.ts);
             p.datetime = datetime;
-            p.filename = dptr->d_name;
+            p.filename = fn;
             history_.push_back(p);
         }
     }

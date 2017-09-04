@@ -26,6 +26,19 @@ DEBUG_LEVEL=debug
 CONF_NAME="${host_cpu}-${host_vendor}-${host_os}-${DEBUG_LEVEL}"
 OUTPUT_ROOT="$SRC_ROOT/build/${CONF_NAME}"
 
+AC_SUBST(PLATFORM)
+AC_SUBST(PLATFORM_CFLAGS)
+AC_SUBST(PATH_SEP)
+if test "${host_vendor}" = "w64"; then
+   PLATFORM=WINAPI
+   PATH_SEP=';'
+   PLATFORM_CFLAGS=""
+else
+   PLATFORM=POSIX
+   PATH_SEP:=':'
+   PLATFORM_CFLAGS="-DUSE_SYSLOG"
+fi
+
 mkdir -p "$OUTPUT_ROOT"
 if test ! -d "$OUTPUT_ROOT"; then
     AC_MSG_ERROR([Could not create build directory $OUTPUT_ROOT])
@@ -41,27 +54,84 @@ AC_PATH_TOOL([CC], [gcc], [:])
 AC_PATH_TOOL([CXX], [g++], [:])
 AC_PATH_TOOL([LD], [ld], [:])
 
+AC_MSG_CHECKING([for fuse])
+
+AC_ARG_ENABLE([fuse],
+  [AS_HELP_STRING([--disable-fuse],
+      [disable libfuse (mount will not work) @<:@enabled@:>@])],
+      [ENABLE_FUSE=${enable_fuse}], [ENABLE_FUSE=yes])
+
+AC_SUBST(NOFUSE_OBJS)
 AC_SUBST(FUSE_CFLAGS)
 AC_SUBST(FUSE_LIBS)
-if pkg-config fuse; then
-   FUSE_CFLAGS=`pkg-config --cflags fuse`
-   FUSE_LIBS=`pkg-config --libs fuse`
+
+if test "x$ENABLE_FUSE" = xyes; then
+    if pkg-config fuse; then
+       NOFUSE_OBJS=""
+       FUSE_CFLAGS="-DFUSE_USE_VERSION=26 $(pkg-config --cflags fuse)"
+       FUSE_LIBS="$(pkg-config --libs fuse)"
+    else
+       AC_MSG_ERROR(Please install libfuse-dev)
+    fi
+    AC_MSG_RESULT([found])    
 else
-   AC_MSG_ERROR(Please install libfuse-dev)
+    NOFUSE_OBJS="${OUTPUT_ROOT}/nofuse.o"
+    FUSE_CFLAGS=""
+    FUSE_LIBS=""
+    AC_MSG_RESULT([explicitly disabled])
 fi
 
-CXXFLAGS="-O0 -g  -Wall -fmessage-length=0 -std=c++11 -Wno-unused-function \
-	-DTARREDFS_VERSION=0.1 -DFUSE_USE_VERSION=26 \
-        -Ilibtar/lib -Ilibtar/listhash -I/usr/include ${FUSE_CFLAGS}"
+AC_MSG_CHECKING([for openssl])
+AC_ARG_WITH(openssl, [AS_HELP_STRING([--with-openssl],
+      [specify prefix directory for the openssl package
+      (expecting the libraries under PATH and the headers under PATH/include)])])
+
+#x${with_openssl}
+#x86_64-w64-mingw32-g++ -I../openssl-1.0.2l/include/ test.cc ../openssl-1.0.2l/libcrypto.a
+
+if test "x${with_openssl}" = "x"; then
+    OPENSSL_CFLAGS="$(pkg-config openssl --cflags)"
+    OPENSSL_LIBS="$(pkg-config openssl --libs)"
+    AC_MSG_RESULT([found])
+else
+    OPENSSL_CFLAGS="-I${with_openssl}/include"
+    OPENSSL_LIBS="${with_openssl}/libcrypto.a"
+    AC_MSG_RESULT([using ${with_openssl}])
+fi
+
+AC_SUBST(OPENSSL_CFLAGS)
+AC_SUBST(OPENSSL_LIBS)
+
+AC_MSG_CHECKING([for zlib])
+AC_ARG_WITH(zlib, [AS_HELP_STRING([--with-zlib],
+      [specify prefix directory for the zlib package
+      (expecting the libraries under PATH and the headers under PATH)])])
+
+if test "x${with_zlib}" = "x"; then
+    ZLIB_CFLAGS="$(pkg-config zlib --cflags)"
+    ZLIB_LIBS="$(pkg-config zlib --libs)"
+    AC_MSG_RESULT([found])    
+else
+    ZLIB_CFLAGS="-I${with_zlib}"
+    ZLIB_LIBS="${with_zlib}/libz.a"
+    AC_MSG_RESULT([using ${with_zlib}])
+fi
+
+AC_SUBST(ZLIB_CFLAGS)
+AC_SUBST(ZLIB_LIBS)
+
+CXXFLAGS="-D${PLATFORM} -O0 -g -Wall -fmessage-length=0 -std=c++11 -Wno-unused-function -DTARREDFS_VERSION=0.1" 
+
+CFLAGS=""
+
+LDFLAGS="-g"
 
 AC_SUBST(CC)
 AC_SUBST(CXX)
 AC_SUBST(LD)
-AC_SUBST(CCFLAGS)
+AC_SUBST(CFLAGS)
 AC_SUBST(CXXFLAGS)
 AC_SUBST(LDFLAGS)
-
-AC_MSG_NOTICE([Output root $OUTPUT_ROOT host=$host build=$build])
 
 AC_CONFIG_FILES([$OUTPUT_ROOT/spec.gmk:$SRC_ROOT/spec.gmk.in])
 AC_CONFIG_FILES([$OUTPUT_ROOT/Makefile:$SRC_ROOT/Makefile.in])

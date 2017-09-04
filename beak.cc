@@ -15,14 +15,19 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "log.h"
-#include "beak.h"
 #include <string.h>
 
+#include "log.h"
+#include "beak.h"
+
+#ifdef FUSE_USE_VERSION
 #include <fuse/fuse.h>
+#else
+#include "nofuse.h"
+#endif
+
 #include <memory.h>
 #include <limits.h>
-#include <regex.h>
 #include <stddef.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -86,8 +91,8 @@ struct BeakImplementation : Beak {
     OptionEntry *parseOption(string s, bool *has_value, string *value);
 };
 
-Beak *newBeak() {
-    return new BeakImplementation();
+std::unique_ptr<Beak> newBeak() {    
+    return std::unique_ptr<Beak>(new BeakImplementation());
 }
 
 struct CommandEntry {
@@ -357,8 +362,8 @@ int BeakImplementation::parseCommandLine(vector<string> *args, Command *cmd, Opt
                 settings->triggersize_supplied = true;                
             }
             break;
-            case triggerregex_option:
-                settings->triggerregex.push_back(value);
+            case triggerglob_option:
+                settings->triggerglob.push_back(value);
                 break;
             case verbose_option:
                 settings->verbose = true;
@@ -508,6 +513,8 @@ static int open_callback(const char *path, struct fuse_file_info *fi)
 
 int BeakImplementation::mountForward(Options *settings)
 {
+    bool k;
+    
     forward_tarredfs_ops.getattr = forwardGetattr;
     forward_tarredfs_ops.open = open_callback;
     forward_tarredfs_ops.read = forwardRead;
@@ -519,22 +526,22 @@ int BeakImplementation::mountForward(Options *settings)
     forward_fs.mount_dir = settings->dst->str();
 
     for (auto &e : settings->include) {
-        regex_t re;
-        if (regcomp(&re, e.c_str(), REG_EXTENDED | REG_NOSUB) != 0)
-        {
-            error(COMMANDLINE, "Not a valid regexp \"%s\"\n", e.c_str());
+        glob_t g;
+        k = globcomp(&g, e.c_str());
+        if (!k) {
+            error(COMMANDLINE, "Not a valid glob \"%s\"\n", e.c_str());
         }
-        forward_fs.filters.push_back(pair<Filter, regex_t>(Filter(e.c_str(), INCLUDE), re));
+        forward_fs.filters.push_back(pair<Filter, glob_t>(Filter(e.c_str(), INCLUDE), g));
         debug(COMMANDLINE, "Includes \"%s\"\n", e.c_str());
     }
     for (auto &e : settings->exclude) {
-        regex_t re;
-        if (regcomp(&re, e.c_str(), REG_EXTENDED | REG_NOSUB) != 0)
-        {
-            error(COMMANDLINE, "Not a valid regexp \"%s\"\n", e.c_str());
+        glob_t g;
+        k = globcomp(&g, e.c_str());
+        if (!k) {
+            error(COMMANDLINE, "Not a valid glob \"%s\"\n", e.c_str());
         }
-        forward_fs.filters.push_back(pair<Filter, regex_t>(Filter(e.c_str(), EXCLUDE), re));
-        debug(COMMANDLINE, "Includes \"%s\"\n", e.c_str());
+        forward_fs.filters.push_back(pair<Filter, glob_t>(Filter(e.c_str(), EXCLUDE), g));
+        debug(COMMANDLINE, "Excludes \"%s\"\n", e.c_str());
     }
 
     forward_fs.forced_tar_collection_dir_depth = settings->depth;
@@ -556,13 +563,13 @@ int BeakImplementation::mountForward(Options *settings)
         forward_fs.tar_trigger_size = settings->triggersize;
     }
 
-    for (auto &e : settings->triggerregex) {
-        regex_t re;
-        if (regcomp(&re, e.c_str(), REG_EXTENDED | REG_NOSUB) != 0)
-        {
-            fprintf(stderr, "Not a valid regexp \"%s\"\n", e.c_str());
+    for (auto &e : settings->triggerglob) {
+        glob_t g;
+        k = globcomp(&g, e.c_str());
+        if (!k) {
+            error(COMMANDLINE, "Not a valid glob \"%s\"\n", e.c_str());
         }
-        forward_fs.triggers.push_back(re);
+        forward_fs.triggers.push_back(g);
         debug(COMMANDLINE, "Triggers on \"%s\"\n", e.c_str());
     }
     

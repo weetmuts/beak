@@ -28,4 +28,9 @@
 #define MAX_FILE_NAME_LENGTH 255
 #define MAX_PATH_LENGTH 4096
 
+#ifdef WINAPI
+typedef int uid_t;
+typedef int gid_t;
+#endif
+
 #endif

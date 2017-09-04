@@ -18,7 +18,14 @@
 #ifndef REVERSE_H
 #define REVERSE_H
 
+#include "defs.h"
+
+#ifdef FUSE_USE_VERSION
 #include <fuse/fuse.h>
+#else
+#include "nofuse.h"
+#endif
+
 #include <pthread.h>
 #include <stddef.h>
 #include <sys/stat.h>

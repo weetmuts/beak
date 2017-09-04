@@ -219,5 +219,74 @@ void TarFile::updateMtim(struct timespec *mtim) {
         }
     }
 }
-   
 
+static bool digitsOnly(char *p, size_t len, string *s) {
+    while (len-- > 0) {
+        char c = *p++;
+        if (!c) return false;
+        if (!isdigit(c)) return false;
+        s->push_back(c);
+    }
+    return true;
+}
+
+static bool hexDigitsOnly(char *p, size_t len, string *s) {
+    while (len-- > 0) {
+        char c = *p++;
+        if (!c) return false;
+        bool is_hex = isdigit(c) ||            
+            (c >= 'A' && c <= 'F') ||
+            (c >= 'a' && c <= 'f');
+        if (!is_hex) return false;
+        s->push_back(c);        
+    }
+    return true;
+}
+
+bool TarFile::parseFileName(string &name, TarFileName *c)
+{
+    bool k;
+    // Example file name:
+    // (r)01_(001501080787).(579054757)_(1119232)_(3b5e4ec7fe38d0f9846947207a0ea44c)_(0).(tar)
+    
+    if (name.size() == 0) return false;
+    
+    k = typeFromChar(name[0], &c->type);
+    if (!k) return false;
+
+    size_t p1 = name.find('_'); if (p1 == string::npos) return false;
+    size_t p2 = name.find('.', p1+1); if (p2 == string::npos) return false;
+    size_t p3 = name.find('_', p2+1); if (p3 == string::npos) return false;
+    size_t p4 = name.find('_', p3+1); if (p4 == string::npos) return false;
+    size_t p5 = name.find('_', p4+1); if (p5 == string::npos) return false;
+    size_t p6 = name.find('.', p5+1); if (p6 == string::npos) return false;
+
+    string version;
+    k = digitsOnly(&name[1], p1-1, &version);
+    if (!k) return false;
+    c->version = atoi(version.c_str());
+
+    string secs;
+    k = digitsOnly(&name[p1+1], p2-p1-1, &secs);
+    if (!k) return false;
+    c->secs = atol(secs.c_str());
+
+    string nsecs;
+    k = digitsOnly(&name[p2+1], p3-p2-1, &nsecs);
+    if (!k) return false;
+    c->nsecs = atol(nsecs.c_str());                    
+
+    string size;
+    k = digitsOnly(&name[p3+1], p4-p3-1, &nsecs);
+    if (!k) return false;    
+    c->size = atol(size.c_str());                    
+
+    k = hexDigitsOnly(&name[p4+1], p5-p4-1, &c->header_hash);
+    if (!k) return false;
+
+    k = hexDigitsOnly(&name[p5+1], p6-p5-1, &c->content_hash);
+    if (!k) return false;
+
+    c->suffix = name.substr(p6+1);
+    return true;
+}

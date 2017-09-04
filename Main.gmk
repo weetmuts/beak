@@ -1,38 +1,37 @@
 
-# SPEC is already included!
+# Expecting a spec.gmk to be included!
 
+# To build with a lot of build output, type:
+# make VERBOSE=
+
+VERBOSE?=@
 HEADERS:=$(wildcard $(SRC_ROOT)/*.h) 
 
 $(OUTPUT_ROOT)/%.o: $(SRC_ROOT)/%.cc $(HEADERS)
-	$(CXX) $(CXXFLAGS) $< -c -o $@
+	@echo Compiling $$(basename $<)
+	$(VERBOSE)$(CXX) $(CXXFLAGS) $< -c -o $@
 
-BEAK_OBJS := \
-$(OUTPUT_ROOT)/beak.o \
-$(OUTPUT_ROOT)/forward.o \
+WINAPI_BEAK_OBJS := \
 $(OUTPUT_ROOT)/help.o \
 $(OUTPUT_ROOT)/log.o \
-$(OUTPUT_ROOT)/main.o \
-$(OUTPUT_ROOT)/reverse.o \
-$(OUTPUT_ROOT)/tar.o \
-$(OUTPUT_ROOT)/tarentry.o \
-$(OUTPUT_ROOT)/tarfile.o \
 $(OUTPUT_ROOT)/util.o \
+$(OUTPUT_ROOT)/util_winapi.o \
+$(NOFUSE_OBJS)
 
 
-DIFF_OBJS := $(OUTPUT_ROOT)/util.o $(OUTPUT_ROOT)/log.o $(OUTPUT_ROOT)/diff.o 
+WINAPI_SOURCES:=$(filter-out %posix.cc, $(wildcard *.cc))
+POSIX_SOURCES:=$(filter-out %winapi.cc, $(wildcard *.cc))
 
-LIBS =
+POSIX_BEAK_OBJS := $(patsubst %.cc,$(OUTPUT_ROOT)/%.o,$(POSIX_SOURCES))
 
-all: $(OUTPUT_ROOT)/beak $(OUTPUT_ROOT)/diff \
-	$(OUTPUT_ROOT)/tarredfs-untar $(OUTPUT_ROOT)/tarredfs-pack \
-	$(OUTPUT_ROOT)/tarredfs-compare $(OUTPUT_ROOT)/tarredfs-integrity-test
+BEAK_OBJS:=$($(PLATFORM)_BEAK_OBJS)
+
+all: $(OUTPUT_ROOT)/beak
 
 $(OUTPUT_ROOT)/beak: $(BEAK_OBJS)
-	$(CXX) -o $(OUTPUT_ROOT)/beak $(BEAK_OBJS) $(LIBS) \
-	`pkg-config fuse --libs`  `pkg-config openssl --libs` `pkg-config zlib --libs`
-
-$(OUTPUT_ROOT)/diff: $(DIFF_OBJS)
-	$(CXX) -o $(OUTPUT_ROOT)/diff $(DIFF_OBJS) $(LIBS) `pkg-config zlib --libs`
+	@echo Linking $@
+	$(VERBOSE)@$(CXX) -o $(OUTPUT_ROOT)/beak $(LDFLAGS) $(BEAK_OBJS) \
+                      $(FUSE_LIBS) $(OPENSSL_LIBS) $(ZLIB_LIBS)
 
 $(OUTPUT_ROOT)/tarredfs-untar: untar.sh
 	cp untar.sh $(OUTPUT_ROOT)/tarredfs-untar
@@ -65,7 +64,7 @@ clean-all:
 
 # Clean remove build artifacts, but keep configuration.
 clean:
-	rm -f $(BEAK_OBJS) $(DIFF_OBJS) $(OUTPUT_ROOT)/beak $(OUTPUT_ROOT)/diff \
+	rm -f $($(PLATFORM)_BEAK_OBJS) $(OUTPUT_ROOT)/beak \
 	$(OUTPUT_ROOT)/tarredfs-untar $(OUTPUT_ROOT)/tarredfs-pack \
 	$(OUTPUT_ROOT)/tarredfs-compare $(OUTPUT_ROOT)/tarredfs-integrity-test *~
 
