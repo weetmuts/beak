@@ -127,7 +127,7 @@ fi
 
 root="$(realpath $2)"
 
-numgzs=$(ls "$root"/x01*.gz | sort -r | wc | tr -s ' ' | cut -f 2 -d ' ')
+numgzs=$(ls "$root"/z01*.gz | sort -r | wc | tr -s ' ' | cut -f 2 -d ' ')
 
 if [ "$numgzs" = "0" ]; then
     echo No tarredfs found in "$root"
@@ -139,16 +139,16 @@ if [ "$numgzs" = "1" ]; then
         echo Only generation @0 exists!
         exit
     fi
-    generation=$(echo "$root"/x01*.gz)
+    generation=$(echo "$root"/z01*.gz)
 else
-    ls "$root"/x01*.gz | sort -r > "$dir/generations"
+    ls "$root"/z01*.gz | sort -r > "$dir/generations"
     if [ "$gen" = "" ]; then
         echo More than one tarredfs generation found!
         echo Select a generation using -g
         n=0
         while IFS='' read i; do
             msg=$(gunzip -c "$i" | head -2 | grep \#message | sed 's/#message //')
-            secs=$(echo "$i" | sed "s/.*x01_\([0-9]\+\).*/\1/")
+            secs=$(echo "$i" | sed "s/.*z01_\([0-9]\+\).*/\1/")
             dat=$(date --date "@$secs")
             echo -e "@$n\t$dat\t$msg"
             n=$((n+1))
@@ -162,7 +162,7 @@ else
 fi
 
 # Find the tar files
-gunzip -c "$generation" | tr -d '\0' | grep -A5000 -m1 \#tars | grep -v x01 | grep -v \#tars | sed 's/^\///' > "$dir/aa"
+gunzip -c "$generation" | tr -d '\0' | grep -A5000 -m1 \#tars | grep -v z01 | grep -v \#tars | sed 's/^\///'  > "$dir/aa"
 cat "$dir/aa" | tr -c -d '/\n' | tr / a > "$dir/bb"
 # Sort them on the number of slashes, ie handle the
 # deepest directories first, finish with the root

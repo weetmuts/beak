@@ -68,7 +68,7 @@ extern bool verbose_logging_;
 
 // Verbose logging
 // Enabled with: -v
-#define verbose(args...) {if(verbose_logging_){logVerbose(args);}}
+#define verbose(args...) {if(verbose_logging_){logVerbose(args);}};
 void logVerbose(ComponentId ci, const char* fmt, ...);
 // The macro is used to avoid evaluating complex argument fed to the verbose printout,
 // when not running with verbose enabled.

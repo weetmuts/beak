@@ -83,22 +83,16 @@ int ReverseTarredFS::parseTarredfsContent(PointInTime *point, vector<char> &v,
     eof = false;        
     while (i != v.end() && !eof && num_files > 0)
     {
-        mode_t mode;
-        size_t size;
+        FileStat fs;
         size_t offset;
         string tar;            
         Path *path;
         string link;
         bool is_sym_link;
-        time_t msecs, asecs, csecs;
-        long mnanos, ananos, cnanos;
         
         ii = i;
-        bool got_entry = eatEntry(v, i, dir_to_prepend, &mode, &size, &offset,
+        bool got_entry = eatEntry(v, i, dir_to_prepend, &fs, &offset,
                                   &tar, &path, &link, &is_sym_link,
-                                  &msecs, &mnanos,
-                                  &asecs, &ananos,
-                                  &csecs, &cnanos,
                                   &eof, &err);
         if (err) {
             failure(REVERSE, "Could not parse tarredfs-contents file in >%s<\n>%s<\n",
@@ -107,16 +101,10 @@ int ReverseTarredFS::parseTarredfsContent(PointInTime *point, vector<char> &v,
         }
         if (!got_entry) break;
         debug(REVERSE," Adding entry for >%s<\n", path->c_str());
-        point->entries_[path] = Entry(mode, size, offset, path);
+        point->entries_[path] = Entry(fs, offset, path);
         Entry *e = &(point->entries_)[path];
         e->link = link;
         e->is_sym_link = is_sym_link;
-        e->msecs = msecs;
-        e->mnanos = mnanos;
-        e->asecs = asecs;
-        e->ananos = ananos;
-        e->csecs = csecs;
-        e->cnanos = cnanos;
         e->tar = tar;
         es.push_back(e);
         num_files--;
@@ -172,7 +160,7 @@ int ReverseTarredFS::parseTarredfsTars(PointInTime *point, vector<char> &v, vect
         // Remove the newline at the end.
         name.pop_back();
         Path *p = Path::lookup(name);
-        if (p->name()->c_str()[0] == 'x') {
+        if (p->name()->c_str()[0] == REG_FILE_CHAR) { 
             point->gz_files_[p->parent()] = p;
         }
         debug(REVERSE,"  found tar %s in dir %s\n", p->name()->c_str(), p->parent()->c_str());        
@@ -265,7 +253,7 @@ void ReverseTarredFS::loadCache(PointInTime *point, Path *path)
     for (;;)
     {
         Path *gz = point->gz_files_[path];
-        debug(REVERSE, "Looking for x01 gz file in dir >%s< (found %p)\n", path->c_str(), gz);
+        debug(REVERSE, "Looking for z01 gz file in dir >%s< (found %p)\n", path->c_str(), gz);
         if (gz != NULL) {
             gz = gz->prepend(rootDir());
             int rc = stat(gz->c_str(), &sb);
@@ -371,33 +359,34 @@ int ReverseTarredFS::getattrCB(const char *path_char_string, struct stat *stbuf)
     
     memset(stbuf, 0, sizeof(struct stat));
     
-    if (e->isDir())
+    if (e->fs.isDirectory())
     {
-        stbuf->st_mode = e->mode_bits;
+        stbuf->st_mode = e->fs.st_mode;
         stbuf->st_nlink = 2;
-        stbuf->st_size = e->size;
-        stbuf->st_uid = geteuid();
-        stbuf->st_gid = getegid();
-        stbuf->st_mtim.tv_sec = e->msecs;
-        stbuf->st_mtim.tv_nsec = e->mnanos;
-        stbuf->st_atim.tv_sec = e->asecs;
-        stbuf->st_atim.tv_nsec = e->ananos;
-        stbuf->st_ctim.tv_sec = e->csecs;
-        stbuf->st_ctim.tv_nsec = e->cnanos;
+        stbuf->st_size = e->fs.st_size;
+        stbuf->st_uid = e->fs.st_uid;
+        stbuf->st_gid = e->fs.st_gid;
+        stbuf->st_mtim.tv_sec = e->fs.st_mtim.tv_sec;
+        stbuf->st_mtim.tv_nsec = e->fs.st_mtim.tv_nsec;
+        stbuf->st_atim.tv_sec = e->fs.st_atim.tv_sec;
+        stbuf->st_atim.tv_nsec = e->fs.st_atim.tv_nsec;
+        stbuf->st_ctim.tv_sec = e->fs.st_ctim.tv_sec;
+        stbuf->st_ctim.tv_nsec = e->fs.st_ctim.tv_nsec;
         goto ok;
     }
     
-    stbuf->st_mode = e->mode_bits;
+    stbuf->st_mode = e->fs.st_mode;
     stbuf->st_nlink = 1;
-    stbuf->st_size = e->size;
-    stbuf->st_uid = geteuid();
-    stbuf->st_gid = getegid();
-    stbuf->st_mtim.tv_sec = e->msecs;
-    stbuf->st_mtim.tv_nsec = e->mnanos;
-    stbuf->st_atim.tv_sec = e->asecs;
-    stbuf->st_atim.tv_nsec = e->ananos;
-    stbuf->st_ctim.tv_sec = e->csecs;
-    stbuf->st_ctim.tv_nsec = e->cnanos;
+    stbuf->st_size = e->fs.st_size;
+    stbuf->st_uid = e->fs.st_uid;
+    stbuf->st_gid = e->fs.st_gid;
+    stbuf->st_mtim.tv_sec = e->fs.st_mtim.tv_sec;
+    stbuf->st_mtim.tv_nsec = e->fs.st_mtim.tv_nsec;
+    stbuf->st_atim.tv_sec = e->fs.st_atim.tv_sec;
+    stbuf->st_atim.tv_nsec = e->fs.st_atim.tv_nsec;
+    stbuf->st_ctim.tv_sec = e->fs.st_ctim.tv_sec;
+    stbuf->st_ctim.tv_nsec = e->fs.st_ctim.tv_nsec;
+    stbuf->st_rdev = e->fs.st_rdev;
     goto ok;
 
     err:
@@ -447,7 +436,7 @@ int ReverseTarredFS::readdirCB(const char *path_char_string, void *buf,
     e = findEntry(point, path);
     if (!e) goto err;
 
-    if (!e->isDir()) goto err;
+    if (!e->fs.isDirectory()) goto err;
 
     if (!e->loaded) {
         debug(REVERSE,"Not loaded %s\n", e->path->c_str());
@@ -523,7 +512,7 @@ int ReverseTarredFS::readCB(const char *path_char_string, char *buf,
 
     pthread_mutex_lock(&global);
     
-    size_t offset = (size_t) offset_;
+    off_t offset = offset_;
     int rc = 0;
     string path_string = path_char_string;
     Path *path = Path::lookup(path_string);
@@ -545,17 +534,17 @@ int ReverseTarredFS::readCB(const char *path_char_string, char *buf,
 
     tar = rootDir()->str() + e->tar;
 
-    if (offset > e->size)
+    if (offset > e->fs.st_size)
     {
         // Read outside of file size
         rc = 0;
         goto ok;
     }
 
-    if (offset + size > e->size)
+    if (offset + (off_t)size > e->fs.st_size)
     {
         // Shrink actual read to fit file.
-        size = e->size - offset;
+        size = e->fs.st_size - offset;
     }
 
     // Offset into tar file.
@@ -608,7 +597,8 @@ bool ReverseTarredFS::lookForPointsInTime(PointInTimeFormat f, Path *path)
         TarFileName tfn;
         string fn(dptr->d_name);
         ok = TarFile::parseFileName(fn, &tfn);
-        if (ok) {
+        
+        if (ok && tfn.type == REG_FILE) {
             PointInTime p;
             p.ts.tv_sec = tfn.secs;
             p.ts.tv_nsec = tfn.nsecs;
@@ -643,8 +633,9 @@ bool ReverseTarredFS::lookForPointsInTime(PointInTimeFormat f, Path *path)
         }
         j.direntry = de;
         points_in_time_[j.direntry] = &j;
-        mode_t m = S_IFDIR | S_IRUSR | S_IXUSR;
-        j.entries_[Path::lookupRoot()] = Entry(m, 0, 0, Path::lookupRoot());
+        FileStat fs;
+        fs.st_mode = S_IFDIR | S_IRUSR | S_IXUSR;
+        j.entries_[Path::lookupRoot()] = Entry(fs, 0, Path::lookupRoot());
     }
     
     closedir(dp);

@@ -64,5 +64,4 @@ Supported hosts: x86_64-linux-gnu x86_64-w64-mingw32 arm-linux-gnueabihf
 
 # Cross compiling
 
-
-./configure --host=x86_64-w64-mingw32 --with
+./configure --host=x86_64-w64-mingw32 --with-zlib=../zlib-1.2.11/

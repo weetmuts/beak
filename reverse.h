@@ -41,34 +41,24 @@
 using namespace std;
 
 struct Entry
-{
-    bool isLnk() {
-        return (bool) S_ISLNK(mode_bits);
-    }
-    bool isDir() {
-        return (bool) S_ISDIR(mode_bits);
-    }
-    
-    Entry(mode_t m, size_t s, size_t o, Path *p) :
-    mode_bits(m), size(s), offset(o), path(p) {
-        msecs = asecs = csecs = 0;
-        mnanos = ananos = cnanos = 0;
+{    
+    Entry(FileStat s, size_t o, Path *p) :
+    fs(s), offset(o), path(p) {
         is_sym_link = false;
         loaded = false;
     }
     
     Entry() { }
 
-    mode_t mode_bits;
-    time_t msecs, asecs, csecs;
-    long   mnanos, ananos, cnanos;
-    size_t size, offset;
+    FileStat fs;   
+    size_t offset;
     Path *path;
     string tar;
     vector<Entry*> dir;
     string link;
     bool is_sym_link;
     bool loaded;
+
 };
 
 enum PointInTimeFormat {

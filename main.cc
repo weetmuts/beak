@@ -16,7 +16,6 @@
  */
 
 #include "beak.h"
-#include "help.h"
 #include "log.h"
 
 int main(int argc, char *argv[])
@@ -36,6 +35,8 @@ int main(int argc, char *argv[])
     
     switch (cmd) {
     case check_cmd:
+        break;
+    case config_cmd:
         break;
     case info_cmd:
         rc = beak->printInfo(&settings);
@@ -64,10 +65,14 @@ int main(int argc, char *argv[])
         rc = beak->status(&settings);
         break;
     case version_cmd:
-        printVersion(beak.get());
+        beak->printVersion();
         break;
     case help_cmd:
-        printHelp(beak.get(), settings.help_me_on_this_cmd);
+        if (settings.license) {
+            beak->printLicense();
+        } else {
+            beak->printHelp(settings.help_me_on_this_cmd);
+        }
         break;
     case nosuch_cmd:
         break;

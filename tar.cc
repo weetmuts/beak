@@ -17,6 +17,8 @@
 
 #include"log.h"
 #include"tar.h"
+#include<grp.h>
+#include<pwd.h>
 #include<sys/stat.h>
 #include<string.h>
 #include<assert.h>
@@ -67,7 +69,7 @@ bool store_path_(Path *path, char *name_str, size_t nlen) {
     return false;
 }
 
-size_t calculate_header_size_(struct stat *sb, Path *tarpath, Path *link,
+size_t calculate_header_size_(FileStat *fs, Path *tarpath, Path *link,
 		       char *name_str, char *link_str,
 		       size_t *num_long_path_blocks,
 		       size_t *num_long_link_blocks,
@@ -105,7 +107,7 @@ size_t calculate_header_size_(struct stat *sb, Path *tarpath, Path *link,
     return (*num_header_blocks)*T_BLOCKSIZE;
 }
 
-size_t TarHeader::calculateSize(struct stat *sb, Path *tarpath, Path *link, bool is_hard_link)
+size_t TarHeader::calculateSize(FileStat *fs, Path *tarpath, Path *link, bool is_hard_link)
 {
     size_t num_long_path_blocks;
     size_t num_long_link_blocks;
@@ -113,7 +115,7 @@ size_t TarHeader::calculateSize(struct stat *sb, Path *tarpath, Path *link, bool
     if (link && is_hard_link) {
 	link = link->unRoot();
     }
-    return calculate_header_size_(sb, tarpath, link,
+    return calculate_header_size_(fs, tarpath, link,
 				  NULL, NULL,
 				  &num_long_path_blocks,
 				  &num_long_link_blocks,
@@ -141,41 +143,53 @@ void TarHeader::setSize(size_t s)
     snprintf(content.members.size_, 12, "%011zo", s);
 }
 
-char getTypeFlagFrom(struct stat *sb, bool is_hard_link)
+char getTypeFlagFrom(FileStat *fs, bool is_hard_link)
 {
     // LNKTYPE in the tar spec means hard link!
     // This must be tested first....
     if (is_hard_link) return LNKTYPE;
-    // Whereas libc macro S_ISLNK returns true for SYMBOLIC links!
-    if (S_ISLNK(sb->st_mode)) return SYMTYPE;
-    
-    if (S_ISREG(sb->st_mode)) return REGTYPE;
-    if (S_ISCHR(sb->st_mode)) return CHRTYPE;
-    if (S_ISBLK(sb->st_mode)) return BLKTYPE;
-    if (S_ISDIR(sb->st_mode)) return DIRTYPE;
-    if (S_ISFIFO(sb->st_mode)) return FIFOTYPE;    
-
-
+    if (fs->isSymbolicLink()) return SYMTYPE;    
+    if (fs->isRegularFile()) return REGTYPE;
+    if (fs->isCharacterDevice()) return CHRTYPE;
+    if (fs->isBlockDevice()) return BLKTYPE;
+    if (fs->isDirectory()) return DIRTYPE;
+    if (fs->isFIFO()) return FIFOTYPE;    
     assert(0);
 }
 
-void writeModeFlagFrom(struct stat *sb, char *mode) {
+void writeModeFlagFrom(FileStat *fs, char *mode, bool full) {
     int bits = 0;
-    if (sb->st_mode & S_ISUID) bits |= TSUID;
-    if (sb->st_mode & S_ISGID) bits |= TSGID;
-    if (sb->st_mode & S_ISVTX) bits |= TSVTX; // Sticky bit
 
-    if (sb->st_mode & S_IRUSR) bits |= TUREAD;
-    if (sb->st_mode & S_IWUSR) bits |= TUWRITE;
-    if (sb->st_mode & S_IXUSR) bits |= TUEXEC;
-
-    if (sb->st_mode & S_IRGRP) bits |= TGREAD;
-    if (sb->st_mode & S_IWGRP) bits |= TGWRITE;
-    if (sb->st_mode & S_IXGRP) bits |= TGEXEC;
-
-    if (sb->st_mode & S_IROTH) bits |= TOREAD;
-    if (sb->st_mode & S_IWOTH) bits |= TOWRITE;
-    if (sb->st_mode & S_IXOTH) bits |= TOEXEC;
+    if (!full) {
+        // If not full, then use default setting rw-rw-r-- or
+        // of executable rwxrwxr-x
+        bits |= TUREAD;
+        bits |= TUWRITE;
+        bits |= TGREAD;
+        bits |= TGWRITE;
+        bits |= TOREAD;        
+        if (fs->isIXUSR()) {
+            bits |= TUEXEC;
+            bits |= TGEXEC;
+            bits |= TOEXEC;
+        }
+    } else {
+        if (fs->isIRUSR()) bits |= TUREAD;
+        if (fs->isIWUSR()) bits |= TUWRITE;
+        if (fs->isIXUSR()) bits |= TUEXEC;
+        
+        if (fs->isIRGRP()) bits |= TGREAD;
+        if (fs->isIWGRP()) bits |= TGWRITE;
+        if (fs->isIXGRP()) bits |= TGEXEC;
+        
+        if (fs->isIROTH()) bits |= TOREAD;
+        if (fs->isIWOTH()) bits |= TOWRITE;
+        if (fs->isIXOTH()) bits |= TOEXEC;
+        
+        if (fs->isISUID()) bits |= TSUID;
+        if (fs->isISGID()) bits |= TSGID;
+        if (fs->isISVTX()) bits |= TSVTX; // Sticky bit
+    }
 
     snprintf(mode, 8, "%07o", bits);
 }
@@ -189,14 +203,14 @@ TarHeader::TarHeader()
     num_header_blocks_ = 0;
 }
 
-TarHeader::TarHeader(struct stat *sb, Path *tarpath, Path *link, bool is_hard_link)
+TarHeader::TarHeader(FileStat *fs, Path *tarpath, Path *link, bool is_hard_link, bool full)
 {
     memset(&content.members, 0, sizeof(content.members));
 
     if (link && is_hard_link) {
 	link = link->unRoot();
     }    
-    calculate_header_size_(sb, tarpath, link,
+    calculate_header_size_(fs, tarpath, link,
 			   content.members.name_,
 			   content.members.linkname_,
 			   &num_long_path_blocks_,
@@ -204,25 +218,30 @@ TarHeader::TarHeader(struct stat *sb, Path *tarpath, Path *link, bool is_hard_li
 			   &num_header_blocks_);
     
     // Mode
-    writeModeFlagFrom(sb, content.members.mode_);
+    writeModeFlagFrom(fs, content.members.mode_, full);
 
     // uid gid
-    memcpy(content.members.uid_, "0000000", 8);
-    memcpy(content.members.gid_, "0000000", 8);
+    if (!full) {
+        memcpy(content.members.uid_, "0000000", 8);
+        memcpy(content.members.gid_, "0000000", 8);
+    } else {
+        snprintf(content.members.uid_, 8, "%07o", fs->st_uid);
+        snprintf(content.members.gid_, 8, "%07o", fs->st_gid);
+    }
 
     // size
     size_t s = 0;
-    if (S_ISREG(sb->st_mode)) s = sb->st_size;
+    if (fs->isRegularFile()) s = fs->st_size;
     snprintf(content.members.size_, 12, "%011zo", s);
 
     // mtime
-    snprintf(content.members.mtime_, 12, "%011zo", sb->st_mtim.tv_sec);
+    snprintf(content.members.mtime_, 12, "%011zo", fs->st_mtime);
 
     // checksum, to be filled in later.
     memset(content.members.checksum_, ' ', 8);
 
     // typeflag
-    content.members.typeflag_ = getTypeFlagFrom(sb, is_hard_link);
+    content.members.typeflag_ = getTypeFlagFrom(fs, is_hard_link);
 
     // linkname
 
@@ -231,8 +250,28 @@ TarHeader::TarHeader(struct stat *sb, Path *tarpath, Path *link, bool is_hard_li
     memcpy(content.members.version_, " ", 2);
 
     // user name and group name
-    memcpy(content.members.uname_, "beak", 5);
-    memcpy(content.members.gname_, "beak", 5);
+    if (!full) {
+        memcpy(content.members.uname_, "beak", 5);
+        memcpy(content.members.gname_, "beak", 5);
+    } else {
+        struct passwd pwd, *res;
+        char buf[1024];
+        int err = getpwuid_r(fs->st_uid, &pwd, buf, 1024, &res);
+        if (!err && res) {
+            strncpy(content.members.uname_, res->pw_name, 31);
+        }
+        struct group grp, *gres;
+        err = getgrgid_r(fs->st_gid, &grp, buf, 1024, &gres);
+        if (!err && res) {
+            strncpy(content.members.gname_, gres->gr_name, 31);
+        }
+    }
+
+    // major minor device
+    if (fs->isCharacterDevice() || fs->isBlockDevice()) {
+        snprintf(content.members.devmajor_, 8, "%07o", major(fs->st_rdev));
+        snprintf(content.members.devminor_, 8, "%07o", minor(fs->st_rdev));
+    }
 
     calculateChecksum();
 }

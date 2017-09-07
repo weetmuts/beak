@@ -28,6 +28,7 @@
 
 #define LIST_OF_COMMANDS                                                \
     X(check,"Check the integrity of an archive.")                       \
+    X(config,"Configure backup rules.")                                 \
     X(help,"Show help. Also: beak push help")                           \
     X(info,"List points in time and other info about archive.")         \
     X(mount,"Mount a backup as a virtual file system.")                 \
@@ -47,28 +48,30 @@ LIST_OF_COMMANDS
 
 #define LIST_OF_OPTIONS \
     X(d,depth,int,true,"Force all dirs at this depth to contain tars.\n" \
-          "                      1 is the root, 2 is the first subdir. The default is 2.")    \
+      "                           1 is the root, 2 is the first subdir. The default is 2.")    \
     X(f,foreground,bool,false,"When mounting do not spawn a daemon.")   \
     X(fd,fusedebug,bool,false,"Enable fuse debug mode, this also triggers foreground.") \
-    X(ff,forceforward,bool,false,"Force forward mount of backup directory," \
-                                 "if you want to backup your backup files!")  \
-    X(i,include,vector<string>,true,"Only paths matching glob are inluded. E.g. -i '.*\\.c'") \
+    X(ff,forceforward,bool,false,"Force forward mount of backup directory,\n" \
+      "                           if you want to backup your backup files!")  \
+    X(i,include,vector<string>,true,"Only matching paths are inluded. E.g. -i '*.c'") \
+    X(,license,bool,false,"Show copyright holders,licenses and notices for the program.") \
     X(l,log,string,true,"Log debug messages for these parts. E.g. --log=reverse,hashing") \
     X(p,pointintime,string,true,"When mounting an archive pick this point in time only.\n" \
-      "                       -p @0 is always the most recent. -p @1 the second most recent.\n" \
-      "                       You can also suffix @1 to the src directory." )        \
+      "                           -p @0 is always the most recent. -p @1 the second most recent.\n" \
+      "                           You can also suffix @1 to the src directory." )        \
     X(pf,pointintimeformat,PointInTimeFormat,true,"How to present the point in time.\n" \
-      "                                 E.g. absolute,relative or both. Default is both.")    \
-    X(ta,targetsize,size_t,true,"Tar target size. E.g. --targetsize=20M" \
-      "                      Default is 10M.")    \
+      "                           E.g. absolute,relative or both. Default is both.")    \
+    X(,tarheader,TarHeaderStyle,true,"Style of tar headers used. E.g. --tarheader=simple\n"   \
+      "                           Alternatives are: none,simple,full Default is simple.")    \
+    X(ta,targetsize,size_t,true,"Tar target size. E.g. --targetsize=20M\n" \
+      "                           Default is 10M.")    \
     X(tr,triggersize,size_t,true,"Trigger tar generation in dir at size. E.g. -tr 40M\n" \
-      "                      Default is 20M.")    \
-    X(tx,triggerglob,vector<string>,true,"Trigger tar generation in dir if path matches glob. " \
-                                          "E.g. -tx 'work/project_.*'\n" \
-      "                      Default is 20M.")    \
+      "                           Default is 20M.")    \
+    X(tx,triggerglob,vector<string>,true,"Trigger tar generation in matching dirs.\n" \
+      "                           E.g. -tx '/work/project_*'\n") \
     X(q,quite,bool,false,"Silence information output.")             \
     X(v,verbose,bool,false,"More detailed information.")            \
-    X(x,exclude,vector<string>,true,"Paths matching glob are excluded. E.g. -exclude='.*\\.c'") \
+    X(x,exclude,vector<string>,true,"Paths matching glob are excluded. E.g. -exclude='beta/**'") \
     X(nso,nosuch,bool,false,"No such option")    
         
     
@@ -107,7 +110,10 @@ struct Beak {
     virtual int mountForward(Options *settings) = 0;
     virtual int mountReverse(Options *settings) = 0;
     virtual int status(Options *settings) = 0;
-    
+
+    virtual void printHelp(Command cmd) = 0;
+    virtual void printVersion() = 0;
+    virtual void printLicense() = 0;
     virtual void printCommands() = 0;
     virtual void printOptions() = 0;
 };

@@ -45,8 +45,8 @@
 #include "log.h"
 #include "reverse.h"
 
-ComponentId MAIN = registerLogComponent("main");
-ComponentId COMMANDLINE = registerLogComponent("commandline");
+static ComponentId MAIN = registerLogComponent("main");
+static ComponentId COMMANDLINE = registerLogComponent("commandline");
 
 struct CommandEntry;
 struct OptionEntry;
@@ -61,6 +61,9 @@ struct BeakImplementation : Beak {
     string argsToVector(int argc, char **argv, vector<string> *args);
     int parseCommandLine(vector<string> *args, Command *cmd, Options *settings);
 
+    void printHelp(Command cmd);
+    void printVersion();
+    void printLicense();    
     int printInfo(Options *settings); 
 
     bool lookForPointsInTime(Options *settings);
@@ -257,6 +260,10 @@ int BeakImplementation::parseCommandLine(vector<string> *args, Command *cmd, Opt
             *cmd = help_cmd;
             return false;
         }
+        if ((*args)[0] == "") {
+            *cmd = help_cmd;
+            return false;
+        }        
         fprintf(stderr, "No such command \"%s\"\n", (*args)[0].c_str());
         return false;        
     }
@@ -299,14 +306,16 @@ int BeakImplementation::parseCommandLine(vector<string> *args, Command *cmd, Opt
                         // thus pick the next arg as the value instead.
                         i++;
                         value = *i;
-                    } else {
-                        error(COMMANDLINE,"Option \"%s\" requires a value to be specified.\n", ope->name);
-                    }
+                    } 
                 }
             }
             switch (op) {
             case depth_option:
                 settings->depth = atoi(value.c_str());
+                if (settings->depth < 1) {
+                    error(COMMANDLINE, "Option depth (-d) cannot be set to "
+                          "less than 1, ie the root.\n");
+                }
                 break;
             case foreground_option:
                 settings->fuse_args.push_back("-f");
@@ -319,6 +328,9 @@ int BeakImplementation::parseCommandLine(vector<string> *args, Command *cmd, Opt
                 break;
             case include_option:
                 settings->include.push_back(value);
+                break;
+            case license_option:
+                settings->license = true;
                 break;
             case log_option:
                 settings->log = value;
@@ -334,6 +346,17 @@ int BeakImplementation::parseCommandLine(vector<string> *args, Command *cmd, Opt
                     error(COMMANDLINE, "No such point in time format \"%s\".", value.c_str());
                 }
                 break;
+            case tarheader_option:
+            {
+                if (value == "none") settings->tarheader = TarHeaderStyle::None;
+                else if (value == "simple") settings->tarheader = TarHeaderStyle::Simple;
+                else if (value == "full") settings->tarheader = TarHeaderStyle::Full;
+                else {
+                    error(COMMANDLINE, "No such tar header style \"%s\".", value.c_str());
+                }
+                settings->tarheader_supplied = true;
+            }
+            break;
             case targetsize_option:
             {
                 size_t parsed_size;
@@ -513,7 +536,7 @@ static int open_callback(const char *path, struct fuse_file_info *fi)
 
 int BeakImplementation::mountForward(Options *settings)
 {
-    bool k;
+    bool ok;
     
     forward_tarredfs_ops.getattr = forwardGetattr;
     forward_tarredfs_ops.open = open_callback;
@@ -526,21 +549,21 @@ int BeakImplementation::mountForward(Options *settings)
     forward_fs.mount_dir = settings->dst->str();
 
     for (auto &e : settings->include) {
-        glob_t g;
-        k = globcomp(&g, e.c_str());
-        if (!k) {
+        Match m;
+        ok = m.use(e);
+        if (!ok) {
             error(COMMANDLINE, "Not a valid glob \"%s\"\n", e.c_str());
         }
-        forward_fs.filters.push_back(pair<Filter, glob_t>(Filter(e.c_str(), INCLUDE), g));
+        forward_fs.filters.push_back(pair<Filter,Match>(Filter(e.c_str(), INCLUDE), m));
         debug(COMMANDLINE, "Includes \"%s\"\n", e.c_str());
     }
     for (auto &e : settings->exclude) {
-        glob_t g;
-        k = globcomp(&g, e.c_str());
-        if (!k) {
+        Match m;
+        ok = m.use(e);
+        if (!ok) {
             error(COMMANDLINE, "Not a valid glob \"%s\"\n", e.c_str());
         }
-        forward_fs.filters.push_back(pair<Filter, glob_t>(Filter(e.c_str(), EXCLUDE), g));
+        forward_fs.filters.push_back(pair<Filter,Match>(Filter(e.c_str(), EXCLUDE), m));
         debug(COMMANDLINE, "Excludes \"%s\"\n", e.c_str());
     }
 
@@ -551,6 +574,12 @@ int BeakImplementation::mountForward(Options *settings)
         setLogLevel(DEBUG);
     }
 
+    if (settings->tarheader_supplied) {
+        forward_fs.setTarHeaderStyle(settings->tarheader);
+    } else {
+        forward_fs.setTarHeaderStyle(TarHeaderStyle::Simple);
+    }
+    
     if (!settings->targetsize_supplied) {
         // Default settings
         forward_fs.target_target_tar_size = 10*1024*1024;
@@ -564,12 +593,12 @@ int BeakImplementation::mountForward(Options *settings)
     }
 
     for (auto &e : settings->triggerglob) {
-        glob_t g;
-        k = globcomp(&g, e.c_str());
-        if (!k) {
+        Match m;
+        ok = m.use(e);
+        if (!ok) {
             error(COMMANDLINE, "Not a valid glob \"%s\"\n", e.c_str());
         }
-        forward_fs.triggers.push_back(g);
+        forward_fs.triggers.push_back(m);
         debug(COMMANDLINE, "Triggers on \"%s\"\n", e.c_str());
     }
     
@@ -671,10 +700,10 @@ int BeakImplementation::mountReverse(Options *settings)
             error(MAIN, "Not a regular file %s\n", gz->c_str());
         }
 
-        // Populate the list of all tars from the root x01 gz file.
+        // Populate the list of all tars from the root z01 gz file.
         bool ok = reverse_fs.loadGz(&point, gz, Path::lookupRoot());
         if (!ok) {
-            error(MAIN, "Fatal error, could not load root x01 file for backup %s!\n", point.ago.c_str());
+            error(MAIN, "Fatal error, could not load root z01 file for backup %s!\n", point.ago.c_str());
         }
 
         // Populate the root directory with its contents.
@@ -689,14 +718,16 @@ int BeakImplementation::mountReverse(Options *settings)
         time_t youngest_secs = 0, youngest_nanos = 0;        
         for (auto i : e->dir)
         {
-            if (i->msecs > youngest_secs || (i->msecs == youngest_secs && i->mnanos > youngest_nanos))
+            if (i->fs.st_mtim.tv_sec > youngest_secs ||
+                (i->fs.st_mtim.tv_sec == youngest_secs &&
+                 i->fs.st_mtim.tv_nsec > youngest_nanos))
             {
-                youngest_secs = i->msecs;
-                youngest_nanos = i->mnanos;
+                youngest_secs = i->fs.st_mtim.tv_sec;
+                youngest_nanos = i->fs.st_mtim.tv_nsec;
             }
         }
-        e->msecs = youngest_secs;
-        e->mnanos = youngest_nanos;
+        e->fs.st_mtim.tv_sec = youngest_secs;
+        e->fs.st_mtim.tv_nsec = youngest_nanos;
     }
     return fuse_main(settings->fuse_argc, settings->fuse_argv, &reverse_tarredfs_ops, &reverse_fs);
 }
@@ -707,5 +738,55 @@ int BeakImplementation::status(Options *settings)
 
 
     return rc;
+}
+
+void BeakImplementation::printHelp(Command cmd)
+{
+    switch (cmd) {
+    case nosuch_cmd:
+        fprintf(stdout,
+                "Beak is a mirroring-backup-rotation/retention tool that is\n"
+                "designed to co-exist with the (cloud) storage of your choice\n"
+                "and allow push/pull to share the backups between multiple client computers.\n"
+                "\n"
+                "Usage:\n"
+                "  beak [command] [options] [src] [dst]\n"
+                "\n");
+        printCommands();
+        fprintf(stdout,"\n");
+        printOptions();
+        fprintf(stdout,"\n");
+        fprintf(stdout,"Beak is licensed to you under the GPLv3. For details do: "
+                "beak help --license\n");
+        break;
+    case mount_cmd:
+        fprintf(stdout,
+        "Examines the contents in src to determine what kind of virtual filesystem\n"
+        "to mount as dst. If src contains your files that you want to backup,\n"
+        "then dst will contain beak backup tar files, suitable for rcloning somewhere.\n"
+        "If src contains beak backup tar files, then dst will contain your original\n"
+        "backed up files.\n"
+        "\n"
+        "Usage:\n"
+            "  beak mount [options] [src] [dst]\n"
+            "\n"
+        "If you really want to backup the beak backup tar files, then you can override\n"
+            "the automatic detection with the --forceforward option.\n");
+        break;
+    default:
+        fprintf(stdout, "Sorry, no help for that command yet.\n");
+        break;
+    }
+}
+
+void BeakImplementation::printVersion()
+{
+    fprintf(stdout, "tarredfs " XSTR(TARREDFS_VERSION) "\n");
+}
+
+void BeakImplementation::printLicense()
+{
+    fprintf(stdout, "Beak contains software:\n"
+            " Copyright (C) 2016-2017 Fredrik Öhrström\n\n");
 }
 

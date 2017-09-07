@@ -34,12 +34,19 @@ struct TarFile;
 
 using namespace std;
 
+enum TarHeaderStyle {
+    None, // Tar headers are not inserted into the archive file. Tar cannot be used to extract data.
+    Simple, // Simple headers, uid/guid set to 1000/1000 name is beak/beak, atime=ctime set to mtime.
+    Full // Full headers, sometimes useful if you expect to use tar to extract the data.
+    // Full extraction is always available using beak itself since the x01_.....gz files always
+    // store all meta data.
+};
+
 struct TarEntry
 {
     
-    TarEntry(size_t size);
-    TarEntry(Path *abspath, Path *path, const struct stat *b,
-             bool header = false);
+    TarEntry(size_t size, TarHeaderStyle ths);
+    TarEntry(Path *abspath, Path *path, const struct stat *b, TarHeaderStyle ths);
     
     Path *path()
     {
@@ -59,15 +66,23 @@ struct TarEntry
     }
     bool isRegularFile()
     {
-	return S_ISREG(sb_.st_mode);
+	return fs_.isRegularFile();
     }
-    bool isDir()
+    bool isDirectory()
     {
-	return S_ISDIR(sb_.st_mode);
+	return fs_.isDirectory();
     }
     bool isSymbolicLink()
     {
-	return S_ISLNK(sb_.st_mode);
+	return fs_.isSymbolicLink();
+    }
+    bool isCharacterDevice()
+    {
+	return fs_.isCharacterDevice();
+    }
+    bool isBlockDevice()
+    {
+	return fs_.isBlockDevice();
     }
     bool isHardLink()
     {
@@ -89,11 +104,11 @@ struct TarEntry
     size_t childrenSize()
     {
 	return children_size_;
-    }
+    }/*
     struct stat *stat()
     {
 	return &sb_;
-    }
+        }*/
     bool isStorageDir()
     {
 	return is_tar_storage_dir_;
@@ -253,7 +268,7 @@ struct TarEntry
     private:
     
     size_t header_size_;
-    
+    TarHeaderStyle tar_header_style_;
     // Full path and name, to read the file from the underlying file system.
     Path *abspath_;
     // Just the name of the file.
@@ -269,7 +284,8 @@ struct TarEntry
     // The target file for a link.
     Path *link_;
     
-    struct stat sb_;
+    FileStat fs_;
+    
     bool is_hard_linked_;
     TarFile *tar_file_;
     size_t tar_offset_;
@@ -308,11 +324,8 @@ struct TarEntry
 void cookEntry(string *listing, TarEntry *entry);
 
 bool eatEntry(vector<char> &v, vector<char>::iterator &i, Path *dir_to_prepend,
-              mode_t *mode, size_t *size, size_t *offset, string *tar, Path **path,
+              FileStat *fs, size_t *offset, string *tar, Path **path,
               string *link, bool *is_sym_link,
-              time_t *msecs, time_t *mnanos,
-              time_t *asecs, time_t *ananos,
-              time_t *csecs, time_t *cnanos,
               bool *eof, bool *err);
 
 

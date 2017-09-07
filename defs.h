@@ -27,10 +27,35 @@
 
 #define MAX_FILE_NAME_LENGTH 255
 #define MAX_PATH_LENGTH 4096
+#define MAXPATH 4096
+#define ARG_MAX 4096
 
 #ifdef WINAPI
 typedef int uid_t;
 typedef int gid_t;
+
+/*
+enum FileTypes {
+    REGTYPE,
+    DIRTYPE,
+    LNKTYPE,
+    SYMTYPE,
+    CHRTYPE,
+    BLKTYPE,
+    FIFTYPE
+};
+
+#define S_ISLNK(x) false
+#define S_ISREG(x) true
+#define S_ISCHR(x) true
+#define S_ISBLK(x) true
+#define S_ISDIR(x) true
+#define S_ISFIFO(x) true
+
+#define S_ISUID 1
+#define S_ISGID 2
+#define S_ISVTX 4
+*/
 #endif
 
 #endif

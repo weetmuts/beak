@@ -161,3 +161,18 @@ int gunzipit(vector<char> *from, vector<char> *to)
 
 
 
+
+dev_t MakeDev(int maj, int min)
+{
+    return 0;
+}
+
+int MajorDev(dev_t d)
+{
+    return 0;
+}
+
+int MinorDev(dev_t d)
+{
+    return 0;
+}

@@ -23,6 +23,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <linux/memfd.h>
+#include <linux/kdev_t.h>
 #include <sys/syscall.h>
 #include <sys/time.h>
 #include <cassert>
@@ -220,10 +221,14 @@ string permissionString(mode_t m)
         ss << "w";
     else
         ss << "-";
-    if (m & S_IXUSR)
-        ss << "x";
-    else
-        ss << "-";
+    if (m & S_ISUID) {
+        ss << "s";
+    } else {                        
+        if (m & S_IXUSR)
+            ss << "x";
+        else
+            ss << "-";
+    }
     if (m & S_IRGRP)
         ss << "r";
     else
@@ -232,10 +237,14 @@ string permissionString(mode_t m)
         ss << "w";
     else
         ss << "-";
-    if (m & S_IXGRP)
-        ss << "x";
-    else
-        ss << "-";
+    if (m & S_ISGID) {
+        ss << "s";
+    } else {                        
+        if (m & S_IXGRP)
+            ss << "x";
+        else
+            ss << "-";
+    }
     if (m & S_IROTH)
         ss << "r";
     else
@@ -244,10 +253,14 @@ string permissionString(mode_t m)
         ss << "w";
     else
         ss << "-";
-    if (m & S_IXOTH)
-        ss << "x";
-    else
-        ss << "-";
+    if (m & S_ISVTX) {
+        ss << "t";
+    } else {
+        if (m & S_IXOTH)
+            ss << "x";
+        else
+            ss << "-";
+    }
     return ss.str();
 }
 
@@ -280,8 +293,14 @@ mode_t stringToPermission(string s)
         rc |= S_IWUSR;
     else if (s[2] != '-')
         goto err;
+
     if (s[3] == 'x')
         rc |= S_IXUSR;
+    else
+    if (s[3] == 's') {
+        rc |= S_IXUSR;
+        rc |= S_ISUID;
+    } 
     else if (s[3] != '-')
         goto err;
     
@@ -295,6 +314,11 @@ mode_t stringToPermission(string s)
         goto err;
     if (s[6] == 'x')
         rc |= S_IXGRP;
+    else
+    if (s[6] == 's') {
+        rc |= S_IXGRP;
+        rc |= S_ISGID;
+    } 
     else if (s[6] != '-')
         goto err;
     
@@ -308,6 +332,11 @@ mode_t stringToPermission(string s)
         goto err;
     if (s[9] == 'x')
         rc |= S_IXOTH;
+    else
+    if (s[9] == 't') {
+        rc |= S_IXOTH;
+        rc |= S_ISVTX;
+    }
     else if (s[9] != '-')
         goto err;
     
@@ -316,4 +345,20 @@ mode_t stringToPermission(string s)
     err:
 
     return 0;
+}
+
+
+dev_t MakeDev(int maj, int min)
+{
+    return MKDEV(maj, min);
+}
+
+int MajorDev(dev_t d)
+{
+    return MAJOR(d);
+}
+
+int MinorDev(dev_t d)
+{
+    return MINOR(d);
 }

@@ -38,6 +38,11 @@ enum TarContents
     REG_FILE, DIR_TAR, SMALL_FILES_TAR, MEDIUM_FILES_TAR, SINGLE_LARGE_FILE_TAR
 };
 
+#define REG_FILE_CHAR 'z'
+#define DIR_TAR_CHAR 'y'
+#define SMALL_FILES_TAR_CHAR 's'
+#define MEDIUM_FILES_TAR_CHAR 'm'
+#define SINGLE_LARGE_FILE_TAR_CHAR 'l'
 
 struct TarFileName {
     TarContents type;
@@ -98,22 +103,22 @@ struct TarFile
 
     char chartype() {
         switch (tar_contents) {
-        case REG_FILE: return 'x';
-        case DIR_TAR: return 'z';
-        case SMALL_FILES_TAR: return 'r';
-        case MEDIUM_FILES_TAR: return 'm';
-        case SINGLE_LARGE_FILE_TAR: return 'l';
+        case REG_FILE: return REG_FILE_CHAR;
+        case DIR_TAR: return DIR_TAR_CHAR;
+        case SMALL_FILES_TAR: return SMALL_FILES_TAR_CHAR;
+        case MEDIUM_FILES_TAR: return MEDIUM_FILES_TAR_CHAR;
+        case SINGLE_LARGE_FILE_TAR: return SINGLE_LARGE_FILE_TAR_CHAR;
         }
         return 0;
     }
 
     static bool typeFromChar(char c, TarContents *tc) {
         switch (c) {
-        case 'x': *tc = REG_FILE; return true;
-        case 'z': *tc = DIR_TAR; return true;
-        case 'r': *tc = SMALL_FILES_TAR; return true;
-        case 'm': *tc = MEDIUM_FILES_TAR; return true;
-        case 'l': *tc = SINGLE_LARGE_FILE_TAR; return true;
+        case REG_FILE_CHAR: *tc = REG_FILE; return true;
+        case DIR_TAR_CHAR: *tc = DIR_TAR; return true;
+        case SMALL_FILES_TAR_CHAR: *tc = SMALL_FILES_TAR; return true;
+        case MEDIUM_FILES_TAR_CHAR: *tc = MEDIUM_FILES_TAR; return true;
+        case SINGLE_LARGE_FILE_TAR_CHAR: *tc = SINGLE_LARGE_FILE_TAR; return true;
         }
         return false;
     }

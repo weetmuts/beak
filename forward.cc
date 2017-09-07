@@ -40,9 +40,9 @@
 
 using namespace std;
 
-ComponentId FORWARD = registerLogComponent("forward");
-ComponentId HARDLINKS = registerLogComponent("hardlinks");
-ComponentId FUSE = registerLogComponent("fuse");
+static ComponentId FORWARD = registerLogComponent("forward");
+static ComponentId HARDLINKS = registerLogComponent("hardlinks");
+static ComponentId FUSE = registerLogComponent("fuse");
 ForwardTarredFS::ForwardTarredFS() {
 }
 
@@ -84,7 +84,7 @@ int ForwardTarredFS::addTarEntry(const char *p, const struct stat *sb, struct FT
 
     int status = 0;
     for (auto & p : filters) {
-        bool match  = globexec(&p.second, name);
+        bool match  = p.second.match(name);
         int rc = (match)?0:1;
         if (p.first.type == INCLUDE) {
             status |= rc;
@@ -101,16 +101,16 @@ int ForwardTarredFS::addTarEntry(const char *p, const struct stat *sb, struct FT
 
 
     // Creation and storage of entry.
-    TarEntry *te = new TarEntry(abspath, path, sb);
+    TarEntry *te = new TarEntry(abspath, path, sb, tarheaderstyle_);
     files[te->path()] = te;
 
-    if (te->isDir()) {
+    if (te->isDirectory()) {
         // Storing the path in the lookup
         directories[te->path()] = te;
         debug(FORWARD, "Added directory >%s<\n", te->path()->c_str());
     }
 
-    if (!te->isDir() && sb->st_nlink > 1) {
+    if (!te->isDirectory() && sb->st_nlink > 1) {
         debug(HARDLINKS, "Found hard link '%s' to inode %ju\n",
               te->path()->c_str(), sb->st_ino);
         TarEntry *prev = hard_links[sb->st_ino];
@@ -149,15 +149,15 @@ void ForwardTarredFS::findTarCollectionDirs() {
     for(auto & e : files) {
         TarEntry *te = e.second;
 
-        debug(FORWARD, "ISDIR >%s< %d\n", te->path()->c_str(), te->isDir());
+        debug(FORWARD, "ISDIR >%s< %d\n", te->path()->c_str(), te->isDirectory());
 
-        if (te->isDir()) {
+        if (te->isDirectory()) {
             bool must_generate_tars = (te->path()->depth() <= 1 ||
                                  te->path()->depth() == forced_tar_collection_dir_depth);
 
             debug(FORWARD, "TARS >%s< %d gentars? %d\n", te->path()->c_str(), te->path()->depth(), must_generate_tars);
             for (auto &g : triggers) {
-                bool match = globexec(&g, te->path()->c_str());
+                bool match = g.match(te->path()->c_str());
                 if (match) {
                     must_generate_tars = true;
                     break;
@@ -206,7 +206,7 @@ void ForwardTarredFS::addDirsToDirectories() {
     for(auto & e : files) {
         Path *path = e.first;
         TarEntry *te = e.second;
-        if (!te->isDir() || path->isRoot() || !te->isStorageDir()) {
+        if (!te->isDirectory() || path->isRoot() || !te->isStorageDir()) {
             // Ignore files
             // Ignore the root
             // Ignore directories that are not tar collection dirs.
@@ -477,7 +477,7 @@ size_t ForwardTarredFS::groupFilesIntoTars() {
             // or subdirectories inside the tar collection subdirectory!
             assert(entry->path()->depth() > te->path()->depth());
 
-            if (entry->isDir()) {
+            if (entry->isDirectory()) {
                 te->tazFile()->addEntryLast(entry);
             } else if (entry->isHardLink()) {
             	te->tazFile()->addEntryFirst(entry);
@@ -546,13 +546,15 @@ size_t ForwardTarredFS::groupFilesIntoTars() {
         te->tazFile()->fixSize();
         te->tazFile()->calculateHash();
         te->tazFile()->fixName();       
+
         
         set<uid_t> uids;
         set<gid_t> gids;
+        /*
         for(auto & entry : te->entries()) {
             uids.insert(entry->stat()->st_uid);
             gids.insert(entry->stat()->st_gid);
-        }
+            }*/
 
         string gzfile_contents;
         gzfile_contents.append("#tarredfs " XSTR(TARREDFS_VERSION) "\n");
@@ -638,7 +640,7 @@ size_t ForwardTarredFS::groupFilesIntoTars() {
         vector<unsigned char> compressed_gzfile_contents;
         gzipit(&gzfile_contents, &compressed_gzfile_contents);
 
-        TarEntry *dirs = new TarEntry(compressed_gzfile_contents.size());
+        TarEntry *dirs = new TarEntry(compressed_gzfile_contents.size(), tarheaderstyle_);
         dirs->setContent(compressed_gzfile_contents);
         te->gzFile()->addEntryLast(dirs);        
         te->gzFile()->fixSize();
@@ -698,7 +700,7 @@ TarFile *ForwardTarredFS::findTarFromPath(Path *path) {
     string d = path->parent()->name()->str();
 
     // File names:
-    // (r)01_(001501080787).(579054757)_(1119232)_(3b5e4ec7fe38d0f9846947207a0ea44c)_(0).(tar)
+    // (s)01_(001501080787).(579054757)_(1119232)_(3b5e4ec7fe38d0f9846947207a0ea44c)_(0).(tar)
 
     TarEntry *te = directories[path->parent()];
     if (!te) {
@@ -767,7 +769,7 @@ int ForwardTarredFS::getattrCB(const char *path_char_string, struct stat *stbuf)
 
         TarEntry *te = directories[path];
         if (te) {
-            memcpy(stbuf, te->stat(), sizeof(*stbuf));
+            memset(stbuf, 0, sizeof(struct stat));
             stbuf->st_mode = S_IFDIR | 0500;
             stbuf->st_nlink = 2;
             stbuf->st_size = 0;

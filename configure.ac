@@ -26,6 +26,8 @@ DEBUG_LEVEL=debug
 CONF_NAME="${host_cpu}-${host_vendor}-${host_os}-${DEBUG_LEVEL}"
 OUTPUT_ROOT="$SRC_ROOT/build/${CONF_NAME}"
 
+AC_CONFIG_HEADERS(${OUTPUT_ROOT}/config.h:config.h.in)
+
 AC_SUBST(PLATFORM)
 AC_SUBST(PLATFORM_CFLAGS)
 AC_SUBST(PATH_SEP)
@@ -33,10 +35,12 @@ if test "${host_vendor}" = "w64"; then
    PLATFORM=WINAPI
    PATH_SEP=';'
    PLATFORM_CFLAGS=""
+   FUSE_DEFAULT="no"
 else
    PLATFORM=POSIX
-   PATH_SEP:=':'
+   PATH_SEP=':'
    PLATFORM_CFLAGS="-DUSE_SYSLOG"
+   FUSE_DEFAULT="yes"
 fi
 
 mkdir -p "$OUTPUT_ROOT"
@@ -47,6 +51,10 @@ fi
 AC_SUBST(CONF_NAME)
 AC_SUBST(SRC_ROOT)
 AC_SUBST(OUTPUT_ROOT)
+
+AC_HEADER_STDC
+AC_HEADER_STAT
+AC_HEADER_TIME
 
 AC_SUBST(CC)
 
@@ -59,15 +67,14 @@ AC_MSG_CHECKING([for fuse])
 AC_ARG_ENABLE([fuse],
   [AS_HELP_STRING([--disable-fuse],
       [disable libfuse (mount will not work) @<:@enabled@:>@])],
-      [ENABLE_FUSE=${enable_fuse}], [ENABLE_FUSE=yes])
+      [ENABLE_FUSE=${enable_fuse}], [ENABLE_FUSE=${FUSE_DEFAULT}])
 
-AC_SUBST(NOFUSE_OBJS)
+AC_SUBST(ENABLE_FUSE)
 AC_SUBST(FUSE_CFLAGS)
 AC_SUBST(FUSE_LIBS)
 
 if test "x$ENABLE_FUSE" = xyes; then
     if pkg-config fuse; then
-       NOFUSE_OBJS=""
        FUSE_CFLAGS="-DFUSE_USE_VERSION=26 $(pkg-config --cflags fuse)"
        FUSE_LIBS="$(pkg-config --libs fuse)"
     else
@@ -75,7 +82,6 @@ if test "x$ENABLE_FUSE" = xyes; then
     fi
     AC_MSG_RESULT([found])    
 else
-    NOFUSE_OBJS="${OUTPUT_ROOT}/nofuse.o"
     FUSE_CFLAGS=""
     FUSE_LIBS=""
     AC_MSG_RESULT([explicitly disabled])
@@ -94,6 +100,7 @@ if test "x${with_openssl}" = "x"; then
     OPENSSL_LIBS="$(pkg-config openssl --libs)"
     AC_MSG_RESULT([found])
 else
+    with_openssl=$(realpath ${with_openssl})
     OPENSSL_CFLAGS="-I${with_openssl}/include"
     OPENSSL_LIBS="${with_openssl}/libcrypto.a"
     AC_MSG_RESULT([using ${with_openssl}])
@@ -112,6 +119,7 @@ if test "x${with_zlib}" = "x"; then
     ZLIB_LIBS="$(pkg-config zlib --libs)"
     AC_MSG_RESULT([found])    
 else
+    with_zlib=$(realpath ${with_zlib})
     ZLIB_CFLAGS="-I${with_zlib}"
     ZLIB_LIBS="${with_zlib}/libz.a"
     AC_MSG_RESULT([using ${with_zlib}])
@@ -119,6 +127,29 @@ fi
 
 AC_SUBST(ZLIB_CFLAGS)
 AC_SUBST(ZLIB_LIBS)
+
+AC_MSG_CHECKING(for st_mtim.tv_nsec in struct stat)
+AC_COMPILE_IFELSE(
+[AC_LANG_PROGRAM([#include <time.h>
+#include <sys/time.h>
+#include <sys/stat.h>],
+[struct stat sb; sb.st_mtim.tv_nsec = 0;])],
+have_st_mtim=yes, have_st_mtim=no)
+AC_MSG_RESULT($have_st_mtim)
+
+AC_DEFINE_UNQUOTED(ST_MTIM,$have_st_mtim,Stat structure has st_mtim)
+
+AC_MSG_CHECKING(for st_mtime in struct stat)
+AC_COMPILE_IFELSE(
+[AC_LANG_PROGRAM([#include <time.h>
+#include <sys/time.h>
+#include <sys/stat.h>],
+[struct stat sb; sb.st_mtime = 0;])],
+have_st_mtime=yes, have_st_mtime=no)
+AC_MSG_RESULT($have_st_mtime)
+
+AC_DEFINE_UNQUOTED(ST_MTIME,$have_st_mtime,Stat structure has st_mtime)
+
 
 CXXFLAGS="-D${PLATFORM} -O0 -g -Wall -fmessage-length=0 -std=c++11 -Wno-unused-function -DTARREDFS_VERSION=0.1" 
 

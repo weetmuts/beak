@@ -20,6 +20,7 @@
 
 #include"util.h"
 #include<string>
+#include<sys/stat.h>
 
 #define T_BLOCKSIZE		512
 
@@ -74,9 +75,9 @@ struct TarHeader
 
     public:
 
-    static size_t calculateSize(struct stat *sb, Path *tarpath, Path *link, bool is_hard_link);
+    static size_t calculateSize(FileStat *fs, Path *tarpath, Path *link, bool is_hard_link);
     TarHeader();
-    TarHeader(struct stat *sb, Path *tar, Path *link, bool is_hard_link);
+    TarHeader(FileStat *fs, Path *tar, Path *link, bool is_hard_link, bool full);
     
     char *buf() { return content.members.name_; }
     char type() { return content.members.typeflag_; }

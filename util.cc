@@ -717,3 +717,7 @@ void fixEndian(long *t)
 {
 }
 
+ssize_t readlink(const char *path, char *dest, size_t len)
+{
+    return -1;
+}

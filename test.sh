@@ -74,15 +74,15 @@ function startFS {
     run="$1"
     extra="$2"
     if [ -z "$test" ]; then
-        ./${prefix}/beak mount $extra $root $mount > $log
+        eval "./${prefix}/beak mount $extra $root $mount > $log"
         ${run}
     else
         if [ -z "$gdb" ]; then
             (sleep 2; eval ${run}) &
-            ./${prefix}/beak mount -d $extra $root $mount 2>&1 | tee $log &
+            eval "./${prefix}/beak mount -d $extra $root $mount 2>&1 | tee $log &"
         else
             (sleep 3; eval ${run}) &
-            gdb -ex=r --args ./${prefix}/beak mount -d $extra $root $mount 
+            eval "gdb -ex=r --args ./${prefix}/beak mount -f $extra $root $mount" 
         fi        
     fi        
 }
@@ -231,20 +231,11 @@ function fifoTest {
     stopFS
 }
 
-function devTest {
-    $THIS_DIR/integrity-test.sh -dd "$dir" -f "! -path '*shm*' -a ! -path '*tty*'" /dev "$mount"
-    if [ $? -ne 0 ]; then
-        echo Failed file attributes diff for $1! Check in $dir for more information.
-        exit
-    fi
-    stopFS nook
-}
-
 setup basic01 "Short simple file (fits in 100 char name)"
 if [ $do_test ]; then
     echo HEJSAN > $root/hello.txt   
     chmod 400 $root/hello.txt
-    startFS standardTest
+    startFS standardTest --tarheader=full
 fi
 
 setup basic02 "Medium path name (fits in 100 char name field and 155 char prefix)"
@@ -322,11 +313,19 @@ setup basic09 "Include exclude"
 if [ $do_test ]; then
     echo HEJSAN > $root/Alfa
     mkdir -p $root/Beta
-    echo HEJSAN > $root/Beta/gamma
     echo HEJSAN > $root/Beta/delta
     echo HEJSAN > $root/BetaDelta
-    startFS filterTest "-i Beta/ -x mm"
+    startFS filterTest "-i Beta/**"
 fi
+
+function devTest {
+    $THIS_DIR/integrity-test.sh -dd "$dir" -f "! -path '*shm*'" /dev "$mount"
+    if [ $? -ne 0 ]; then
+        echo Failed file attributes diff for $1! Check in $dir for more information.
+        exit
+    fi
+    stopFS nook
+}
 
 setup basic10 "block and character devices (ie the whole /dev directory)"
 if [ $do_test ]; then
@@ -334,7 +333,7 @@ if [ $do_test ]; then
     # require you to be root. So lets just mount /dev and
     # just list the contents of the tars!
     root=/dev
-    startFS devTest "-x shm -x tty -d 0"
+    startFS devTest "--tarheader=full -x '/shm/**'"
 fi
 
 setup basic11 "check that nothing gets between the directory and its contents"
@@ -358,7 +357,7 @@ function mtimeTestPart1 {
     (cd $mount; find . -exec ls -ld \{\} \; > $org)    
     stopFS nook
     touch -d "2015-03-03 03:03:03.1235" $root/beta/zz
-    startFS mtimeTestPart2
+    startFS mtimeTestPart2 "-d 1"
 }
 
 function mtimeTestPart2 {
@@ -370,17 +369,19 @@ function mtimeTestPart2 {
     if [ "$rc" != "" ]; then
         echo "****$rc****"
         echo Comparison should be empty since the nanoseconds do not show in ls -ld.
+        echo Check in $dir for more information.
         exit
     fi
 
-    cat $org  | sed '/\(alfa\|\.\/z01\)/! s/1234.*/1235/' > ${org}.2
-    cat $dest | sed '/\(alfa\|\.\/z01\)/! s/1235.*/1235/' > ${dest}.2
+    cat $org  | egrep -o z01_[[:digit:]]+\.[[:digit:]]+ | sed 's/1234/1235/' > ${org}.2
+    cat $dest | egrep -o z01_[[:digit:]]+\.[[:digit:]]+  > ${dest}.2
     rc=$(diff -d ${org}.2 ${dest}.2)
     
     if [ "$rc" != "" ]; then
         echo "****$rc****"
         echo Comparison should be empty since we adjusted the 1234 nanos to 12345
         echo and cut away the hashes that are expected to change.
+        echo Check in $dir for more information.                
         exit
     fi
     stopFS
@@ -395,19 +396,19 @@ if [ $do_test ]; then
     echo HEJSAN > $root/beta/zz
     echo HEJSAN > $root/beta/ww
     touch -d "2015-03-03 03:03:03.1234" $root/alfa/* $root/beta/* $root/alfa $root/beta
-    startFS mtimeTestPart1
+    startFS mtimeTestPart1 "-d 1"
 fi
 
 
 function timestampHashTest1 {
-    rc1=$(ls $mount/TJO/r*.tar)
+    rc1=$(ls $mount/TJO/s*.tar)
     stopFS nook
     touch -d "2015-03-03 03:03:03.1235" $root/TJO/alfa
     startFS timestampHashTest2
 }
 
 function timestampHashTest2 {
-    rc2=$(ls $mount/TJO/r*.tar)
+    rc2=$(ls $mount/TJO/s*.tar)
     if [ "$rc1" = "$rc2" ]; then
         echo "$rc1"
         echo Change in timestamp should change the virtual tar file name!
@@ -487,7 +488,7 @@ setup basic16 "Test paths with percentages in them"
 if [ $do_test ]; then
     mkdir -p "$root/alfa"
     echo HEJSAN > "$root/alfa/p%25e2%2594%259c%25c3%2591vensf%25e2%2594%259c%25e2%2595%25a2.jpg"
-    startFS percentageTest
+    startFS percentageTest "--tarheader=full"
 fi
 
 setup basic17 "Test small/medium/large tar files"
@@ -528,7 +529,7 @@ if [ $do_test ]; then
     mkdir -p $root/alfa
     echo HEJSAN > $root/Alfa/a
     echo HEJSAN > $root/alfa/b
-    startFS standardTest "-d 0 -ta 1G"
+    startFS standardTest "-d 1 -ta 1G"
 fi
 
 function expectLocaleFailure {
@@ -548,7 +549,7 @@ if [ $do_test ]; then
 fi
 
 function txTriggerTest {
-    if [ ! -f $mount/Alfa/snapshot_2016-12-30/x01_*.gz ]; then
+    if [ ! -f $mount/Alfa/snapshot_2016-12-30/z01_*.gz ]; then
         echo Expected the snapshot dir to be tarred! Check in $dir for more information.
         exit
     fi
@@ -564,7 +565,7 @@ if [ $do_test ]; then
     mkdir -p $root/Alfa/snapshot_2016-12-30
     echo HEJSAN > $root/Alfa/a
     cp -a $root/Alfa/a $root/Alfa/snapshot_2016-12-30
-    startFS txTriggerTest "-tx snapshot_....-..-.." 
+    startFS txTriggerTest "-tx 'snapshot*'" 
 fi
 
 function noAvalancheTestPart1 {
@@ -608,13 +609,13 @@ if [ $do_test ]; then
     startFS noAvalancheTestPart1 "-ta 1M -tr 1M"
 fi
 
-setup libtar1 "Mount of libtar extract all default settings"
+setup bulktest1 "Mount of generated bulk extract all default settings"
 if [ $do_test ]; then
     ./generate_filesystem.sh $root 5 10
     startFS standardTest
 fi
 
-setup libtar2 "Mount of libtar, pack using xz, decompress and untar."
+setup bulktest2 "Mount of generated bulk, pack using xz, decompress and untar."
 if [ $do_test ]; then
     ./generate_filesystem.sh $root 5 10
     startFS standardPackedTest
@@ -624,36 +625,36 @@ function expectOneBigR01Tar {
     untar
     checkdiff
     checkls-ld
-    num=$(find $mount -name "r01*.tar" | wc --lines)
+    num=$(find $mount -name "s01*.tar" | wc --lines)
     if [ "$num" != "1" ]; then
-        echo Expected a single big r01 tar! Check in $dir for more information.
+        echo Expected a single big s01 tar! Check in $dir for more information.
         exit
     fi        
     stopFS
 }
 
-setup options1 "Mount of libtar -d 0 -ta 1G" 
+setup bulktest3 "Mount of generated bulk -d 1 -ta 1G" 
 if [ $do_test ]; then
     ./generate_filesystem.sh $root 5 10
-    startFS expectOneBigR01Tar "-d 0 -ta 1G"
+    startFS expectOneBigR01Tar "-d 1 -ta 1G"
 fi
 
 function expect8R01Tar {
     untar
     checkdiff
     checkls-ld
-    num=$(find $mount -name "r01*.tar" | wc --lines)
+    num=$(find $mount -name "s01*.tar" | wc --lines)
     if [ "$num" != "8" ]; then
-        echo Expected 8 r01 tar! Check in $dir for more information.
+        echo Expected 8 s01 tar! Check in $dir for more information.
         exit
     fi        
     stopFS
 }
 
-setup options2 "Mount of libtar -d 0 -ta 1M -tr 1G" 
+setup bulktest4 "Mount of generated bulk -d 1 -ta 1M -tr 1G" 
 if [ $do_test ]; then
     ./generate_filesystem.sh $root 5 10
-    startFS expect8R01Tar "-d 0 -ta 1M -tr 1G"
+    startFS expect8R01Tar "-d 1 -ta 1M -tr 1G"
 fi
 
 function compareTwo {

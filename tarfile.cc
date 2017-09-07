@@ -172,7 +172,7 @@ void TarFile::fixName() {
         char gztype[] = "gz";
         char tartype[] = "tar";
         char *type = tartype;
-        if (chartype() == 'x') {
+        if (chartype() == 'z') {
             type = gztype;
         }
 	snprintf(buffer, sizeof(buffer), "%c01_%s_%s_%s_0.%s",

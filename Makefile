@@ -24,10 +24,18 @@ root_dir:=$(dir $(makefile_path))
 
 SPEC:=$(wildcard build/*/spec.gmk)
 
-ifeq ($(words $(SPEC)),1)
-    # Only one configuration exists, thus we built that one.
-    include $(SPEC)
-    include $(root_dir)/Main.gmk
-else
-      $(error You have more than one configuration. Run make from the build directory of your choice!)
-endif
+#ifeq ($(words $(SPEC)),1)
+#    # Only one configuration exists, thus we built that one.
+#    include $(SPEC)
+#    include $(root_dir)/Main.gmk
+#else
+#      $(info You have more than one configuration. Run make from the build directory of your choice!)
+#      $(info Or specify linux,winapi,arm for common builds)
+#endif
+
+
+linux:
+	(cd build/x86_64-pc-linux-gnu-debug && make)
+
+winapi:
+	(cd build/x86_64-w64-mingw32-debug && make)
