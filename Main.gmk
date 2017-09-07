@@ -5,13 +5,13 @@
 # make VERBOSE=
 
 VERBOSE?=@
-HEADERS:=$(wildcard $(SRC_ROOT)/*.h) 
+HEADERS:=$(wildcard $(SRC_ROOT)/src/*.h) 
 
-$(OUTPUT_ROOT)/%.o: $(SRC_ROOT)/%.cc $(HEADERS)
+$(OUTPUT_ROOT)/%.o: $(SRC_ROOT)/src/%.cc $(HEADERS)
 	@echo Compiling $$(basename $<)
 	$(VERBOSE)$(CXX) $(CXXFLAGS) -I$(OUTPUT_ROOT) $< -c -o $@
 
-WINAPI_SOURCES:=$(filter-out %posix.cc, $(wildcard $(SRC_ROOT)/*.cc))
+WINAPI_SOURCES:=$(filter-out %posix.cc, $(wildcard $(SRC_ROOT)/src/*.cc))
 
 WINAPI_BEAK_OBJS := \
 $(OUTPUT_ROOT)/diff.o \
@@ -24,13 +24,13 @@ $(OUTPUT_ROOT)/util.o \
 $(OUTPUT_ROOT)/util_winapi.o \
 $(NOFUSE_OBJS)
 
-POSIX_SOURCES:=$(filter-out %winapi.cc,$(wildcard $(SRC_ROOT)/*.cc))
+POSIX_SOURCES:=$(filter-out %winapi.cc,$(wildcard $(SRC_ROOT)/src/*.cc))
 ifeq ($(ENABLE_FUSE),yes)
 POSIX_SOURCES:=$(filter-out %nofuse.cc,$(POSIX_SOURCES))
 endif
 
 POSIX_OBJS:=\
-    $(patsubst %.cc,%.o,$(subst $(SRC_ROOT),$(OUTPUT_ROOT),$(POSIX_SOURCES)))
+    $(patsubst %.cc,%.o,$(subst $(SRC_ROOT)/src,$(OUTPUT_ROOT),$(POSIX_SOURCES)))
 
 POSIX_BEAK_OBJS:=\
     $(filter-out %testinternals.o,$(POSIX_OBJS))
