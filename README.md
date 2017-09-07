@@ -1,67 +1,84 @@
-# tarredfs
-Beak is a mirroring-backup-rotation-retention tool that is designed to co-exist
+# beak
+
+Beak is a mirroring-backup-share-rotation-retention tool that is designed to co-exist
 with the (cloud) storage of your choice and allow push/pull to share the backups
 between multiple client computers.
 
-There is no need for an active server, merely a storage location (local or remote).
+Beak is the tool for impatient people who want to initiate the backup
+manually and you want to see it finish, quickly! Then you switch to
+another client to continue working there. But while you are at it, it
+is nice to have version control and tracking of where data is stored
+in the cloud and locally.
 
-See the home page for installation, usage, documentation, changelog
-and configuration walkthroughs.
+A typical use case for me: Happily programming on your laptop and the
+suddenly, the kids MUST see Frozen and you have to relinguish the
+laptop before child-induced calamity ensues. Beak comes to the rescue:
+`beak push work gdrivecrypt:/work` done!
 
-http://nivelleringslikaren.eu/beak/
+You sit down in front of the desktop computer and performs:
+`beak pull work gdrivecrypt:/work` done!
 
-Tarredfs, a libfuse filesystem that renders your files in virtual tar files.
-by Fredrik Öhrström oehrstroem@gmail.com
+You do not have to switch computer to do a `push`. Do it whenever you
+have done some useful work and want to make sure it is not lost. You
+can push to multiple storage locations, like: `gdrivecrypt:/work` `s3crypt:/work`
+`media/myself/usbdevice/work`.
 
-If you want to rclone your data to a cloud storage, but the cloud storage provider has
-a transfer limit of 1 file per second or so. Then you want to automatically concatenate
-multiple small files into larger files that take at least a second or so to transfer.
+Each push registers as a point in time (assuming data actually has
+changed).  The data accumulates in the storage location. Once per week
+or per month, you might want to do `beak prune gdrivecrypt:/work` to prune
+older points in time and keep typically one per day for the last week,
+one per week for the last month and one per month for the last year.
 
-This is what tarredfs does! 
+You can access any point in time not yet pruned away by mounting the storage location.
+For example: `beak mount gdrivecrypt:/work OldWork`
 
-The default settings:
-* trigger tar file creation in a directory if its contents is at least 5 MiB.
-* if possible merge as many small files as possible to create tar files of 10 MiB. 
-* A file larger than 10MiB get its own tar file.
-* always trigger tar file creation in the first subdirectory level.
+When you do: `ls OldWork` you will see directories named as the points in time stored at that location:
 
-First mount a tarredfs:
 ```
->tarredfs root mount
-Scanning /home/you/root
-Mounted /home/you/mount with 3 virtual tars with 33 entries in 379ms.
+@0 2017-09-07 14:27 2 minutes ago
+@1 2017-09-07 14:25 3 minutes ago
+@2 2017-09-05 10:01 2 days ago
+@3 2017-07-01 08:23 2 months ago
 ```
 
-Then extract the tars in check and compare that root and check is identical.
-```
->mkdir -p check; cd check
-tarredfs-untar xv ../mount
-cd ..; tarredfs-compare root check
-```
-(`diff -rq root check` also works but does not check the time stamps)
+Simply cd enter the point in time you are interested in a copy out the old data that you need.
+You can also mount the latest version directly using: `beak mount gdrivecrypt:/work@0 LatestPush`
 
-Or if your root is so big that you do not want to clone a copy, then you
-can run an integrity test for 120 seconds, where it first performs a compare and then extracts a random file from the tars. It is compared with the original in root. If ok, then it is deleted and the process continues until the time is up.
-```
->tarredfs-integrity-test root mount 120
- OK
- OK (10) foo/bar.c
- ...
- ..
- .
-```
+To get a status report of where and when you pushed, do: `beak status`
+
+# Rclone
+
+Beak uses rclone to copy the data to the storage locations. Thus
+gdrivecrypt: is an rclone target that you configure with `rclone
+config`. Beak takes care of wrapping several small files into larger
+archive files, this is neccessary since cloud storage locations often
+have a transfer limit of two files per second. Source code, with many small
+files, can therefore take a ridiculous time to rclone to the cloud!
+
+Also beak takes care of storing symlinks and other unix:like stuff, which cannot be stored
+as such in cloud providers buckets.
+
+# Example Commands
+
+Run `beak config` to setup directories that you want to mirror-backup-share.
+
+Run `beak push work gdrivecrypt:/work` to push your work to a cloud drive.
+Run `beak push work /media/myself/usbdrive/work` to push your work to a local drive.
+
+Run `beak mount gdrivecrypt:/work` gives you access to the remote data in the virtual
+directories .beak/gdrivecrypt/work
+
+Run `beak prune work gdrivecrypt:` to prune the points in time stored in gdrivecrypt: for work.
 
 # Development
-* Clone: `git clone git@github.com:jabberbeak/tarredfs.git ; cd tarredfs`
+* Clone: `git clone git@github.com:weetmuts/beak.git ; cd beak`
+* Configure: `./configure`
 * Build: `make` Your executables are now in `build/tarredfs*`.
 * Test: `make test`
 * Install: `sudo make install` Installs in /usr/local/bin
 
-./configure --build=i686-pc-linux-gnu --host=
-
-Supported builds: x86_64-linux-gnu
-Supported hosts: x86_64-linux-gnu x86_64-w64-mingw32 arm-linux-gnueabihf
+Hosts to be supported: x86_64-linux-gnu x86_64-w64-mingw32 arm-linux-gnueabihf
 
 # Cross compiling
 
-./configure --host=x86_64-w64-mingw32 --with-zlib=../zlib-1.2.11/
+`./configure --host=x86_64-w64-mingw32 --with-zlib=../zlib-1.2.11/`
