@@ -29,9 +29,7 @@
 #include <ctime>
 #include <iterator>
 #include <locale>
-#include <fstream>
 #include <set>
-#include <sstream>
 #include <zlib.h>
 
 
@@ -563,18 +561,14 @@ size_t ForwardTarredFS::groupFilesIntoTars() {
         gzfile_contents.append("\n");
         gzfile_contents.append("#uids");
         for (auto & x : uids) {
-            stringstream ss;
-            ss << x;
             gzfile_contents.append(" ");
-            gzfile_contents.append(ss.str());
+            gzfile_contents.append(std::to_string(x));
         }
         gzfile_contents.append("\n");
         gzfile_contents.append("#gids");
         for (auto & x : gids) {
-            stringstream ss;
-            ss << x;
             gzfile_contents.append(" ");
-            gzfile_contents.append(ss.str());
+            gzfile_contents.append(std::to_string(x));
         }
         gzfile_contents.append("\n");
         //gzfile_contents.append("#columns permissions uid/gid mtime_readable mtime_secs.nanos atime_secs.nanos ctime_secs.nanos filename link_information tar_file_name offset_inside_tar content_hash header_hash\n");
@@ -582,22 +576,6 @@ size_t ForwardTarredFS::groupFilesIntoTars() {
         gzfile_contents.append(to_string(te->entries().size()));
         gzfile_contents.append("\n");
         gzfile_contents.append(separator_string);
-
-        size_t width = 3;
-        string space(" ");
-        for(auto & entry : te->entries()) {
-            ssize_t diff = width - entry->tv_line_size.length();
-            stringstream ss;
-            if (diff < 0) {
-                width = entry->tv_line_size.length();
-                diff = 0;
-            }
-            while (diff > 0) {
-                ss << space;
-                diff--;
-            }
-            entry->tv_line_size = ss.str()+entry->tv_line_size;
-        }
 
         for(auto & entry : te->entries()) {
             cookEntry(&gzfile_contents, entry);

@@ -34,8 +34,11 @@ SPEC:=$(wildcard build/*/spec.gmk)
 #endif
 
 
-linux:
-	(cd build/x86_64-pc-linux-gnu-debug && make)
+release:
+	(cd build/x86_64-pc-linux-gnu && make release)
 
-winapi:
-	(cd build/x86_64-w64-mingw32-debug && make)
+debug:
+	(cd build/x86_64-pc-linux-gnu && make debug)
+
+#winapi:
+#	(cd build/x86_64-w64-mingw32 && make)

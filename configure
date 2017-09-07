@@ -587,6 +587,10 @@ PACKAGE_URL='http://nivelleringslikaren.eu/beak'
 
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
+LDFLAGS_RELEASE
+LDFLAGS_DEBUG
+CXXFLAGS_RELEASE
+CXXFLAGS_DEBUG
 CXXFLAGS
 ZLIB_LIBS
 ZLIB_CFLAGS
@@ -1975,8 +1979,7 @@ case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
 
 SRC_ROOT="$(pwd -L)"
 
-DEBUG_LEVEL=debug
-CONF_NAME="${host_cpu}-${host_vendor}-${host_os}-${DEBUG_LEVEL}"
+CONF_NAME="${host_cpu}-${host_vendor}-${host_os}"
 OUTPUT_ROOT="$SRC_ROOT/build/${CONF_NAME}"
 
 ac_config_headers="$ac_config_headers ${OUTPUT_ROOT}/config.h:config.h.in"
@@ -3695,12 +3698,20 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+CXXFLAGS="-D${PLATFORM} -Wall -fmessage-length=0 -std=c++11 -Wno-unused-function -DTARREDFS_VERSION=0.1"
 
-CXXFLAGS="-D${PLATFORM} -O0 -g -Wall -fmessage-length=0 -std=c++11 -Wno-unused-function -DTARREDFS_VERSION=0.1"
+CXXFLAGS_DEBUG="-O0 -g"
+CXXFLAGS_RELEASE="-Os"
+
+LDFLAGS=""
+LDFLAGS_DEBUG="-g"
+LDFLAGS_RELEASE="-Os"
 
 CFLAGS=""
 
-LDFLAGS="-g"
+
+
+
 
 
 

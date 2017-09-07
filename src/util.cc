@@ -29,7 +29,6 @@
 #include<iterator>
 #include<locale>
 #include<map>
-#include<sstream>
 #include<stddef.h>
 #include<string.h>
 #include<sys/stat.h>

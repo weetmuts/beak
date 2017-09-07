@@ -4,24 +4,44 @@
 # To build with a lot of build output, type:
 # make VERBOSE=
 
+# Expect release or debug as a target
+
+ifeq ($(MAKECMDGOALS),release)
+TYPE=RELEASE
+STRIP_COMMAND=strip
+endif
+
+ifeq ($(MAKECMDGOALS),debug)
+TYPE=DEBUG
+STRIP_COMMAND=touch
+endif
+
+ifeq ($(TYPE),)
+    $(error You must specify "make release" or "make debug")
+endif
+
+$(shell mkdir -p $(OUTPUT_ROOT)/$(TYPE))
+
+$(info Building $(TYPE))
+
 VERBOSE?=@
 HEADERS:=$(wildcard $(SRC_ROOT)/src/*.h) 
 
-$(OUTPUT_ROOT)/%.o: $(SRC_ROOT)/src/%.cc $(HEADERS)
+$(OUTPUT_ROOT)/$(TYPE)/%.o: $(SRC_ROOT)/src/%.cc $(HEADERS)
 	@echo Compiling $$(basename $<)
-	$(VERBOSE)$(CXX) $(CXXFLAGS) -I$(OUTPUT_ROOT) $< -c -o $@
+	$(VERBOSE)$(CXX) $(CXXFLAGS_$(TYPE)) $(CXXFLAGS) -I$(OUTPUT_ROOT) $< -c -o $@
 
 WINAPI_SOURCES:=$(filter-out %posix.cc, $(wildcard $(SRC_ROOT)/src/*.cc))
 
 WINAPI_BEAK_OBJS := \
-$(OUTPUT_ROOT)/diff.o \
-$(OUTPUT_ROOT)/tarentry.o \
-$(OUTPUT_ROOT)/match.o \
-$(OUTPUT_ROOT)/log.o \
-$(OUTPUT_ROOT)/nofuse.o \
-$(OUTPUT_ROOT)/tar.o \
-$(OUTPUT_ROOT)/util.o \
-$(OUTPUT_ROOT)/util_winapi.o \
+$(OUTPUT_ROOT)/$(TYPE)/diff.o \
+$(OUTPUT_ROOT)/$(TYPE)/tarentry.o \
+$(OUTPUT_ROOT)/$(TYPE)/match.o \
+$(OUTPUT_ROOT)/$(TYPE)/log.o \
+$(OUTPUT_ROOT)/$(TYPE)/nofuse.o \
+$(OUTPUT_ROOT)/$(TYPE)/tar.o \
+$(OUTPUT_ROOT)/$(TYPE)/util.o \
+$(OUTPUT_ROOT)/$(TYPE)/util_winapi.o \
 $(NOFUSE_OBJS)
 
 POSIX_SOURCES:=$(filter-out %winapi.cc,$(wildcard $(SRC_ROOT)/src/*.cc))
@@ -30,7 +50,7 @@ POSIX_SOURCES:=$(filter-out %nofuse.cc,$(POSIX_SOURCES))
 endif
 
 POSIX_OBJS:=\
-    $(patsubst %.cc,%.o,$(subst $(SRC_ROOT)/src,$(OUTPUT_ROOT),$(POSIX_SOURCES)))
+    $(patsubst %.cc,%.o,$(subst $(SRC_ROOT)/src,$(OUTPUT_ROOT)/$(TYPE),$(POSIX_SOURCES)))
 
 POSIX_BEAK_OBJS:=\
     $(filter-out %testinternals.o,$(POSIX_OBJS))
@@ -41,42 +61,24 @@ POSIX_TESTINTERNALS_OBJS:=\
 BEAK_OBJS:=$($(PLATFORM)_BEAK_OBJS)
 TESTINTERNALS_OBJS:=$($(PLATFORM)_TESTINTERNALS_OBJS)
 
-all: $(OUTPUT_ROOT)/beak $(OUTPUT_ROOT)/testinternals
+release debug: $(OUTPUT_ROOT)/$(TYPE)/beak $(OUTPUT_ROOT)/$(TYPE)/testinternals
 
-$(OUTPUT_ROOT)/beak: $(BEAK_OBJS)
+$(OUTPUT_ROOT)/$(TYPE)/beak: $(BEAK_OBJS)
 	@echo Linking $@
-	$(VERBOSE)@$(CXX) -o $(OUTPUT_ROOT)/beak $(LDFLAGS) $(BEAK_OBJS) \
+	$(VERBOSE)@$(CXX) -o $(OUTPUT_ROOT)/$(TYPE)/beak $(LDFLAGS_$(TYPE)) $(LDFLAGS) $(BEAK_OBJS) \
                       $(FUSE_LIBS) $(OPENSSL_LIBS) $(ZLIB_LIBS)
-
-$(OUTPUT_ROOT)/testinternals: $(TESTINTERNALS_OBJS)
+	$(VERBOSE)@$(STRIP_COMMAND) $(OUTPUT_ROOT)/$(TYPE)/beak
+        
+$(OUTPUT_ROOT)/$(TYPE)/testinternals: $(TESTINTERNALS_OBJS)
 	@echo Linking $@
-	$(VERBOSE)@$(CXX) -o $(OUTPUT_ROOT)/testinternals $(LDFLAGS) \
+	$(VERBOSE)@$(CXX) -o $(OUTPUT_ROOT)/$(TYPE)/testinternals $(LDFLAGS_$(TYPE)) $(LDFLAGS) \
                           $(TESTINTERNALS_OBJS) \
                       $(FUSE_LIBS) $(OPENSSL_LIBS) $(ZLIB_LIBS)
 
-$(OUTPUT_ROOT)/tarredfs-untar: untar.sh
-	cp untar.sh $(OUTPUT_ROOT)/tarredfs-untar
-	chmod a+x $(OUTPUT_ROOT)/tarredfs-untar
-
-$(OUTPUT_ROOT)/tarredfs-pack: pack.sh
-	cp pack.sh $(OUTPUT_ROOT)/tarredfs-pack
-	chmod a+x $(OUTPUT_ROOT)/tarredfs-pack
-
-$(OUTPUT_ROOT)/tarredfs-compare: compare.sh
-	cp compare.sh $(OUTPUT_ROOT)/tarredfs-compare
-	chmod a+x $(OUTPUT_ROOT)/tarredfs-compare
-
-$(OUTPUT_ROOT)/tarredfs-integrity-test: integrity-test.sh
-	cp integrity-test.sh $(OUTPUT_ROOT)/tarredfs-integrity-test
-	chmod a+x $(OUTPUT_ROOT)/tarredfs-integrity-test
-
 install:
 	echo Installing into /usr/local/bin
-	cp $(OUTPUT_ROOT)/beak /usr/local/bin
-	cp $(OUTPUT_ROOT)/tarredfs-* /usr/local/bin
+	cp $(OUTPUT_ROOT)/$(TYPE)/beak /usr/local/bin
 	mkdir -p /usr/local/lib/tarredfs
-	cp format_find.pl /usr/local/lib/tarredfs/format_find.pl
-	cp format_tar.pl /usr/local/lib/tarredfs/format_tar.pl
 	cp tarredfs.1 /usr/local/share/man/man1
 
 # Clean all, then you have to re-configure.
@@ -85,10 +87,6 @@ clean-all:
 
 # Clean remove build artifacts, but keep configuration.
 clean:
-	rm -f $(BEAK_OBJS) $(TESTINTERNALS_OBJS) \
-        $(OUTPUT_ROOT)/beak \
-        $(OUTPUT_ROOT)/testinternals \
-	$(OUTPUT_ROOT)/tarredfs-untar $(OUTPUT_ROOT)/tarredfs-pack \
-	$(OUTPUT_ROOT)/tarredfs-compare $(OUTPUT_ROOT)/tarredfs-integrity-test *~
+	rm -f $(OUTPUT_ROOT)/$(TYPE)/*
 
 .PHONY: clean clean-all

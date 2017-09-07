@@ -22,8 +22,7 @@ AC_CANONICAL_HOST
 
 SRC_ROOT="$(pwd -L)"
 
-DEBUG_LEVEL=debug
-CONF_NAME="${host_cpu}-${host_vendor}-${host_os}-${DEBUG_LEVEL}"
+CONF_NAME="${host_cpu}-${host_vendor}-${host_os}"
 OUTPUT_ROOT="$SRC_ROOT/build/${CONF_NAME}"
 
 AC_CONFIG_HEADERS(${OUTPUT_ROOT}/config.h:config.h.in)
@@ -150,19 +149,27 @@ AC_MSG_RESULT($have_st_mtime)
 
 AC_DEFINE_UNQUOTED(ST_MTIME,$have_st_mtime,Stat structure has st_mtime)
 
+CXXFLAGS="-D${PLATFORM} -Wall -fmessage-length=0 -std=c++11 -Wno-unused-function -DTARREDFS_VERSION=0.1" 
 
-CXXFLAGS="-D${PLATFORM} -O0 -g -Wall -fmessage-length=0 -std=c++11 -Wno-unused-function -DTARREDFS_VERSION=0.1" 
+CXXFLAGS_DEBUG="-O0 -g" 
+CXXFLAGS_RELEASE="-Os"
+
+LDFLAGS=""
+LDFLAGS_DEBUG="-g"
+LDFLAGS_RELEASE="-Os"
 
 CFLAGS=""
-
-LDFLAGS="-g"
 
 AC_SUBST(CC)
 AC_SUBST(CXX)
 AC_SUBST(LD)
 AC_SUBST(CFLAGS)
 AC_SUBST(CXXFLAGS)
+AC_SUBST(CXXFLAGS_DEBUG)
+AC_SUBST(CXXFLAGS_RELEASE)
 AC_SUBST(LDFLAGS)
+AC_SUBST(LDFLAGS_DEBUG)
+AC_SUBST(LDFLAGS_RELEASE)
 
 AC_CONFIG_FILES([$OUTPUT_ROOT/spec.gmk:$SRC_ROOT/spec.gmk.in])
 AC_CONFIG_FILES([$OUTPUT_ROOT/Makefile:$SRC_ROOT/Makefile.in])

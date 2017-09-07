@@ -32,7 +32,6 @@
 #include <iterator>
 #include <locale>
 #include <map>
-#include <sstream>
 #include <utility>
 #include <zlib.h>
 

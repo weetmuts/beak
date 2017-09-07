@@ -29,7 +29,6 @@
 #include <cstdlib>
 #include <iterator>
 #include <openssl/sha.h>
-#include <sstream>
 #include <zlib.h>
 
 #include "tarfile.h"
@@ -102,43 +101,46 @@ TarEntry::TarEntry(Path *ap, Path *p, const struct stat *b, TarHeaderStyle ths) 
     updateSizes();
 
     if (tar_header_style_ != TarHeaderStyle::None) {
-        stringstream ss;
-        ss << permissionString(fs_.st_mode) << separator_string << fs_.st_uid << "/" << fs_.st_gid;
-        tv_line_left = ss.str();
+        string s;
+        s.append(permissionString(fs_.st_mode));
+        s.append(separator_string);
+        s.append(std::to_string(fs_.st_uid));
+        s.append("/");
+        s.append(std::to_string(fs_.st_gid));
+        tv_line_left = s;
 
-        ss.str("");
+        s = "";
         if (isSymbolicLink()) {
-            ss << 0;
+            s = std::to_string(0);
         } else if (isCharacterDevice() || isBlockDevice()) {
-            ss << major(fs_.st_rdev) << "," << minor(fs_.st_rdev);
+            s = std::to_string(major(fs_.st_rdev)) + "," + std::to_string(minor(fs_.st_rdev));
         } else {
-            ss << fs_.st_size;
+            s = std::to_string(fs_.st_size);
         }
-        tv_line_size = ss.str();
+        tv_line_size = s;
 
-        ss.str("");
+        s = "";
         char datetime[20];
         memset(datetime, 0, sizeof(datetime));
         strftime(datetime, 20, "%Y-%m-%d %H:%M.%S", localtime(&fs_.st_mtime));
-        ss << datetime;
-        ss << separator_string;
+        s.append(datetime);
+        s.append(separator_string);
 
         char secs_and_nanos[32];
         memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
         snprintf(secs_and_nanos, 32, "%012ju.%09ju", fs_.st_mtim.tv_sec, fs_.st_mtim.tv_nsec);
-        ss << secs_and_nanos;
-        ss << separator_string;
+        s.append(secs_and_nanos);
+        s.append(separator_string);
 
         memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
         snprintf(secs_and_nanos, 32, "%012ju.%09ju", fs_.st_atim.tv_sec, fs_.st_atim.tv_nsec);
-        ss << secs_and_nanos;
-        ss << separator_string;
+        s.append(secs_and_nanos);
+        s.append(separator_string);
 
         memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
         snprintf(secs_and_nanos, 32, "%012ju.%09ju", fs_.st_ctim.tv_sec, fs_.st_ctim.tv_nsec);
-        ss << secs_and_nanos;
-
-        tv_line_right = ss.str();
+        s.append(secs_and_nanos);
+        tv_line_right = s;
     }
     debug(TARENTRY, "Entry %s added\n", path_->c_str());
 }
@@ -511,9 +513,7 @@ void cookEntry(string *listing, TarEntry *entry) {
     listing->append(separator_string);
     listing->append(entry->tarFile()->name());
     listing->append(separator_string);
-    stringstream ss;
-    ss << entry->tarOffset()+entry->headerSize();
-    listing->append(ss.str());
+    listing->append(std::to_string(entry->tarOffset()+entry->headerSize()));
     listing->append(separator_string);
     listing->append("0"); // content hash not used
     listing->append(separator_string);

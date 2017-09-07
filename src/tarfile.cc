@@ -24,7 +24,6 @@
 #include <cstdio>
 #include <functional>
 #include <iterator>
-#include <sstream>
 
 #include "log.h"
 #include "tarentry.h"
@@ -190,23 +189,29 @@ void TarFile::setName(string s) {
 
 string TarFile::line(Path *p)
 {
-    stringstream ss;
+    string s;
 
-    ss << p->str();
-    ss << "/" << name();
-    ss << separator << size();
+    s.append(p->str());
+    s.append("/");
+    s.append(name());
+    s.append(separator_string);
+    s.append(std::to_string(size()));
 
     char secs_and_nanos[32];
     memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
     snprintf(secs_and_nanos, 32, "%012ju.%09ju", mtim()->tv_sec, mtim()->tv_nsec);
-    ss << separator << secs_and_nanos;
+    s.append(separator_string);
+    s.append(secs_and_nanos);
     
     char datetime[20];
     memset(datetime, 0, sizeof(datetime));
     strftime(datetime, 20, "%Y-%m-%d %H:%M.%S", localtime(&mtim()->tv_sec));
-    ss << separator << datetime << endl << separator; 
+    s.append(separator_string);
+    s.append(datetime);
+    s.append("\n");
+    s.append(separator_string); 
     
-    return ss.str();
+    return s;
 }
 
 void TarFile::updateMtim(struct timespec *mtim) {

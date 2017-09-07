@@ -37,7 +37,6 @@
 #include <iterator>
 #include <locale>
 #include <map>
-#include <sstream>
 #include <utility>
 #include <zlib.h>
 
@@ -57,14 +56,14 @@ string ownergroupString(uid_t uid, gid_t gid)
     struct passwd pwd;
     struct passwd *result;
     char buf[16000];
-    stringstream ss;
+    string s;
     
     int rc = getpwuid_r(uid, &pwd, buf, sizeof(buf), &result);
     if (result == NULL)
     {
         if (rc == 0)
         {
-            ss << uid;
+            s = std::to_string(uid);
         }
         else
         {
@@ -74,9 +73,9 @@ string ownergroupString(uid_t uid, gid_t gid)
     }
     else
     {
-        ss << pwd.pw_name;
+        s = pwd.pw_name;
     }
-    ss << "/";
+    s += "/";
     
     struct group grp;
     struct group *gresult;
@@ -86,7 +85,7 @@ string ownergroupString(uid_t uid, gid_t gid)
     {
         if (rc == 0)
         {
-            ss << gid;
+            s += std::to_string(gid);
         }
         else
         {
@@ -96,10 +95,10 @@ string ownergroupString(uid_t uid, gid_t gid)
     }
     else
     {
-        ss << grp.gr_name;
+        s += grp.gr_name;
     }
     
-    return ss.str();
+    return s;
 }
 
 // Return microseconds
@@ -194,74 +193,74 @@ int gunzipit(vector<char> *from, vector<char> *to)
 
 string permissionString(mode_t m)
 {
-    stringstream ss;
+    string s;
     
     if (S_ISDIR(m))
-        ss << "d";
+        s.append("d");
     else if (S_ISLNK(m))
-        ss << "l";
+        s.append("l");
     else if (S_ISCHR(m))
-        ss << "c";
+        s.append("c");
     else if (S_ISBLK(m))
-        ss << "b";
+        s.append("b");
     else if (S_ISFIFO(m))
-        ss << "p";
+        s.append("p");
     else if (S_ISSOCK(m))
-        ss << "s";
+        s.append("s");
     else
     {
         assert(S_ISREG(m));
-        ss << "-";
+        s.append("-");
     }
     if (m & S_IRUSR)
-        ss << "r";
+        s.append("r");
     else
-        ss << "-";
+        s.append("-");
     if (m & S_IWUSR)
-        ss << "w";
+        s.append("w");
     else
-        ss << "-";
+        s.append("-");
     if (m & S_ISUID) {
-        ss << "s";
+        s.append("s");
     } else {                        
         if (m & S_IXUSR)
-            ss << "x";
+            s.append("x");
         else
-            ss << "-";
+            s.append("-");
     }
     if (m & S_IRGRP)
-        ss << "r";
+        s.append("r");
     else
-        ss << "-";
+        s.append("-");
     if (m & S_IWGRP)
-        ss << "w";
+        s.append("w");
     else
-        ss << "-";
+        s.append("-");
     if (m & S_ISGID) {
-        ss << "s";
+        s.append("s");
     } else {                        
         if (m & S_IXGRP)
-            ss << "x";
+            s.append("x");
         else
-            ss << "-";
+            s.append("-");
     }
     if (m & S_IROTH)
-        ss << "r";
+        s.append("r");
     else
-        ss << "-";
+        s.append("-");
     if (m & S_IWOTH)
-        ss << "w";
+        s.append("w");
     else
-        ss << "-";
+        s.append("-");
     if (m & S_ISVTX) {
-        ss << "t";
+        s.append("t");
     } else {
         if (m & S_IXOTH)
-            ss << "x";
+            s.append("x");
         else
-            ss << "-";
+            s.append("-");
     }
-    return ss.str();
+    return s;
 }
 
 mode_t stringToPermission(string s)
