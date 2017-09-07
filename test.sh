@@ -181,15 +181,15 @@ function stopTwoFS {
 }
 
 function untar {
-    (cd "$check"; $THIS_DIR/untar.sh x "$mount" "$1")
+    (cd "$check"; $THIS_DIR/scripts/untar.sh x "$mount" "$1")
 }
 
 function pack {
-    (cd "$dir"; $THIS_DIR/pack.sh gzip "$mount" "$packed") >> "$log" 2>&1
+    (cd "$dir"; $THIS_DIR/scripts/pack.sh gzip "$mount" "$packed") >> "$log" 2>&1
 }
 
 function untarpacked {
-    (cd "$check"; $THIS_DIR/untar.sh xa "$packed" "$1")
+    (cd "$check"; $THIS_DIR/scripts/untar.sh xa "$packed" "$1")
 }
 
 function checkdiff {
@@ -319,7 +319,7 @@ if [ $do_test ]; then
 fi
 
 function devTest {
-    $THIS_DIR/integrity-test.sh -dd "$dir" -f "! -path '*shm*'" /dev "$mount"
+    $THIS_DIR/scripts/integrity-test.sh -dd "$dir" -f "! -path '*shm*'" /dev "$mount"
     if [ $? -ne 0 ]; then
         echo Failed file attributes diff for $1! Check in $dir for more information.
         exit
@@ -471,7 +471,7 @@ function percentageTest {
     checkls-ld
     # This error can pop up because of accidental use of printf in perl code.
     # The percentage in the file name will become a printf command.
-    $THIS_DIR/integrity-test.sh -dd "$dir" "$root" "$mount"
+    $THIS_DIR/scripts/integrity-test.sh -dd "$dir" "$root" "$mount"
     if [ $? -ne 0 ]; then
         echo Failed file attributes diff for $1! Check in $dir for more information.
         exit
@@ -611,13 +611,13 @@ fi
 
 setup bulktest1 "Mount of generated bulk extract all default settings"
 if [ $do_test ]; then
-    ./generate_filesystem.sh $root 5 10
+    ./scripts/generate_filesystem.sh $root 5 10
     startFS standardTest
 fi
 
 setup bulktest2 "Mount of generated bulk, pack using xz, decompress and untar."
 if [ $do_test ]; then
-    ./generate_filesystem.sh $root 5 10
+    ./scripts/generate_filesystem.sh $root 5 10
     startFS standardPackedTest
 fi
 
@@ -635,7 +635,7 @@ function expectOneBigR01Tar {
 
 setup bulktest3 "Mount of generated bulk -d 1 -ta 1G" 
 if [ $do_test ]; then
-    ./generate_filesystem.sh $root 5 10
+    ./scripts/generate_filesystem.sh $root 5 10
     startFS expectOneBigR01Tar "-d 1 -ta 1G"
 fi
 
@@ -653,12 +653,12 @@ function expect8R01Tar {
 
 setup bulktest4 "Mount of generated bulk -d 1 -ta 1M -tr 1G" 
 if [ $do_test ]; then
-    ./generate_filesystem.sh $root 5 10
+    ./scripts/generate_filesystem.sh $root 5 10
     startFS expect8R01Tar "-d 1 -ta 1M -tr 1G"
 fi
 
 function compareTwo {
-    rc=$($THIS_DIR/compare.sh "$root" "$mountreverse" | grep -v $'< .\t' | grep -v $'> .\t')
+    rc=$($THIS_DIR/scripts/compare.sh "$root" "$mountreverse" | grep -v $'< .\t' | grep -v $'> .\t')
     if [ "$rc" != $'1c1\n---' ]; then
         echo xx"$rc"xx
         echo Unexpected diff after forward and then reverse!
@@ -669,7 +669,7 @@ function compareTwo {
 
 setup reverse1 "Forward mount of libtar, Reverse mount back!"
 if [ $do_test ]; then
-    ./generate_filesystem.sh $root 5 10
+    ./scripts/generate_filesystem.sh $root 5 10
     startTwoFS compareTwo "" "-p @0"
 fi
 
@@ -710,7 +710,7 @@ function pointInTimeTestPart4 {
 
 setup pointInTime1 "Test that pointInTimes work"
 if [ $do_test ]; then
-    ./generate_filesystem.sh $root 3
+    ./scripts/generate_filesystem.sh $root 3
     startFS pointInTimeTestPart1
 fi
 
