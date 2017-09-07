@@ -1,9 +1,11 @@
 
 .TH TARREDFS 1
 .SH NAME
-tarredfs \- mounts or creates a file system populated with virtual tar files
+beak \- mirroring-sharing-versioning-backup-rotation-retention tool that is designed to co-exist
+with the (cloud) storage of your choice and allow push/pull to share the backups
+between multiple client computers.
 .SH SYNOPSIS
-.B tarredfs
+.B beak
 [\fB\-r\fR|\fB\--reverse\fR]
 [\fB\-i\fR \fIREGEX\fR]
 [\fB\-x\fR \fIREGEX\fR]
@@ -17,14 +19,8 @@ tarredfs \- mounts or creates a file system populated with virtual tar files
 [\fB\-h\fR]
 \fIroot\fR \fImount\fR
 
-.B tarredfs-untar
-\fBx\fR|\fBxv\fR|\fBt\fR|\fBtv\fR|\fBxa\fR|\fBxav\fR|\fBta\fR|\fBtav\fR \fIpath\fR [\fIfile\fR]
-
-.B tarredfs-diff
-\fIfrom\fR \fIto\fR
-
 .SH DESCRIPTION
-.B tarredfs
+.B beak
 mounts a source file system (\fIroot\fR) and presents a new
 file system (\fImount\fR) filled with virtual tar files.
 All files are put into tars; smaller files are grouped together to make the
@@ -162,11 +158,6 @@ This is free software: you are free to change and redistribute it.
 .br
 There is NO WARRANTY, to the extent permitted by law.
 
-Contains source code from libtar:
-.br
-Copyright \(co 1998-2003  University of Illinois Board of Trustees
-.br
-Copyright \(co 1998-2003  Mark D. Roth
 
 
 
