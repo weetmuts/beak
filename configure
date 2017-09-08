@@ -587,10 +587,10 @@ PACKAGE_URL='http://nivelleringslikaren.eu/beak'
 
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
-LDFLAGS_RELEASE
-LDFLAGS_DEBUG
-CXXFLAGS_RELEASE
-CXXFLAGS_DEBUG
+LDFLAGS_release
+LDFLAGS_debug
+CXXFLAGS_release
+CXXFLAGS_debug
 CXXFLAGS
 ZLIB_LIBS
 ZLIB_CFLAGS
@@ -3700,12 +3700,12 @@ _ACEOF
 
 CXXFLAGS="-D${PLATFORM} -Wall -fmessage-length=0 -std=c++11 -Wno-unused-function -DTARREDFS_VERSION=0.1"
 
-CXXFLAGS_DEBUG="-O0 -g"
-CXXFLAGS_RELEASE="-Os"
+CXXFLAGS_debug="-O0 -g"
+CXXFLAGS_release="-Os"
 
 LDFLAGS=""
-LDFLAGS_DEBUG="-g"
-LDFLAGS_RELEASE="-Os"
+LDFLAGS_debug="-g"
+LDFLAGS_release="-Os"
 
 CFLAGS=""
 
@@ -3722,7 +3722,7 @@ CFLAGS=""
 
 ac_config_files="$ac_config_files $OUTPUT_ROOT/spec.gmk:$SRC_ROOT/spec.gmk.in"
 
-ac_config_files="$ac_config_files $OUTPUT_ROOT/Makefile:$SRC_ROOT/Makefile.in"
+ac_config_files="$ac_config_files $OUTPUT_ROOT/Makefile:$SRC_ROOT/make/Makefile.in"
 
 # Make sure config.status ends up in the build directory instead of the src root.
 CONFIG_STATUS="$OUTPUT_ROOT/config.status"
@@ -4419,7 +4419,7 @@ do
   case $ac_config_target in
     "${OUTPUT_ROOT}/config.h") CONFIG_HEADERS="$CONFIG_HEADERS ${OUTPUT_ROOT}/config.h:config.h.in" ;;
     "$OUTPUT_ROOT/spec.gmk") CONFIG_FILES="$CONFIG_FILES $OUTPUT_ROOT/spec.gmk:$SRC_ROOT/spec.gmk.in" ;;
-    "$OUTPUT_ROOT/Makefile") CONFIG_FILES="$CONFIG_FILES $OUTPUT_ROOT/Makefile:$SRC_ROOT/Makefile.in" ;;
+    "$OUTPUT_ROOT/Makefile") CONFIG_FILES="$CONFIG_FILES $OUTPUT_ROOT/Makefile:$SRC_ROOT/make/Makefile.in" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac

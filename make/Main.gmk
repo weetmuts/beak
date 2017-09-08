@@ -1,19 +1,34 @@
+#
+# Copyright (C) 2017 Fredrik Öhrström
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# Expecting a spec.gmk to be included!
+# Expecting a spec.gmk to be included already!
 
 # To build with a lot of build output, type:
 # make VERBOSE=
 
 # Expect release or debug as a target
 
-ifeq ($(MAKECMDGOALS),release)
-TYPE=RELEASE
-STRIP_COMMAND=strip
+ifeq (release,$(findstring release,$(MAKECMDGOALS)))
+TYPE:=release
+STRIP_COMMAND:=strip
 endif
 
-ifeq ($(MAKECMDGOALS),debug)
-TYPE=DEBUG
-STRIP_COMMAND=touch
+ifeq (debug,$(findstring debug,$(MAKECMDGOALS)))
+TYPE:=debug
+STRIP_COMMAND:=true
 endif
 
 ifeq ($(TYPE),)
@@ -22,14 +37,8 @@ endif
 
 $(shell mkdir -p $(OUTPUT_ROOT)/$(TYPE))
 
-$(info Building $(TYPE))
-
 VERBOSE?=@
 HEADERS:=$(wildcard $(SRC_ROOT)/src/*.h) 
-
-$(OUTPUT_ROOT)/$(TYPE)/%.o: $(SRC_ROOT)/src/%.cc $(HEADERS)
-	@echo Compiling $$(basename $<)
-	$(VERBOSE)$(CXX) $(CXXFLAGS_$(TYPE)) $(CXXFLAGS) -I$(OUTPUT_ROOT) $< -c -o $@
 
 WINAPI_SOURCES:=$(filter-out %posix.cc, $(wildcard $(SRC_ROOT)/src/*.cc))
 
@@ -61,19 +70,30 @@ POSIX_TESTINTERNALS_OBJS:=\
 BEAK_OBJS:=$($(PLATFORM)_BEAK_OBJS)
 TESTINTERNALS_OBJS:=$($(PLATFORM)_TESTINTERNALS_OBJS)
 
-release debug: $(OUTPUT_ROOT)/$(TYPE)/beak $(OUTPUT_ROOT)/$(TYPE)/testinternals
+$(OUTPUT_ROOT)/$(TYPE)/%.o: $(SRC_ROOT)/src/%.cc $(HEADERS)
+	@echo Compiling $$(basename $<)
+	$(VERBOSE)$(CXX) $(CXXFLAGS_$(TYPE)) $(CXXFLAGS) -I$(OUTPUT_ROOT) $< -c -o $@
 
 $(OUTPUT_ROOT)/$(TYPE)/beak: $(BEAK_OBJS)
 	@echo Linking $@
-	$(VERBOSE)@$(CXX) -o $(OUTPUT_ROOT)/$(TYPE)/beak $(LDFLAGS_$(TYPE)) $(LDFLAGS) $(BEAK_OBJS) \
+	$(VERBOSE)@$(CXX) -o $@ $(LDFLAGS_$(TYPE)) $(LDFLAGS) $(BEAK_OBJS) \
                       $(FUSE_LIBS) $(OPENSSL_LIBS) $(ZLIB_LIBS)
-	$(VERBOSE)@$(STRIP_COMMAND) $(OUTPUT_ROOT)/$(TYPE)/beak
-        
+	$(VERBOSE)@$(STRIP_COMMAND) $@
+
 $(OUTPUT_ROOT)/$(TYPE)/testinternals: $(TESTINTERNALS_OBJS)
 	@echo Linking $@
-	$(VERBOSE)@$(CXX) -o $(OUTPUT_ROOT)/$(TYPE)/testinternals $(LDFLAGS_$(TYPE)) $(LDFLAGS) \
-                          $(TESTINTERNALS_OBJS) \
+	$(VERBOSE)@$(CXX) -o $@ $(LDFLAGS_$(TYPE)) $(LDFLAGS) $(BEAK_OBJS) \
                       $(FUSE_LIBS) $(OPENSSL_LIBS) $(ZLIB_LIBS)
+	$(VERBOSE)@$(STRIP_COMMAND) $@
+
+ifeq ($(CLEAN),clean)
+# Clean!
+release debug:
+	rm -f $(OUTPUT_ROOT)/$(TYPE)/*
+else
+# Build!
+release debug:$(OUTPUT_ROOT)/$(TYPE)/beak $(OUTPUT_ROOT)/$(TYPE)/testinternals
+endif
 
 install:
 	echo Installing into /usr/local/bin
@@ -81,12 +101,5 @@ install:
 	mkdir -p /usr/local/lib/tarredfs
 	cp tarredfs.1 /usr/local/share/man/man1
 
-# Clean all, then you have to re-configure.
-clean-all:
-	rm -rf $(OUTPUT_ROOT)
+.PHONY: release debug
 
-# Clean remove build artifacts, but keep configuration.
-clean:
-	rm -f $(OUTPUT_ROOT)/$(TYPE)/*
-
-.PHONY: clean clean-all

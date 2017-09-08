@@ -151,12 +151,12 @@ AC_DEFINE_UNQUOTED(ST_MTIME,$have_st_mtime,Stat structure has st_mtime)
 
 CXXFLAGS="-D${PLATFORM} -Wall -fmessage-length=0 -std=c++11 -Wno-unused-function -DTARREDFS_VERSION=0.1" 
 
-CXXFLAGS_DEBUG="-O0 -g" 
-CXXFLAGS_RELEASE="-Os"
+CXXFLAGS_debug="-O0 -g" 
+CXXFLAGS_release="-Os"
 
 LDFLAGS=""
-LDFLAGS_DEBUG="-g"
-LDFLAGS_RELEASE="-Os"
+LDFLAGS_debug="-g"
+LDFLAGS_release="-Os"
 
 CFLAGS=""
 
@@ -165,14 +165,14 @@ AC_SUBST(CXX)
 AC_SUBST(LD)
 AC_SUBST(CFLAGS)
 AC_SUBST(CXXFLAGS)
-AC_SUBST(CXXFLAGS_DEBUG)
-AC_SUBST(CXXFLAGS_RELEASE)
+AC_SUBST(CXXFLAGS_debug)
+AC_SUBST(CXXFLAGS_release)
 AC_SUBST(LDFLAGS)
-AC_SUBST(LDFLAGS_DEBUG)
-AC_SUBST(LDFLAGS_RELEASE)
+AC_SUBST(LDFLAGS_debug)
+AC_SUBST(LDFLAGS_release)
 
 AC_CONFIG_FILES([$OUTPUT_ROOT/spec.gmk:$SRC_ROOT/spec.gmk.in])
-AC_CONFIG_FILES([$OUTPUT_ROOT/Makefile:$SRC_ROOT/Makefile.in])
+AC_CONFIG_FILES([$OUTPUT_ROOT/Makefile:$SRC_ROOT/make/Makefile.in])
 # Make sure config.status ends up in the build directory instead of the src root.
 CONFIG_STATUS="$OUTPUT_ROOT/config.status"
 # Write out spec.gmk and build/Makefile

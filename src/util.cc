@@ -37,9 +37,6 @@
 
 using namespace std;
 
-static ComponentId UTIL = registerLogComponent("util");
-static ComponentId TMP = registerLogComponent("tmp");
-
 char separator = 0;
 string separator_string = string("\0",1);
 struct timespec start_time_;

@@ -35,9 +35,9 @@ org=""
 dest=""
 do_test=""
 
-prefix="$(echo build/*)"
-test=$1
-gdb=$2
+BEAK=$1
+test=$2
+gdb=$3
 
 THIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 THIS_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
@@ -74,15 +74,15 @@ function startFS {
     run="$1"
     extra="$2"
     if [ -z "$test" ]; then
-        eval "./${prefix}/beak mount $extra $root $mount > $log"
+        eval "${BEAK} mount $extra $root $mount > $log"
         ${run}
     else
         if [ -z "$gdb" ]; then
             (sleep 2; eval ${run}) &
-            eval "./${prefix}/beak mount -d $extra $root $mount 2>&1 | tee $log &"
+            eval "${BEAK} mount -d $extra $root $mount 2>&1 | tee $log &"
         else
             (sleep 3; eval ${run}) &
-            eval "gdb -ex=r --args ./${prefix}/beak mount -f $extra $root $mount" 
+            eval "gdb -ex=r --args ${BEAK} mount -f $extra $root $mount" 
         fi        
     fi        
 }
@@ -91,15 +91,15 @@ function startFSArchive {
     run="$1"
     extra="$2"
     if [ -z "$test" ]; then
-        ./${prefix}/beak mount $extra $packed $check > $log
+        ${BEAK} mount $extra $packed $check > $log
         ${run}
     else
         if [ -z "$gdb" ]; then
             (sleep 2; eval ${run}) &
-            ./${prefix}/beak mount -d $extra $packed $check 2>&1 | tee $log &
+            ${BEAK} mount -d $extra $packed $check 2>&1 | tee $log &
         else
             (sleep 3; eval ${run}) &
-            gdb -ex=r --args ./${prefix}/beak mount -d $extra $packed $check 
+            gdb -ex=r --args ${BEAK} mount -d $extra $packed $check 
         fi        
     fi        
 }
@@ -109,15 +109,15 @@ function startFSExpectFail {
     extra="$2"
     env="$3"
     if [ -z "$test" ]; then
-        "$env" ./${prefix}/beak mount $extra $root $mount > $log 2>&1
+        "$env" ${BEAK} mount $extra $root $mount > $log 2>&1
         ${run}
     else
         if [ -z "$gdb" ]; then
             (sleep 2; eval ${run}) &
-            "$env" ./${prefix}/beak mount -d $extra $root $mount 2>&1 | tee $log &
+            "$env" ${BEAK} mount -d $extra $root $mount 2>&1 | tee $log &
         else
             (sleep 3; eval ${run}) &
-            gdb -ex=r --args "$env" ./${prefix}/beak mount -d $extra $root $mount 
+            gdb -ex=r --args "$env" ${BEAK} mount -d $extra $root $mount 
         fi        
     fi        
 }
@@ -149,20 +149,20 @@ function startTwoFS {
     extra="$2"
     extrareverse="$3"
     if [ -z "$test" ]; then
-        ./${prefix}/beak mount $extra $root $mount > $log
+        ${BEAK} mount $extra $root $mount > $log
         sleep 2
-        ./${prefix}/beak mount $extrareverse $mount $mountreverse > $log
+        ${BEAK} mount $extrareverse $mount $mountreverse > $log
         ${run}
     else
         if [ -z "$gdb" ]; then
             (sleep 4; eval ${run}) &
-            ./${prefix}/beak mount $extra $root $mount 2>&1 | tee $log &
-            ./${prefix}/beak mount -d $extrareverse $mount $mountreverse 2>&1 | tee $logreverse &
+            ${BEAK} mount $extra $root $mount 2>&1 | tee $log &
+            ${BEAK} mount -d $extrareverse $mount $mountreverse 2>&1 | tee $logreverse &
         else
             (sleep 5; eval ${run}) &
-            ./${prefix}/beak mount $extra $root $mount > $log
+            ${BEAK} mount $extra $root $mount > $log
             sleep 2
-            gdb -ex=r --args ./${prefix}/beak mount -d $extrareverse $mount $mountreverse 
+            gdb -ex=r --args ${BEAK} mount -d $extrareverse $mount $mountreverse 
         fi        
     fi        
 }

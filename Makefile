@@ -13,32 +13,39 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # 
+help:
+	@echo "Usage: make (release|debug|clean|clean-all)"
 
-# Establish the source directory where this makefile resides.
-ifeq ($(filter /%,$(lastword $(MAKEFILE_LIST))),)
-  makefile_path:=$(CURDIR)/$(lastword $(MAKEFILE_LIST))
-else
-  makefile_path:=$(lastword $(MAKEFILE_LIST))
+BUILDDIR:=$(dir $(realpath $(wildcard build/*/spec.gmk)))
+
+ifeq (,$(BUILDDIR))
+    $(error Run configure first!)
 endif
-root_dir:=$(dir $(makefile_path))
 
-SPEC:=$(wildcard build/*/spec.gmk)
-
-#ifeq ($(words $(SPEC)),1)
-#    # Only one configuration exists, thus we built that one.
-#    include $(SPEC)
-#    include $(root_dir)/Main.gmk
-#else
-#      $(info You have more than one configuration. Run make from the build directory of your choice!)
-#      $(info Or specify linux,winapi,arm for common builds)
-#endif
-
+VERBOSE?=@
 
 release:
-	(cd build/x86_64-pc-linux-gnu && make release)
+	@echo Building release
+	$(VERBOSE)$(MAKE) --no-print-directory -C $(BUILDDIR) release
 
 debug:
-	(cd build/x86_64-pc-linux-gnu && make debug)
+	@echo Building debug
+	$(VERBOSE)$(MAKE) --no-print-directory -C $(BUILDDIR) debug
 
-#winapi:
-#	(cd build/x86_64-w64-mingw32 && make)
+test_release:
+	@echo Running tests
+	./test.sh $(BUILDDIR)/release/beak
+
+test_debug:
+	@echo Running tests
+	./test.sh $(BUILDDIR)/debug/beak
+
+clean:
+	@echo Removing release and debug builds
+	$(VERBOSE)rm -rf $(BUILDDIR)/release $(BUILDDIR)/debug
+
+clean-all:
+	@echo Removing configuration and artifacts
+	$(VERBOSE)rm -rf $(BUILDDIR)
+
+.PHONY: release debug test clean clean-all help
