@@ -48,4 +48,9 @@ clean-all:
 	@echo Removing configuration and artifacts
 	$(VERBOSE)rm -rf $(BUILDDIR)
 
+DESTDIR?=/usr/local
+install:
+	cp $(BUILDDIR)/release/beak $(DESTDIR)/bin/beak
+	cp beak.1 $(DESTDIR)/man/man1/beak.1
+
 .PHONY: release debug test clean clean-all help
