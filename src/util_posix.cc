@@ -47,7 +47,6 @@
 using namespace std;
 
 static ComponentId UTIL = registerLogComponent("util");
-static ComponentId TMP = registerLogComponent("tmp");
 
 extern struct timespec start_time_; // Inside util.cc
 
@@ -127,7 +126,8 @@ int gzipit(string *from, vector<unsigned char> *to)
     lseek(fd, 0, SEEK_SET);
     
     to->resize(len);
-    read(fd, &(*to)[0], len);
+    size_t s = read(fd, &(*to)[0], len);
+    assert(s == len);
     close(fd);
 
     return OK;
@@ -136,8 +136,8 @@ int gzipit(string *from, vector<unsigned char> *to)
 int gunzipit(vector<char> *from, vector<char> *to)
 {
     int fd = syscall(SYS_memfd_create, "tobunzipped", 0);
-    write(fd, &(*from)[0], from->size());
-
+    size_t s = write(fd, &(*from)[0], from->size());
+    assert(s == from->size());
     lseek(fd, 0, SEEK_SET);       
     int fdd = dup(fd);
     char buf[4096];

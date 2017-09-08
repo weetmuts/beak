@@ -36,6 +36,13 @@ dest=""
 do_test=""
 
 BEAK=$1
+
+if [ "$BEAK" = "" ]; then
+    echo First argument must be the binary to test!
+    exit 1
+fi
+
+
 test=$2
 gdb=$3
 
@@ -714,18 +721,18 @@ if [ $do_test ]; then
     startFS pointInTimeTestPart1
 fi
 
-setup diff1 "Compare directories!"
-if [ $do_test ]; then
-    mkdir -p "$root/alfa beta/gamma"
-    mkdir -p "$check/alfa beta/gamma"
-    echo HEJSAN1 > "$root/alfa beta/gamma/delta"
-    echo HEJSAN2 > "$root/alfa beta/gamma/x"
-    echo HEJSAN3 > "$root/alfa beta/gamma/y"
-    cp -a "$root/"* "$check"
-    echo HEJSAN1 > "$check/alfa beta/z"    
-    rm "$check/alfa beta/gamma/x"
-    ./${prefix}/diff "$root" "$check"
-fi
+#setup diff1 "Compare directories!"
+#if [ $do_test ]; then
+#    mkdir -p "$root/alfa beta/gamma"
+#    mkdir -p "$check/alfa beta/gamma"
+#    echo HEJSAN1 > "$root/alfa beta/gamma/delta"
+#    echo HEJSAN2 > "$root/alfa beta/gamma/x"
+#    echo HEJSAN3 > "$root/alfa beta/gamma/y"
+#    cp -a "$root/"* "$check"
+#    echo HEJSAN1 > "$check/alfa beta/z"    
+#    rm "$check/alfa beta/gamma/x"
+#    ./${prefix}/diff "$root" "$check"
+#fi
 
 
 #echo All tests succeeded!

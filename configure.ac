@@ -16,6 +16,7 @@
 
 AC_PREREQ([2.69])
 AC_INIT(BEAK, beak, oehrstroem@gmail.com,,http://nivelleringslikaren.eu/beak)
+AC_CONFIG_AUX_DIR([autoconf])
 
 AC_CANONICAL_BUILD
 AC_CANONICAL_HOST
@@ -25,7 +26,7 @@ SRC_ROOT="$(pwd -L)"
 CONF_NAME="${host_cpu}-${host_vendor}-${host_os}"
 OUTPUT_ROOT="$SRC_ROOT/build/${CONF_NAME}"
 
-AC_CONFIG_HEADERS(${OUTPUT_ROOT}/config.h:config.h.in)
+AC_CONFIG_HEADERS(${OUTPUT_ROOT}/config.h:autoconf/config.h.in)
 
 AC_SUBST(PLATFORM)
 AC_SUBST(PLATFORM_CFLAGS)
@@ -171,7 +172,7 @@ AC_SUBST(LDFLAGS)
 AC_SUBST(LDFLAGS_debug)
 AC_SUBST(LDFLAGS_release)
 
-AC_CONFIG_FILES([$OUTPUT_ROOT/spec.gmk:$SRC_ROOT/spec.gmk.in])
+AC_CONFIG_FILES([$OUTPUT_ROOT/spec.gmk:$SRC_ROOT/autoconf/spec.gmk.in])
 AC_CONFIG_FILES([$OUTPUT_ROOT/Makefile:$SRC_ROOT/make/Makefile.in])
 # Make sure config.status ends up in the build directory instead of the src root.
 CONFIG_STATUS="$OUTPUT_ROOT/config.status"
