@@ -16,7 +16,7 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-dir=$(mktemp -d /tmp/tarredfs_untarXXXXXXXX)
+dir=$(mktemp -d /tmp/beak_untarXXXXXXXX)
 
 function finish {
     if [ "$debug" == "" ]

@@ -16,7 +16,7 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-dir=$(mktemp -d /tmp/tarredfs_integrityXXXXXXXX)
+dir=$(mktemp -d /tmp/beak_integrityXXXXXXXX)
 
 function finish {
     if [ "$debugdirset" == "" ] && [ "$debug" == "" ]

@@ -18,6 +18,7 @@
 #include "beak.h"
 #include "log.h"
 #include "system.h"
+#include <unistd.h>
 
 static ComponentId MAIN = registerLogComponent("main");
 
@@ -63,12 +64,12 @@ int main(int argc, char *argv[])
     case push_cmd:
     {
         char name[32];
-        strcpy(name, "/tmp/beakXXXXXX");
+        strcpy(name, "/tmp/beak_pushXXXXXX");
         char *mount = mkdtemp(name);
         if (!mount) {
             error(MAIN, "Could not create temp directory!");
         }
-        Options forward_settings;
+        Options forward_settings = settings;
         forward_settings.src = settings.src;
         forward_settings.dst = Path::lookup(mount);
         forward_settings.fuse_argc = 1;
@@ -83,6 +84,7 @@ int main(int argc, char *argv[])
 
         std::vector<std::string> args;
         args.push_back("copy");
+        args.push_back("-v");
         args.push_back(mount);
         if (settings.dst) {
             args.push_back(settings.dst->str());
@@ -93,6 +95,7 @@ int main(int argc, char *argv[])
 
         // Unmount virtual filesystem.
         rc = beak->unmountForward(&forward_settings);
+        rmdir(mount);
     }
         break;
     case pull_cmd:

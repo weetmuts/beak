@@ -24,7 +24,7 @@ if [ "$1" == "" ] || [ "$2" == "" ]; then
     exit
 fi
 
-dir=$(mktemp -d /tmp/tarredfs_compareXXXXXXXX)
+dir=$(mktemp -d /tmp/beak_compareXXXXXXXX)
 
 function finish {
     rm -rf $dir
