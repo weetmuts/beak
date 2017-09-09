@@ -15,8 +15,7 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <string.h>
-
+#include "config.h"
 #include "log.h"
 #include "beak.h"
 
@@ -31,6 +30,9 @@
 #include <stddef.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <wait.h>
+#include <unistd.h>
+
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
@@ -59,7 +61,7 @@ struct BeakImplementation : Beak {
     
     void captureStartTime() {  ::captureStartTime(); }
     string argsToVector(int argc, char **argv, vector<string> *args);
-    int parseCommandLine(vector<string> *args, Command *cmd, Options *settings);
+    int parseCommandLine(int argc, char **argv, Command *cmd, Options *settings);
 
     void printHelp(Command cmd);
     void printVersion();
@@ -71,11 +73,20 @@ struct BeakImplementation : Beak {
     bool setPointInTime(string g);
     
     int push(Options *settings);
+    int mountForwardDaemon(Options *settings);
     int mountForward(Options *settings);
+    int unmountForward(Options *settings);
+
+    int mountReverseDaemon(Options *settings);
     int mountReverse(Options *settings);
+    int unmountReverse(Options *settings);
+
     int status(Options *settings);
 
     private:
+
+    int mountForwardInternal(Options *settings, bool daemon);
+    int mountReverseInternal(Options *settings, bool daemon);
     
     ForwardTarredFS forward_fs;
     fuse_operations forward_tarredfs_ops;
@@ -92,6 +103,11 @@ struct BeakImplementation : Beak {
     
     Command parseCommand(string s);
     OptionEntry *parseOption(string s, bool *has_value, string *value);
+    std::unique_ptr<Config> config_;
+
+    struct fuse_chan *chan_;
+    struct fuse *fuse_;
+    pid_t loop_pid_;
 };
 
 std::unique_ptr<Beak> newBeak() {    
@@ -139,6 +155,9 @@ BeakImplementation::BeakImplementation() {
             nosuch_option_ = &e;
         }
     }
+
+    config_ = newConfig();
+    config_->load();
 }
 
 Command BeakImplementation::parseCommand(string s)
@@ -243,33 +262,36 @@ string BeakImplementation::argsToVector(int argc, char **argv, vector<string> *a
     return argv[0];
 }
 
-int BeakImplementation::parseCommandLine(vector<string> *args, Command *cmd, Options *settings)
+int BeakImplementation::parseCommandLine(int argc, char **argv, Command *cmd, Options *settings)
 {
+    vector<string> args;
+    argsToVector(argc, argv, &args);
+    
     memset(settings, 0, sizeof(*settings)); // Note! Contents can be set to zero!
     settings->help_me_on_this_cmd = nosuch_cmd;
     settings->fuse_args.push_back("beak"); // Application name
     settings->depth = 2; // Default value
     settings->pointintimeformat = both_point;
     
-    if (args->size() < 1) return false;
+    if (args.size() < 1) return false;
     
-    *cmd = parseCommand((*args)[0]);
+    *cmd = parseCommand(args[0]);
 
     if (*cmd == nosuch_cmd) {
-        if ((*args)[0] == "") {
+        if (args[0] == "") {
             *cmd = help_cmd;
             return false;
         }
-        if ((*args)[0] == "") {
+        if (args[0] == "") {
             *cmd = help_cmd;
             return false;
         }        
-        fprintf(stderr, "No such command \"%s\"\n", (*args)[0].c_str());
+        fprintf(stderr, "No such command \"%s\"\n", args[0].c_str());
         return false;        
     }
 
-    auto i = args->begin();
-    i = args->erase(i);
+    auto i = args.begin();
+    i = args.erase(i);
 
     if ((*i) == "help") {
         // beak push help
@@ -281,7 +303,7 @@ int BeakImplementation::parseCommandLine(vector<string> *args, Command *cmd, Opt
     }
     
     bool options_completed = false;
-    for (;i != args->end(); ++i)
+    for (;i != args.end(); ++i)
     {
         int l = i->length();
         if (!l) continue;
@@ -334,6 +356,8 @@ int BeakImplementation::parseCommandLine(vector<string> *args, Command *cmd, Opt
                 break;
             case log_option:
                 settings->log = value;
+                setLogComponents(settings->log.c_str());
+                setLogLevel(DEBUG);
                 break;
             case pointintime_option:
                 settings->pointintime = value;
@@ -426,6 +450,12 @@ int BeakImplementation::parseCommandLine(vector<string> *args, Command *cmd, Opt
                         debug(COMMANDLINE, "Since -p was specified, assume the directory actually contains an @ sign!\n", point);
                     }
                 }
+
+                Location *loc = config_->location(src);
+                if (loc) {
+                    debug(COMMANDLINE, "Translating %s to %s\n", src.c_str(), loc->source_path.c_str());
+                    src = loc->source_path;
+                } 
                 char tmp[PATH_MAX];
                 const char *rc = realpath(src.c_str(), tmp);
                 if (!rc)
@@ -437,27 +467,43 @@ int BeakImplementation::parseCommandLine(vector<string> *args, Command *cmd, Opt
             }
             else if (settings->dst == NULL)
             {
+                string dst = *i;
                 char tmp[PATH_MAX];
-                const char *rc = realpath((*i).c_str(), tmp);
-                if (!rc)
-                {
-                    error(COMMANDLINE,
-                          "Could not find real path for \"%s\"\nDo you have an existing mount here?\n",
-                          (*i).c_str());
+                const char *rc = realpath(dst.c_str(), tmp);
+                if (rc) {
+                    settings->dst = Path::lookup(tmp);
                 }
-                settings->dst = Path::lookup(tmp);
+                else
+                {
+                    if (dst.find(':') != std::string::npos) {
+                        // Assume this is an rclone remote target.
+                        settings->remote = dst;
+                        settings->dst = NULL;
+                    } else {
+                        error(COMMANDLINE,
+                              "Could not find real path for \"%s\"\nDo you have an existing mount here?\n",
+                              (*i).c_str());
+                    }
+                }                
             }
         }
     }
 
-    if (*cmd == mount_cmd) {
+    if (*cmd == mount_cmd || *cmd == push_cmd) {
         if (!settings->src) {
             error(COMMANDLINE,"You have to specify a src directory.\n");
         }
+    }
+    if (*cmd == mount_cmd) {
         if (!settings->dst) {
             error(COMMANDLINE,"You have to specify a dst directory.\n");
         }
         settings->fuse_args.push_back(settings->dst->c_str());
+    }
+    if (*cmd == push_cmd) {
+        if (!settings->dst && settings->remote == "") {
+            error(COMMANDLINE,"You have to specify a remote or a dst directory.\n");
+        }
     }
     
     settings->fuse_argc = settings->fuse_args.size();
@@ -534,7 +580,24 @@ static int open_callback(const char *path, struct fuse_file_info *fi)
     return 0;
 }
 
+int BeakImplementation::mountForwardDaemon(Options *settings)
+{
+    return mountForwardInternal(settings, true);
+}
+
 int BeakImplementation::mountForward(Options *settings)
+{
+    return mountForwardInternal(settings, false);
+}
+
+int BeakImplementation::unmountForward(Options *settings)
+{
+    fuse_exit(fuse_);
+    fuse_unmount (settings->dst->c_str(), chan_);
+    return 0;
+}
+
+int BeakImplementation::mountForwardInternal(Options *settings, bool daemon)
 {
     bool ok;
     
@@ -569,11 +632,6 @@ int BeakImplementation::mountForward(Options *settings)
 
     forward_fs.forced_tar_collection_dir_depth = settings->depth;
 
-    if (settings->log.length() > 0) {
-        setLogComponents(settings->log.c_str());
-        setLogLevel(DEBUG);
-    }
-
     if (settings->tarheader_supplied) {
         forward_fs.setTarHeaderStyle(settings->tarheader);
     } else {
@@ -602,8 +660,7 @@ int BeakImplementation::mountForward(Options *settings)
         debug(COMMANDLINE, "Triggers on \"%s\"\n", e.c_str());
     }
     
-    debug(COMMANDLINE, "main",
-          "Target tar size \"%zu\"\nTarget trigger size %zu\n",
+    debug(COMMANDLINE, "Target tar size \"%zu\" Target trigger size %zu\n",
           forward_fs.target_target_tar_size,
           forward_fs.tar_trigger_size);
     
@@ -637,7 +694,29 @@ int BeakImplementation::mountForward(Options *settings)
             forward_fs.mount_dir.c_str(), num_tars, forward_fs.files.size(),
             scan_time / 1000, group_time / 1000);
 
-    return fuse_main(settings->fuse_argc, settings->fuse_argv, &forward_tarredfs_ops, &forward_fs);
+    if (daemon) {
+        return fuse_main(settings->fuse_argc, settings->fuse_argv, &forward_tarredfs_ops, &forward_fs);
+    }
+
+    struct fuse_args args;
+    args.argc = settings->fuse_argc;
+    args.argv = settings->fuse_argv;
+    args.allocated = 0;
+    struct fuse_chan *chan = fuse_mount(settings->dst->c_str(), &args);
+    fuse_ = fuse_new(chan,
+                     &args,
+                     &forward_tarredfs_ops,
+                     sizeof(forward_tarredfs_ops),
+                     &forward_fs);
+
+    loop_pid_ = fork();
+    
+    if (loop_pid_ == 0) {
+        // This is the child process. Serve the virtual file system.
+        fuse_loop_mt (fuse_);
+        exit(0);
+    }
+    return 0;
 }
 
 static int reverseGetattr(const char *path, struct stat *stbuf)
@@ -666,7 +745,24 @@ static int reverseReadlink(const char *path, char *buf, size_t size)
     return fs->readlinkCB(path, buf, size);
 }
 
+int BeakImplementation::mountReverseDaemon(Options *settings)
+{
+    return mountReverseInternal(settings, true);
+}
+
 int BeakImplementation::mountReverse(Options *settings)
+{
+    return mountReverseInternal(settings, false);
+}
+
+int BeakImplementation::unmountReverse(Options *settings)
+{
+    fuse_exit(fuse_);
+    fuse_unmount(settings->dst->c_str(), chan_);
+    return 0;
+}
+
+int BeakImplementation::mountReverseInternal(Options *settings, bool daemon)
 {
     reverse_tarredfs_ops.getattr = reverseGetattr;
     reverse_tarredfs_ops.open = open_callback;
@@ -729,7 +825,29 @@ int BeakImplementation::mountReverse(Options *settings)
         e->fs.st_mtim.tv_sec = youngest_secs;
         e->fs.st_mtim.tv_nsec = youngest_nanos;
     }
-    return fuse_main(settings->fuse_argc, settings->fuse_argv, &reverse_tarredfs_ops, &reverse_fs);
+    if (daemon) {
+        return fuse_main(settings->fuse_argc, settings->fuse_argv, &reverse_tarredfs_ops, &reverse_fs);
+    }
+
+    struct fuse_args args;
+    args.argc = settings->fuse_argc;
+    args.argv = settings->fuse_argv;
+    args.allocated = 0;
+    struct fuse_chan *chan = fuse_mount(settings->dst->c_str(), &args);
+    fuse_ = fuse_new(chan,
+                     &args,
+                     &reverse_tarredfs_ops,
+                     sizeof(reverse_tarredfs_ops),
+                     &reverse_fs);
+
+    loop_pid_ = fork();
+    
+    if (loop_pid_ == 0) {
+        // This is the child process. Serve the virtual file system.
+        fuse_loop_mt (fuse_);
+        exit(0);
+    }
+    return 0;
 }
 
 int BeakImplementation::status(Options *settings)

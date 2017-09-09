@@ -50,6 +50,10 @@ void eraseArg(int i, int *argc, char **argv);
 // If the end char is not found, return error.
 // If the maximum length is reached without finding the end char, return error.
 string eatTo(vector<char> &v, vector<char>::iterator &i, int c, size_t max, bool *eof, bool *err);
+// Eat whitespace (space and tab, not end of lines).
+void eatWhitespace(vector<char> &v, vector<char>::iterator &i, bool *eof);
+// Remove leading and trailing white space
+void trimWhitespace(string *s);
 // Translate binary buffer with printable strings to ascii
 // with non-printabled escaped as such: \xC0 \xFF \xEE
 string toHexAndText(const char *b, size_t len);

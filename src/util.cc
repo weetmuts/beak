@@ -352,6 +352,25 @@ string eatTo(vector<char> &v, vector<char>::iterator &i, int c, size_t max, bool
     return s;
 }
 
+void eatWhitespace(vector<char> &v, vector<char>::iterator &i, bool *eof)
+{
+    *eof = false;
+    while (i != v.end() && (*i == ' ' || *i == '\t'))
+    {
+        i++;
+    }
+    if (i == v.end()) {
+        *eof = true;
+    }
+}
+
+void trimWhitespace(string *s)
+{
+    const char *ws = " \t";
+    s->erase(0, s->find_first_not_of(ws));
+    s->erase(s->find_last_not_of(ws) + 1);
+}
+
 string toHexAndText(const char *b, size_t len)
 {
     string s;

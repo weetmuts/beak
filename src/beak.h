@@ -18,6 +18,7 @@
 #ifndef BEAK_H
 #define BEAK_H
 
+#include "config.h"
 #include "defs.h"
 #include "forward.h"
 #include "reverse.h"
@@ -26,10 +27,12 @@
 #include<string>
 #include<vector>
 
+
 #define LIST_OF_COMMANDS                                                \
     X(check,"Check the integrity of an archive.")                       \
     X(config,"Configure backup rules.")                                 \
     X(help,"Show help. Also: beak push help")                           \
+    X(genautocomplete,"Output bash completion script for beak.")        \
     X(info,"List points in time and other info about archive.")         \
     X(mount,"Mount a backup as a virtual file system.")                 \
     X(pack,"Update the backup to use incremental changes.")             \
@@ -84,7 +87,8 @@ LIST_OF_OPTIONS
 struct Options {
     Path *src;
     Path *dst;
-
+    string remote;
+    
 #define X(shortname,name,type,requirevalue,info) type name; bool name##_supplied;
 LIST_OF_OPTIONS
 #undef X
@@ -100,15 +104,19 @@ LIST_OF_OPTIONS
 struct Beak {
     virtual void captureStartTime() = 0;
     virtual string argsToVector(int argc, char **argv, vector<string> *args) = 0;
-    virtual int parseCommandLine(vector<string> *args, Command *cmd, Options *settings) = 0;
+    virtual int parseCommandLine(int argc, char **argv, Command *cmd, Options *settings) = 0;
     virtual int printInfo(Options *settings) = 0;
     virtual bool lookForPointsInTime(Options *settings) = 0;
     virtual vector<PointInTime> &history() = 0;
     virtual bool setPointInTime(string g) = 0;
     
     virtual int push(Options *settings) = 0;
-    virtual int mountForward(Options *settings) = 0;
-    virtual int mountReverse(Options *settings) = 0;
+    virtual int mountForwardDaemon(Options *settings) = 0;
+    virtual int mountForward(Options *settings) = 0;    
+    virtual int unmountForward(Options *settings) = 0;    
+    virtual int mountReverseDaemon(Options *settings) = 0;
+    virtual int mountReverse(Options *settings) = 0;    
+    virtual int unmountReverse(Options *settings) = 0;    
     virtual int status(Options *settings) = 0;
 
     virtual void printHelp(Command cmd) = 0;
