@@ -31,8 +31,8 @@ function finish {
 }
 trap finish EXIT
 
-(cd $1 && find . -printf '%p\t%TY-%Tm-%Td_%TT\t%M\t%u %g\t%s\t%l\n' | sort > $dir/org.txt)
-(cd $2 && find . -printf '%p\t%TY-%Tm-%Td_%TT\t%M\t%u %g\t%s\t%l\n' | sort > $dir/dest.txt)
+(cd "$1" && find . -printf '%p\t%TY-%Tm-%Td_%TT\t%M\t%u %g\t%s\t%l\n' | sort > $dir/org.txt)
+(cd "$2" && find . -printf '%p\t%TY-%Tm-%Td_%TT\t%M\t%u %g\t%s\t%l\n' | sort > $dir/dest.txt)
 
 diff $dir/org.txt $dir/dest.txt
 

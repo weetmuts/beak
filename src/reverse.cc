@@ -368,10 +368,10 @@ int ReverseTarredFS::getattrCB(const char *path_char_string, struct stat *stbuf)
         stbuf->st_gid = e->fs.st_gid;
         stbuf->st_mtim.tv_sec = e->fs.st_mtim.tv_sec;
         stbuf->st_mtim.tv_nsec = e->fs.st_mtim.tv_nsec;
-        stbuf->st_atim.tv_sec = e->fs.st_atim.tv_sec;
-        stbuf->st_atim.tv_nsec = e->fs.st_atim.tv_nsec;
-        stbuf->st_ctim.tv_sec = e->fs.st_ctim.tv_sec;
-        stbuf->st_ctim.tv_nsec = e->fs.st_ctim.tv_nsec;
+        stbuf->st_atim.tv_sec = e->fs.st_mtim.tv_sec;
+        stbuf->st_atim.tv_nsec = e->fs.st_mtim.tv_nsec;
+        stbuf->st_ctim.tv_sec = e->fs.st_mtim.tv_sec;
+        stbuf->st_ctim.tv_nsec = e->fs.st_mtim.tv_nsec;
         goto ok;
     }
     
@@ -382,10 +382,10 @@ int ReverseTarredFS::getattrCB(const char *path_char_string, struct stat *stbuf)
     stbuf->st_gid = e->fs.st_gid;
     stbuf->st_mtim.tv_sec = e->fs.st_mtim.tv_sec;
     stbuf->st_mtim.tv_nsec = e->fs.st_mtim.tv_nsec;
-    stbuf->st_atim.tv_sec = e->fs.st_atim.tv_sec;
-    stbuf->st_atim.tv_nsec = e->fs.st_atim.tv_nsec;
-    stbuf->st_ctim.tv_sec = e->fs.st_ctim.tv_sec;
-    stbuf->st_ctim.tv_nsec = e->fs.st_ctim.tv_nsec;
+    stbuf->st_atim.tv_sec = e->fs.st_mtim.tv_sec;
+    stbuf->st_atim.tv_nsec = e->fs.st_mtim.tv_nsec;
+    stbuf->st_ctim.tv_sec = e->fs.st_mtim.tv_sec;
+    stbuf->st_ctim.tv_nsec = e->fs.st_mtim.tv_nsec;
     stbuf->st_rdev = e->fs.st_rdev;
     goto ok;
 

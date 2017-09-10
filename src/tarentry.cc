@@ -130,8 +130,10 @@ TarEntry::TarEntry(Path *ap, Path *p, const struct stat *b, TarHeaderStyle ths) 
         memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
         snprintf(secs_and_nanos, 32, "%012ju.%09ju", fs_.st_mtim.tv_sec, fs_.st_mtim.tv_nsec);
         s.append(secs_and_nanos);
-        s.append(separator_string);
 
+        /*
+        s.append(separator_string);
+        
         memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
         snprintf(secs_and_nanos, 32, "%012ju.%09ju", fs_.st_atim.tv_sec, fs_.st_atim.tv_nsec);
         s.append(secs_and_nanos);
@@ -140,6 +142,7 @@ TarEntry::TarEntry(Path *ap, Path *p, const struct stat *b, TarHeaderStyle ths) 
         memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
         snprintf(secs_and_nanos, 32, "%012ju.%09ju", fs_.st_ctim.tv_sec, fs_.st_ctim.tv_nsec);
         s.append(secs_and_nanos);
+        */
         tv_line_right = s;
     }
     debug(TARENTRY, "Entry %s added\n", path_->c_str());
@@ -249,7 +252,7 @@ size_t TarEntry::copy(char *buf, size_t size, size_t from) {
             debug(TARENTRY, "Reading from file size=%ju copied=%ju blocked_size=%ju from=%ju header_size=%ju\n",
                   size, copied, blocked_size_, from, header_size_);
             // Read from file
-            int fd = open(abspath_->c_str(), O_RDONLY);
+            int fd = open(abspath_->c_str(), O_RDONLY|O_NOATIME);
             if (fd==-1) {
                 failure(TARENTRY, "Could not open file >%s< in underlying filesystem err %d", path_->c_str(), errno);
                 return 0;
@@ -570,6 +573,7 @@ bool eatEntry(vector<char> &v, vector<char>::iterator &i, Path *dir_to_prepend,
         fs->st_mtim.tv_nsec = atol(na.c_str());
     }
 
+    /*
     secs_and_nanos = eatTo(v, i, separator, 64, eof, err);
     if (*err || *eof) return false;
     
@@ -584,7 +588,7 @@ bool eatEntry(vector<char> &v, vector<char>::iterator &i, Path *dir_to_prepend,
         fs->st_atim.tv_sec = atol(se.c_str());
         fs->st_atim.tv_nsec = atol(na.c_str());
     }
-
+    
     secs_and_nanos = eatTo(v, i, separator, 64, eof, err);
     if (*err || *eof) return false;    
 
@@ -599,7 +603,7 @@ bool eatEntry(vector<char> &v, vector<char>::iterator &i, Path *dir_to_prepend,
         fs->st_ctim.tv_sec = atol(se.c_str());
         fs->st_ctim.tv_nsec = atol(na.c_str());
     }
-    
+    */
     string filename = dir_to_prepend->str() + "/" + eatTo(v, i, separator, 1024, eof, err);
     if (*err || *eof) return false;
     if (filename.length() > 1 && filename.back() == '/')

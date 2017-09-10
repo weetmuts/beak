@@ -98,7 +98,8 @@ Like this:
 `s01_--seconds---.--nanos--_-size--_----------metadata-hash-----------------------------------------_0.tar`
 
 Then create an index file, again with a modify timestamp that is equal
-to the most recent file found in any of the archive files. Name the index file
+to the most recent file found in any of the archive files and the modify timestamp
+of the containing directory. Name the index file
 using that timestamp and a hash of the all the archives pointed to by this index file.
 
 `z01_001504803295.504732149_0_cb56cc0ee219e54f7afceff6aae29843bc4a4bfa25c421b24cc5d918f524a6ff_0.gz`
@@ -106,20 +107,22 @@ using that timestamp and a hash of the all the archives pointed to by this index
 `z01_--seconds---.--nanos--_0_----------metadata-hash-----------------------------------------_0.gz`
 
 You now have an archive tree, rooted in a point of time, i.e. the most recent modify timestamp
-of any of the archived files.
+of any of the archived files or the containing directory.
 
 The grouping algorithm is not random, so this file system is predetermined from the source tree.
-If the source tree has not changed, a newly created archive tree will be identical, to the one before.
+If the source tree has not changed, a newly mounted archive tree will be identical, to the one before.
 
 This makes the archive tree suitable for copying, using for example rclone. RClone will check
 the archive files timestamps, names and sizes. If they match what is on the remote location,
 no copying takes place.
 
-If the source tree is change, for example a file is modified, then the most recent timestamp will
-be visible in the archive containing the modified file, and the index file will change
-due to the new timestamp. Rclone the archive tree, will skip all the archives that have
-not changed and push the new archive file and the new index file. The index file
-will point to already existing (and unmodified archives) as well as to the new archive.
+If the source tree is change, for example a file is modified, then the
+most recent timestamp will be visible in the archive name containing
+the modified file, and the index file name will also change due to the
+new timestamp. Rclone the archive tree, will skip all the archives
+that have not changed and push the new archive file and the new index
+file. The index file will point to already existing (and unmodified
+archives) as well as to the new archive.
 
 The index file will not clash with the old index file, thus we have two points in time stored
 at the remote location! Of course if the archive file is 10MiB and the changed file is 1KiB, there

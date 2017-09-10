@@ -153,7 +153,7 @@ char getTypeFlagFrom(FileStat *fs, bool is_hard_link)
     if (fs->isCharacterDevice()) return CHRTYPE;
     if (fs->isBlockDevice()) return BLKTYPE;
     if (fs->isDirectory()) return DIRTYPE;
-    if (fs->isFIFO()) return FIFOTYPE;    
+    if (fs->isFIFO()) return FIFOTYPE;
     assert(0);
 }
 

@@ -47,7 +47,7 @@ ForwardTarredFS::ForwardTarredFS() {
 thread_local ForwardTarredFS *current_fs;
 
 static int addEntry(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf)
-{
+{    
     return current_fs->addTarEntry(fpath, sb, ftwbuf);
 }
 
@@ -56,7 +56,7 @@ int ForwardTarredFS::recurse() {
     // Look at symbolic links (ie do not follow them) so that
     // we can store the links in the tar file.
     current_fs = this;
-    int rc = nftw(root_dir.c_str(), addEntry, 256, FTW_PHYS|FTW_DEPTH);
+    int rc = nftw(root_dir.c_str(), addEntry, 256, FTW_PHYS|FTW_ACTIONRETVAL);
 
     if (rc  == -1) {
         error(FORWARD,"Could not scan files");
@@ -70,6 +70,30 @@ int ForwardTarredFS::addTarEntry(const char *p, const struct stat *sb, struct FT
     Path *abspath = Path::lookup(p);
     Path *path = abspath->subpath(root_dir_path->depth());
     path = path->prepend(Path::lookup(""));
+
+    // Sockets cannot be stored.
+    if(S_ISSOCK(sb->st_mode)) { return FTW_CONTINUE; }
+
+    // Ignore any directory that has a subdir named .beak
+    if(S_ISDIR(sb->st_mode) && abspath->depth() > root_dir_path->depth())
+    {
+        struct stat sb;
+        char buf[abspath->c_str_len()+7];
+        memcpy(buf, abspath->c_str(), abspath->c_str_len());
+        memcpy(buf+abspath->c_str_len(), "/.beak", 7);
+        int err = stat(buf, &sb);
+        if (err == 0) {
+            // Oups found .beak subdir! This directory and children
+            // must be ignored!
+            info(FORWARD,"Skipping subbeak %s\n", path->c_str());
+            return FTW_SKIP_SUBTREE;
+        }
+    }
+
+    // Ignore any directory named .beak, this is just a special
+    // case, do not enter the .beak directory inside the configured
+    // beak source dir that we are pushing.
+    if (abspath->name()->str() == ".beak") return FTW_SKIP_SUBTREE;
 
     size_t len = strlen(path->c_str());
     char name[len+2];
@@ -96,7 +120,6 @@ int ForwardTarredFS::addTarEntry(const char *p, const struct stat *sb, struct FT
     } else {
         debug(FORWARD, "Filter NOT dropped \"%s\"\n", name);
     }
-
 
     // Creation and storage of entry.
     TarEntry *te = new TarEntry(abspath, path, sb, tarheaderstyle_);
@@ -126,7 +149,7 @@ int ForwardTarredFS::addTarEntry(const char *p, const struct stat *sb, struct FT
             hardlinksavings += prev->blockedSize() - prev->headerSize();
         }
     }
-    return 0;
+    return FTW_CONTINUE;
 }
 
 void ForwardTarredFS::findTarCollectionDirs() {
