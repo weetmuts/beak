@@ -43,6 +43,7 @@ test_debug:
 clean:
 	@echo Removing release and debug builds
 	$(VERBOSE)rm -rf $(BUILDDIR)/release $(BUILDDIR)/debug
+	$(VERBOSE)rm -rf $(BUILDDIR)/generated_autocomplete.h
 
 clean-all:
 	@echo Removing configuration and artifacts

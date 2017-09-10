@@ -61,6 +61,8 @@ struct Beak {
     virtual void printLicense() = 0;
     virtual void printCommands() = 0;
     virtual void printOptions() = 0;
+
+    virtual void genAutoComplete(std::string filename) = 0;
 };
 
 std::unique_ptr<Beak> newBeak();

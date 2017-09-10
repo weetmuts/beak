@@ -43,6 +43,13 @@ int main(int argc, char *argv[])
         break;
 
     case genautocomplete_cmd:
+        if (settings.src == NULL) {
+            beak->genAutoComplete("/etc/bash_completion.d/beak");
+            printf("Wrote /etc/bash_completion.d/beak\n");
+        } else {
+            beak->genAutoComplete(settings.src->str());
+            printf("Wrote %s\n", settings.src->c_str());
+        }
         break;
 
     case mount_cmd:

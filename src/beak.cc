@@ -19,6 +19,10 @@
 #include "log.h"
 #include "beak.h"
 
+const char *autocomplete = 
+#include"generated_autocomplete.h"
+    ;
+
 #ifdef FUSE_USE_VERSION
 #include <fuse/fuse.h>
 #else
@@ -87,6 +91,8 @@ struct BeakImplementation : Beak {
 
     int status(Options *settings);
 
+    void genAutoComplete(std::string filename);
+    
     private:
 
     int mountForwardInternal(Options *settings, bool daemon);
@@ -957,3 +963,12 @@ void BeakImplementation::printLicense()
             " Copyright (C) 2016-2017 Fredrik Öhrström\n\n");
 }
 
+void BeakImplementation::genAutoComplete(std::string filename)
+{
+    FILE *f = fopen(filename.c_str(),"wb");
+    if (!f) {
+        error(COMMANDLINE, "Could not open %s\n", filename.c_str());
+    }
+    fwrite(autocomplete, 1, strlen(autocomplete), f);
+    fclose(f);
+}

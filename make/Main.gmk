@@ -67,12 +67,19 @@ POSIX_BEAK_OBJS:=\
 POSIX_TESTINTERNALS_OBJS:=\
     $(filter-out %main.o,$(POSIX_OBJS))
 
+$(OUTPUT_ROOT)/generated_autocomplete.h: $(SRC_ROOT)/scripts/autocompletion_for_beak.sh
+	echo Generating autocomplete include.
+	cat $< | sed 's/\\/\\\\/g' | sed 's/\"/\\\"/g' | sed 's/^\(.*\)$$/"\1\\n"/g'> $@
+
 BEAK_OBJS:=$($(PLATFORM)_BEAK_OBJS)
 TESTINTERNALS_OBJS:=$($(PLATFORM)_TESTINTERNALS_OBJS)
+
+$(OUTPUT_ROOT)/$(TYPE)/beak.o: $(OUTPUT_ROOT)/generated_autocomplete.h
 
 $(OUTPUT_ROOT)/$(TYPE)/%.o: $(SRC_ROOT)/src/%.cc $(HEADERS)
 	@echo Compiling $$(basename $<)
 	$(VERBOSE)$(CXX) $(CXXFLAGS_$(TYPE)) $(CXXFLAGS) -I$(OUTPUT_ROOT) $< -c -o $@
+
 
 $(OUTPUT_ROOT)/$(TYPE)/beak: $(BEAK_OBJS)
 	@echo Linking $@
@@ -90,6 +97,7 @@ ifeq ($(CLEAN),clean)
 # Clean!
 release debug:
 	rm -f $(OUTPUT_ROOT)/$(TYPE)/*
+	rm -f $(OUTPUT_ROOT)/$(TYPE)/generated_autocomplete.h
 else
 # Build!
 release debug:$(OUTPUT_ROOT)/$(TYPE)/beak $(OUTPUT_ROOT)/$(TYPE)/testinternals
