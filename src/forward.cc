@@ -599,7 +599,9 @@ size_t ForwardTarredFS::groupFilesIntoTars() {
                 }
             }
         }
-
+        // Finally update with the latest mtime of the current storage directory!
+        te->updateMtim(te->gzFile()->mtim());
+        
         // Hash the hashes of all the other tar and gz files.
         te->gzFile()->calculateHash(tars, gzfile_contents);
         te->gzFile()->fixName();

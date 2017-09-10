@@ -34,7 +34,7 @@ struct TarFile;
 
 using namespace std;
 
-enum TarHeaderStyle {
+enum TarHeaderStyle : short {
     None, // Tar headers are not inserted into the archive file. Tar cannot be used to extract data.
     Simple, // Simple headers, uid/guid set to 1000/1000 name is beak/beak, atime=ctime set to mtime.
     Full // Full headers, sometimes useful if you expect to use tar to extract the data.

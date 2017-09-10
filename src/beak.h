@@ -20,12 +20,50 @@
 
 #include "config.h"
 #include "defs.h"
-#include "forward.h"
-#include "reverse.h"
+#include "util.h"
 
 #include<memory>
 #include<string>
 #include<vector>
+
+enum Command : short;
+struct Options;
+
+enum PointInTimeFormat : short;
+struct PointInTime;
+
+enum TarHeaderStyle : short;
+
+struct Beak {
+    virtual void captureStartTime() = 0;
+    virtual std::string argsToVector(int argc, char **argv, std::vector<std::string> *args) = 0;
+    virtual int parseCommandLine(int argc, char **argv, Command *cmd, Options *settings) = 0;
+    virtual int printInfo(Options *settings) = 0;
+    virtual bool lookForPointsInTime(Options *settings) = 0;
+    virtual std::vector<PointInTime> &history() = 0;
+    virtual bool setPointInTime(std::string g) = 0;
+    
+    virtual int push(Options *settings) = 0;
+
+    virtual int umountDaemon(Options *settings) = 0;
+    
+    virtual int mountForwardDaemon(Options *settings) = 0;
+    virtual int mountForward(Options *settings) = 0;
+    virtual int umountForward(Options *settings) = 0;
+    virtual int mountReverseDaemon(Options *settings) = 0;
+    virtual int mountReverse(Options *settings) = 0;   
+    virtual int umountReverse(Options *settings) = 0;
+
+    virtual int status(Options *settings) = 0;
+
+    virtual void printHelp(Command cmd) = 0;
+    virtual void printVersion() = 0;
+    virtual void printLicense() = 0;
+    virtual void printCommands() = 0;
+    virtual void printOptions() = 0;
+};
+
+std::unique_ptr<Beak> newBeak();
 
 
 #define LIST_OF_COMMANDS                                                \
@@ -40,10 +78,11 @@
     X(pull,"Restore a backup to a directory.")                          \
     X(push,"Backup a directory.")                                       \
     X(status,"Show the current status of your backups.")                \
+    X(umount,"Unmount a virtual file system.")                          \
     X(version,"Show version.")                                          \
     X(nosuch,"No such command.")                                        \
 
-enum Command {
+enum Command : short {
 #define X(name,info) name##_cmd,
 LIST_OF_COMMANDS
 #undef X
@@ -56,10 +95,10 @@ LIST_OF_COMMANDS
     X(fd,fusedebug,bool,false,"Enable fuse debug mode, this also triggers foreground.") \
     X(ff,forceforward,bool,false,"Force forward mount of backup directory,\n" \
       "                           if you want to backup your backup files!")  \
-    X(i,include,vector<string>,true,"Only matching paths are inluded. E.g. -i '*.c'") \
+    X(i,include,std::vector<std::string>,true,"Only matching paths are inluded. E.g. -i '*.c'") \
     X(,license,bool,false,"Show copyright holders,licenses and notices for the program.") \
-    X(l,log,string,true,"Log debug messages for these parts. E.g. --log=reverse,hashing") \
-    X(p,pointintime,string,true,"When mounting an archive pick this point in time only.\n" \
+    X(l,log,std::string,true,"Log debug messages for these parts. E.g. --log=reverse,hashing") \
+    X(p,pointintime,std::string,true,"When mounting an archive pick this point in time only.\n" \
       "                           -p @0 is always the most recent. -p @1 the second most recent.\n" \
       "                           You can also suffix @1 to the src directory." )        \
     X(pf,pointintimeformat,PointInTimeFormat,true,"How to present the point in time.\n" \
@@ -70,13 +109,14 @@ LIST_OF_COMMANDS
       "                           Default is 10M.")    \
     X(tr,triggersize,size_t,true,"Trigger tar generation in dir at size. E.g. -tr 40M\n" \
       "                           Default is 20M.")    \
-    X(tx,triggerglob,vector<string>,true,"Trigger tar generation in matching dirs.\n" \
+    X(tx,triggerglob,std::vector<std::string>,true,"Trigger tar generation in matching dirs.\n" \
       "                           E.g. -tx '/work/project_*'\n") \
     X(q,quite,bool,false,"Silence information output.")             \
     X(v,verbose,bool,false,"More detailed information.")            \
-    X(x,exclude,vector<string>,true,"Paths matching glob are excluded. E.g. -exclude='beta/**'") \
+    X(x,exclude,std::vector<std::string>,true,"Paths matching glob are excluded. E.g. -exclude='beta/**'") \
     X(nso,nosuch,bool,false,"No such option")    
         
+
     
 enum Option {
 #define X(shortname,name,type,requirevalue,info) name##_option,
@@ -87,47 +127,19 @@ LIST_OF_OPTIONS
 struct Options {
     Path *src;
     Path *dst;
-    string remote;
+    std::string remote;
     
 #define X(shortname,name,type,requirevalue,info) type name; bool name##_supplied;
 LIST_OF_OPTIONS
 #undef X
 
-    vector<string> fuse_args;
+    std::vector<std::string> fuse_args;
     int fuse_argc;
     char **fuse_argv;
 
     Command help_me_on_this_cmd;
     int point_in_time; // 0 is the most recent, 1 second recent etc.
 };
-
-struct Beak {
-    virtual void captureStartTime() = 0;
-    virtual string argsToVector(int argc, char **argv, vector<string> *args) = 0;
-    virtual int parseCommandLine(int argc, char **argv, Command *cmd, Options *settings) = 0;
-    virtual int printInfo(Options *settings) = 0;
-    virtual bool lookForPointsInTime(Options *settings) = 0;
-    virtual vector<PointInTime> &history() = 0;
-    virtual bool setPointInTime(string g) = 0;
-    
-    virtual int push(Options *settings) = 0;
-    virtual int mountForwardDaemon(Options *settings) = 0;
-    virtual int mountForward(Options *settings) = 0;    
-    virtual int unmountForward(Options *settings) = 0;    
-    virtual int mountReverseDaemon(Options *settings) = 0;
-    virtual int mountReverse(Options *settings) = 0;    
-    virtual int unmountReverse(Options *settings) = 0;    
-    virtual int status(Options *settings) = 0;
-
-    virtual void printHelp(Command cmd) = 0;
-    virtual void printVersion() = 0;
-    virtual void printLicense() = 0;
-    virtual void printCommands() = 0;
-    virtual void printOptions() = 0;
-};
-
-std::unique_ptr<Beak> newBeak();
-
 
 
 #endif

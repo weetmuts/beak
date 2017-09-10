@@ -17,36 +17,37 @@
 
 #include "beak.h"
 #include "log.h"
-#include "system.h"
 #include <unistd.h>
-
-static ComponentId MAIN = registerLogComponent("main");
 
 int main(int argc, char *argv[])
 {
-    auto beak = newBeak();
+    int rc = 0;
     Command cmd;
     Options settings;
 
-    int rc = 0;
+    auto beak = newBeak();
 
-    auto sys = newSystem();
-    
     beak->captureStartTime();
     beak->parseCommandLine(argc, argv, &cmd, &settings);
-    bool has_history = beak->lookForPointsInTime(&settings);
     
     switch (cmd) {
+
     case check_cmd:
         break;
+
     case config_cmd:
         break;
+
     case info_cmd:
         rc = beak->printInfo(&settings);
         break;
+
     case genautocomplete_cmd:
         break;
+
     case mount_cmd:
+    {
+        bool has_history = beak->lookForPointsInTime(&settings);
         if (!has_history || settings.forceforward) {
             // src contains your files, to be backed up
             // dst will contain a virtual file system with the backup files.
@@ -56,56 +57,34 @@ int main(int argc, char *argv[])
             // dst will contain a virtual file system with your files.
             rc = beak->mountReverseDaemon(&settings);
         }
-        break;
+    }
+    break;
+
     case pack_cmd:
         break;
+
     case prune_cmd:
         break;
+
     case push_cmd:
-    {
-        char name[32];
-        strcpy(name, "/tmp/beak_pushXXXXXX");
-        char *mount = mkdtemp(name);
-        if (!mount) {
-            error(MAIN, "Could not create temp directory!");
-        }
-        Options forward_settings = settings;
-        forward_settings.src = settings.src;
-        forward_settings.dst = Path::lookup(mount);
-        forward_settings.fuse_argc = 1;
-        char *arg;
-        char **argv = &arg;
-        *argv = new char[16];
-        strcpy(*argv, "beak");
-        forward_settings.fuse_argv = argv;
-        
-        // Spawn virtual filesystem.
-        rc = beak->mountForward(&forward_settings);
-
-        std::vector<std::string> args;
-        args.push_back("copy");
-        args.push_back("-v");
-        args.push_back(mount);
-        if (settings.dst) {
-            args.push_back(settings.dst->str());
-        } else {
-            args.push_back(settings.remote);
-        }
-        rc = sys->invoke("rclone", args);
-
-        // Unmount virtual filesystem.
-        rc = beak->unmountForward(&forward_settings);
-        rmdir(mount);
-    }
+        rc = beak->push(&settings);
         break;
+        
     case pull_cmd:
         break;
+
     case status_cmd:
         rc = beak->status(&settings);
         break;
+
+    case umount_cmd:
+        rc = beak->umountDaemon(&settings);
+        break;
+
     case version_cmd:
         beak->printVersion();
         break;
+
     case help_cmd:
         if (settings.license) {
             beak->printLicense();
@@ -113,6 +92,7 @@ int main(int argc, char *argv[])
             beak->printHelp(settings.help_me_on_this_cmd);
         }
         break;
+
     case nosuch_cmd:
         break;
     }

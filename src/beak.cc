@@ -46,6 +46,7 @@
 #include "forward.h"
 #include "log.h"
 #include "reverse.h"
+#include "system.h"
 
 static ComponentId MAIN = registerLogComponent("main");
 static ComponentId COMMANDLINE = registerLogComponent("commandline");
@@ -73,13 +74,16 @@ struct BeakImplementation : Beak {
     bool setPointInTime(string g);
     
     int push(Options *settings);
+
+    int umountDaemon(Options *settings);
+    
     int mountForwardDaemon(Options *settings);
     int mountForward(Options *settings);
-    int unmountForward(Options *settings);
+    int umountForward(Options *settings);
 
     int mountReverseDaemon(Options *settings);
     int mountReverse(Options *settings);
-    int unmountReverse(Options *settings);
+    int umountReverse(Options *settings);
 
     int status(Options *settings);
 
@@ -108,6 +112,8 @@ struct BeakImplementation : Beak {
     struct fuse_chan *chan_;
     struct fuse *fuse_;
     pid_t loop_pid_;
+
+    std::unique_ptr<System> sys_;
 };
 
 std::unique_ptr<Beak> newBeak() {    
@@ -158,6 +164,8 @@ BeakImplementation::BeakImplementation() {
 
     config_ = newConfig();
     config_->load();
+
+    sys_ = newSystem();
 }
 
 Command BeakImplementation::parseCommand(string s)
@@ -552,7 +560,40 @@ bool BeakImplementation::setPointInTime(string p)
 
 int BeakImplementation::push(Options *settings)
 {
-    return 0;
+    char name[32];
+    strcpy(name, "/tmp/beak_pushXXXXXX");
+    char *mount = mkdtemp(name);
+    if (!mount) {
+        error(MAIN, "Could not create temp directory!");
+    }
+    Options forward_settings = *settings;
+    forward_settings.dst = Path::lookup(mount);
+    forward_settings.fuse_argc = 1;
+    char *arg;
+    char **argv = &arg;
+    *argv = new char[16];
+    strcpy(*argv, "beak");
+    forward_settings.fuse_argv = argv;
+    
+    // Spawn virtual filesystem.
+    int rc = mountForward(&forward_settings);
+
+    std::vector<std::string> args;
+    args.push_back("copy");
+    args.push_back("-v");
+    args.push_back(mount);
+    if (settings->dst) {
+        args.push_back(settings->dst->str());
+    } else {
+        args.push_back(settings->remote);
+    }
+    rc = sys_->invoke("rclone", args);
+    
+    // Unmount virtual filesystem.
+    rc = umountForward(&forward_settings);
+    rmdir(mount);
+
+    return rc;
 }
 
 static int forwardGetattr(const char *path, struct stat *stbuf)
@@ -580,6 +621,14 @@ static int open_callback(const char *path, struct fuse_file_info *fi)
     return 0;
 }
 
+int BeakImplementation::umountDaemon(Options *settings)
+{
+    std::vector<std::string> args;
+    args.push_back("-u");
+    args.push_back(settings->src->str());
+    return sys_->invoke("fusermount", args);
+}
+
 int BeakImplementation::mountForwardDaemon(Options *settings)
 {
     return mountForwardInternal(settings, true);
@@ -590,7 +639,7 @@ int BeakImplementation::mountForward(Options *settings)
     return mountForwardInternal(settings, false);
 }
 
-int BeakImplementation::unmountForward(Options *settings)
+int BeakImplementation::umountForward(Options *settings)
 {
     fuse_exit(fuse_);
     fuse_unmount (settings->dst->c_str(), chan_);
@@ -755,7 +804,7 @@ int BeakImplementation::mountReverse(Options *settings)
     return mountReverseInternal(settings, false);
 }
 
-int BeakImplementation::unmountReverse(Options *settings)
+int BeakImplementation::umountReverse(Options *settings)
 {
     fuse_exit(fuse_);
     fuse_unmount(settings->dst->c_str(), chan_);

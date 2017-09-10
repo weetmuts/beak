@@ -61,7 +61,7 @@ struct Entry
 
 };
 
-enum PointInTimeFormat {
+enum PointInTimeFormat : short {
     absolute_point,
     relative_point,
     both_point
