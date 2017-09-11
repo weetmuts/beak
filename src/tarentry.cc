@@ -110,12 +110,12 @@ TarEntry::TarEntry(Path *ap, Path *p, const struct stat *b, TarHeaderStyle ths) 
         tv_line_left = s;
 
         s = "";
-        if (isSymbolicLink()) {
-            s = std::to_string(0);
+        if (isRegularFile()) {
+            s = std::to_string(fs_.st_size);
         } else if (isCharacterDevice() || isBlockDevice()) {
             s = std::to_string(major(fs_.st_rdev)) + "," + std::to_string(minor(fs_.st_rdev));
         } else {
-            s = std::to_string(fs_.st_size);
+            s = std::to_string(0);
         }
         tv_line_size = s;
 
