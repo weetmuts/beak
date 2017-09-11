@@ -16,6 +16,7 @@
  */
 
 #include "beak.h"
+#include "diff.h"
 #include "log.h"
 #include <unistd.h>
 
@@ -25,6 +26,11 @@ int main(int argc, char *argv[])
     Command cmd;
     Options settings;
 
+/*    DiffTarredFS diff;
+    diff.loadZ01File(FROM, Path::lookup("a.gz"));
+    
+    exit(0);*/
+    
     auto beak = newBeak();
 
     beak->captureStartTime();

@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2016 Fredrik Öhrström
+    Copyright (C) 2016-2017 Fredrik Öhrström
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -18,22 +18,14 @@
 #ifndef DIFF_H
 #define DIFF_H
 
-#include <string.h>
-#include <sys/stat.h>
-#include <map>
 #include <string>
 
 #include "util.h"
 
-using namespace std;
-
-typedef int (*FileCB)(const char *,const struct stat *,int,struct FTW *);
-
 struct Entry {
-    struct stat sb;
+    FileStat fs;
 
-    Entry() { }
-    Entry(const struct stat *s) { memcpy(&sb, s, sizeof(struct stat)); }
+    Entry(FileStat *s) { if (s) memcpy(&fs, s, sizeof(struct stat)); }
 
     bool same(Entry *e);
 };
@@ -43,10 +35,12 @@ typedef Entry *EntryP;
 enum Target { FROM, TO };
 
 struct DiffTarredFS {
-    int recurse(Target t, FileCB cb);
-    int addFromFile(const char *fpath, const struct stat *sb, struct FTW *ftwbuf);
-    int addToFile(const char *fpath, const struct stat *sb, struct FTW *ftwbuf);
-    int addFile(Target t, const char *fpath, const struct stat *sb, struct FTW *ftwbuf);
+    int loadZ01File(Target ft, Path *file);
+
+    /*
+    int addFromFile(const char *fpath, FileStat *s, struct FTW *ftwbuf);
+    int addToFile(const char *fpath, FileStat *s, struct FTW *ftwbuf);
+    int addFile(Target t, const char *fpath, FileStat *s, struct FTW *ftwbuf);
     int addLinesFromFile(Target t, Path *p);
     void compare();
 
@@ -55,14 +49,16 @@ struct DiffTarredFS {
     void setFromDir(Path *p) { from_dir = p; }
     void setToDir(Path *p) { to_dir = p; }
     void setListMode() { list_mode_ = true; }
+    */
 private:
+    /*
     bool list_mode_ = false;
     Path *from_dir;
     Path *to_dir;
         
     map<Path*,EntryP,depthFirstSortPath> from_files;
     map<Path*,EntryP,depthFirstSortPath> to_files;
-    
+    */
 };
 
 #endif

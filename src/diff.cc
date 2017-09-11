@@ -15,9 +15,9 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-/*
 #include "diff.h"
 
+/*
 #include <assert.h>
 #include <ftw.h>
 #include <limits.h>
@@ -29,23 +29,37 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <utility>
+*/
 
 #include "log.h"
 #include "util.h"
 
-using namespace std;
-
 ComponentId DIFF = registerLogComponent("diff");
 
 bool Entry::same(Entry *e) {
-    return sb.st_mode == e->sb.st_mode &&
+    return true;
+    /*sb.st_mode == e->sb.st_mode &&
         sb.st_uid == e->sb.st_uid &&
         sb.st_gid == e->sb.st_gid &&
         sb.st_size == e->sb.st_size &&
         sb.st_mtim.tv_sec == e->sb.st_mtim.tv_sec &&
         sb.st_mtim.tv_nsec == e->sb.st_mtim.tv_nsec;
+    */
 }
 
+int DiffTarredFS::loadZ01File(Target ft, Path *file)
+{    
+    vector<char> buf;
+    int rc = loadVector(file, 4096, &buf);
+    if (rc) return -1;
+    
+    vector<char> contents;
+    gunzipit(&buf, &contents);
+
+    return 0;
+}
+
+/*
 int DiffTarredFS::recurse(Target t, FileCB cb) {
     string s = (t==FROM)? from_dir->str(): to_dir->str();
 

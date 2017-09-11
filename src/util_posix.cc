@@ -22,6 +22,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <linux/memfd.h>
 #include <linux/kdev_t.h>
 #include <sys/syscall.h>
@@ -38,6 +39,8 @@
 #include <locale>
 #include <map>
 #include <utility>
+#include <unistd.h>
+#include <fcntl.h>
 #include <zlib.h>
 
 #include "log.h"
@@ -360,4 +363,32 @@ int MajorDev(dev_t d)
 int MinorDev(dev_t d)
 {
     return MINOR(d);
+}
+
+
+int loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
+{
+    char block[blocksize+1];
+    
+    int fd = open(file->c_str(), O_RDONLY);
+    if (fd == -1) {
+        return -1;
+    }
+    while (true) {
+        ssize_t n = read(fd, block, sizeof(block));
+        if (n == -1) {
+            if (errno == EINTR) {
+                continue;
+            }
+            failure(UTIL,"Could not read from gzfile %s errno=%d\n", file->c_str(), errno);
+            close(fd);
+            return -1;
+        }
+        buf->insert(buf->end(), block, block+n);
+        if (n < (ssize_t)sizeof(block)) {
+            break;
+        }
+    }
+    close(fd);
+    return 0;
 }

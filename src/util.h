@@ -65,6 +65,9 @@ void fixEndian(long *t);
 bool isInTheFuture(struct timespec *tm);
 string timeAgo(struct timespec *tm);
 
+struct Path;
+int loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
+
 struct FileStat {
     ino_t st_ino;
     mode_t st_mode;

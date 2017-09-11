@@ -16,6 +16,7 @@
  */
 
 #include "reverse.h"
+#include "index.h"
 #include "tarfile.h"
 
 #include <algorithm>
@@ -177,6 +178,7 @@ int ReverseTarredFS::parseTarredfsTars(PointInTime *point, vector<char> &v, vect
 // The gz file to load, and the dir to populate with its contents.
 bool ReverseTarredFS::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
 {
+    int rc;
     debug(REVERSE, "Loadgz %s %p >%s<\n", gz->c_str(), gz, dir_to_prepend->c_str());
     if (point->loaded_gz_files_.count(gz) == 1)
     {
@@ -186,49 +188,52 @@ bool ReverseTarredFS::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
     point->loaded_gz_files_.insert(gz);
     
     vector<char> buf;
-    char block[T_BLOCKSIZE + 1];
-    int fd = open(gz->c_str(), O_RDONLY);
-    if (fd == -1) {
-        return false;
-    }
-    while (true) {
-        ssize_t n = read(fd, block, sizeof(block));
-        if (n == -1) {
-            if (errno == EINTR) {
-                continue;
-            }
-            failure(REVERSE,"Could not read from gzfile %s errno=%d\n", gz->c_str(), errno);
-            close(fd);
-            return false;
-        }
-        buf.insert(buf.end(), block, block+n);
-        if (n < (ssize_t)sizeof(block)) {
-            break;
-        }
-    }
-    close(fd);
+    rc = loadVector(gz, T_BLOCKSIZE, &buf);
+    if (rc) return false;
     
     vector<char> contents;
     gunzipit(&buf, &contents);
     auto i = contents.begin();
 
     debug(REVERSE, "Parsing %s for files in %s\n", gz->c_str(), dir_to_prepend->c_str());
-    int rc = parseTarredfsContent(point, contents, i, dir_to_prepend);
+    struct IndexEntry index_entry;
+    struct IndexTar index_tar;
+
+    vector<Entry*> es;
+    bool parsed_tars_already = point->gz_files_.size() != 0;
+
+    rc = Index::loadIndex(contents, i, &index_entry, &index_tar, dir_to_prepend,
+                     [this,point,&es](IndexEntry *ie){
+                         debug(REVERSE," Adding entry for >%s<\n", ie->path->c_str());
+                         point->entries_[ie->path] = Entry(ie->fs, ie->offset, ie->path);
+                         Entry *e = &(point->entries_)[ie->path];
+                         e->link = ie->link;
+                         e->is_sym_link = ie->is_sym_link;
+                         e->tar = ie->tar;
+                         es.push_back(e);
+                     },
+                     [this,point,parsed_tars_already](IndexTar *it){
+                         if (!parsed_tars_already) {
+                             if (it->path->name()->c_str()[0] == REG_FILE_CHAR) { 
+                                 point->gz_files_[it->path->parent()] = it->path;
+                             }
+                         }
+                     });
+
     if (rc) {
-        failure(REVERSE, "Could not parse the contents part in %s\n",
-                gz->c_str());
+        failure(REVERSE, "Could not parse the index file %s\n", gz->c_str());
         return false;
     }
 
-    if (point->gz_files_.size() == 0) {
-        debug(REVERSE, "Parsing %s for tars in %s\n", gz->c_str(), dir_to_prepend->c_str());    
-        rc = parseTarredfsTars(point, contents, i);
-        if (rc)
-        {
-            failure(REVERSE, "Could not parse the tars part in %s\n",
-                    gz->c_str());
-            return false;
-        }
+    for (auto i : es) {
+        // Now iterate over the files found.
+        // Some of them might be in subdirectories.
+        Path *p = i->path;
+        Path *pp = p->parent();
+        Entry *d = &(point->entries_)[pp];
+        debug(REVERSE, "   found %s added to >%s<\n", i->path->c_str(), pp->c_str());
+        d->dir.push_back(i);
+        d->loaded = true;        
     }
     
     debug(REVERSE, "Found proper gz file! %s\n", gz->c_str());
