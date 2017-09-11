@@ -263,7 +263,7 @@ if [ $do_test ]; then
     startFS standardTest
 fi
 
-setup basic04 "Exactly 100 char file name (does not fit in 100 char name field due to zero terminating char)"
+setup basic04a "Exactly 100 char file name (does not fit in 100 char name field due to zero terminating char)"
 if [ $do_test ]; then
     tmp=$root/test/test
     mkdir -p $tmp
@@ -271,6 +271,14 @@ if [ $do_test ]; then
     startFS standardTest
 fi
 
+setup basic04b "Long paths cause problems"
+if [ $do_test ]; then
+    mkdir -p $root/BhlcuNTyTvLedMdLYqDeSySKkGCajOLG/JelKMOzorxaHRRYilhHCH/zGtUkDjJrpaYruHVsh
+    echo Hejsan > $root/BhlcuNTyTvLedMdLYqDeSySKkGCajOLG/JelKMOzorxaHRRYilhHCH/zGtUkDjJrpaYruHVsh/zTeEgnbHEROQBZhnLzfkSOWkAu
+    echo Hejsan > $root/BhlcuNTyTvLedMdLYqDeSySKkGCajOLG/JelKMOzorxaHRRYilhHCH/AijIwubbgq
+    startFS standardTest
+fi
+    
 setup basic05 "Symbolic link"
 if [ $do_test ]; then
     echo HEJSAN > $root/test

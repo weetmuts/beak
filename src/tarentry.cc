@@ -149,11 +149,14 @@ TarEntry::TarEntry(Path *ap, Path *p, const struct stat *b, TarHeaderStyle ths) 
 }
 
 void TarEntry::calculateTarpath(Path *storage_dir) {
+    size_t old_header_size = header_size_;
     tarpath_ = path_->subpath(storage_dir->depth());
-    //tar_.setPath(tarpath_->str());
-    //tar_.calculateChecksum();
     tarpath_hash_ = hashString(tarpath_->str());
-    //assert(sanityCheck(tarpath_->c_str(), th_get_pathname(tar_)));
+    
+    updateSizes();
+    if (header_size_ < old_header_size) {
+        debug(TARENTRY,"Avoided long path block!\n");
+    }
 }
 
 void TarEntry::createSmallTar(int i) {
