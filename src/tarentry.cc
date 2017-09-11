@@ -474,7 +474,13 @@ void TarEntry::calculateSHA256Hash()
     SHA256_Update(&sha256ctx, tarpath_->c_str(), tarpath_->c_str_len());
 
     // Hash the file size.
-    off_t filesize = fs_.st_size;
+    off_t filesize;
+    if (isRegularFile()) {
+        filesize = fs_.st_size;
+    } else {
+        filesize = 0;
+    }
+    
     fixEndian(&filesize);    
     SHA256_Update(&sha256ctx, &filesize, sizeof(filesize));
 
