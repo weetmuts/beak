@@ -869,7 +869,7 @@ int ForwardTarredFS::readCB(const char *path_char_string, char *buf, size_t size
         TarEntry *te = r.first;
         size_t tar_offset = r.second;
         assert(te != NULL);
-        size_t l =  te->copy(buf, size, offset - tar_offset);
+        size_t l =  te->copy(buf, size, offset - tar_offset, file_system_);
         debug(FORWARD, "readCB copy size=%ju result=%ju\n", size, l);
         size -= l;
         buf += l;

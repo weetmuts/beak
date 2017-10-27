@@ -27,6 +27,7 @@
 #include <vector>
 
 #include "tar.h"
+#include "filesystem.h"
 
 struct Atom;
 struct Path;
@@ -120,7 +121,7 @@ struct TarEntry
     
     void calculateTarpath(Path *storage_dir);
     void setContent(vector<unsigned char> &c);
-    size_t copy(char *buf, size_t size, size_t from);
+    size_t copy(char *buf, size_t size, size_t from, FileSystem *fs);
     void updateSizes();
     void rewriteIntoHardLink(TarEntry *target);
     bool fixHardLink(Path *storage_dir);

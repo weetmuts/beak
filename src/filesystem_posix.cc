@@ -17,12 +17,16 @@
 
 #include "filesystem.h"
 
+#include <dirent.h>
+#include <fcntl.h>
 #include <ftw.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 struct FileSystemImplementation : FileSystem
 {
-    std::vector<Path*> readdir(Path *p);
-    std::vector<char> pread(Path *p, size_t count, off_t offset);
+    bool readdir(Path *p, std::vector<Path*> *vec);
+    ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
     
 private:
 
@@ -35,15 +39,30 @@ std::unique_ptr<FileSystem> newDefaultFileSystem()
     return std::unique_ptr<FileSystem>(new FileSystemImplementation());
 }
 
-std::vector<Path*> FileSystemImplementation::readdir(Path *p)
-{
-    vector<Path*> v;
-    return v;
+bool FileSystemImplementation::readdir(Path *p, std::vector<Path*> *vec)
+{    
+    DIR *dp = NULL;
+    struct dirent *dptr = NULL;
+
+    if (NULL == (dp = opendir(p->c_str())))
+    {
+        return false;
+    }
+    while(NULL != (dptr = ::readdir(dp)))
+    {
+        vec->push_back(Path::lookup(dptr->d_name));
+    }
+    closedir(dp);
+    
+    return true;
 }
 
-std::vector<char> FileSystemImplementation::pread(Path *p, size_t count, off_t offset)
+ssize_t FileSystemImplementation::pread(Path *p, char *buf, size_t size, off_t offset)
 {
-    vector<char> v;
-    return v;
+    int fd = open(p->c_str(), O_RDONLY | O_NOATIME);
+    if (fd == -1) return ERR;
+    int rc = ::pread(fd, buf, size, offset);
+    close(fd);
+    return rc;
 }
  

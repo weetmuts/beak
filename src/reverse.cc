@@ -31,7 +31,6 @@
 #include <cstdlib>
 #include <iterator>
 #include <memory>
-#include <dirent.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -395,9 +394,8 @@ int ReverseTarredFS::readCB(const char *path_char_string, char *buf,
     string path_string = path_char_string;
     Path *path = Path::lookup(path_string);
 
-    int fd;
     Entry *e;
-    string tar;
+    Path *tar;
     
     PointInTime *point = single_point_in_time_;
     if (!point) {
@@ -410,8 +408,8 @@ int ReverseTarredFS::readCB(const char *path_char_string, char *buf,
     e = findEntry(point, path);
     if (!e) goto err;
 
-    tar = rootDir()->str() + e->tar;
-
+    tar = Path::lookup(rootDir()->str() + e->tar);
+    
     if (offset > e->fs.st_size)
     {
         // Read outside of file size
@@ -428,22 +426,13 @@ int ReverseTarredFS::readCB(const char *path_char_string, char *buf,
     // Offset into tar file.
     offset += e->offset;
 
-    fd = open(tar.c_str(), O_RDONLY);
-    if (fd == -1)
-    {
-        failure(REVERSE,
-                "Could not open file >%s< in underlying filesystem err %d",
-                tar.c_str(), errno);
-        goto err;
-    }
-    debug(REVERSE, "Reading %ju bytes from offset %ju in file %s\n", size, offset, tar.c_str());
-    rc = pread(fd, buf, size, offset);
-    close(fd);
+    debug(REVERSE, "Reading %ju bytes from offset %ju in file %s\n", size, offset, tar->c_str());
+    rc = file_system_->pread(tar, buf, size, offset);
     if (rc == -1)
     {
         failure(REVERSE,
                 "Could not read from file >%s< in underlying filesystem err %d",
-                tar.c_str(), errno);
+                tar->c_str(), errno);
         goto err;
     }
     ok:
@@ -463,18 +452,14 @@ bool ReverseTarredFS::lookForPointsInTime(PointInTimeFormat f, Path *path)
     bool ok;
     if (path == NULL) return false;
     
-    DIR *dp = NULL;
-    struct dirent *dptr = NULL;
-
-    if (NULL == (dp = opendir(path->c_str())))
-    {
+    std::vector<Path*> contents;
+    if (!file_system_->readdir(path, &contents)) {
         return false;
     }
-    while(NULL != (dptr = readdir(dp)) )
+    for (auto f : contents)
     {
         TarFileName tfn;
-        string fn(dptr->d_name);
-        ok = TarFile::parseFileName(fn, &tfn);
+        ok = TarFile::parseFileName(f->str(), &tfn);
         
         if (ok && tfn.type == REG_FILE) {
             PointInTime p;
@@ -486,7 +471,7 @@ bool ReverseTarredFS::lookForPointsInTime(PointInTimeFormat f, Path *path)
 
             p.ago = timeAgo(&p.ts);
             p.datetime = datetime;
-            p.filename = fn;
+            p.filename = f->str();
             history_.push_back(p);
         }
     }
@@ -518,7 +503,6 @@ bool ReverseTarredFS::lookForPointsInTime(PointInTimeFormat f, Path *path)
         j.entries_[Path::lookupRoot()] = Entry(fs, 0, Path::lookupRoot());
     }
     
-    closedir(dp);
     return i > 0;
 }
 

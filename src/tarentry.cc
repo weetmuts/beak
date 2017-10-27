@@ -172,7 +172,7 @@ void TarEntry::createLargeTar(uint32_t hash) {
     tars_.push_back(large_tars_[hash]);
 }
 
-size_t TarEntry::copy(char *buf, size_t size, size_t from) {
+size_t TarEntry::copy(char *buf, size_t size, size_t from, FileSystem *fs) {
     size_t copied = 0;
     debug(TARENTRY, "Copying from %s\n", name_->c_str());
 
@@ -254,19 +254,8 @@ size_t TarEntry::copy(char *buf, size_t size, size_t from) {
         } else {
             debug(TARENTRY, "Reading from file size=%ju copied=%ju blocked_size=%ju from=%ju header_size=%ju\n",
                   size, copied, blocked_size_, from, header_size_);
-            // Read from file
-            int fd = open(abspath_->c_str(), O_RDONLY|O_NOATIME);
-            if (fd==-1) {
-                failure(TARENTRY, "Could not open file >%s< in underlying filesystem err %d", path_->c_str(), errno);
-                return 0;
-            }
             debug(TARENTRY, "    contents out from %s %zu size=%zu\n", path_->c_str(), from-header_size_, size);
-            ssize_t l = pread(fd, buf, size, from-header_size_);
-            if (l==-1) {
-                failure(TARENTRY, "Could not read from file >%s< in underlying filesystem err %d", path_->c_str(), errno);
-                return 0;
-            }
-            close(fd);
+            ssize_t l = fs->pread(abspath_, buf, size, from-header_size_);
             size -= l;
             buf += l;
             copied += l;

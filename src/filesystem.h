@@ -29,8 +29,8 @@
 */
 struct FileSystem
 {
-    virtual std::vector<Path*> readdir(Path *p) = 0;
-    virtual std::vector<char> pread(Path *p, size_t count, off_t offset) = 0;
+    virtual bool readdir(Path *p, std::vector<Path*> *vec) = 0;
+    virtual ssize_t pread(Path *p, char *buf, size_t size, off_t offset) = 0;
 
 //    virtual void recurse(Path *p, 
     //int rc = nftw(root_dir.c_str(), addEntry, 256, FTW_PHYS|FTW_ACTIONRETVAL);
