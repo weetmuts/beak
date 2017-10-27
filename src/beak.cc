@@ -154,6 +154,7 @@ LIST_OF_OPTIONS
 };
 
 BeakImplementation::BeakImplementation(FileSystem *fs) :
+    forward_fs(fs),
     reverse_fs(fs) {
     for (auto &e : command_entries_) {
         if (e.cmd != nosuch_cmd) {

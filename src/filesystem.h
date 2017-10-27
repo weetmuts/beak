@@ -24,10 +24,17 @@
 #include <string>
 #include <vector>
 
+/*int (*recurse_cb) (const char *fpath, const struct stat *sb,
+                   int typeflag, struct FTW *ftwbuf);
+*/
 struct FileSystem
 {
     virtual std::vector<Path*> readdir(Path *p) = 0;
     virtual std::vector<char> pread(Path *p, size_t count, off_t offset) = 0;
+
+//    virtual void recurse(Path *p, 
+    //int rc = nftw(root_dir.c_str(), addEntry, 256, FTW_PHYS|FTW_ACTIONRETVAL);
+
 };
 
 std::unique_ptr<FileSystem> newDefaultFileSystem();

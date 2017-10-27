@@ -91,22 +91,25 @@ fi
 if [ "$onlypart2" = "" ]
 then
     # Find all files under root (using a potential filter)
-    (cd $root && \
-            eval "find . $filter -printf '%M\0%u/%g\0%s\0%TY-%Tm-%Td\0%TH:%TM\0%p\0%l\n'") \
-        | perl ${PERL_PREFIX}format_find.pl $root > $dir/test_root.txt
+    (cd $root && eval "find . $filter -printf '%M\0%u/%g\0%s\0%TY-%Tm-%Td\0%TH:%TM\0%p\0%l\n'") \
+        > $dir/test_root_raw.txt
+
+    cat $dir/test_root_raw.txt | perl ${PERL_PREFIX}format_find.pl $root > $dir/test_root.txt
     
     # Find all files listed in the tar files below mount.
-    ${UNTAR} tv $mount | perl ${PERL_PREFIX}format_tar.pl > $dir/test_tar.txt
+    ${UNTAR} tv $mount > $dir/test_tar_raw.txt
+    cat $dir/test_tar_raw.txt | perl ${PERL_PREFIX}format_tar.pl > $dir/test_tar.txt
     
     sort $dir/test_root.txt > $dir/test_root_sorted.txt
     sort $dir/test_tar.txt > $dir/test_tar_sorted.txt
-    
-    diff $dir/test_root_sorted.txt $dir/test_tar_sorted.txt
-    if [ "$?" = "0" ]; then
+
+    rc=$(diff $dir/test_root_sorted.txt $dir/test_tar_sorted.txt)
+    if [ "$rc" = "" ]; then
         echo OK
     else
+        echo XXX${rc}XXX
         debug='true'
-        exit $?
+        exit 1
     fi
 fi
 

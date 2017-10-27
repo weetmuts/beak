@@ -673,8 +673,8 @@ if [ $do_test ]; then
 fi
 
 function compareTwo {
-    rc=$($THIS_DIR/scripts/compare.sh "$root" "$mountreverse" | grep -v $'< .\t' | grep -v $'> .\t')
-    if [ "$rc" != $'1c1\n---' ]; then
+    rc=$($THIS_DIR/scripts/compare.sh --nodirs "$root" "$mountreverse")
+    if [ "$rc" != "" ]; then
         echo xx"$rc"xx
         echo Unexpected diff after forward and then reverse!
         exit

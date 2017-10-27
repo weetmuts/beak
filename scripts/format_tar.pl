@@ -5,6 +5,7 @@ while (<STDIN>) {
         } else {
             if (my($bi,$ow,$si,$da,$ti,$fi) = $_ =~ m/([dlcbrwxst-]{10}) +(\S+\/\S+) +([\d,]+) +(\d\d\d\d-\d\d-\d\d) (\d\d:\d\d) (.*)/) {
 
+                $fi =~ s/^\s//;
                 $fi =~ s/^\.\///;
                 if ($fi ne ".") {
                     $fi =~ s/\\\\/\\/g;
@@ -19,7 +20,7 @@ while (<STDIN>) {
                 $fi = $_;
                 $fi =~ s/^\s+|\s+$//g;
                 if ($fi ne "") {
-                    print("WOOT >$fi<");
+                    print("WOOT >$fi<\n");
                 }
             }
         }

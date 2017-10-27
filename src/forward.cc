@@ -18,7 +18,6 @@
 #include "forward.h"
 
 #include <asm-generic/errno-base.h>
-#include <ftw.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -27,6 +26,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
+#include <ftw.h>
 #include <iterator>
 #include <locale>
 #include <set>
@@ -41,14 +41,15 @@ using namespace std;
 static ComponentId FORWARD = registerLogComponent("forward");
 static ComponentId HARDLINKS = registerLogComponent("hardlinks");
 static ComponentId FUSE = registerLogComponent("fuse");
-ForwardTarredFS::ForwardTarredFS() {
+ForwardTarredFS::ForwardTarredFS(FileSystem *fs) {
+    file_system_ = fs;
 }
 
 thread_local ForwardTarredFS *current_fs;
 
 static int addEntry(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf)
 { 
-    return current_fs->addTarEntry(fpath, sb, ftwbuf);
+    return current_fs->addTarEntry(fpath, sb);
 }
 
 int ForwardTarredFS::recurse() {
@@ -65,7 +66,7 @@ int ForwardTarredFS::recurse() {
     return 0;
 }
 
-int ForwardTarredFS::addTarEntry(const char *p, const struct stat *sb, struct FTW *ftwbuf)
+int ForwardTarredFS::addTarEntry(const char *p, const struct stat *sb)
 {
     Path *abspath = Path::lookup(p);
     Path *path = abspath->subpath(root_dir_path->depth());

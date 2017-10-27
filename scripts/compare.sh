@@ -16,6 +16,13 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+if [ "$1" == "--nodirs" ]; then
+    NODIRS="-type f"
+    shift
+else
+    NODIRS=""
+fi
+
 if [ "$1" == "" ] || [ "$2" == "" ]; then
     echo Usage: tarrredfs-compare [root] [extracted]
     echo
@@ -24,6 +31,7 @@ if [ "$1" == "" ] || [ "$2" == "" ]; then
     exit
 fi
 
+
 dir=$(mktemp -d /tmp/beak_compareXXXXXXXX)
 
 function finish {
@@ -31,8 +39,8 @@ function finish {
 }
 trap finish EXIT
 
-(cd "$1" && find . -printf '%p\t%TY-%Tm-%Td_%TT\t%M\t%u %g\t%s\t%l\n' | sort > $dir/org.txt)
-(cd "$2" && find . -printf '%p\t%TY-%Tm-%Td_%TT\t%M\t%u %g\t%s\t%l\n' | sort > $dir/dest.txt)
+(cd "$1" && find . $NODIRS -printf '%p\t%TY-%Tm-%Td_%TT\t%M\t%u %g\t%s\t%l\n' | sort > $dir/org.txt)
+(cd "$2" && find . $NODIRS -printf '%p\t%TY-%Tm-%Td_%TT\t%M\t%u %g\t%s\t%l\n' | sort > $dir/dest.txt)
 
 diff $dir/org.txt $dir/dest.txt
 

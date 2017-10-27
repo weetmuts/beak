@@ -492,8 +492,10 @@ bool ReverseTarredFS::lookForPointsInTime(PointInTimeFormat f, Path *path)
     }
     std::sort(history_.begin(), history_.end(),
               [](PointInTime &a, PointInTime &b)->bool {
-                  return b.ts.tv_sec<a.ts.tv_sec;
-              });
+                  return (b.ts.tv_sec < a.ts.tv_sec) ||
+                      (b.ts.tv_sec == a.ts.tv_sec && 
+                       b.ts.tv_nsec < a.ts.tv_nsec);
+                      });
 
     most_recent_point_in_time_ = &history_[0];
     int i = 0;

@@ -17,6 +17,8 @@
 
 #include "filesystem.h"
 
+#include <ftw.h>
+
 struct FileSystemImplementation : FileSystem
 {
     std::vector<Path*> readdir(Path *p);

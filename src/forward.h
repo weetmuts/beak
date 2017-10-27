@@ -82,7 +82,7 @@ struct ForwardTarredFS {
     vector<Match> triggers;
 
     int recurse();
-    int addTarEntry(const char *fpath, const struct stat *sb, struct FTW *ftwbuf);
+    int addTarEntry(const char *fpath, const struct stat *sb);
     void findTarCollectionDirs();
     void recurseAddDir(Path *path, TarEntry *direntry);
     void addDirsToDirectories();
@@ -100,7 +100,7 @@ struct ForwardTarredFS {
     int readCB(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi);
     void setMessage(string m) { message_ = m; }
     void setTarHeaderStyle(TarHeaderStyle ths) { tarheaderstyle_= ths; }
-    ForwardTarredFS();
+    ForwardTarredFS(FileSystem *fs);
   
 private:
     size_t findNumTarsFromSize(size_t amount, size_t total_size);
@@ -111,6 +111,8 @@ private:
     vector<string> tar_list_; // Contents to be stored in the tar_list_file
     string message_;
     TarHeaderStyle tarheaderstyle_;
+
+    FileSystem *file_system_;
 };
 
 #endif
