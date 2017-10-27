@@ -1,5 +1,7 @@
 # beak
 
+Beak is in development.... the text below is the target! Don't use this for real, yet! :-)
+
 Beak is a mirroring-backup-share-rotation-retention tool that is designed to co-exist
 with the (cloud) storage of your choice and allow push/pull to share the backups
 between multiple client computers.
