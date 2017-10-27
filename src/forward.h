@@ -19,8 +19,10 @@
 #define FORWARD_H
 
 #include "defs.h"
+#include "filesystem.h"
 #include "match.h"
-
+#include "tarentry.h"
+#include "util.h"
 
 #ifdef FUSE_USE_VERSION
 #include <fuse/fuse.h>
@@ -35,9 +37,6 @@
 #include <utility>
 #include <vector>
 
-#include "defs.h"
-#include "tarentry.h"
-#include "util.h"
 
 using namespace std;
 

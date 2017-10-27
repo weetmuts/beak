@@ -47,7 +47,7 @@ ForwardTarredFS::ForwardTarredFS() {
 thread_local ForwardTarredFS *current_fs;
 
 static int addEntry(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf)
-{    
+{ 
     return current_fs->addTarEntry(fpath, sb, ftwbuf);
 }
 

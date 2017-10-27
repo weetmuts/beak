@@ -104,7 +104,7 @@ struct ReverseTarredFS
     PointInTime *findPointInTime(string s);    
     bool setPointInTime(string g);
     
-    ReverseTarredFS();
+    ReverseTarredFS(FileSystem *fs);
 
     Path *rootDir() { return root_dir_; }
     Path *mountDir() { return mount_dir_; }
@@ -120,6 +120,8 @@ struct ReverseTarredFS
     map<string,PointInTime*> points_in_time_;
     PointInTime *single_point_in_time_;
     PointInTime *most_recent_point_in_time_;
+
+    FileSystem *file_system_;
 };
 
 #endif

@@ -60,7 +60,7 @@ struct OptionEntry;
 
 struct BeakImplementation : Beak {
 
-    BeakImplementation();
+    BeakImplementation(FileSystem *fs);
     void printCommands();
     void printOptions();
     
@@ -89,6 +89,7 @@ struct BeakImplementation : Beak {
     int mountReverse(Options *settings);
     int umountReverse(Options *settings);
 
+    int shell(Options *settings);
     int status(Options *settings);
 
     void genAutoComplete(std::string filename);
@@ -122,8 +123,8 @@ struct BeakImplementation : Beak {
     std::unique_ptr<System> sys_;
 };
 
-std::unique_ptr<Beak> newBeak() {    
-    return std::unique_ptr<Beak>(new BeakImplementation());
+std::unique_ptr<Beak> newBeak(FileSystem *fs) {    
+    return std::unique_ptr<Beak>(new BeakImplementation(fs));
 }
 
 struct CommandEntry {
@@ -152,7 +153,8 @@ LIST_OF_OPTIONS
 #undef X
 };
 
-BeakImplementation::BeakImplementation() {
+BeakImplementation::BeakImplementation(FileSystem *fs) :
+    reverse_fs(fs) {
     for (auto &e : command_entries_) {
         if (e.cmd != nosuch_cmd) {
             commands_[e.name] = &e;
@@ -469,15 +471,21 @@ int BeakImplementation::parseCommandLine(int argc, char **argv, Command *cmd, Op
                 if (loc) {
                     debug(COMMANDLINE, "Translating %s to %s\n", src.c_str(), loc->source_path.c_str());
                     src = loc->source_path;
-                } 
-                char tmp[PATH_MAX];
-                const char *rc = realpath(src.c_str(), tmp);
-                if (!rc)
-                {
-                    error(COMMANDLINE, "Could not find real path for %s\n", src.c_str());
                 }
-                assert(rc == tmp);
-                settings->src = Path::lookup(tmp);
+                if (src.find(':') != std::string::npos) {
+                    // Assume this is an rclone remote target.
+                    settings->remote = src;
+                    settings->src = NULL;
+                } else {
+                    char tmp[PATH_MAX];
+                    const char *rc = realpath(src.c_str(), tmp);
+                    if (!rc)
+                    {
+                        error(COMMANDLINE, "Could not find real path for %s\n", src.c_str());
+                    }
+                    assert(rc == tmp);
+                    settings->src = Path::lookup(tmp);
+                }
             }
             else if (settings->dst == NULL)
             {
@@ -593,7 +601,7 @@ int BeakImplementation::push(Options *settings)
     } else {
         args.push_back(settings->remote);
     }
-    rc = sys_->invoke("rclone", args);
+    rc = sys_->invoke("rclone", args, NULL);
     
     // Unmount virtual filesystem.
     rc = umountForward(&forward_settings);
@@ -632,7 +640,7 @@ int BeakImplementation::umountDaemon(Options *settings)
     std::vector<std::string> args;
     args.push_back("-u");
     args.push_back(settings->src->str());
-    return sys_->invoke("fusermount", args);
+    return sys_->invoke("fusermount", args, NULL);
 }
 
 int BeakImplementation::mountForwardDaemon(Options *settings)
@@ -903,6 +911,31 @@ int BeakImplementation::mountReverseInternal(Options *settings, bool daemon)
         exit(0);
     }
     return 0;
+}
+
+int BeakImplementation::shell(Options *settings)
+{
+    int rc = 0;
+
+    std::vector<char> stdout;
+    std::vector<std::string> args;
+    args.push_back("ls");
+    args.push_back(settings->remote);
+    rc = sys_->invoke("rclone", args, &stdout);
+
+    auto i = stdout.begin();
+    bool eof, err;
+
+    for (;;) {
+        eatWhitespace(stdout, i, &eof);
+        if (eof) break;
+        string size = eatTo(stdout, i, ' ', 64, &eof, &err);
+        if (eof || err) break;
+        string name = eatTo(stdout, i, '\n', 4096, &eof, &err);
+        if (err) break;
+        
+    }
+    return rc;
 }
 
 int BeakImplementation::status(Options *settings)

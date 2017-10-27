@@ -16,6 +16,7 @@
 */
 
 #include "diff.h"
+#include "index.h"
 
 /*
 #include <assert.h>
@@ -36,15 +37,8 @@
 
 ComponentId DIFF = registerLogComponent("diff");
 
-bool Entry::same(Entry *e) {
+bool DiffEntry::same(DiffEntry *e) {
     return true;
-    /*sb.st_mode == e->sb.st_mode &&
-        sb.st_uid == e->sb.st_uid &&
-        sb.st_gid == e->sb.st_gid &&
-        sb.st_size == e->sb.st_size &&
-        sb.st_mtim.tv_sec == e->sb.st_mtim.tv_sec &&
-        sb.st_mtim.tv_nsec == e->sb.st_mtim.tv_nsec;
-    */
 }
 
 int DiffTarredFS::loadZ01File(Target ft, Path *file)
@@ -55,7 +49,23 @@ int DiffTarredFS::loadZ01File(Target ft, Path *file)
     
     vector<char> contents;
     gunzipit(&buf, &contents);
+    auto i = contents.begin();
 
+    struct IndexEntry index_entry;
+    struct IndexTar index_tar;
+
+    rc = Index::loadIndex(contents, i, &index_entry, &index_tar, Path::lookupRoot(),
+                          [](IndexEntry *ie){ },
+                          [this,ft](IndexTar *it){
+                              if (it->path->name()->c_str()[0] == 'z') {
+                                  if (ft == FROM) {
+                                      from_files[it->path] = DiffEntry();
+                                  } else {
+                                      to_files[it->path] = DiffEntry();
+                                  }
+                              }
+                          });
+    
     return 0;
 }
 
@@ -120,68 +130,68 @@ int DiffTarredFS::addLinesFromFile(Target t, Path *p) {
         }
     return 0;
 }
+*/
 
 void DiffTarredFS::compare() {
 
-    map<Path*,EntryP,depthFirstSortPath> added;
-    map<Path*,EntryP,depthFirstSortPath> deleted;
-    map<Path*,EntryP,depthFirstSortPath> changed;
+    map<Path*,DiffEntry*,depthFirstSortPath> added;
+    map<Path*,DiffEntry*,depthFirstSortPath> deleted;
+    map<Path*,DiffEntry*,depthFirstSortPath> changed;
 
-    size_t size_added=0, size_changed=0, size_deleted=0;
+    //size_t size_added=0, size_changed=0, size_deleted=0;
 
     for (auto & i : to_files) {
         if (from_files.count(i.first) == 0) {
-            added[i.first] = i.second;
+            added[i.first] = &i.second;
         } else {
-            Entry *e = from_files[i.first];
-            if (!e->same(i.second)) {
-                changed[i.first] = i.second;
+            DiffEntry *e = &from_files[i.first];
+            if (!e->same(&i.second)) {
+                changed[i.first] = &i.second;
             }
         }
     }
 
     for (auto i : from_files) {
         if (to_files.count(i.first) == 0) {
-            deleted[i.first] = i.second;
+            deleted[i.first] = &i.second;
         }
     }
 
     for (auto i : added) {
-        string s = humanReadable(i.second->sb.st_size);
-        if (!list_mode_) {
-            printf("Added %s %s\n", i.first->c_str(), s.c_str());
-        }
-        size_added += i.second->sb.st_size;
+        //string s = humanReadable(i.second->sb.st_size);
+        printf("Added %s\n", i.first->c_str()); // , s.c_str());
+        //size_added += i.second->sb.st_size;
     }
     for (auto i : changed) {
-        string s = humanReadable(i.second->sb.st_size);
-        if (!list_mode_) {
-            printf("Changed %s %s\n", i.first->c_str(), s.c_str());
-        } else {
-            printf("%s\n", i.first->c_str());
-        }
-        size_changed += i.second->sb.st_size;
+        //string s = humanReadable(i.second->sb.st_size);
+        //if (!list_mode_) {
+        printf("Changed %s\n", i.first->c_str()); //, s.c_str());
+        //} else {
+        //printf("%s\n", i.first->c_str());
+        //}
+// size_changed += i.second->sb.st_size;
     }
     for (auto i : deleted) {
-        string s = humanReadable(i.second->sb.st_size);
-        if (!list_mode_) {
-            printf("Deleted %s %s\n", i.first->c_str(), s.c_str());
-        } else {
-            printf("%s\n", i.first->c_str());
-        }
-        size_deleted += i.second->sb.st_size;
+        //string s = humanReadable(i.second->sb.st_size);
+        //if (!list_mode_) {
+        printf("Deleted %s\n", i.first->c_str()); //, s.c_str());
+        //} else {
+        //   printf("%s\n", i.first->c_str());
+        //}
+        // size_deleted += i.second->sb.st_size;
     }
 
-    if (!list_mode_) {
+    /*if (!list_mode_) {
         string up = humanReadable(size_added + size_changed);
         string del = humanReadable(size_deleted);
         printf("Uploading %s\n", up.c_str());
         if (size_deleted != 0) {
             printf("Deleting %s\n", del.c_str());
         }
-    }
+        }*/
 }
 
+/*
 static DiffTarredFS diff_fs;
 
 template<DiffTarredFS*fs> struct AddFromFile {

@@ -20,6 +20,7 @@
 
 #include "config.h"
 #include "defs.h"
+#include "filesystem.h"
 #include "util.h"
 
 #include<memory>
@@ -54,6 +55,7 @@ struct Beak {
     virtual int mountReverse(Options *settings) = 0;   
     virtual int umountReverse(Options *settings) = 0;
 
+    virtual int shell(Options *settings) = 0;
     virtual int status(Options *settings) = 0;
 
     virtual void printHelp(Command cmd) = 0;
@@ -65,8 +67,7 @@ struct Beak {
     virtual void genAutoComplete(std::string filename) = 0;
 };
 
-std::unique_ptr<Beak> newBeak();
-
+std::unique_ptr<Beak> newBeak(FileSystem *fs);
 
 #define LIST_OF_COMMANDS                                                \
     X(check,"Check the integrity of an archive.")                       \
@@ -79,6 +80,7 @@ std::unique_ptr<Beak> newBeak();
     X(prune,"Discard old backups according to the backup retention policy.") \
     X(pull,"Restore a backup to a directory.")                          \
     X(push,"Backup a directory.")                                       \
+    X(shell,"Start a minimal shell with access to the remote backup.")  \
     X(status,"Show the current status of your backups.")                \
     X(umount,"Unmount a virtual file system.")                          \
     X(version,"Show version.")                                          \

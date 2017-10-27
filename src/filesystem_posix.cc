@@ -15,20 +15,33 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef SYSTEM_H
-#define SYSTEM_H
+#include "filesystem.h"
 
-#include <memory>
-#include <string>
-#include <vector>
-
-struct System
+struct FileSystemImplementation : FileSystem
 {
-    virtual int invoke(std::string program,
-                       std::vector<std::string> args,
-                       std::vector<char> *stdout) = 0;
+    std::vector<Path*> readdir(Path *p);
+    std::vector<char> pread(Path *p, size_t count, off_t offset);
+    
+private:
+
+    Path *root;
+    Path *cache;
 };
 
-std::unique_ptr<System> newSystem();
+std::unique_ptr<FileSystem> newDefaultFileSystem()
+{
+    return std::unique_ptr<FileSystem>(new FileSystemImplementation());
+}
 
-#endif
+std::vector<Path*> FileSystemImplementation::readdir(Path *p)
+{
+    vector<Path*> v;
+    return v;
+}
+
+std::vector<char> FileSystemImplementation::pread(Path *p, size_t count, off_t offset)
+{
+    vector<char> v;
+    return v;
+}
+ 

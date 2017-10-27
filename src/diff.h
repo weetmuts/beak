@@ -22,20 +22,19 @@
 
 #include "util.h"
 
-struct Entry {
-    FileStat fs;
+struct DiffEntry {
+    //FileStat fs;
+    
+    //DiffEntry(FileStat *s) { if (s) memcpy(&fs, s, sizeof(struct stat)); }
 
-    Entry(FileStat *s) { if (s) memcpy(&fs, s, sizeof(struct stat)); }
-
-    bool same(Entry *e);
+    bool same(DiffEntry *e);
 };
-
-typedef Entry *EntryP;
 
 enum Target { FROM, TO };
 
 struct DiffTarredFS {
     int loadZ01File(Target ft, Path *file);
+    void compare();
 
     /*
     int addFromFile(const char *fpath, FileStat *s, struct FTW *ftwbuf);
@@ -55,10 +54,9 @@ private:
     bool list_mode_ = false;
     Path *from_dir;
     Path *to_dir;
-        
-    map<Path*,EntryP,depthFirstSortPath> from_files;
-    map<Path*,EntryP,depthFirstSortPath> to_files;
     */
+    map<Path*,DiffEntry,depthFirstSortPath> from_files;
+    map<Path*,DiffEntry,depthFirstSortPath> to_files;    
 };
 
 #endif

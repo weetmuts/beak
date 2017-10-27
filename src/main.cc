@@ -17,7 +17,9 @@
 
 #include "beak.h"
 #include "diff.h"
+#include "filesystem.h"
 #include "log.h"
+
 #include <unistd.h>
 
 int main(int argc, char *argv[])
@@ -26,12 +28,17 @@ int main(int argc, char *argv[])
     Command cmd;
     Options settings;
 
-/*    DiffTarredFS diff;
+    /*
+    DiffTarredFS diff;
     diff.loadZ01File(FROM, Path::lookup("a.gz"));
+    diff.loadZ01File(TO, Path::lookup("b.gz"));
+
+    diff.compare();
     
-    exit(0);*/
-    
-    auto beak = newBeak();
+    exit(0);
+    */
+    auto fs = newDefaultFileSystem();
+    auto beak = newBeak(fs.get());
 
     beak->captureStartTime();
     beak->parseCommandLine(argc, argv, &cmd, &settings);
@@ -86,6 +93,10 @@ int main(int argc, char *argv[])
     case pull_cmd:
         break;
 
+    case shell_cmd:
+        rc = beak->shell(&settings);
+        break;
+        
     case status_cmd:
         rc = beak->status(&settings);
         break;
