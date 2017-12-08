@@ -20,23 +20,43 @@
 
 #include "util.h"
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
 
-/*int (*recurse_cb) (const char *fpath, const struct stat *sb,
-                   int typeflag, struct FTW *ftwbuf);
-*/
+#ifdef FUSE_USE_VERSION
+#include <fuse/fuse.h>
+#else
+#include "nofuse.h"
+#endif
+
+struct FuseAPI {
+    virtual int getattrCB(const char *path,
+                          struct stat *stbuf) = 0;
+    virtual int readdirCB(const char *path,
+                          void *buf,
+                          fuse_fill_dir_t filler,
+                          off_t offset,
+                          struct fuse_file_info *fi) = 0;
+    virtual int readCB(const char *path,
+                       char *buf,
+                       size_t size,
+                       off_t offset,
+                       struct fuse_file_info *fi) = 0;    
+    virtual int readlinkCB(const char *path_char_string,
+                           char *buf,
+                           size_t s) = 0;
+};
+
 struct FileSystem
 {
     virtual bool readdir(Path *p, std::vector<Path*> *vec) = 0;
     virtual ssize_t pread(Path *p, char *buf, size_t size, off_t offset) = 0;
-
-//    virtual void recurse(Path *p, 
-    //int rc = nftw(root_dir.c_str(), addEntry, 256, FTW_PHYS|FTW_ACTIONRETVAL);
-
+    virtual void recurse(function<void(Path *p)> cb) = 0;
 };
 
 std::unique_ptr<FileSystem> newDefaultFileSystem();
+std::unique_ptr<FileSystem> newFileSystem(FuseAPI *api);
 
 #endif

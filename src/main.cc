@@ -20,8 +20,6 @@
 #include "filesystem.h"
 #include "log.h"
 
-#include <unistd.h>
-
 int main(int argc, char *argv[])
 {
     int rc = 0;
@@ -42,7 +40,7 @@ int main(int argc, char *argv[])
 
     beak->captureStartTime();
     beak->parseCommandLine(argc, argv, &cmd, &settings);
-    
+        
     switch (cmd) {
 
     case check_cmd:
@@ -99,6 +97,10 @@ int main(int argc, char *argv[])
         
     case status_cmd:
         rc = beak->status(&settings);
+        break;
+
+    case store_cmd:
+        rc = beak->store(&settings);
         break;
 
     case umount_cmd:

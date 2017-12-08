@@ -72,6 +72,15 @@ directories .beak/gdrivecrypt/work
 
 Run `beak prune gdrivecrypt:/work` to prune the points in time stored in gdrivecrypt: for work.
 
+```
+keep = all for 7-14d days then oneperday for 2w
+       then oneperweek for 4w
+       then onepermonth for 12m
+```
+
+week | month | mon tue wed thu fri sat sun
+```
+
 # Development
 * Clone: `git clone git@github.com:weetmuts/beak.git ; cd beak`
 * Configure: `./configure`

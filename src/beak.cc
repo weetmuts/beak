@@ -91,6 +91,7 @@ struct BeakImplementation : Beak {
 
     int shell(Options *settings);
     int status(Options *settings);
+    int store(Options *settings);
 
     void genAutoComplete(std::string filename);
     
@@ -121,6 +122,7 @@ struct BeakImplementation : Beak {
     pid_t loop_pid_;
 
     std::unique_ptr<System> sys_;
+    FileSystem *file_system_;
 };
 
 std::unique_ptr<Beak> newBeak(FileSystem *fs) {    
@@ -155,7 +157,9 @@ LIST_OF_OPTIONS
 
 BeakImplementation::BeakImplementation(FileSystem *fs) :
     forward_fs(fs),
-    reverse_fs(fs) {
+    reverse_fs(fs),
+    file_system_(fs)
+{
     for (auto &e : command_entries_) {
         if (e.cmd != nosuch_cmd) {
             commands_[e.name] = &e;
@@ -669,94 +673,12 @@ int BeakImplementation::mountForwardInternal(Options *settings, bool daemon)
     forward_tarredfs_ops.open = open_callback;
     forward_tarredfs_ops.read = forwardRead;
     forward_tarredfs_ops.readdir = forwardReaddir;
-    
-    forward_fs.root_dir_path = settings->src;
-    forward_fs.root_dir = settings->src->str();
-    forward_fs.mount_dir_path = settings->dst;
-    forward_fs.mount_dir = settings->dst->str();
 
-    for (auto &e : settings->include) {
-        Match m;
-        ok = m.use(e);
-        if (!ok) {
-            error(COMMANDLINE, "Not a valid glob \"%s\"\n", e.c_str());
-        }
-        forward_fs.filters.push_back(pair<Filter,Match>(Filter(e.c_str(), INCLUDE), m));
-        debug(COMMANDLINE, "Includes \"%s\"\n", e.c_str());
+    ok = forward_fs.scanFileSystem(settings);
+
+    if (ok) {
+        return ERR;
     }
-    for (auto &e : settings->exclude) {
-        Match m;
-        ok = m.use(e);
-        if (!ok) {
-            error(COMMANDLINE, "Not a valid glob \"%s\"\n", e.c_str());
-        }
-        forward_fs.filters.push_back(pair<Filter,Match>(Filter(e.c_str(), EXCLUDE), m));
-        debug(COMMANDLINE, "Excludes \"%s\"\n", e.c_str());
-    }
-
-    forward_fs.forced_tar_collection_dir_depth = settings->depth;
-
-    if (settings->tarheader_supplied) {
-        forward_fs.setTarHeaderStyle(settings->tarheader);
-    } else {
-        forward_fs.setTarHeaderStyle(TarHeaderStyle::Simple);
-    }
-    
-    if (!settings->targetsize_supplied) {
-        // Default settings
-        forward_fs.target_target_tar_size = 10*1024*1024;
-    } else {
-        forward_fs.target_target_tar_size = settings->targetsize;
-    }        
-    if (!settings->triggersize_supplied) {
-        forward_fs.tar_trigger_size = forward_fs.target_target_tar_size * 2;
-    } else {
-        forward_fs.tar_trigger_size = settings->triggersize;
-    }
-
-    for (auto &e : settings->triggerglob) {
-        Match m;
-        ok = m.use(e);
-        if (!ok) {
-            error(COMMANDLINE, "Not a valid glob \"%s\"\n", e.c_str());
-        }
-        forward_fs.triggers.push_back(m);
-        debug(COMMANDLINE, "Triggers on \"%s\"\n", e.c_str());
-    }
-    
-    debug(COMMANDLINE, "Target tar size \"%zu\" Target trigger size %zu\n",
-          forward_fs.target_target_tar_size,
-          forward_fs.tar_trigger_size);
-    
-    info(MAIN, "Scanning %s\n", forward_fs.root_dir.c_str());
-    uint64_t start = clockGetTime();
-    forward_fs.recurse();
-    uint64_t stop = clockGetTime();
-    uint64_t scan_time = stop - start;
-    start = stop;
-
-    // Find suitable directories points where virtual tars will be created.
-    forward_fs.findTarCollectionDirs();
-    // Remove all other directories that will be hidden inside tars.
-    forward_fs.pruneDirectories();
-    // Add remaining dirs as dir entries to their parent directories.
-    forward_fs.addDirsToDirectories();
-    // Add content (files and directories) to the tar collection dirs.
-    forward_fs.addEntriesToTarCollectionDirs();
-    // Calculate the tarpaths and fix/move the hardlinks.
-    forward_fs.fixTarPathsAndHardLinks();
-    // Group the entries into tar files.
-    size_t num_tars = forward_fs.groupFilesIntoTars();
-    // Sort the entries in a tar friendly order.
-    forward_fs.sortTarCollectionEntries();
-
-    stop = clockGetTime();
-    uint64_t group_time = stop - start;
-
-    info(MAIN, "Mounted %s with %zu virtual tars with %zu entries.\n"
-            "Time to scan %jdms, time to group %jdms.\n",
-            forward_fs.mount_dir.c_str(), num_tars, forward_fs.files.size(),
-            scan_time / 1000, group_time / 1000);
 
     if (daemon) {
         return fuse_main(settings->fuse_argc, settings->fuse_argv, &forward_tarredfs_ops, &forward_fs);
@@ -780,8 +702,9 @@ int BeakImplementation::mountForwardInternal(Options *settings, bool daemon)
         fuse_loop_mt (fuse_);
         exit(0);
     }
-    return 0;
+    return 0;    
 }
+
 
 static int reverseGetattr(const char *path, struct stat *stbuf)
 {
@@ -944,6 +867,21 @@ int BeakImplementation::status(Options *settings)
     int rc = 0;
 
 
+    return rc;
+}
+
+int BeakImplementation::store(Options *settings)
+{
+    int rc = 0;
+
+    auto ffs  = newForwardTarredFS(file_system_);
+    auto view = ffs->asFileSystem();
+    
+    rc = ffs->scanFileSystem(settings);
+
+    view->recurse([](Path *p){
+            
+        });
     return rc;
 }
 

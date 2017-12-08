@@ -18,6 +18,7 @@
 #ifndef FORWARD_H
 #define FORWARD_H
 
+#include "beak.h"
 #include "defs.h"
 #include "filesystem.h"
 #include "match.h"
@@ -55,7 +56,10 @@ typedef int (*GetAttrCB)(const char*, struct stat*);
 typedef int (*ReaddirCB)(const char*,void*,fuse_fill_dir_t,off_t,struct fuse_file_info*);
 typedef int (*ReadCB)(const char *,char *,size_t,off_t,struct fuse_file_info *);
 
-struct ForwardTarredFS {
+struct ForwardTarredFS : FileSystem, FuseAPI
+{
+    int scanFileSystem(Options *settings);
+    
     pthread_mutex_t global;
 
     string root_dir;
@@ -94,10 +98,20 @@ struct ForwardTarredFS {
     TarEntry *findNearestStorageDirectory(TarEntry *te);
 
     TarFile *findTarFromPath(Path *path);
+    FileSystem *asFileSystem() { return this; }
+
+    // Implement a FileSystem API
+    bool readdir(Path *p, std::vector<Path*> *vec);
+    ssize_t pread(Path *p, char *buf, size_t size, off_t offset);
+    void recurse(function<void(Path *p)> cb);
+
+    // Implement a FUSE API
     int getattrCB(const char *path, struct stat *stbuf);
     int readdirCB(const char *path, void *buf, fuse_fill_dir_t filler,
                   off_t offset, struct fuse_file_info *fi);
     int readCB(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi);
+    int readlinkCB(const char *path_char_string, char *buf, size_t s);
+
     void setMessage(string m) { message_ = m; }
     void setTarHeaderStyle(TarHeaderStyle ths) { tarheaderstyle_= ths; }
     ForwardTarredFS(FileSystem *fs);
@@ -114,5 +128,7 @@ private:
 
     FileSystem *file_system_;
 };
+
+std::unique_ptr<ForwardTarredFS> newForwardTarredFS(FileSystem *fs);
 
 #endif

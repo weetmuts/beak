@@ -57,6 +57,7 @@ struct Beak {
 
     virtual int shell(Options *settings) = 0;
     virtual int status(Options *settings) = 0;
+    virtual int store(Options *settings) = 0;
 
     virtual void printHelp(Command cmd) = 0;
     virtual void printVersion() = 0;
@@ -82,6 +83,7 @@ std::unique_ptr<Beak> newBeak(FileSystem *fs);
     X(push,"Backup a directory.")                                       \
     X(shell,"Start a minimal shell with access to the remote backup.")  \
     X(status,"Show the current status of your backups.")                \
+    X(store,"Store the virtual file system into a directory.")          \
     X(umount,"Unmount a virtual file system.")                          \
     X(version,"Show version.")                                          \
     X(nosuch,"No such command.")                                        \

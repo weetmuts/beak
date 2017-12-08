@@ -27,6 +27,7 @@ struct FileSystemImplementation : FileSystem
 {
     bool readdir(Path *p, std::vector<Path*> *vec);
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
+    void recurse(function<void(Path *p)> cb);
     
 private:
 
@@ -65,4 +66,9 @@ ssize_t FileSystemImplementation::pread(Path *p, char *buf, size_t size, off_t o
     close(fd);
     return rc;
 }
- 
+
+void FileSystemImplementation::recurse(function<void(Path *p)> cb)
+{
+    //int rc = nftw(root_dir.c_str(), addEntry, 256, FTW_PHYS|FTW_ACTIONRETVAL);
+}
+

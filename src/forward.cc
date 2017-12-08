@@ -38,6 +38,7 @@
 
 using namespace std;
 
+static ComponentId COMMANDLINE = registerLogComponent("commandline");
 static ComponentId FORWARD = registerLogComponent("forward");
 static ComponentId HARDLINKS = registerLogComponent("hardlinks");
 static ComponentId FUSE = registerLogComponent("fuse");
@@ -762,6 +763,20 @@ TarFile *ForwardTarredFS::findTarFromPath(Path *path) {
     return NULL;
 }
 
+bool ForwardTarredFS::readdir(Path *p, std::vector<Path*> *vec)
+{
+    return true;
+}
+
+ssize_t ForwardTarredFS::pread(Path *p, char *buf, size_t size, off_t offset)
+{
+    return 0;
+}
+
+void ForwardTarredFS::recurse(function<void(Path *p)> cb)
+{
+}
+
 int ForwardTarredFS::getattrCB(const char *path_char_string, struct stat *stbuf) {
     pthread_mutex_lock(&global);
 
@@ -809,7 +824,7 @@ ok:
 }
 
 int ForwardTarredFS::readdirCB(const char *path_char_string, void *buf, fuse_fill_dir_t filler,
-                        off_t offset, struct fuse_file_info *fi)
+                               off_t offset, struct fuse_file_info *fi)
 {
 
     debug(FUSE,"readdirCB >%s<\n", path_char_string);
@@ -899,3 +914,109 @@ zero:
     pthread_mutex_unlock(&global);
     return 0;
 }
+
+int ForwardTarredFS::readlinkCB(const char *path_char_string, char *buf, size_t s)
+{
+    return 0;
+}
+
+int ForwardTarredFS::scanFileSystem(Options *settings)
+{
+    bool ok;
+    
+    root_dir_path = settings->src;
+    root_dir = settings->src->str();
+    mount_dir_path = settings->dst;
+    mount_dir = settings->dst->str();
+
+    for (auto &e : settings->include) {
+        Match m;
+        ok = m.use(e);
+        if (!ok) {
+            error(COMMANDLINE, "Not a valid glob \"%s\"\n", e.c_str());
+        }
+        filters.push_back(pair<Filter,Match>(Filter(e.c_str(), INCLUDE), m));
+        debug(COMMANDLINE, "Includes \"%s\"\n", e.c_str());
+    }
+    for (auto &e : settings->exclude) {
+        Match m;
+        ok = m.use(e);
+        if (!ok) {
+            error(COMMANDLINE, "Not a valid glob \"%s\"\n", e.c_str());
+        }
+        filters.push_back(pair<Filter,Match>(Filter(e.c_str(), EXCLUDE), m));
+        debug(COMMANDLINE, "Excludes \"%s\"\n", e.c_str());
+    }
+
+    forced_tar_collection_dir_depth = settings->depth;
+
+    if (settings->tarheader_supplied) {
+        setTarHeaderStyle(settings->tarheader);
+    } else {
+        setTarHeaderStyle(TarHeaderStyle::Simple);
+    }
+    
+    if (!settings->targetsize_supplied) {
+        // Default settings
+        target_target_tar_size = 10*1024*1024;
+    } else {
+        target_target_tar_size = settings->targetsize;
+    }        
+    if (!settings->triggersize_supplied) {
+        tar_trigger_size = target_target_tar_size * 2;
+    } else {
+        tar_trigger_size = settings->triggersize;
+    }
+
+    for (auto &e : settings->triggerglob) {
+        Match m;
+        ok = m.use(e);
+        if (!ok) {
+            error(COMMANDLINE, "Not a valid glob \"%s\"\n", e.c_str());
+        }
+        triggers.push_back(m);
+        debug(COMMANDLINE, "Triggers on \"%s\"\n", e.c_str());
+    }
+    
+    debug(COMMANDLINE, "Target tar size \"%zu\" Target trigger size %zu\n",
+          target_target_tar_size,
+          tar_trigger_size);
+    
+    info(FORWARD, "Scanning %s\n", root_dir.c_str());
+    uint64_t start = clockGetTime();
+    recurse();
+    uint64_t stop = clockGetTime();
+    uint64_t scan_time = stop - start;
+    start = stop;
+
+    // Find suitable directories points where virtual tars will be created.
+    findTarCollectionDirs();
+    // Remove all other directories that will be hidden inside tars.
+    pruneDirectories();
+    // Add remaining dirs as dir entries to their parent directories.
+    addDirsToDirectories();
+    // Add content (files and directories) to the tar collection dirs.
+    addEntriesToTarCollectionDirs();
+    // Calculate the tarpaths and fix/move the hardlinks.
+    fixTarPathsAndHardLinks();
+    // Group the entries into tar files.
+    size_t num_tars = groupFilesIntoTars();
+    // Sort the entries in a tar friendly order.
+    sortTarCollectionEntries();
+
+    stop = clockGetTime();
+    uint64_t group_time = stop - start;
+
+    info(FORWARD, "Mounted %s with %zu virtual tars with %zu entries.\n"
+            "Time to scan %jdms, time to group %jdms.\n",
+            mount_dir.c_str(), num_tars, files.size(),
+            scan_time / 1000, group_time / 1000);
+
+    return OK;
+}
+
+std::unique_ptr<ForwardTarredFS> newForwardTarredFS(FileSystem *fs)
+{
+    return std::unique_ptr<ForwardTarredFS>(new ForwardTarredFS(fs));
+}
+
