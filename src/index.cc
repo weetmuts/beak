@@ -19,6 +19,7 @@
 
 #include "diff.h"
 #include "index.h"
+#include "filesystem.h"
 #include "log.h"
 #include "tarentry.h"
 #include "tarfile.h"
@@ -31,42 +32,42 @@ int Index::loadIndex(vector<char> &v,
                      IndexEntry *ie, IndexTar *it,
                      Path *dir_to_prepend,
                      function<void(IndexEntry*)> on_entry,
-                     function<void(IndexTar*)> on_tar)                     
+                     function<void(IndexTar*)> on_tar)
 {
     vector<char>::iterator ii = i;
-    
+
     bool eof, err;
     string header = eatTo(v, i, separator, 30 * 1024 * 1024, &eof, &err);
-    
+
     std::vector<char> data(header.begin(), header.end());
     auto j = data.begin();
-    
+
     string type = eatTo(data, j, '\n', 64, &eof, &err);
     string msg = eatTo(data, j, '\n', 1024, &eof, &err); // Message can be 1024 bytes long
     string uid = eatTo(data, j, '\n', 10 * 1024 * 1024, &eof, &err); // Accept up to a ~million uniq uids
     string gid = eatTo(data, j, '\n', 10 * 1024 * 1024, &eof, &err); // Accept up to a ~million uniq gids
-    string files = eatTo(data, j, '\n', 64, &eof, &err); 
-    
-    if (type != "#tarredfs 0.1")
+    string files = eatTo(data, j, '\n', 64, &eof, &err);
+
+    if (type != "#beak " XSTR(BEAK_VERSION))
     {
         failure(INDEX,
-                "Type was not \"#tarredfs 0.1\" as expected! It was \"%s\"\n",
+                "Type was not \"#beak " XSTR(BEAK_VERSION) "\" as expected! It was \"%s\"\n",
                 type.c_str());
         return ERR;
     }
-    
+
     int num_files = 0;
     int n = sscanf(files.c_str(), "#files %d", &num_files);
     if (n != 1) {
         failure(INDEX, "File format error gz file. [%d]\n", __LINE__);
         return ERR;
     }
-    
+
     debug(INDEX, "Loading gz contents with >%s< and %d files.\n", msg.c_str(), num_files);
-    
-    eof = false;        
+
+    eof = false;
     while (i != v.end() && !eof && num_files > 0)
-    {        
+    {
         ii = i;
         bool got_entry = eatEntry(v, i, dir_to_prepend, &ie->fs, &ie->offset,
                                   &ie->tar, &ie->path, &ie->link,
@@ -81,7 +82,7 @@ int Index::loadIndex(vector<char> &v,
         on_entry(ie);
         num_files--;
     }
-    
+
     if (num_files != 0) {
         failure(INDEX, "Error in gz file format!");
         return ERR;
@@ -91,7 +92,7 @@ int Index::loadIndex(vector<char> &v,
 
     std::vector<char> tar_data(tar_header.begin(), tar_header.end());
     j = tar_data.begin();
-    
+
     string tars = eatTo(data, j, '\n', 64, &eof, &err);
 
     int num_tars = 0;
@@ -100,8 +101,8 @@ int Index::loadIndex(vector<char> &v,
         failure(INDEX, "File format error gz file. [%d]\n", __LINE__);
         return ERR;
     }
-    
-    eof = false;        
+
+    eof = false;
     while (i != v.end() && !eof && num_tars > 0) {
         string name = eatTo(v, i, separator, 4096, &eof, &err); // Max path names 4096 bytes
         if (err) {
@@ -123,6 +124,5 @@ int Index::loadIndex(vector<char> &v,
     }
     return OK;
 
-    
-};
 
+};

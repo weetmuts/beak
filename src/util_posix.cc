@@ -17,14 +17,11 @@
 
 #include "util.h"
 
-#include <grp.h>
-#include <pwd.h>
 #include <stddef.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <linux/memfd.h>
-#include <linux/kdev_t.h>
 #include <sys/syscall.h>
 #include <sys/time.h>
 #include <cassert>
@@ -53,54 +50,10 @@ static ComponentId UTIL = registerLogComponent("util");
 
 extern struct timespec start_time_; // Inside util.cc
 
-string ownergroupString(uid_t uid, gid_t gid)
+// Seconds since 1970-01-01 Z timezone.
+uint64_t clockGetUnixTime()
 {
-    struct passwd pwd;
-    struct passwd *result;
-    char buf[16000];
-    string s;
-    
-    int rc = getpwuid_r(uid, &pwd, buf, sizeof(buf), &result);
-    if (result == NULL)
-    {
-        if (rc == 0)
-        {
-            s = std::to_string(uid);
-        }
-        else
-        {
-            errno = rc;
-            error(UTIL, "Internal error getpwuid_r %d", errno);
-        }
-    }
-    else
-    {
-        s = pwd.pw_name;
-    }
-    s += "/";
-    
-    struct group grp;
-    struct group *gresult;
-    
-    rc = getgrgid_r(gid, &grp, buf, sizeof(buf), &gresult);
-    if (gresult == NULL)
-    {
-        if (rc == 0)
-        {
-            s += std::to_string(gid);
-        }
-        else
-        {
-            errno = rc;
-            error(UTIL, "Internal error getgrgid_r %d", errno);
-        }
-    }
-    else
-    {
-        s += grp.gr_name;
-    }
-    
-    return s;
+    return time(NULL);
 }
 
 // Return microseconds
@@ -115,7 +68,6 @@ void captureStartTime() {
     clock_gettime(CLOCK_REALTIME, &start_time_);
 }
 
-
 int gzipit(string *from, vector<unsigned char> *to)
 {
     int fd = syscall(SYS_memfd_create, "tobezipped", 0);
@@ -123,11 +75,11 @@ int gzipit(string *from, vector<unsigned char> *to)
     gzFile gzf = gzdopen(fdd, "w");
     gzwrite(gzf, from->c_str(), from->length());
     gzclose(gzf);
-    
+
     size_t len = lseek(fd, 0, SEEK_END);
     //assert(from->length()  == 0 || len < 10+8+2*from->length()); // The gzip header is 10, crc32+isize is 8
     lseek(fd, 0, SEEK_SET);
-    
+
     to->resize(len);
     size_t s = read(fd, &(*to)[0], len);
     assert(s == len);
@@ -141,7 +93,7 @@ int gunzipit(vector<char> *from, vector<char> *to)
     int fd = syscall(SYS_memfd_create, "tobunzipped", 0);
     size_t s = write(fd, &(*from)[0], from->size());
     assert(s == from->size());
-    lseek(fd, 0, SEEK_SET);       
+    lseek(fd, 0, SEEK_SET);
     int fdd = dup(fd);
     char buf[4096];
     int n = 0;
@@ -153,242 +105,43 @@ int gunzipit(vector<char> *from, vector<char> *to)
     } while (n==sizeof(buf));
     gzclose(gzf);
     close(fd);
-    
+
     return OK;
 }
 
-/*    
+/*
   const unsigned char *cstr = reinterpret_cast<const unsigned char*>(from->c_str());
   size_t cstrlen = strlen(from->c_str());
-  
+
   unsigned long bufsize = compressBound(cstrlen);
   unsigned char *buf = new unsigned char[bufsize];
   int rc = compress2(buf, &bufsize, cstr, cstrlen,1);
 
   printf("%d >%*s<\n", (int)cstrlen, (int)cstrlen, cstr);
-  
+
   assert(rc == Z_OK);
 
   struct GZipHeader header;
-  
+
   assert(sizeof(GZipHeader)==10);
   memset(&header, 0, sizeof(GZipHeader));
   header.magic_header[0] = 0x1f;
   header.magic_header[1] = 0x8b;
   header.compression_method = 8;
   header.os_type = 3;
-  
+
   to->clear();
   uint32_t isize  = (uint32_t)cstrlen;
   to->resize(bufsize+sizeof(GZipHeader)+sizeof(isize));
-  
+
   memcpy(&(*to)[0],&header, sizeof(GZipHeader));
   memcpy(&(*to)[0]+sizeof(GZipHeader),buf, bufsize);
 
   toLittleEndian(&isize);
   memcpy(&(*to)[0]+sizeof(GZipHeader)+bufsize, &isize, sizeof(isize));
-  
+
   delete [] buf;
   return OK;
 }
 
 */
-
-string permissionString(mode_t m)
-{
-    string s;
-    
-    if (S_ISDIR(m))
-        s.append("d");
-    else if (S_ISLNK(m))
-        s.append("l");
-    else if (S_ISCHR(m))
-        s.append("c");
-    else if (S_ISBLK(m))
-        s.append("b");
-    else if (S_ISFIFO(m))
-        s.append("p");
-    else if (S_ISSOCK(m))
-        s.append("s");
-    else
-    {
-        assert(S_ISREG(m));
-        s.append("-");
-    }
-    if (m & S_IRUSR)
-        s.append("r");
-    else
-        s.append("-");
-    if (m & S_IWUSR)
-        s.append("w");
-    else
-        s.append("-");
-    if (m & S_ISUID) {
-        s.append("s");
-    } else {                        
-        if (m & S_IXUSR)
-            s.append("x");
-        else
-            s.append("-");
-    }
-    if (m & S_IRGRP)
-        s.append("r");
-    else
-        s.append("-");
-    if (m & S_IWGRP)
-        s.append("w");
-    else
-        s.append("-");
-    if (m & S_ISGID) {
-        s.append("s");
-    } else {                        
-        if (m & S_IXGRP)
-            s.append("x");
-        else
-            s.append("-");
-    }
-    if (m & S_IROTH)
-        s.append("r");
-    else
-        s.append("-");
-    if (m & S_IWOTH)
-        s.append("w");
-    else
-        s.append("-");
-    if (m & S_ISVTX) {
-        s.append("t");
-    } else {
-        if (m & S_IXOTH)
-            s.append("x");
-        else
-            s.append("-");
-    }
-    return s;
-}
-
-mode_t stringToPermission(string s)
-{
-    mode_t rc = 0;
-    
-    if (s[0] == 'd')
-        rc |= S_IFDIR;
-    else if (s[0] == 'l')
-        rc |= S_IFLNK;
-    else if (s[0] == 'c')
-        rc |= S_IFCHR;
-    else if (s[0] == 'b')
-        rc |= S_IFBLK;
-    else if (s[0] == 'p')
-        rc |= S_IFIFO;
-    else if (s[0] == 's')
-        rc |= S_IFSOCK;
-    else if (s[0] == '-')
-        rc |= S_IFREG;
-    else
-        goto err;
-    
-    if (s[1] == 'r')
-        rc |= S_IRUSR;
-    else if (s[1] != '-')
-        goto err;
-    if (s[2] == 'w')
-        rc |= S_IWUSR;
-    else if (s[2] != '-')
-        goto err;
-
-    if (s[3] == 'x')
-        rc |= S_IXUSR;
-    else
-    if (s[3] == 's') {
-        rc |= S_IXUSR;
-        rc |= S_ISUID;
-    } 
-    else if (s[3] != '-')
-        goto err;
-    
-    if (s[4] == 'r')
-        rc |= S_IRGRP;
-    else if (s[4] != '-')
-        goto err;
-    if (s[5] == 'w')
-        rc |= S_IWGRP;
-    else if (s[5] != '-')
-        goto err;
-    if (s[6] == 'x')
-        rc |= S_IXGRP;
-    else
-    if (s[6] == 's') {
-        rc |= S_IXGRP;
-        rc |= S_ISGID;
-    } 
-    else if (s[6] != '-')
-        goto err;
-    
-    if (s[7] == 'r')
-        rc |= S_IROTH;
-    else if (s[7] != '-')
-        goto err;
-    if (s[8] == 'w')
-        rc |= S_IWOTH;
-    else if (s[8] != '-')
-        goto err;
-    if (s[9] == 'x')
-        rc |= S_IXOTH;
-    else
-    if (s[9] == 't') {
-        rc |= S_IXOTH;
-        rc |= S_ISVTX;
-    }
-    else if (s[9] != '-')
-        goto err;
-    
-    return rc;
-    
-    err:
-
-    return 0;
-}
-
-
-dev_t MakeDev(int maj, int min)
-{
-    return MKDEV(maj, min);
-}
-
-int MajorDev(dev_t d)
-{
-    return MAJOR(d);
-}
-
-int MinorDev(dev_t d)
-{
-    return MINOR(d);
-}
-
-
-int loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
-{
-    char block[blocksize+1];
-    
-    int fd = open(file->c_str(), O_RDONLY);
-    if (fd == -1) {
-        return -1;
-    }
-    while (true) {
-        ssize_t n = read(fd, block, sizeof(block));
-        if (n == -1) {
-            if (errno == EINTR) {
-                continue;
-            }
-            failure(UTIL,"Could not read from gzfile %s errno=%d\n", file->c_str(), errno);
-            close(fd);
-            return -1;
-        }
-        buf->insert(buf->end(), block, block+n);
-        if (n < (ssize_t)sizeof(block)) {
-            break;
-        }
-    }
-    close(fd);
-    return 0;
-}

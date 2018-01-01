@@ -1,5 +1,5 @@
 
-.TH TARREDFS 1
+.TH BEAK 1
 .SH NAME
 beak \- mirroring-sharing-versioning-backup-rotation-retention tool that is designed to co-exist
 with the (cloud) storage of your choice and allow push/pull to share the backups
@@ -40,7 +40,7 @@ and by default also in the immediate subdirectories to the root.
 
 All directories are stored in the tar files. Directories that are
 necessary to reach the tarred directories are visible in the
-tarred file system. 
+tarred file system.
 
 Thus tarredfs makes the original file system more chunky, ie reduces
 the number of files and directories, while keeping the remaining directory structure
@@ -51,9 +51,9 @@ for other remote storage service limitations, like case-insensitive
 and lack of symbolic links.
 
 The tarred file system is read only, and will not update itself, nor give a warning,
-if the source filesystem changes. 
+if the source filesystem changes.
 
-Example:    % tarredfs /home/you/Storage /home/you/TarredFS 
+Example:    % tarredfs /home/you/Storage /home/you/TarredFS
 
 .B tarredfs reverse mount
 
@@ -67,7 +67,7 @@ the tarred file system.
 
 Example:    % tarredfs -r /home/you/TarredFS/Project /home/you/ProjectCopy
 
-.B tarredfs-untar 
+.B tarredfs-untar
 will untar the virtual tar files in the correct order to reconstruct the file system
 in the current directory as if the file system was stored in a single tar file.
 
@@ -157,8 +157,3 @@ License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.
 This is free software: you are free to change and redistribute it.
 .br
 There is NO WARRANTY, to the extent permitted by law.
-
-
-
-
-

@@ -18,7 +18,20 @@
 #include "diff.h"
 #include "index.h"
 
+using namespace std;
+
 /*
+    printf("ST_MTIM=%s\n", XSTR(ST_MTIM));
+    printf("ST_MTIME=%s\n", XSTR(ST_MTIME));
+
+    DiffTarredFS diff;
+    diff.loadZ01File(FROM, Path::lookup("a.gz"));
+    diff.loadZ01File(TO, Path::lookup("b.gz"));
+
+    diff.compare();
+
+    exit(0);
+
 #include <assert.h>
 #include <ftw.h>
 #include <limits.h>
@@ -42,11 +55,11 @@ bool DiffEntry::same(DiffEntry *e) {
 }
 
 int DiffTarredFS::loadZ01File(Target ft, Path *file)
-{    
+{
     vector<char> buf;
     int rc = loadVector(file, 4096, &buf);
     if (rc) return -1;
-    
+
     vector<char> contents;
     gunzipit(&buf, &contents);
     auto i = contents.begin();
@@ -65,7 +78,7 @@ int DiffTarredFS::loadZ01File(Target ft, Path *file)
                                   }
                               }
                           });
-    
+
     return 0;
 }
 
@@ -113,23 +126,6 @@ int DiffTarredFS::addFile(Target t, const char *fpath, const struct stat *sb, st
     return 0;
 }
 
-int DiffTarredFS::addLinesFromFile(Target t, Path *p) {
-
-    vector<char> buf;
-
-    ifstream is (p->str(), ifstream::binary);
-    if (is) {
-        is.seekg (0, is.end);
-        size_t length = is.tellg();
-        is.seekg (0, is.beg);
-        char *tmp = new char[length];
-        is.read (tmp,length);
-        is.close();
-        buf.insert(buf.end(), tmp, tmp+length);
-        delete[] tmp;
-        }
-    return 0;
-}
 */
 
 void DiffTarredFS::compare() {
@@ -248,7 +244,7 @@ int diffmain(int argc, char **argv) {
             i--;
         }
     }
-    
+
     diff_fs.setFromDir(Path::lookup(real(argv[1])));
     diff_fs.setToDir(Path::lookup(real(argv[2])));
 

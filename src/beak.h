@@ -18,8 +18,7 @@
 #ifndef BEAK_H
 #define BEAK_H
 
-#include "config.h"
-#include "defs.h"
+#include "always.h"
 #include "filesystem.h"
 #include "util.h"
 
@@ -43,16 +42,17 @@ struct Beak {
     virtual bool lookForPointsInTime(Options *settings) = 0;
     virtual std::vector<PointInTime> &history() = 0;
     virtual bool setPointInTime(std::string g) = 0;
-    
+
+    virtual int configure(Options *settings) = 0;
     virtual int push(Options *settings) = 0;
 
     virtual int umountDaemon(Options *settings) = 0;
-    
+
     virtual int mountForwardDaemon(Options *settings) = 0;
     virtual int mountForward(Options *settings) = 0;
     virtual int umountForward(Options *settings) = 0;
     virtual int mountReverseDaemon(Options *settings) = 0;
-    virtual int mountReverse(Options *settings) = 0;   
+    virtual int mountReverse(Options *settings) = 0;
     virtual int umountReverse(Options *settings) = 0;
 
     virtual int shell(Options *settings) = 0;
@@ -73,16 +73,18 @@ std::unique_ptr<Beak> newBeak(FileSystem *fs);
 #define LIST_OF_COMMANDS                                                \
     X(check,"Check the integrity of an archive.")                       \
     X(config,"Configure backup rules.")                                 \
+    X(diff,"Show changes since last backup.")                           \
     X(help,"Show help. Also: beak push help")                           \
     X(genautocomplete,"Output bash completion script for beak.")        \
+    X(genmounttrigger,"Output systemd rule to trigger backup when USB drive is mounted.")        \
     X(info,"List points in time and other info about archive.")         \
     X(mount,"Mount a backup as a virtual file system.")                 \
     X(pack,"Update the backup to use incremental changes.")             \
     X(prune,"Discard old backups according to the backup retention policy.") \
     X(pull,"Restore a backup to a directory.")                          \
-    X(push,"Backup a directory.")                                       \
+    X(push,"Backup a directory to a remote.")                           \
     X(shell,"Start a minimal shell with access to the remote backup.")  \
-    X(status,"Show the current status of your backups.")                \
+    X(status,"Show the status of your backups both locally and remotly.") \
     X(store,"Store the virtual file system into a directory.")          \
     X(umount,"Unmount a virtual file system.")                          \
     X(version,"Show version.")                                          \
@@ -120,10 +122,10 @@ LIST_OF_COMMANDS
     X(q,quite,bool,false,"Silence information output.")             \
     X(v,verbose,bool,false,"More detailed information.")            \
     X(x,exclude,std::vector<std::string>,true,"Paths matching glob are excluded. E.g. -exclude='beta/**'") \
-    X(nso,nosuch,bool,false,"No such option")    
-        
+    X(nso,nosuch,bool,false,"No such option")
 
-    
+
+
 enum Option {
 #define X(shortname,name,type,requirevalue,info) name##_option,
 LIST_OF_OPTIONS
@@ -134,7 +136,7 @@ struct Options {
     Path *src;
     Path *dst;
     std::string remote;
-    
+
 #define X(shortname,name,type,requirevalue,info) type name; bool name##_supplied;
 LIST_OF_OPTIONS
 #undef X

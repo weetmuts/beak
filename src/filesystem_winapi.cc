@@ -1,0 +1,254 @@
+/*
+ Copyright (C) 2017 Fredrik Öhrström
+
+ This program is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#define WINVER 0x0601
+#define _WIN32_WINNT 0x0601
+
+#include <windows.h>
+
+#include "filesystem.h"
+
+#include "log.h"
+#include "util.h"
+
+using namespace std;
+
+static ComponentId FILESYSTEM = registerLogComponent("filesystem");
+
+bool FileStat::isRegularFile() { return true; }
+bool FileStat::isDirectory() { return false; }
+bool FileStat::isSymbolicLink() { return false; }
+bool FileStat::isCharacterDevice() { return false; }
+bool FileStat::isBlockDevice() { return false; }
+bool FileStat::isFIFO()  { return false; }
+bool FileStat::isSOCK()  { return false; }
+bool FileStat::isISUID() { return false; } // set uid
+bool FileStat::isISGID() { return false; } // set gid
+bool FileStat::isISVTX() { return false; } // sticky
+
+bool FileStat::isIRUSR() { return false; }
+bool FileStat::isIWUSR() { return false; }
+bool FileStat::isIXUSR() { return false; }
+
+bool FileStat::isIRGRP() { return false; }
+bool FileStat::isIWGRP() { return false; }
+bool FileStat::isIXGRP() { return false; }
+
+bool FileStat::isIROTH() { return false; }
+bool FileStat::isIWOTH() { return false; }
+bool FileStat::isIXOTH() { return false; }
+
+
+std::string FileStat::uidName()
+{
+    return "Woot!";
+
+}
+
+std::string FileStat::gidName()
+{
+    return "Woot!";
+}
+
+dev_t MakeDev(int maj, int min)
+{
+    return 0;
+}
+
+int MajorDev(dev_t d)
+{
+    return 0;
+}
+
+int MinorDev(dev_t d)
+{
+    return 0;
+}
+
+std::string ownergroupString(uid_t uid, gid_t gid)
+{
+    return "";
+}
+
+struct FileSystemImplementationWinapi : FileSystem
+{
+    bool readdir(Path *p, std::vector<Path*> *vec);
+    ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
+    void recurse(std::function<void(Path *p)> cb);
+    bool stat(Path *p, FileStat *fs);
+    Path *mkTempDir(std::string prefix);
+
+private:
+
+    Path *root;
+    Path *cache;
+};
+
+FileSystem *default_file_system_;
+
+FileSystem *defaultFileSystem()
+{
+    return default_file_system_;
+}
+
+std::unique_ptr<FileSystem> newDefaultFileSystem()
+{
+    default_file_system_ = new FileSystemImplementationWinapi();
+    return std::unique_ptr<FileSystem>(default_file_system_);
+}
+
+
+bool FileSystemImplementationWinapi::readdir(Path *p, std::vector<Path*> *vec)
+{
+    HANDLE find;
+    WIN32_FIND_DATA find_data;
+    char buf[MAX_PATH+2];
+
+    strcpy(buf, p->c_str());
+    strcat(buf, "/*");
+    find = FindFirstFile(buf, &find_data);
+    if (find == INVALID_HANDLE_VALUE) return false;
+
+    do {
+        vec->push_back(Path::lookup(find_data.cFileName));
+    }
+    while(FindNextFile(find, &find_data));
+
+    FindClose(find);
+    return true;
+}
+
+ssize_t FileSystemImplementationWinapi::pread(Path *p, char *buf, size_t count, off_t offset)
+{
+    return 0;
+}
+
+void FileSystemImplementationWinapi::recurse(std::function<void(Path *p)> cb)
+{
+}
+
+bool FileSystemImplementationWinapi::stat(Path *p, FileStat *fs)
+{
+    return false;
+}
+
+Path *FileSystemImplementationWinapi::mkTempDir(std::string prefix)
+{
+    int attempts = 0;
+    string buf;
+    buf.resize(MAX_PATH);
+    size_t l = GetTempPath(MAX_PATH, &buf[0]);
+    if (l+1 > MAX_PATH) {
+        error(FILESYSTEM,"Cannot find the temp dir path!\n");
+    }
+    buf.resize(l);
+    Path *tmp_path = Path::lookup(buf);
+    Path *tmp_dir;
+
+    for (;;) {
+        string suffix = randomUpperCaseCharacterString(6);
+        string dirname = prefix+suffix;
+        tmp_dir = tmp_path->append(dirname);
+
+        int rc = CreateDirectory(tmp_dir->c_str(), NULL);
+        if (rc != 0) break;
+        attempts++;
+        if (attempts > 100) {
+            error(FILESYSTEM, "Cannot create temporary directory. Too many fails.\n");
+        }
+    }
+    return tmp_dir;
+}
+
+int loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
+{
+    /*
+    char block[blocksize+1];
+
+    int fd = open(file->c_str(), O_RDONLY);
+    if (fd == -1) {
+        return -1;
+    }
+    while (true) {
+        ssize_t n = read(fd, block, sizeof(block));
+        if (n == -1) {
+            if (errno == EINTR) {
+                continue;
+            }
+            failure(FILESYSTEM,"Could not read from gzfile %s errno=%d\n", file->c_str(), errno);
+            close(fd);
+            return -1;
+        }
+        buf->insert(buf->end(), block, block+n);
+        if (n < (ssize_t)sizeof(block)) {
+            break;
+        }
+    }
+    close(fd);
+    */
+    return 0;
+}
+
+int writeVector(std::vector<char> *buf, Path *file)
+{
+    /*
+    int fd = open(file->c_str(), O_WRONLY | O_CREAT, 0666);
+    if (fd == -1) {
+	failure(FILESYSTEM,"Could not open file %s errno=%d\n", file->c_str(), errno);
+        return -1;
+    }
+    char *p = buf->data();
+    ssize_t total = buf->size();
+    while (true) {
+        ssize_t n = write(fd, buf->data(), buf->size());
+        if (n == -1) {
+            if (errno == EINTR) {
+                continue;
+            }
+            failure(FILESYSTEM,"Could not write to file %s errno=%d\n", file->c_str(), errno);
+            close(fd);
+            return -1;
+        }
+	p += n;
+	total -= n;
+        if (total <= 0) {
+            break;
+        }
+    }
+    close(fd);*/
+    return 0;
+}
+
+uid_t geteuid()
+{
+    return 0;
+}
+
+gid_t getegid()
+{
+    return 0;
+}
+
+char *realpath(const char *path, char *resolved_path)
+{
+    return NULL;
+}
+
+char *mkdtemp(char *pattern)
+{
+    return NULL;
+}

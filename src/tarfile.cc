@@ -58,7 +58,7 @@ void TarFile::addEntryLast(TarEntry *entry)
 void TarFile::addEntryFirst(TarEntry *entry)
 {
     entry->updateMtim(&mtim_);
-    
+
     entry->registerTarFile(this, 0);
     map<size_t, TarEntry*> newc;
     vector<size_t> newo;
@@ -76,11 +76,11 @@ void TarFile::addEntryFirst(TarEntry *entry)
     }
     contents_ = newc;
     offsets = newo;
-    
+
     debug(TARFILE, "    %s    Added FIRST %s at %zu with blocked size %zu\n",
           name_.c_str(), entry->path()->c_str(), current_tar_offset_,
           entry->blockedSize());
-    current_tar_offset_ += entry->blockedSize();    
+    current_tar_offset_ += entry->blockedSize();
 }
 
 pair<TarEntry*, size_t> TarFile::findTarEntry(size_t offset)
@@ -91,10 +91,10 @@ pair<TarEntry*, size_t> TarFile::findTarEntry(size_t offset)
     }
     debug(TARFILE, "tarfile", "Looking for offset %zu\n", offset);
     size_t o = 0;
-    
+
     vector<size_t>::iterator i = lower_bound(offsets.begin(), offsets.end(),
                                              offset, less_equal<size_t>());
-    
+
     if (i == offsets.end())
     {
         o = *offsets.rbegin();
@@ -105,7 +105,7 @@ pair<TarEntry*, size_t> TarFile::findTarEntry(size_t offset)
         o = *i;
     }
     TarEntry *te = contents_[o];
-    
+
     debug(TARFILE, "Found it %s\n", te->path()->c_str());
     return pair<TarEntry*, size_t>(te, o);
 }
@@ -128,7 +128,7 @@ void TarFile::calculateSHA256Hash()
 {
     SHA256_CTX sha256ctx;
     SHA256_Init(&sha256ctx);
-    
+
     for (auto & a : contents_)
     {
         TarEntry *te = a.second;
@@ -142,44 +142,44 @@ void TarFile::calculateSHA256Hash(vector<TarFile*> &tars, string &content)
 {
     SHA256_CTX sha256ctx;
     SHA256_Init(&sha256ctx);
-    
+
     // SHA256 all other tar and gz file hashes! This is the hash of this state!
     for (auto & tf : tars)
     {
         if (tf == this) continue;
-        
+
         SHA256_Update(&sha256ctx, &tf->hash()[0], tf->hash().size());
     }
 
     // SHA256 the detailed file listing too!
     SHA256_Update(&sha256ctx, &content[0], content.length());
-    
+
     sha256_hash_.resize(SHA256_DIGEST_LENGTH);
     SHA256_Final((unsigned char*)&sha256_hash_[0], &sha256ctx);
 }
 
-void TarFile::fixName() {        
-        char sizes[32];
-        memset(sizes, 0, sizeof(sizes));
-        snprintf(sizes, 32, "%zu", size());
-        
-        char secs_and_nanos[32];
-        memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
-        snprintf(secs_and_nanos, 32, "%012ju.%09ju", mtim()->tv_sec, mtim()->tv_nsec);
-        
-	char buffer[256];
-        char gztype[] = "gz";
-        char tartype[] = "tar";
-        char *type = tartype;
-        if (chartype() == 'z') {
-            type = gztype;
-        }
-	snprintf(buffer, sizeof(buffer), "%c01_%s_%s_%s_0.%s",
-                 chartype(), secs_and_nanos, sizes, toHex(hash()).c_str(), type);
-	name_ = buffer;
-        path_ = in_directory_->path()->appendName(Atom::lookup(name_));
-            
-        debug(HASHING,"Fix name of tarfile to %s\n\n", name_.c_str());
+void TarFile::fixName() {
+    char sizes[32];
+    memset(sizes, 0, sizeof(sizes));
+    snprintf(sizes, 32, "%zu", size());
+
+    char secs_and_nanos[32];
+    memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
+    snprintf(secs_and_nanos, 32, "%012ju.%09lu", mtim()->tv_sec, mtim()->tv_nsec);
+
+    char buffer[256];
+    char gztype[] = "gz";
+    char tartype[] = "tar";
+    char *type = tartype;
+    if (chartype() == 'z') {
+        type = gztype;
+    }
+    snprintf(buffer, sizeof(buffer), "%c01_%s_%s_%s_0.%s",
+             chartype(), secs_and_nanos, sizes, toHex(hash()).c_str(), type);
+    name_ = buffer;
+    path_ = in_directory_->path()->appendName(Atom::lookup(name_));
+
+    debug(HASHING,"Fix name of tarfile to %s\n\n", name_.c_str());
 }
 
 void TarFile::setName(string s) {
@@ -199,25 +199,25 @@ string TarFile::line(Path *p)
 
     char secs_and_nanos[32];
     memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
-    snprintf(secs_and_nanos, 32, "%012ju.%09ju", mtim()->tv_sec, mtim()->tv_nsec);
+    snprintf(secs_and_nanos, 32, "%012ju.%09lu", mtim()->tv_sec, mtim()->tv_nsec);
     s.append(separator_string);
     s.append(secs_and_nanos);
-    
+
     char datetime[20];
     memset(datetime, 0, sizeof(datetime));
     strftime(datetime, 20, "%Y-%m-%d %H:%M.%S", localtime(&mtim()->tv_sec));
     s.append(separator_string);
     s.append(datetime);
     s.append("\n");
-    s.append(separator_string); 
-    
+    s.append(separator_string);
+
     return s;
 }
 
 void TarFile::updateMtim(struct timespec *mtim) {
     if (isInTheFuture(&mtim_)) {
         fprintf(stderr, "Virtual tarfile %s has a future timestamp! Ignoring the timstamp.\n", path()->c_str());
-    } else {    
+    } else {
         if (mtim_.tv_sec > mtim->tv_sec ||
             (mtim_.tv_sec == mtim->tv_sec && mtim_.tv_nsec > mtim->tv_nsec)) {
             memcpy(mtim, &mtim_, sizeof(*mtim));
@@ -239,11 +239,11 @@ static bool hexDigitsOnly(char *p, size_t len, string *s) {
     while (len-- > 0) {
         char c = *p++;
         if (!c) return false;
-        bool is_hex = isdigit(c) ||            
+        bool is_hex = isdigit(c) ||
             (c >= 'A' && c <= 'F') ||
             (c >= 'a' && c <= 'f');
         if (!is_hex) return false;
-        s->push_back(c);        
+        s->push_back(c);
     }
     return true;
 }
@@ -253,9 +253,9 @@ bool TarFile::parseFileName(string &name, TarFileName *c)
     bool k;
     // Example file name:
     // (r)01_(001501080787).(579054757)_(1119232)_(3b5e4ec7fe38d0f9846947207a0ea44c)_(0).(tar)
-    
+
     if (name.size() == 0) return false;
-    
+
     k = typeFromChar(name[0], &c->type);
     if (!k) return false;
 
@@ -279,12 +279,12 @@ bool TarFile::parseFileName(string &name, TarFileName *c)
     string nsecs;
     k = digitsOnly(&name[p2+1], p3-p2-1, &nsecs);
     if (!k) return false;
-    c->nsecs = atol(nsecs.c_str());                    
+    c->nsecs = atol(nsecs.c_str());
 
     string size;
     k = digitsOnly(&name[p3+1], p4-p3-1, &nsecs);
-    if (!k) return false;    
-    c->size = atol(size.c_str());                    
+    if (!k) return false;
+    c->size = atol(size.c_str());
 
     k = hexDigitsOnly(&name[p4+1], p5-p4-1, &c->header_hash);
     if (!k) return false;

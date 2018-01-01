@@ -12,7 +12,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-# 
+#
 
 AC_PREREQ([2.69])
 AC_INIT(BEAK, beak, oehrstroem@gmail.com,,http://nivelleringslikaren.eu/beak)
@@ -80,7 +80,7 @@ if test "x$ENABLE_FUSE" = xyes; then
     else
        AC_MSG_ERROR(Please install libfuse-dev)
     fi
-    AC_MSG_RESULT([found])    
+    AC_MSG_RESULT([found])
 else
     FUSE_CFLAGS=""
     FUSE_LIBS=""
@@ -117,7 +117,7 @@ AC_ARG_WITH(zlib, [AS_HELP_STRING([--with-zlib],
 if test "x${with_zlib}" = "x"; then
     ZLIB_CFLAGS="$(pkg-config zlib --cflags)"
     ZLIB_LIBS="$(pkg-config zlib --libs)"
-    AC_MSG_RESULT([found])    
+    AC_MSG_RESULT([found])
 else
     with_zlib=$(realpath ${with_zlib})
     ZLIB_CFLAGS="-I${with_zlib}"
@@ -137,7 +137,9 @@ AC_COMPILE_IFELSE(
 have_st_mtim=yes, have_st_mtim=no)
 AC_MSG_RESULT($have_st_mtim)
 
-AC_DEFINE_UNQUOTED(ST_MTIM,$have_st_mtim,Stat structure has st_mtim)
+if test "x${have_st_mtim}" = "xyes"; then
+    AC_DEFINE(HAS_ST_MTIM,1,Stat structure has st_mtim)
+fi
 
 AC_MSG_CHECKING(for st_mtime in struct stat)
 AC_COMPILE_IFELSE(
@@ -148,11 +150,13 @@ AC_COMPILE_IFELSE(
 have_st_mtime=yes, have_st_mtime=no)
 AC_MSG_RESULT($have_st_mtime)
 
-AC_DEFINE_UNQUOTED(ST_MTIME,$have_st_mtime,Stat structure has st_mtime)
+if test "x${have_st_mtime}" = "xyes"; then
+    AC_DEFINE(HAS_ST_MTIME,1,Stat structure has st_mtime)
+fi
 
-CXXFLAGS="-D${PLATFORM} -Wall -fmessage-length=0 -std=c++11 -Wno-unused-function -DTARREDFS_VERSION=0.1" 
+CXXFLAGS="-DPLATFORM_${PLATFORM} -Wall -fmessage-length=0 -std=c++11 -Wno-unused-function"
 
-CXXFLAGS_debug="-O0 -g" 
+CXXFLAGS_debug="-O0 -g"
 CXXFLAGS_release="-Os"
 
 LDFLAGS=""

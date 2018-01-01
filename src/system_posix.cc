@@ -23,6 +23,8 @@
 
 #include <unistd.h>
 
+using namespace std;
+
 static ComponentId SYSTEM = registerLogComponent("system");
 
 struct SystemImplementation : System
@@ -50,14 +52,14 @@ int SystemImplementation::invoke(std::string program,
     const char **argv = new const char*[args.size()+2];
     argv[0] = program.c_str();
     int i = 1;
-    debug(SYSTEM, "Invoking: %s ", program.c_str());
+    debug(SYSTEM, "Invoking: \"%s\"\n", program.c_str());
     for (auto &a : args) {
         argv[i] = a.c_str();
         i++;
-        debug(SYSTEM, ">>%s<< ", a.c_str());
+        debug(SYSTEM, "\"%s\"\n ", a.c_str());
     }
     argv[i] = NULL;
-    
+
     debug(SYSTEM, "\n");
 
     if (stdout) {
@@ -73,7 +75,7 @@ int SystemImplementation::invoke(std::string program,
         if (stdout) {
             dup2 (link[1], STDOUT_FILENO);
             close(link[0]);
-            close(link[1]);            
+            close(link[1]);
         }
         close(0); // Close stdin
         execvp(program.c_str(), (char*const*)argv);
@@ -87,11 +89,11 @@ int SystemImplementation::invoke(std::string program,
         close(link[1]);
         if (stdout) {
             char buf[4096 + 1];
-            
+
             int n = 0;
             while (0 != (n = read(link[0], buf, sizeof(buf)))) {
                 stdout->insert(stdout->end(), buf, buf+n);
-                debug(SYSTEM,"Stdout: (%.*s)\n", n, buf);
+                debug(SYSTEM,"Stdout: \"%.*s\"\n", n, buf);
             }
         }
         debug(SYSTEM,"Waiting for child %d.\n", pid);
@@ -105,4 +107,3 @@ int SystemImplementation::invoke(std::string program,
     }
     return rc;
 }
-

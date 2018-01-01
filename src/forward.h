@@ -18,8 +18,8 @@
 #ifndef FORWARD_H
 #define FORWARD_H
 
+#include "always.h"
 #include "beak.h"
-#include "defs.h"
 #include "filesystem.h"
 #include "match.h"
 #include "tarentry.h"
@@ -38,16 +38,13 @@
 #include <utility>
 #include <vector>
 
-
-using namespace std;
-
 enum FilterType { INCLUDE, EXCLUDE };
 
 struct Filter {
-    string rule;
+    std::string rule;
     FilterType type;
 
-    Filter(string rule_, FilterType type_) : rule(rule_), type(type_) { }
+    Filter(std::string rule_, FilterType type_) : rule(rule_), type(type_) { }
 };
 
 typedef int (*FileCB)(const char *,const struct stat *,int,struct FTW *);
@@ -59,12 +56,12 @@ typedef int (*ReadCB)(const char *,char *,size_t,off_t,struct fuse_file_info *);
 struct ForwardTarredFS : FileSystem, FuseAPI
 {
     int scanFileSystem(Options *settings);
-    
+
     pthread_mutex_t global;
 
-    string root_dir;
+    std::string root_dir;
     Path *root_dir_path;
-    string mount_dir;
+    std::string mount_dir;
     Path *mount_dir_path;
 
     size_t target_target_tar_size = DEFAULT_TARGET_TAR_SIZE;
@@ -76,14 +73,14 @@ struct ForwardTarredFS : FileSystem, FuseAPI
     // tars directly below the mount dir, ie no subdirs, only tars.
     int forced_tar_collection_dir_depth = 2;
 
-    map<Path*,TarEntry*,depthFirstSortPath> files;
-    map<Path*,TarEntry*,depthFirstSortPath> tar_storage_directories;
-    map<Path*,TarEntry*> directories;
-    map<ino_t,TarEntry*> hard_links; // Only inodes for which st_nlink > 1
+    std::map<Path*,TarEntry*,depthFirstSortPath> files;
+    std::map<Path*,TarEntry*,depthFirstSortPath> tar_storage_directories;
+    std::map<Path*,TarEntry*> directories;
+    std::map<ino_t,TarEntry*> hard_links; // Only inodes for which st_nlink > 1
     size_t hardlinksavings = 0;
 
-    vector<pair<Filter,Match>> filters;
-    vector<Match> triggers;
+    std::vector<std::pair<Filter,Match>> filters;
+    std::vector<Match> triggers;
 
     int recurse();
     int addTarEntry(const char *fpath, const struct stat *sb);
@@ -103,7 +100,9 @@ struct ForwardTarredFS : FileSystem, FuseAPI
     // Implement a FileSystem API
     bool readdir(Path *p, std::vector<Path*> *vec);
     ssize_t pread(Path *p, char *buf, size_t size, off_t offset);
-    void recurse(function<void(Path *p)> cb);
+    void recurse(std::function<void(Path *p)> cb);
+    bool stat(Path *p, FileStat *fs);
+    Path *mkTempDir(std::string prefix);
 
     // Implement a FUSE API
     int getattrCB(const char *path, struct stat *stbuf);
@@ -112,18 +111,18 @@ struct ForwardTarredFS : FileSystem, FuseAPI
     int readCB(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi);
     int readlinkCB(const char *path_char_string, char *buf, size_t s);
 
-    void setMessage(string m) { message_ = m; }
+    void setMessage(std::string m) { message_ = m; }
     void setTarHeaderStyle(TarHeaderStyle ths) { tarheaderstyle_= ths; }
     ForwardTarredFS(FileSystem *fs);
-  
+
 private:
     size_t findNumTarsFromSize(size_t amount, size_t total_size);
     void calculateNumTars(TarEntry *te, size_t *nst, size_t *nmt, size_t *nlt,
                           size_t *sfs, size_t *mfs, size_t *lfs,
                           size_t *sc, size_t *mc);
     Path *tar_list_file_ = NULL;
-    vector<string> tar_list_; // Contents to be stored in the tar_list_file
-    string message_;
+    std::vector<std::string> tar_list_; // Contents to be stored in the tar_list_file
+    std::string message_;
     TarHeaderStyle tarheaderstyle_;
 
     FileSystem *file_system_;

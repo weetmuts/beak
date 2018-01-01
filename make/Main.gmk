@@ -19,7 +19,7 @@
 # To build with a lot of build output, type:
 # make VERBOSE=
 
-# Expect release or debug as a target
+# Expects release or debug as a target
 
 ifeq (release,$(findstring release,$(MAKECMDGOALS)))
 TYPE:=release
@@ -38,20 +38,32 @@ endif
 $(shell mkdir -p $(OUTPUT_ROOT)/$(TYPE))
 
 VERBOSE?=@
-HEADERS:=$(wildcard $(SRC_ROOT)/src/*.h) 
+HEADERS:=$(wildcard $(SRC_ROOT)/src/*.h)
 
 WINAPI_SOURCES:=$(filter-out %posix.cc, $(wildcard $(SRC_ROOT)/src/*.cc))
+ifeq ($(ENABLE_FUSE),yes)
+WINAPI_SOURCES:=$(filter-out %nofuse.cc,$(WINAPI_SOURCES))
+endif
 
-WINAPI_BEAK_OBJS := \
-$(OUTPUT_ROOT)/$(TYPE)/diff.o \
-$(OUTPUT_ROOT)/$(TYPE)/tarentry.o \
-$(OUTPUT_ROOT)/$(TYPE)/match.o \
+WINAPI_OBJS:=\
+    $(patsubst %.cc,%.o,$(subst $(SRC_ROOT)/src,$(OUTPUT_ROOT)/$(TYPE),$(WINAPI_SOURCES)))
+
+WINAPI_BEAK_OBJS:=\
+    $(filter-out %testinternals.o,$(WINAPI_OBJS))
+
+WINAPI_LIBS := \
+$(OUTPUT_ROOT)/$(TYPE)/libgcc_s_seh-1.dll \
+$(OUTPUT_ROOT)/$(TYPE)/libstdc++-6.dll \
+$(OUTPUT_ROOT)/$(TYPE)/libwinpthread-1.dll
+
+WINAPI_TESTINTERNALS_OBJS := \
+$(OUTPUT_ROOT)/$(TYPE)/filesystem.o \
+$(OUTPUT_ROOT)/$(TYPE)/filesystem_winapi.o \
 $(OUTPUT_ROOT)/$(TYPE)/log.o \
-$(OUTPUT_ROOT)/$(TYPE)/nofuse.o \
-$(OUTPUT_ROOT)/$(TYPE)/tar.o \
+$(OUTPUT_ROOT)/$(TYPE)/match.o \
 $(OUTPUT_ROOT)/$(TYPE)/util.o \
 $(OUTPUT_ROOT)/$(TYPE)/util_winapi.o \
-$(NOFUSE_OBJS)
+$(OUTPUT_ROOT)/$(TYPE)/testinternals.o
 
 POSIX_SOURCES:=$(filter-out %winapi.cc,$(wildcard $(SRC_ROOT)/src/*.cc))
 ifeq ($(ENABLE_FUSE),yes)
@@ -67,6 +79,10 @@ POSIX_BEAK_OBJS:=\
 POSIX_TESTINTERNALS_OBJS:=\
     $(filter-out %main.o,$(POSIX_OBJS))
 
+POSIX_LIBS :=
+
+EXTRA_LIBS := $($(PLATFORM)_LIBS)
+
 $(OUTPUT_ROOT)/generated_autocomplete.h: $(SRC_ROOT)/scripts/autocompletion_for_beak.sh
 	echo Generating autocomplete include.
 	cat $< | sed 's/\\/\\\\/g' | sed 's/\"/\\\"/g' | sed 's/^\(.*\)$$/"\1\\n"/g'> $@
@@ -80,18 +96,26 @@ $(OUTPUT_ROOT)/$(TYPE)/%.o: $(SRC_ROOT)/src/%.cc $(HEADERS)
 	@echo Compiling $$(basename $<)
 	$(VERBOSE)$(CXX) $(CXXFLAGS_$(TYPE)) $(CXXFLAGS) -I$(OUTPUT_ROOT) $< -c -o $@
 
-
 $(OUTPUT_ROOT)/$(TYPE)/beak: $(BEAK_OBJS)
 	@echo Linking $@
 	$(VERBOSE)@$(CXX) -o $@ $(LDFLAGS_$(TYPE)) $(LDFLAGS) $(BEAK_OBJS) \
-                      $(FUSE_LIBS) $(OPENSSL_LIBS) $(ZLIB_LIBS)
+                      $(FUSE_LIBS) $(OPENSSL_LIBS) $(ZLIB_LIBS) -lpthread
 	$(VERBOSE)@$(STRIP_COMMAND) $@
 
 $(OUTPUT_ROOT)/$(TYPE)/testinternals: $(TESTINTERNALS_OBJS)
 	@echo Linking $@
-	$(VERBOSE)@$(CXX) -o $@ $(LDFLAGS_$(TYPE)) $(LDFLAGS) $(BEAK_OBJS) \
-                      $(FUSE_LIBS) $(OPENSSL_LIBS) $(ZLIB_LIBS)
+	$(VERBOSE)@$(CXX) -o $@ $(LDFLAGS_$(TYPE)) $(LDFLAGS) $(TESTINTERNALS_OBJS) \
+                      $(FUSE_LIBS) $(OPENSSL_LIBS) $(ZLIB_LIBS) -lpthread
 	$(VERBOSE)@$(STRIP_COMMAND) $@
+
+$(OUTPUT_ROOT)/$(TYPE)/libgcc_s_seh-1.dll: /usr/lib/gcc/x86_64-w64-mingw32/5.3-win32/libgcc_s_seh-1.dll
+	cp /usr/lib/gcc/x86_64-w64-mingw32/5.3-win32/libgcc_s_seh-1.dll $@
+
+$(OUTPUT_ROOT)/$(TYPE)/libstdc++-6.dll: /usr/lib/gcc/x86_64-w64-mingw32/5.3-win32/libstdc++-6.dll
+	cp /usr/lib/gcc/x86_64-w64-mingw32/5.3-win32/libstdc++-6.dll $@
+
+$(OUTPUT_ROOT)/$(TYPE)/libwinpthread-1.dll: /usr/x86_64-w64-mingw32/lib/libwinpthread-1.dll
+	cp $< $@
 
 ifeq ($(CLEAN),clean)
 # Clean!
@@ -100,14 +124,7 @@ release debug:
 	rm -f $(OUTPUT_ROOT)/$(TYPE)/generated_autocomplete.h
 else
 # Build!
-release debug:$(OUTPUT_ROOT)/$(TYPE)/beak $(OUTPUT_ROOT)/$(TYPE)/testinternals
+release debug:$(OUTPUT_ROOT)/$(TYPE)/beak $(OUTPUT_ROOT)/$(TYPE)/testinternals $(EXTRA_LIBS)
 endif
 
-install:
-	echo Installing into /usr/local/bin
-	cp $(OUTPUT_ROOT)/$(TYPE)/beak /usr/local/bin
-	mkdir -p /usr/local/lib/tarredfs
-	cp tarredfs.1 /usr/local/share/man/man1
-
 .PHONY: release debug
-

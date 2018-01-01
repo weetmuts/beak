@@ -92,7 +92,7 @@ Hosts to be supported: x86_64-linux-gnu x86_64-w64-mingw32 arm-linux-gnueabihf
 
 # Cross compiling
 
-`./configure --host=x86_64-w64-mingw32 --with-zlib=../zlib-1.2.11/`
+`./configure --host=x86_64-w64-mingw32 --with-zlib=3rdparty/zlib-1.2.11/ --with-openssl=3rdparty/openssl-1.0.2l`
 
 # Beak Internals
 
@@ -100,7 +100,7 @@ Beak is based on a simple idea: Group the files to be backed up (the source tree
 into larger archive files and give each archive file a modify timestamp that equals
 the most recently modified file inside the archive file. Now, also give the archive
 file a name, that consists of that modify timestamp, the size of the contents inside the
-archive file and a hash of the meta-data of the files inside the archive file. 
+archive file and a hash of the meta-data of the files inside the archive file.
 (The meta-data hashed is the file name (and path), its size and its modify timestamp.)
 Like this:
 
@@ -164,7 +164,7 @@ side. As always, rclone skips any archive files already copied.
 For fun, if you want to study the archive tree, you can mount any directory (does not have to be
 configured) like this:
 
-`beak mount src_tree_dir archive_tree_dir` 
+`beak mount src_tree_dir archive_tree_dir`
 
 You can now examine the contents of the archive_tree_dir. Copy the contents from archive_tree_dir
 to another directory Backups (e.g. `rclone copy archive_tree_dir/ Backups` or simply
@@ -188,7 +188,7 @@ and by default also in the immediate subdirectories to the root.
 
 All directories are stored in the tar files. Directories that are
 necessary to reach the tarred directories are visible in the
-tarred file system. 
+tarred file system.
 
 Thus tarredfs makes the original file system more chunky, ie reduces
 the number of files and directories, while keeping the remaining directory structure
@@ -197,4 +197,3 @@ remote storage service that have high a transfer bandwidth but allows
 few files to be transferred per second. Tarredfs is also a work around
 for other remote storage service limitations, like case-insensitive
 and lack of symbolic links.
-

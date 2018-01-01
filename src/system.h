@@ -26,7 +26,7 @@ struct System
 {
     virtual int invoke(std::string program,
                        std::vector<std::string> args,
-                       std::vector<char> *stdout) = 0;
+                       std::vector<char> *out) = 0;
 };
 
 std::unique_ptr<System> newSystem();

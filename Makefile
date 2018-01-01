@@ -51,7 +51,11 @@ clean-all:
 
 DESTDIR?=/usr/local
 install:
-	cp $(BUILDDIR)/release/beak $(DESTDIR)/bin/beak
-	cp beak.1 $(DESTDIR)/man/man1/beak.1
+	install -Dm 755 -s $(BUILDDIR)/release/beak $(DESTDIR)/bin/beak
+	install -Dm 644 beak.1 $(DESTDIR)/man/man1/beak.1
+
+uninstall:
+	rm -f $(DESTDIR)/bin/beak
+	rm -f $(DESTDIR)/man/man1/beak.1
 
 .PHONY: release debug test clean clean-all help

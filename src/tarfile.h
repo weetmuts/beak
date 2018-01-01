@@ -18,6 +18,10 @@
 #ifndef TARFILE_H
 #define TARFILE_H
 
+#include "always.h"
+#include "filesystem.h"
+#include "util.h"
+
 #include <stddef.h>
 #include <cstdint>
 #include <ctime>
@@ -27,7 +31,6 @@
 #include <vector>
 #include <openssl/sha.h>
 
-#include "util.h"
 
 struct TarEntry;
 
@@ -85,10 +88,10 @@ struct TarFile
     void calculateHash();
     void calculateHash(vector<TarFile*> &tars, string &contents);
     vector<char> &hash();
-    
+
     void fixName();
     void setName(string s);
-    
+
     size_t currentTarOffset()
     {
         return current_tar_offset_;
@@ -122,9 +125,9 @@ struct TarFile
         }
         return false;
     }
-    
+
     static bool parseFileName(string &name, TarFileName *c);
-    
+
 private:
 
     TarEntry *in_directory_;
@@ -144,7 +147,7 @@ private:
 
     void calculateSHA256Hash();
     void calculateSHA256Hash(vector<TarFile*> &tars, string &content);
-    
+
     vector<char> sha256_hash_;
 };
 

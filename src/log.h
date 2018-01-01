@@ -18,11 +18,7 @@
 #ifndef LOG_H
 #define LOG_H
 
-#include<string>
-
-#include "defs.h"
-
-using namespace std;
+#include "always.h"
 
 enum LogLevel
 {

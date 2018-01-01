@@ -15,45 +15,35 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef CONFIG_H
-#define CONFIG_H
+#include "log.h"
+#include "system.h"
 
-#include<map>
-#include<memory>
-#include<string>
-#include<vector>
+#include <sys/types.h>
 
+using namespace std;
 
-enum LocationType {
-    BEAK_LOCATION,
-    RCLONE_LOCATION
-};
+static ComponentId SYSTEM = registerLogComponent("system");
 
-struct Location {
-    LocationType type;
-    std::string name;
-    std::string source_path;
-    std::string snapshot_path;
-    std::string args;
-    std::vector<std::string> remotes;
-};
-
-struct Config
+struct SystemImplementationWinapi : System
 {
-    Config();
-    bool load();
-
-    Location *location(std::string name) {
-        if (locations_.count(name) == 0) return NULL;
-        return &locations_[name];
-    }
-    
-private:
-
-    std::map<std::string,Location> locations_;
-    bool load(std::vector<char> *buf);
+    int invoke(std::string program,
+               std::vector<std::string> args,
+               std::vector<char> *out);
 };
 
-std::unique_ptr<Config> newConfig();
+std::unique_ptr<System> newSystem()
+{
+    return std::unique_ptr<System>(new SystemImplementationWinapi());
+}
 
-#endif
+string protect_(string arg)
+{
+    return arg;
+}
+
+int SystemImplementationWinapi::invoke(std::string program,
+                                       std::vector<std::string> args,
+                                       std::vector<char> *out)
+{
+    return OK;
+}

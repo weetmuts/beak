@@ -21,6 +21,8 @@
 #include<assert.h>
 #include<string.h>
 
+using namespace std;
+
 // This is the goal of match functionality. Identicla to rclone.
 // This implementation currently does not do this:
 //
@@ -54,7 +56,7 @@
 //       - doesn't match "floss"
 
 // A [ and ] together make a a character class,
-// such as [a-z] or [aeiou] or [[:alpha:]]. 
+// such as [a-z] or [aeiou] or [[:alpha:]].
 
 // h[ae]llo - matches "hello"
 //          - matches "hallo"
@@ -137,7 +139,7 @@ bool Match::match(const char *path, size_t len)
             debug(MATCH,"Rooted double star match %d\n", m);
             return m;
         }
-        bool m = 0 == strcmp(pattern_.c_str(), path); 
+        bool m = 0 == strcmp(pattern_.c_str(), path);
         debug(MATCH,"Rooted exact match %d\n", m);
         return m;
     }
@@ -156,7 +158,7 @@ bool Match::match(const char *path, size_t len)
         debug(MATCH,"Double star match %d\n", m);
         return m;
     }
-    
+
     const char *p = strrchr(path, '/');
     if (p == NULL) p = path; else p++;
     size_t slen = strlen(p);
@@ -171,7 +173,7 @@ bool Match::match(const char *path, size_t len)
                 p+=diff;
                 m = (p[pattern_.length()] == 0 ||
                      p[pattern_.length()] == '/');
-            }                
+            }
         }
         debug(MATCH,"Prefix single star %d\n", m);
         return m;
@@ -184,4 +186,3 @@ bool Match::match(const char *path, size_t len)
     }
     return 0 == strcmp(p, pattern_.c_str());
 }
-

@@ -18,7 +18,8 @@
 #ifndef TAR_H
 #define TAR_H
 
-#include"util.h"
+#include"filesystem.h"
+
 #include<string>
 #include<sys/stat.h>
 
@@ -36,7 +37,7 @@ struct TarHeaderContents {
     // GNU Header style
     char name_[100];
     char mode_[8];
-    char uid_[8]; 
+    char uid_[8];
     char gid_[8];
     char size_[12];
     char mtime_[12];
@@ -78,13 +79,13 @@ struct TarHeader
     static size_t calculateSize(FileStat *fs, Path *tarpath, Path *link, bool is_hard_link);
     TarHeader();
     TarHeader(FileStat *fs, Path *tar, Path *link, bool is_hard_link, bool full);
-    
+
     char *buf() { return content.members.name_; }
     char type() { return content.members.typeflag_; }
     void setLongLinkType(TarHeader *file);
     void setLongPathType(TarHeader *file);
     void setSize(size_t s);
-    
+
     void calculateChecksum();
 
     size_t numLongPathBlocks() { return num_long_path_blocks_; }

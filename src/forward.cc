@@ -17,7 +17,6 @@
 
 #include "forward.h"
 
-#include <asm-generic/errno-base.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -49,7 +48,7 @@ ForwardTarredFS::ForwardTarredFS(FileSystem *fs) {
 thread_local ForwardTarredFS *current_fs;
 
 static int addEntry(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf)
-{ 
+{
     return current_fs->addTarEntry(fpath, sb);
 }
 
@@ -73,8 +72,10 @@ int ForwardTarredFS::addTarEntry(const char *p, const struct stat *sb)
     Path *path = abspath->subpath(root_dir_path->depth());
     path = path->prepend(Path::lookup(""));
 
+    #ifdef PLATFORM_POSIX
     // Sockets cannot be stored.
     if(S_ISSOCK(sb->st_mode)) { return FTW_CONTINUE; }
+    #endif
 
     // Ignore any directory that has a subdir named .beak
     if(S_ISDIR(sb->st_mode) && abspath->depth() > root_dir_path->depth())
@@ -83,7 +84,7 @@ int ForwardTarredFS::addTarEntry(const char *p, const struct stat *sb)
         char buf[abspath->c_str_len()+7];
         memcpy(buf, abspath->c_str(), abspath->c_str_len());
         memcpy(buf+abspath->c_str_len(), "/.beak", 7);
-        int err = stat(buf, &sb);
+        int err = ::stat(buf, &sb);
         if (err == 0) {
             // Oups found .beak subdir! This directory and children
             // must be ignored!
@@ -422,7 +423,7 @@ void ForwardTarredFS::fixTarPathsAndHardLinks() {
             TarEntry *entry = e;
             // This will remove the prefix (ie path outside of tar) and update the hash.
             entry->calculateTarpath(te->path());
-	    
+
             if (entry->isHardLink()) {
                 debug(HARDLINKS, "Found hardlink from >%s< to >%s<\n", entry->path()->c_str(), te->path()->c_str());
 
@@ -465,7 +466,7 @@ size_t ForwardTarredFS::groupFilesIntoTars() {
         TarEntry *te = e.second;
         te->calculateHash();
     }
-    
+
     for (auto & e : tar_storage_directories) {
         TarEntry *te = e.second;
 
@@ -568,9 +569,9 @@ size_t ForwardTarredFS::groupFilesIntoTars() {
 
         te->tazFile()->fixSize();
         te->tazFile()->calculateHash();
-        te->tazFile()->fixName();       
+        te->tazFile()->fixName();
 
-        
+
         set<uid_t> uids;
         set<gid_t> gids;
         /*
@@ -580,7 +581,7 @@ size_t ForwardTarredFS::groupFilesIntoTars() {
             }*/
 
         string gzfile_contents;
-        gzfile_contents.append("#tarredfs " XSTR(TARREDFS_VERSION) "\n");
+        gzfile_contents.append("#beak " XSTR(BEAK_VERSION) "\n");
         gzfile_contents.append("#message ");
         gzfile_contents.append(message_);
         gzfile_contents.append("\n");
@@ -626,7 +627,7 @@ size_t ForwardTarredFS::groupFilesIntoTars() {
         }
         // Finally update with the latest mtime of the current storage directory!
         te->updateMtim(te->gzFile()->mtim());
-        
+
         // Hash the hashes of all the other tar and gz files.
         te->gzFile()->calculateHash(tars, gzfile_contents);
         te->gzFile()->fixName();
@@ -641,17 +642,17 @@ size_t ForwardTarredFS::groupFilesIntoTars() {
             gzfile_contents.append("\n");
             gzfile_contents.append(separator_string);
         }
-                
+
         vector<unsigned char> compressed_gzfile_contents;
         gzipit(&gzfile_contents, &compressed_gzfile_contents);
 
         TarEntry *dirs = new TarEntry(compressed_gzfile_contents.size(), tarheaderstyle_);
         dirs->setContent(compressed_gzfile_contents);
-        te->gzFile()->addEntryLast(dirs);        
+        te->gzFile()->addEntryLast(dirs);
         te->gzFile()->fixSize();
 
         if (te->tazFile()->size() > 0 ) {
-            
+
             debug(FORWARD,"%s%s size became %zu\n", te->path()->c_str(),
                   te->tazFile()->name().c_str(), te->tazFile()->size());
 
@@ -773,8 +774,18 @@ ssize_t ForwardTarredFS::pread(Path *p, char *buf, size_t size, off_t offset)
     return 0;
 }
 
-void ForwardTarredFS::recurse(function<void(Path *p)> cb)
+void ForwardTarredFS::recurse(std::function<void(Path *p)> cb)
 {
+}
+
+bool ForwardTarredFS::stat(Path *p, FileStat *fs)
+{
+    return false;
+}
+
+Path *ForwardTarredFS::mkTempDir(std::string prefix)
+{
+    return NULL;
 }
 
 int ForwardTarredFS::getattrCB(const char *path_char_string, struct stat *stbuf) {
@@ -792,8 +803,10 @@ int ForwardTarredFS::getattrCB(const char *path_char_string, struct stat *stbuf)
             stbuf->st_mode = S_IFDIR | 0500;
             stbuf->st_nlink = 2;
             stbuf->st_size = 0;
+            #ifdef PLATFORM_POSIX
             stbuf->st_blksize = 512;
             stbuf->st_blocks = 0;
+            #endif
             goto ok;
         }
 
@@ -804,13 +817,21 @@ int ForwardTarredFS::getattrCB(const char *path_char_string, struct stat *stbuf)
             stbuf->st_mode = S_IFREG | 0500;
             stbuf->st_nlink = 1;
             stbuf->st_size = tar->size();
+            #ifdef PLATFORM_POSIX
             stbuf->st_blksize = 512;
             if (tar->size() > 0) {
                 stbuf->st_blocks = 1+(tar->size()/512);
             } else {
                 stbuf->st_blocks = 0;
             }
+            #endif
+            #if HAS_ST_MTIM
             memcpy(&stbuf->st_mtim, tar->mtim(), sizeof(stbuf->st_mtim));
+            #elif HAS_ST_MTIME
+            stbuf->st_mtime = tar->mtim()->tv_sec;
+            #else
+            #error
+            #endif
             goto ok;
         }
     }
@@ -923,7 +944,7 @@ int ForwardTarredFS::readlinkCB(const char *path_char_string, char *buf, size_t 
 int ForwardTarredFS::scanFileSystem(Options *settings)
 {
     bool ok;
-    
+
     root_dir_path = settings->src;
     root_dir = settings->src->str();
     mount_dir_path = settings->dst;
@@ -955,13 +976,13 @@ int ForwardTarredFS::scanFileSystem(Options *settings)
     } else {
         setTarHeaderStyle(TarHeaderStyle::Simple);
     }
-    
+
     if (!settings->targetsize_supplied) {
         // Default settings
         target_target_tar_size = 10*1024*1024;
     } else {
         target_target_tar_size = settings->targetsize;
-    }        
+    }
     if (!settings->triggersize_supplied) {
         tar_trigger_size = target_target_tar_size * 2;
     } else {
@@ -977,11 +998,11 @@ int ForwardTarredFS::scanFileSystem(Options *settings)
         triggers.push_back(m);
         debug(COMMANDLINE, "Triggers on \"%s\"\n", e.c_str());
     }
-    
+
     debug(COMMANDLINE, "Target tar size \"%zu\" Target trigger size %zu\n",
           target_target_tar_size,
           tar_trigger_size);
-    
+
     info(FORWARD, "Scanning %s\n", root_dir.c_str());
     uint64_t start = clockGetTime();
     recurse();
@@ -1019,4 +1040,3 @@ std::unique_ptr<ForwardTarredFS> newForwardTarredFS(FileSystem *fs)
 {
     return std::unique_ptr<ForwardTarredFS>(new ForwardTarredFS(fs));
 }
-

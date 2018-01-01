@@ -3662,11 +3662,11 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $have_st_mtim" >&5
 $as_echo "$have_st_mtim" >&6; }
 
+if test "x${have_st_mtim}" = "xyes"; then
 
-cat >>confdefs.h <<_ACEOF
-#define ST_MTIM $have_st_mtim
-_ACEOF
+$as_echo "#define HAS_ST_MTIM 1" >>confdefs.h
 
+fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for st_mtime in struct stat" >&5
 $as_echo_n "checking for st_mtime in struct stat... " >&6; }
@@ -3692,13 +3692,13 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $have_st_mtime" >&5
 $as_echo "$have_st_mtime" >&6; }
 
+if test "x${have_st_mtime}" = "xyes"; then
 
-cat >>confdefs.h <<_ACEOF
-#define ST_MTIME $have_st_mtime
-_ACEOF
+$as_echo "#define HAS_ST_MTIME 1" >>confdefs.h
 
+fi
 
-CXXFLAGS="-D${PLATFORM} -Wall -fmessage-length=0 -std=c++11 -Wno-unused-function -DTARREDFS_VERSION=0.1"
+CXXFLAGS="-DPLATFORM_${PLATFORM} -Wall -fmessage-length=0 -std=c++11 -Wno-unused-function"
 
 CXXFLAGS_debug="-O0 -g"
 CXXFLAGS_release="-Os"

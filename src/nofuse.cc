@@ -25,3 +25,27 @@ int fuse_main(int argc, char **argv, fuse_operations *op, void *user_data)
 {
     return 0;
 }
+
+struct fuse * fuse_new (struct fuse_chan *chan, struct fuse_args *args,
+                        const struct fuse_operations *op, size_t op_size, void *private_data)
+{
+    return NULL;
+}
+
+void fuse_exit(struct fuse *fuse)
+{
+}
+
+struct fuse_chan *fuse_mount (const char *mountpoint, struct fuse_args *args)
+{
+    return NULL;
+}
+
+void fuse_unmount(const char *s, struct fuse_chan *chan)
+{
+}
+
+int fuse_loop_mt(struct fuse *f)
+{
+    return 0;
+}

@@ -15,13 +15,13 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "filesystem.h"
 #include "reverse.h"
+
+#include "filesystem.h"
 #include "index.h"
 #include "tarfile.h"
 
 #include <algorithm>
-#include <asm-generic/errno-base.h>
 #include <fcntl.h>
 #include <string.h>
 #include <unistd.h>
@@ -31,6 +31,7 @@
 #include <cstdlib>
 #include <iterator>
 #include <memory>
+#include <pthread.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -58,11 +59,11 @@ bool ReverseTarredFS::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
         return true;
     }
     point->loaded_gz_files_.insert(gz);
-    
+
     vector<char> buf;
     rc = loadVector(gz, T_BLOCKSIZE, &buf);
     if (rc) return false;
-    
+
     vector<char> contents;
     gunzipit(&buf, &contents);
     auto i = contents.begin();
@@ -86,7 +87,7 @@ bool ReverseTarredFS::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
                      },
                      [this,point,parsed_tars_already](IndexTar *it){
                          if (!parsed_tars_already) {
-                             if (it->path->name()->c_str()[0] == REG_FILE_CHAR) { 
+                             if (it->path->name()->c_str()[0] == REG_FILE_CHAR) {
                                  point->gz_files_[it->path->parent()] = it->path;
                              }
                          }
@@ -105,11 +106,11 @@ bool ReverseTarredFS::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
         Entry *d = &(point->entries_)[pp];
         debug(REVERSE, "   found %s added to >%s<\n", i->path->c_str(), pp->c_str());
         d->dir.push_back(i);
-        d->loaded = true;        
+        d->loaded = true;
     }
-    
+
     debug(REVERSE, "Found proper gz file! %s\n", gz->c_str());
-    
+
     return true;
 }
 
@@ -124,7 +125,7 @@ void ReverseTarredFS::loadCache(PointInTime *point, Path *path)
             return;
         }
     }
-        
+
     debug(REVERSE, "Load cache for >%s<\n", path->c_str());
     // Walk up in the directory structure until a gz file is found.
     for (;;)
@@ -187,21 +188,30 @@ int ReverseTarredFS::getattrCB(const char *path_char_string, struct stat *stbuf)
     Path *path = Path::lookup(path_string);
     Entry *e;
     PointInTime *point;
-    
+
     if (path->depth() == 1)
     {
-        memset(stbuf, 0, sizeof(struct stat));        
+        memset(stbuf, 0, sizeof(struct stat));
         stbuf->st_mode = S_IFDIR | S_IRUSR | S_IXUSR;
         stbuf->st_nlink = 2;
         stbuf->st_size = 0;
         stbuf->st_uid = geteuid();
         stbuf->st_gid = getegid();
+        #if HAS_ST_MTIM
         stbuf->st_mtim.tv_sec = most_recent_point_in_time_->ts.tv_sec;
         stbuf->st_mtim.tv_nsec = most_recent_point_in_time_->ts.tv_nsec;
         stbuf->st_atim.tv_sec = most_recent_point_in_time_->ts.tv_sec;
         stbuf->st_atim.tv_nsec = most_recent_point_in_time_->ts.tv_nsec;
         stbuf->st_ctim.tv_sec = most_recent_point_in_time_->ts.tv_sec;
         stbuf->st_ctim.tv_nsec = most_recent_point_in_time_->ts.tv_nsec;
+        #elif HAS_ST_MTIME
+        stbuf->st_mtime = most_recent_point_in_time_->ts.tv_sec;
+        stbuf->st_atime = most_recent_point_in_time_->ts.tv_sec;
+        stbuf->st_ctime = most_recent_point_in_time_->ts.tv_sec;
+        #else
+        #error
+        #endif
+
         goto ok;
     }
 
@@ -212,19 +222,27 @@ int ReverseTarredFS::getattrCB(const char *path_char_string, struct stat *stbuf)
         if (!point) goto err;
         if (path->depth() == 2) {
             // We are getting the attributes for the virtual point_in_time directory.
-            memset(stbuf, 0, sizeof(struct stat));        
+            memset(stbuf, 0, sizeof(struct stat));
             stbuf->st_mode = S_IFDIR | S_IRUSR | S_IXUSR;
             stbuf->st_nlink = 2;
             stbuf->st_size = 0;
             stbuf->st_uid = geteuid();
             stbuf->st_gid = getegid();
+            #if HAS_ST_MTIM
             stbuf->st_mtim.tv_sec = point->ts.tv_sec;
             stbuf->st_mtim.tv_nsec = point->ts.tv_nsec;
             stbuf->st_atim.tv_sec = point->ts.tv_sec;
             stbuf->st_atim.tv_nsec = point->ts.tv_nsec;
             stbuf->st_ctim.tv_sec = point->ts.tv_sec;
             stbuf->st_ctim.tv_nsec = point->ts.tv_nsec;
-            goto ok;            
+            #elif HAS_ST_MTIME
+            stbuf->st_mtime = point->ts.tv_sec;
+            stbuf->st_atime = point->ts.tv_sec;
+            stbuf->st_ctime = point->ts.tv_sec;
+            #else
+            #error
+            #endif
+            goto ok;
         }
         if (path->depth() > 2) {
             path = path->subpath(2)->prepend(Path::lookupRoot());
@@ -233,9 +251,9 @@ int ReverseTarredFS::getattrCB(const char *path_char_string, struct stat *stbuf)
 
     e = findEntry(point, path);
     if (!e) goto err;
-    
+
     memset(stbuf, 0, sizeof(struct stat));
-    
+
     if (e->fs.isDirectory())
     {
         stbuf->st_mode = e->fs.st_mode;
@@ -243,26 +261,42 @@ int ReverseTarredFS::getattrCB(const char *path_char_string, struct stat *stbuf)
         stbuf->st_size = e->fs.st_size;
         stbuf->st_uid = e->fs.st_uid;
         stbuf->st_gid = e->fs.st_gid;
+        #if HAS_ST_MTIM
         stbuf->st_mtim.tv_sec = e->fs.st_mtim.tv_sec;
         stbuf->st_mtim.tv_nsec = e->fs.st_mtim.tv_nsec;
         stbuf->st_atim.tv_sec = e->fs.st_mtim.tv_sec;
         stbuf->st_atim.tv_nsec = e->fs.st_mtim.tv_nsec;
         stbuf->st_ctim.tv_sec = e->fs.st_mtim.tv_sec;
         stbuf->st_ctim.tv_nsec = e->fs.st_mtim.tv_nsec;
+        #elif HAS_ST_MTIME
+        stbuf->st_mtime = e->fs.st_mtim.tv_sec;
+        stbuf->st_atime = e->fs.st_mtim.tv_sec;
+        stbuf->st_ctime = e->fs.st_mtim.tv_sec;
+        #else
+        #error
+        #endif
         goto ok;
     }
-    
+
     stbuf->st_mode = e->fs.st_mode;
     stbuf->st_nlink = 1;
     stbuf->st_size = e->fs.st_size;
     stbuf->st_uid = e->fs.st_uid;
     stbuf->st_gid = e->fs.st_gid;
+    #if HAS_ST_MTIM
     stbuf->st_mtim.tv_sec = e->fs.st_mtim.tv_sec;
     stbuf->st_mtim.tv_nsec = e->fs.st_mtim.tv_nsec;
     stbuf->st_atim.tv_sec = e->fs.st_mtim.tv_sec;
     stbuf->st_atim.tv_nsec = e->fs.st_mtim.tv_nsec;
     stbuf->st_ctim.tv_sec = e->fs.st_mtim.tv_sec;
     stbuf->st_ctim.tv_nsec = e->fs.st_mtim.tv_nsec;
+    #elif HAS_ST_MTIME
+    stbuf->st_mtime = e->fs.st_mtim.tv_sec;
+    stbuf->st_atime = e->fs.st_mtim.tv_sec;
+    stbuf->st_ctime = e->fs.st_mtim.tv_sec;
+    #else
+    #error
+    #endif
     stbuf->st_rdev = e->fs.st_rdev;
     goto ok;
 
@@ -270,9 +304,9 @@ int ReverseTarredFS::getattrCB(const char *path_char_string, struct stat *stbuf)
 
     pthread_mutex_unlock(&global);
     return -ENOENT;
-    
+
     ok:
-    
+
     pthread_mutex_unlock(&global);
     return 0;
 }
@@ -281,7 +315,7 @@ int ReverseTarredFS::readdirCB(const char *path_char_string, void *buf,
 		fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
 {
     debug(REVERSE, "readdirCB >%s<\n", path_char_string);
-    
+
     pthread_mutex_lock(&global);
 
     string path_string = path_char_string;
@@ -293,7 +327,7 @@ int ReverseTarredFS::readdirCB(const char *path_char_string, void *buf,
         if (path->depth() == 1) {
             filler(buf, ".", NULL, 0);
             filler(buf, "..", NULL, 0);
-            
+
             for (auto &p : history_)
             {
                 char filename[256];
@@ -301,15 +335,15 @@ int ReverseTarredFS::readdirCB(const char *path_char_string, void *buf,
                 snprintf(filename, 255, "%s", p.direntry.c_str());
                 filler(buf, filename, NULL, 0);
             }
-            goto ok;        
+            goto ok;
         }
-                
+
         Path *pnt_dir = path->subpath(1,1);
         point = findPointInTime(pnt_dir->str());
         if (!point) goto err;
         path = path->subpath(2)->prepend(Path::lookupRoot());
     }
-    
+
     e = findEntry(point, path);
     if (!e) goto err;
 
@@ -330,14 +364,14 @@ int ReverseTarredFS::readdirCB(const char *path_char_string, void *buf,
         filler(buf, filename, NULL, 0);
     }
     goto ok;
-    
+
     err:
-    
+
     pthread_mutex_unlock(&global);
     return -ENOENT;
 
     ok:
-    
+
     pthread_mutex_unlock(&global);
     return 0;
 }
@@ -361,14 +395,14 @@ int ReverseTarredFS::readlinkCB(const char *path_char_string, char *buf, size_t 
     }
     e = findEntry(point, path);
     if (!e) goto err;
-    
+
     c = e->link.length();
     if (c > s) c = s;
 
     memcpy(buf, e->link.c_str(), c);
     buf[c] = 0;
     debug(REVERSE, "readlinkCB >%s< bufsiz=%ju returns buf=>%s<\n", path, s, buf);
-    
+
     goto ok;
 
     err:
@@ -388,7 +422,7 @@ int ReverseTarredFS::readCB(const char *path_char_string, char *buf,
     debug(REVERSE, "readCB >%s< offset=%ju size=%ju\n", path_char_string, offset_, size);
 
     pthread_mutex_lock(&global);
-    
+
     off_t offset = offset_;
     int rc = 0;
     string path_string = path_char_string;
@@ -396,7 +430,7 @@ int ReverseTarredFS::readCB(const char *path_char_string, char *buf,
 
     Entry *e;
     Path *tar;
-    
+
     PointInTime *point = single_point_in_time_;
     if (!point) {
         Path *pnt_dir = path->subpath(1,1);
@@ -404,12 +438,12 @@ int ReverseTarredFS::readCB(const char *path_char_string, char *buf,
         if (!point) goto err;
         path = path->subpath(2)->prepend(Path::lookupRoot());
     }
-    
+
     e = findEntry(point, path);
     if (!e) goto err;
 
     tar = Path::lookup(rootDir()->str() + e->tar);
-    
+
     if (offset > e->fs.st_size)
     {
         // Read outside of file size
@@ -439,7 +473,7 @@ int ReverseTarredFS::readCB(const char *path_char_string, char *buf,
 
     pthread_mutex_unlock(&global);
     return rc;
-    
+
     err:
 
     pthread_mutex_unlock(&global);
@@ -451,7 +485,7 @@ bool ReverseTarredFS::lookForPointsInTime(PointInTimeFormat f, Path *path)
 {
     bool ok;
     if (path == NULL) return false;
-    
+
     std::vector<Path*> contents;
     if (!file_system_->readdir(path, &contents)) {
         return false;
@@ -460,7 +494,7 @@ bool ReverseTarredFS::lookForPointsInTime(PointInTimeFormat f, Path *path)
     {
         TarFileName tfn;
         ok = TarFile::parseFileName(f->str(), &tfn);
-        
+
         if (ok && tfn.type == REG_FILE) {
             PointInTime p;
             p.ts.tv_sec = tfn.secs;
@@ -478,7 +512,7 @@ bool ReverseTarredFS::lookForPointsInTime(PointInTimeFormat f, Path *path)
     std::sort(history_.begin(), history_.end(),
               [](PointInTime &a, PointInTime &b)->bool {
                   return (b.ts.tv_sec < a.ts.tv_sec) ||
-                      (b.ts.tv_sec == a.ts.tv_sec && 
+                      (b.ts.tv_sec == a.ts.tv_sec &&
                        b.ts.tv_nsec < a.ts.tv_nsec);
                       });
 
@@ -502,14 +536,14 @@ bool ReverseTarredFS::lookForPointsInTime(PointInTimeFormat f, Path *path)
         fs.st_mode = S_IFDIR | S_IRUSR | S_IXUSR;
         j.entries_[Path::lookupRoot()] = Entry(fs, 0, Path::lookupRoot());
     }
-    
+
     return i > 0;
 }
 
 PointInTime *ReverseTarredFS::findPointInTime(string s) {
     return points_in_time_[s];
 }
-    
+
 bool ReverseTarredFS::setPointInTime(string g) {
     if ((g.length() < 2) | (g[0] != '@')) {
         error(REVERSE,"Specify generation as @0 @1 @2 etc.\n");
@@ -527,7 +561,3 @@ bool ReverseTarredFS::setPointInTime(string g) {
     single_point_in_time_ = &history_[gg];
     return true;
 }
-
-
-
-

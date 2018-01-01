@@ -97,7 +97,7 @@ void setLogLevel(LogLevel l) {
     if (log_level == DEBUG) {
         verbose_logging_ = true;
         debug_logging_ = true;
-    }        
+    }
 }
 
 void setLogComponents(const char *cs) {
@@ -182,7 +182,7 @@ void logDebug(ComponentId ci, const char* fmt, ...) {
 	    syslog(LOG_INFO, "%s: ", all_components[ci]);
             vsyslog(LOG_DEBUG, fmt, args);
         } else {
-	    fprintf(stdout, "%s: ", all_components[ci]);	    
+	    fprintf(stdout, "%s: ", all_components[ci]);
             vfprintf(stdout, fmt, args);
         }
         va_end(args);
@@ -220,4 +220,3 @@ void info(ComponentId ci, const char* fmt, ...) {
         va_end(args);
     }
 }
-

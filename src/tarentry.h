@@ -33,8 +33,6 @@ struct Atom;
 struct Path;
 struct TarFile;
 
-using namespace std;
-
 enum TarHeaderStyle : short {
     None, // Tar headers are not inserted into the archive file. Tar cannot be used to extract data.
     Simple, // Simple headers, uid/guid set to 1000/1000 name is beak/beak, atime=ctime set to mtime.
@@ -45,10 +43,10 @@ enum TarHeaderStyle : short {
 
 struct TarEntry
 {
-    
+
     TarEntry(size_t size, TarHeaderStyle ths);
     TarEntry(Path *abspath, Path *path, const struct stat *b, TarHeaderStyle ths);
-    
+
     Path *path()
     {
         return path_;
@@ -89,7 +87,7 @@ struct TarEntry
     {
 	return is_hard_linked_;
     }
-    
+
     TarEntry *parent()
     {
 	return parent_;
@@ -118,9 +116,9 @@ struct TarEntry
     {
 	return is_added_to_directory_;
     }
-    
+
     void calculateTarpath(Path *storage_dir);
-    void setContent(vector<unsigned char> &c);
+    void setContent(std::vector<unsigned char> &c);
     size_t copy(char *buf, size_t size, size_t from, FileSystem *fs);
     void updateSizes();
     void rewriteIntoHardLink(TarEntry *target);
@@ -163,21 +161,21 @@ struct TarEntry
 	{
             return tar_offset_;
 	}
-    
-    vector<TarEntry*>& dirs()
+
+    std::vector<TarEntry*>& dirs()
 	{
             return dirs_;
 	}
-    vector<string>& files()
+    std::vector<std::string>& files()
 	{
             return files_;
 	}
-    
+
     void createSmallTar(int i);
     void createMediumTar(int i);
     void createLargeTar(uint32_t hash);
-    
-    vector<TarFile*> &tars() { return tars_; }
+
+    std::vector<TarFile*> &tars() { return tars_; }
     TarFile *smallTar(int i)
 	{
             return small_tars_[i];
@@ -194,46 +192,46 @@ struct TarEntry
 	{
             return large_tars_.count(hash) > 0;
 	}
-    TarFile *smallHashTar(vector<char> i)
+    TarFile *smallHashTar(std::vector<char> i)
 	{
             return small_hash_tars_[i];
 	}
-    TarFile *mediumHashTar(vector<char> i)
+    TarFile *mediumHashTar(std::vector<char> i)
 	{
             return medium_hash_tars_[i];
 	}
-    TarFile *largeHashTar(vector<char> i)
+    TarFile *largeHashTar(std::vector<char> i)
 	{
             return large_hash_tars_[i];
 	}
-    map<size_t, TarFile*>& smallTars()
+    std::map<size_t, TarFile*>& smallTars()
 	{
             return small_tars_;
 	}
-    map<size_t, TarFile*>& mediumTars()
+    std::map<size_t, TarFile*>& mediumTars()
 	{
             return medium_tars_;
 	}
-    map<size_t, TarFile*>& largeTars()
+    std::map<size_t, TarFile*>& largeTars()
 	{
             return large_tars_;
 	}
-    map<vector<char>, TarFile*>& smallHashTars()
+    std::map<std::vector<char>, TarFile*>& smallHashTars()
 	{
             return small_hash_tars_;
 	}
-    map<vector<char>, TarFile*>& mediumHashTars()
+    std::map<std::vector<char>, TarFile*>& mediumHashTars()
 	{
             return medium_hash_tars_;
 	}
-    map<vector<char>, TarFile*>& largeHashTars()
+    std::map<std::vector<char>, TarFile*>& largeHashTars()
 	{
             return large_hash_tars_;
 	}
-    
+
     void registerParent(TarEntry *p);
     void addChildrenSize(size_t s);
-    
+
     void secsAndNanos(char *buf, size_t len);
     void injectHash(const char *buf, size_t len);
     void setAsStorageDir()
@@ -246,28 +244,28 @@ struct TarEntry
 	}
     void addDir(TarEntry *dir);
     void addEntry(TarEntry *te);
-    vector<TarEntry*>& entries()
+    std::vector<TarEntry*>& entries()
 	{
             return entries_;
 	}
     void sortEntries();
-    
-    void appendFileName(string name)
+
+    void appendFileName(std::string name)
 	{
             files_.push_back(name);
 	}
-    
+
     void calculateHash();
-    vector<char> &hash();
-    
+    std::vector<char> &hash();
+
     // This is a re-construction of how the entry would be listed by "tar tv"
     // tv_line_left is accessbits, ownership
     // tv_line_size is the size, to be left padded with space
     // tv_line_right is the last modification time
-    string tv_line_left, tv_line_size, tv_line_right;
-    
+    std::string tv_line_left, tv_line_size, tv_line_right;
+
     private:
-    
+
     size_t header_size_;
     TarHeaderStyle tar_header_style_;
     // Full path and name, to read the file from the underlying file system.
@@ -284,49 +282,49 @@ struct TarEntry
     uint32_t tarpath_hash_;
     // The target file for a link.
     Path *link_;
-    
+
     FileStat fs_;
-    
+
     bool is_hard_linked_;
     TarFile *tar_file_;
     size_t tar_offset_;
     size_t blocked_size_;
-    
+
     // If this is a directory, then all children sizes are summed here.
     size_t children_size_;
     TarEntry *parent_;
     //TarHeader tar_;
     bool is_tar_storage_dir_;
-    vector<TarEntry*> dirs_; // Directories to be listed inside this TarEntry
-    vector<string> files_; // Files to be listed inside this TarEntry (ie the virtual tar files..)
+    std::vector<TarEntry*> dirs_; // Directories to be listed inside this TarEntry
+    std::vector<std::string> files_; // Files to be listed inside this TarEntry (ie the virtual tar files..)
     TarFile *taz_file_;
     bool taz_file_in_use_ = false;
     TarFile *gz_file_;
     bool gz_file_in_use_ = false;
-    vector<TarFile*> tars_; // All tars including the taz.
-    map<size_t, TarFile*> small_tars_;  // Small file tars in side this TarEntry
-    map<size_t, TarFile*> medium_tars_; // Medium file tars in side this TarEntry
-    map<size_t, TarFile*> large_tars_;  // Large file tars in side this TarEntry
-    map<vector<char>,TarFile*> small_hash_tars_;
-    map<vector<char>,TarFile*> medium_hash_tars_;
-    map<vector<char>,TarFile*> large_hash_tars_;
-    vector<TarEntry*> entries_; // The contents stored in the tar files.
-    
+    std::vector<TarFile*> tars_; // All tars including the taz.
+    std::map<size_t, TarFile*> small_tars_;  // Small file tars in side this TarEntry
+    std::map<size_t, TarFile*> medium_tars_; // Medium file tars in side this TarEntry
+    std::map<size_t, TarFile*> large_tars_;  // Large file tars in side this TarEntry
+    std::map<std::vector<char>,TarFile*> small_hash_tars_;
+    std::map<std::vector<char>,TarFile*> medium_hash_tars_;
+    std::map<std::vector<char>,TarFile*> large_hash_tars_;
+    std::vector<TarEntry*> entries_; // The contents stored in the tar files.
+
     TarEntry *tar_collection_dir = NULL; // This entry is stored in this tar collection dir.
     bool is_added_to_directory_ = false;
     bool virtual_file_ = false;
-    vector<unsigned char> content;
+    std::vector<unsigned char> content;
 
     void calculateSHA256Hash();
-    
-    vector<char> sha256_hash_;
+
+    std::vector<char> sha256_hash_;
 };
 
-void cookEntry(string *listing, TarEntry *entry);
+void cookEntry(std::string *listing, TarEntry *entry);
 
-bool eatEntry(vector<char> &v, vector<char>::iterator &i, Path *dir_to_prepend,
-              FileStat *fs, size_t *offset, string *tar, Path **path,
-              string *link, bool *is_sym_link,
+bool eatEntry(std::vector<char> &v, std::vector<char>::iterator &i, Path *dir_to_prepend,
+              FileStat *fs, size_t *offset, std::string *tar, Path **path,
+              std::string *link, bool *is_sym_link,
               bool *eof, bool *err);
 
 

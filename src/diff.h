@@ -18,13 +18,14 @@
 #ifndef DIFF_H
 #define DIFF_H
 
+#include <map>
 #include <string>
 
-#include "util.h"
+#include "filesystem.h"
 
 struct DiffEntry {
     //FileStat fs;
-    
+
     //DiffEntry(FileStat *s) { if (s) memcpy(&fs, s, sizeof(struct stat)); }
 
     bool same(DiffEntry *e);
@@ -55,8 +56,8 @@ private:
     Path *from_dir;
     Path *to_dir;
     */
-    map<Path*,DiffEntry,depthFirstSortPath> from_files;
-    map<Path*,DiffEntry,depthFirstSortPath> to_files;    
+    std::map<Path*,DiffEntry,depthFirstSortPath> from_files;
+    std::map<Path*,DiffEntry,depthFirstSortPath> to_files;
 };
 
 #endif

@@ -18,7 +18,7 @@
 #ifndef REVERSE_H
 #define REVERSE_H
 
-#include "defs.h"
+#include "always.h"
 
 #ifdef FUSE_USE_VERSION
 #include <fuse/fuse.h>
@@ -41,16 +41,16 @@
 using namespace std;
 
 struct Entry
-{    
+{
     Entry(FileStat s, size_t o, Path *p) :
     fs(s), offset(o), path(p) {
         is_sym_link = false;
         loaded = false;
     }
-    
+
     Entry() { }
 
-    FileStat fs;   
+    FileStat fs;
     size_t offset;
     Path *path;
     string tar;
@@ -75,7 +75,7 @@ struct PointInTime {
     string direntry;
     string filename;
 
-    map<Path*,Entry> entries_;   
+    map<Path*,Entry> entries_;
     map<Path*,Path*> gz_files_;
     set<Path*> loaded_gz_files_;
 };
@@ -83,7 +83,7 @@ struct PointInTime {
 struct ReverseTarredFS
 {
     pthread_mutex_t global;
-    
+
     Entry *findEntry(PointInTime *point, Path *path);
 
     int getattrCB(const char *path, struct stat *stbuf);
@@ -92,7 +92,7 @@ struct ReverseTarredFS
     int readCB(const char *path, char *buf, size_t size, off_t offset,
                struct fuse_file_info *fi);
     int readlinkCB(const char *path, char *buf, size_t s);
-    
+
     int parseTarredfsContent(PointInTime *point, vector<char> &v, vector<char>::iterator &i,
                              Path *dir_to_prepend);
     int parseTarredfsTars(PointInTime *point, vector<char> &v, vector<char>::iterator &i);
@@ -101,16 +101,16 @@ struct ReverseTarredFS
 
     bool lookForPointsInTime(PointInTimeFormat f, Path *src);
     vector<PointInTime> &history() { return history_; }
-    PointInTime *findPointInTime(string s);    
+    PointInTime *findPointInTime(string s);
     bool setPointInTime(string g);
-    
+
     ReverseTarredFS(FileSystem *fs);
 
     Path *rootDir() { return root_dir_; }
     Path *mountDir() { return mount_dir_; }
     void setRootDir(Path *p) { root_dir_ = p; }
     void setMountDir(Path *p) { mount_dir_ = p; }
-    
+
     private:
 
     Path *root_dir_;

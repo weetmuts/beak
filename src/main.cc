@@ -15,10 +15,14 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "always.h"
 #include "beak.h"
-#include "diff.h"
 #include "filesystem.h"
 #include "log.h"
+
+#include<stdio.h>
+
+using namespace std;
 
 int main(int argc, char *argv[])
 {
@@ -26,27 +30,33 @@ int main(int argc, char *argv[])
     Command cmd;
     Options settings;
 
-    /*
-    DiffTarredFS diff;
-    diff.loadZ01File(FROM, Path::lookup("a.gz"));
-    diff.loadZ01File(TO, Path::lookup("b.gz"));
-
-    diff.compare();
-    
-    exit(0);
-    */
     auto fs = newDefaultFileSystem();
     auto beak = newBeak(fs.get());
 
     beak->captureStartTime();
     beak->parseCommandLine(argc, argv, &cmd, &settings);
-        
+
     switch (cmd) {
 
     case check_cmd:
+    {
+        vector<Path*> contents;
+        bool b = fs->readdir(Path::lookup("Test"), &contents);
+        if (!b) {
+            printf("ERROR\n");
+        } else {
+            for (auto i : contents) {
+                printf("DIRENTRY %s\n", i->c_str());
+            }
+        }
+    }
         break;
 
     case config_cmd:
+        rc = beak->configure(&settings);
+        break;
+
+    case diff_cmd:
         break;
 
     case info_cmd:
@@ -61,6 +71,9 @@ int main(int argc, char *argv[])
             beak->genAutoComplete(settings.src->str());
             printf("Wrote %s\n", settings.src->c_str());
         }
+        break;
+
+    case genmounttrigger_cmd:
         break;
 
     case mount_cmd:
@@ -87,14 +100,14 @@ int main(int argc, char *argv[])
     case push_cmd:
         rc = beak->push(&settings);
         break;
-        
+
     case pull_cmd:
         break;
 
     case shell_cmd:
         rc = beak->shell(&settings);
         break;
-        
+
     case status_cmd:
         rc = beak->status(&settings);
         break;
@@ -122,6 +135,6 @@ int main(int argc, char *argv[])
     case nosuch_cmd:
         break;
     }
-    
+
     return rc;
 }

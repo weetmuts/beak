@@ -15,7 +15,14 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#define WINVER 0x0601
+#define _WIN32_WINNT 0x0601
+
+#include <windows.h>
+
 #include "util.h"
+
+#include "log.h"
 
 #include <stddef.h>
 #include <string.h>
@@ -35,8 +42,6 @@
 #include <utility>
 #include <zlib.h>
 
-#include "log.h"
-
 using namespace std;
 
 static ComponentId UTIL = registerLogComponent("util");
@@ -44,10 +49,6 @@ static ComponentId TMP = registerLogComponent("tmp");
 
 #define KB 1024ul
 
-string ownergroupString(uid_t uid, gid_t gid)
-{
-    return "";
-}
 
 void captureStartTime() {
     //clock_gettime(CLOCK_REALTIME, &start_time_);
@@ -57,7 +58,7 @@ void captureStartTime() {
 
 struct GZipHeader {
   char magic_header[2]; // 0x1f 0x8b
-  char compression_method; 
+  char compression_method;
   // 0: store (copied)
   //  1: compress
   //  2: pack
@@ -87,11 +88,11 @@ int gzipit(string *from, vector<unsigned char> *to)
     gzFile gzf = gzdopen(fdd, "w");
     gzwrite(gzf, from->c_str(), from->length());
     gzclose(gzf);
-    
+
     size_t len = lseek(fd, 0, SEEK_END);
     //assert(from->length()  == 0 || len < 10+8+2*from->length()); // The gzip header is 10, crc32+isize is 8
     lseek(fd, 0, SEEK_SET);
-    
+
     to->resize(len);
     read(fd, &(*to)[0], len);
     close(fd);
@@ -105,7 +106,7 @@ int gunzipit(vector<char> *from, vector<char> *to)
     int fd = syscall(SYS_memfd_create, "tobunzipped", 0);
     write(fd, &(*from)[0], from->size());
 
-    lseek(fd, 0, SEEK_SET);       
+    lseek(fd, 0, SEEK_SET);
     int fdd = dup(fd);
     char buf[4096];
     int n = 0;
@@ -121,57 +122,57 @@ int gunzipit(vector<char> *from, vector<char> *to)
     return OK;
 }
 
-/*    
+/*
   const unsigned char *cstr = reinterpret_cast<const unsigned char*>(from->c_str());
   size_t cstrlen = strlen(from->c_str());
-  
+
   unsigned long bufsize = compressBound(cstrlen);
   unsigned char *buf = new unsigned char[bufsize];
   int rc = compress2(buf, &bufsize, cstr, cstrlen,1);
 
   printf("%d >%*s<\n", (int)cstrlen, (int)cstrlen, cstr);
-  
+
   assert(rc == Z_OK);
 
   struct GZipHeader header;
-  
+
   assert(sizeof(GZipHeader)==10);
   memset(&header, 0, sizeof(GZipHeader));
   header.magic_header[0] = 0x1f;
   header.magic_header[1] = 0x8b;
   header.compression_method = 8;
   header.os_type = 3;
-  
+
   to->clear();
   uint32_t isize  = (uint32_t)cstrlen;
   to->resize(bufsize+sizeof(GZipHeader)+sizeof(isize));
-  
+
   memcpy(&(*to)[0],&header, sizeof(GZipHeader));
   memcpy(&(*to)[0]+sizeof(GZipHeader),buf, bufsize);
 
   toLittleEndian(&isize);
   memcpy(&(*to)[0]+sizeof(GZipHeader)+bufsize, &isize, sizeof(isize));
-  
+
   delete [] buf;
   return OK;
 }
 
 */
 
-
-
-
-dev_t MakeDev(int maj, int min)
+uint64_t clockGetUnixTime()
 {
-    return 0;
+    time_t t;
+    time(&t);
+    return t;
 }
 
-int MajorDev(dev_t d)
+uint64_t clockGetTime()
 {
-    return 0;
+    uint64_t millis = GetTickCount64();
+
+    return (uint64_t) millis * 1000LL;
 }
 
-int MinorDev(dev_t d)
-{
+pid_t fork() {
     return 0;
 }

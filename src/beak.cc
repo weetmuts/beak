@@ -15,11 +15,17 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "config.h"
-#include "log.h"
 #include "beak.h"
 
-const char *autocomplete = 
+#include "configuration.h"
+#include "log.h"
+#include "filesystem.h"
+#include "forward.h"
+#include "reverse.h"
+#include "system.h"
+#include "ui.h"
+
+const char *autocomplete =
 #include"generated_autocomplete.h"
     ;
 
@@ -29,12 +35,12 @@ const char *autocomplete =
 #include "nofuse.h"
 #endif
 
+#include <algorithm>
 #include <memory.h>
 #include <limits.h>
 #include <stddef.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <wait.h>
 #include <unistd.h>
 
 #include <cassert>
@@ -47,10 +53,6 @@ const char *autocomplete =
 #include <utility>
 #include <vector>
 
-#include "forward.h"
-#include "log.h"
-#include "reverse.h"
-#include "system.h"
 
 static ComponentId MAIN = registerLogComponent("main");
 static ComponentId COMMANDLINE = registerLogComponent("commandline");
@@ -63,24 +65,27 @@ struct BeakImplementation : Beak {
     BeakImplementation(FileSystem *fs);
     void printCommands();
     void printOptions();
-    
+
     void captureStartTime() {  ::captureStartTime(); }
     string argsToVector(int argc, char **argv, vector<string> *args);
     int parseCommandLine(int argc, char **argv, Command *cmd, Options *settings);
 
     void printHelp(Command cmd);
     void printVersion();
-    void printLicense();    
-    int printInfo(Options *settings); 
+    void printLicense();
+    int printInfo(Options *settings);
 
     bool lookForPointsInTime(Options *settings);
     vector<PointInTime> &history();
     bool setPointInTime(string g);
-    
+    RC findPointsInTime(string path, std::vector<struct timespec> *v);
+    RC fetchPointsInTime(string remote, string local);
+
+    int configure(Options *settings);
     int push(Options *settings);
 
     int umountDaemon(Options *settings);
-    
+
     int mountForwardDaemon(Options *settings);
     int mountForward(Options *settings);
     int umountForward(Options *settings);
@@ -94,17 +99,17 @@ struct BeakImplementation : Beak {
     int store(Options *settings);
 
     void genAutoComplete(std::string filename);
-    
+
     private:
 
     int mountForwardInternal(Options *settings, bool daemon);
     int mountReverseInternal(Options *settings, bool daemon);
-    
+
     ForwardTarredFS forward_fs;
     fuse_operations forward_tarredfs_ops;
     ReverseTarredFS reverse_fs;
     fuse_operations reverse_tarredfs_ops;
-    
+
     map<string,CommandEntry*> commands_;
     map<string,OptionEntry*> short_options_;
     map<string,OptionEntry*> long_options_;
@@ -112,10 +117,10 @@ struct BeakImplementation : Beak {
     OptionEntry *nosuch_option_;
 
     vector<PointInTime> history_;
-    
+
     Command parseCommand(string s);
     OptionEntry *parseOption(string s, bool *has_value, string *value);
-    std::unique_ptr<Config> config_;
+    std::unique_ptr<Configuration> configuration_;
 
     struct fuse_chan *chan_;
     struct fuse *fuse_;
@@ -125,7 +130,7 @@ struct BeakImplementation : Beak {
     FileSystem *file_system_;
 };
 
-std::unique_ptr<Beak> newBeak(FileSystem *fs) {    
+std::unique_ptr<Beak> newBeak(FileSystem *fs) {
     return std::unique_ptr<Beak>(new BeakImplementation(fs));
 }
 
@@ -175,8 +180,8 @@ BeakImplementation::BeakImplementation(FileSystem *fs) :
         }
     }
 
-    config_ = newConfig();
-    config_->load();
+    configuration_ = newConfiguration(fs);
+    configuration_->load();
 
     sys_ = newSystem();
 }
@@ -192,7 +197,7 @@ OptionEntry *BeakImplementation::parseOption(string s, bool *has_value, string *
 {
     OptionEntry *ce = short_options_[s];
     if (ce) {
-        *has_value = false;        
+        *has_value = false;
         return ce;
     }
     size_t p = s.find("=");
@@ -206,7 +211,7 @@ OptionEntry *BeakImplementation::parseOption(string s, bool *has_value, string *
     ce = long_options_[o];
     if (!ce) return nosuch_option_;
     *has_value = true;
-    *value = s.substr(p+1);    
+    *value = s.substr(p+1);
     return ce;
 }
 
@@ -218,7 +223,7 @@ void BeakImplementation::printCommands() {
         size_t l = strlen(e.name);
         if (l > max) max = l;
     }
-    
+
     for (auto &e : command_entries_) {
         if (e.cmd == nosuch_cmd) continue;
         size_t l = strlen(e.name);
@@ -238,7 +243,7 @@ void BeakImplementation::printOptions() {
         size_t l = strlen(e.name);
         if (l > max) max = l;
     }
-    
+
     for (auto &e : option_entries_) {
         if (e.option == nosuch_option) continue;
 
@@ -287,15 +292,17 @@ int BeakImplementation::parseCommandLine(int argc, char **argv, Command *cmd, Op
 {
     vector<string> args;
     argsToVector(argc, argv, &args);
-    
+
     memset(settings, 0, sizeof(*settings)); // Note! Contents can be set to zero!
     settings->help_me_on_this_cmd = nosuch_cmd;
     settings->fuse_args.push_back("beak"); // Application name
+    // settings->fuse_args.push_back("-o"); // Application name
+    // settings->fuse_args.push_back("nonempty"); // Application name
     settings->depth = 2; // Default value
     settings->pointintimeformat = both_point;
-    
+
     if (args.size() < 1) return false;
-    
+
     *cmd = parseCommand(args[0]);
 
     if (*cmd == nosuch_cmd) {
@@ -306,9 +313,9 @@ int BeakImplementation::parseCommandLine(int argc, char **argv, Command *cmd, Op
         if (args[0] == "") {
             *cmd = help_cmd;
             return false;
-        }        
+        }
         fprintf(stderr, "No such command \"%s\"\n", args[0].c_str());
-        return false;        
+        return false;
     }
 
     auto i = args.begin();
@@ -322,7 +329,7 @@ int BeakImplementation::parseCommandLine(int argc, char **argv, Command *cmd, Op
         *cmd = help_cmd;
         return true;
     }
-    
+
     bool options_completed = false;
     for (;i != args.end(); ++i)
     {
@@ -332,7 +339,7 @@ int BeakImplementation::parseCommandLine(int argc, char **argv, Command *cmd, Op
         if (*i == "--") {
             options_completed = true;
         }
-        
+
         if (!options_completed)
         {
             bool contains_value;
@@ -349,7 +356,7 @@ int BeakImplementation::parseCommandLine(int argc, char **argv, Command *cmd, Op
                         // thus pick the next arg as the value instead.
                         i++;
                         value = *i;
-                    } 
+                    }
                 }
             }
             switch (op) {
@@ -427,7 +434,7 @@ int BeakImplementation::parseCommandLine(int argc, char **argv, Command *cmd, Op
                           value.c_str());
                 }
                 settings->triggersize = parsed_size;
-                settings->triggersize_supplied = true;                
+                settings->triggersize_supplied = true;
             }
             break;
             case triggerglob_option:
@@ -443,7 +450,7 @@ int BeakImplementation::parseCommandLine(int argc, char **argv, Command *cmd, Op
                 break;
             case exclude_option:
                 settings->exclude.push_back(value);
-                break;                
+                break;
             case nosuch_option:
                 if ((*i)[0] == '-' && !options_completed) {
                     // It looks like an option, but we could not find it!
@@ -460,6 +467,7 @@ int BeakImplementation::parseCommandLine(int argc, char **argv, Command *cmd, Op
             {
                 string src = *i;
                 string point = "";
+
                 size_t at = src.find_last_of('@');
                 if (at != string::npos) {
                     point = src.substr(at);
@@ -472,10 +480,14 @@ int BeakImplementation::parseCommandLine(int argc, char **argv, Command *cmd, Op
                     }
                 }
 
-                Location *loc = config_->location(src);
-                if (loc) {
-                    debug(COMMANDLINE, "Translating %s to %s\n", src.c_str(), loc->source_path.c_str());
-                    src = loc->source_path;
+                Rule *rule = NULL;
+		if (src.back() == ':') {
+		    src.pop_back();
+		    rule = configuration_->rule(src);
+		}
+                if (rule) {
+                    debug(COMMANDLINE, "Translating %s to %s\n", src.c_str(), rule->path.c_str());
+                    src = rule->path;
                 }
                 if (src.find(':') != std::string::npos) {
                     // Assume this is an rclone remote target.
@@ -511,7 +523,7 @@ int BeakImplementation::parseCommandLine(int argc, char **argv, Command *cmd, Op
                               "Could not find real path for \"%s\"\nDo you have an existing mount here?\n",
                               (*i).c_str());
                     }
-                }                
+                }
             }
         }
     }
@@ -532,7 +544,7 @@ int BeakImplementation::parseCommandLine(int argc, char **argv, Command *cmd, Op
             error(COMMANDLINE,"You have to specify a remote or a dst directory.\n");
         }
     }
-    
+
     settings->fuse_argc = settings->fuse_args.size();
     settings->fuse_argv = new char*[settings->fuse_argc+1];
     int j = 0;
@@ -549,7 +561,7 @@ int BeakImplementation::printInfo(Options *settings)
     if (reverse_fs.history().size() == 0) {
         fprintf(stdout, "Not a beak archive.\n");
         return 1;
-    } else 
+    } else
     if (reverse_fs.history().size() == 1) {
         fprintf(stdout, "Single point in time found:\n");
     } else {
@@ -577,61 +589,61 @@ bool BeakImplementation::setPointInTime(string p)
     return reverse_fs.setPointInTime(p);
 }
 
+int BeakImplementation::configure(Options *settings)
+{
+    return configuration_->configure();
+}
+
 int BeakImplementation::push(Options *settings)
 {
-    char name[32];
-    strcpy(name, "/tmp/beak_pushXXXXXX");
-    char *mount = mkdtemp(name);
-    if (!mount) {
-        error(MAIN, "Could not create temp directory!");
-    }
+    Path *mount = file_system_->mkTempDir("beak_push_");
     Options forward_settings = *settings;
-    forward_settings.dst = Path::lookup(mount);
+    forward_settings.dst = mount;
     forward_settings.fuse_argc = 1;
     char *arg;
     char **argv = &arg;
-    *argv = new char[16];
+    argv[0] = new char[16];
     strcpy(*argv, "beak");
     forward_settings.fuse_argv = argv;
-    
+
     // Spawn virtual filesystem.
     int rc = mountForward(&forward_settings);
 
     std::vector<std::string> args;
     args.push_back("copy");
     args.push_back("-v");
-    args.push_back(mount);
+    args.push_back(mount->c_str());
     if (settings->dst) {
         args.push_back(settings->dst->str());
     } else {
         args.push_back(settings->remote);
     }
     rc = sys_->invoke("rclone", args, NULL);
-    
+
     // Unmount virtual filesystem.
     rc = umountForward(&forward_settings);
-    rmdir(mount);
+    rmdir(mount->c_str());
 
     return rc;
 }
 
 static int forwardGetattr(const char *path, struct stat *stbuf)
 {
-    ForwardTarredFS *fs = (ForwardTarredFS*)fuse_get_context()->private_data;    
+    ForwardTarredFS *fs = (ForwardTarredFS*)fuse_get_context()->private_data;
     return fs->getattrCB(path, stbuf);
 }
 
 static int forwardReaddir(const char *path, void *buf, fuse_fill_dir_t filler,
                           off_t offset, struct fuse_file_info *fi)
 {
-    ForwardTarredFS *fs = (ForwardTarredFS*)fuse_get_context()->private_data;    
-    return fs->readdirCB(path, buf, filler, offset, fi);    
+    ForwardTarredFS *fs = (ForwardTarredFS*)fuse_get_context()->private_data;
+    return fs->readdirCB(path, buf, filler, offset, fi);
 }
 
 static int forwardRead(const char *path, char *buf, size_t size, off_t offset,
                        struct fuse_file_info *fi)
 {
-    ForwardTarredFS *fs = (ForwardTarredFS*)fuse_get_context()->private_data;    
+    ForwardTarredFS *fs = (ForwardTarredFS*)fuse_get_context()->private_data;
     return fs->readCB(path, buf, size, offset, fi);
 }
 
@@ -668,7 +680,7 @@ int BeakImplementation::umountForward(Options *settings)
 int BeakImplementation::mountForwardInternal(Options *settings, bool daemon)
 {
     bool ok;
-    
+
     forward_tarredfs_ops.getattr = forwardGetattr;
     forward_tarredfs_ops.open = open_callback;
     forward_tarredfs_ops.read = forwardRead;
@@ -696,33 +708,33 @@ int BeakImplementation::mountForwardInternal(Options *settings, bool daemon)
                      &forward_fs);
 
     loop_pid_ = fork();
-    
+
     if (loop_pid_ == 0) {
         // This is the child process. Serve the virtual file system.
         fuse_loop_mt (fuse_);
         exit(0);
     }
-    return 0;    
+    return 0;
 }
 
 
 static int reverseGetattr(const char *path, struct stat *stbuf)
 {
-    ReverseTarredFS *fs = (ReverseTarredFS*)fuse_get_context()->private_data;    
+    ReverseTarredFS *fs = (ReverseTarredFS*)fuse_get_context()->private_data;
     return fs->getattrCB(path, stbuf);
 }
 
 static int reverseReaddir(const char *path, void *buf, fuse_fill_dir_t filler,
                           off_t offset, struct fuse_file_info *fi)
 {
-    ReverseTarredFS *fs = (ReverseTarredFS*)fuse_get_context()->private_data;    
-    return fs->readdirCB(path, buf, filler, offset, fi);    
+    ReverseTarredFS *fs = (ReverseTarredFS*)fuse_get_context()->private_data;
+    return fs->readdirCB(path, buf, filler, offset, fi);
 }
 
 static int reverseRead(const char *path, char *buf, size_t size, off_t offset,
                        struct fuse_file_info *fi)
 {
-    ReverseTarredFS *fs = (ReverseTarredFS*)fuse_get_context()->private_data;    
+    ReverseTarredFS *fs = (ReverseTarredFS*)fuse_get_context()->private_data;
     return fs->readCB(path, buf, size, offset, fi);
 }
 
@@ -759,7 +771,7 @@ int BeakImplementation::mountReverseInternal(Options *settings, bool daemon)
 
     reverse_fs.setRootDir(settings->src);
     reverse_fs.setMountDir(settings->dst);
-    
+
     if (settings->log.length() > 0) {
         setLogComponents(settings->log.c_str());
         setLogLevel(DEBUG);
@@ -798,7 +810,7 @@ int BeakImplementation::mountReverseInternal(Options *settings, bool daemon)
         // Look for the youngest timestamp inside root to
         // be used as the timestamp for the root directory.
         // The root directory is by definition not defined inside gz file.
-        time_t youngest_secs = 0, youngest_nanos = 0;        
+        time_t youngest_secs = 0, youngest_nanos = 0;
         for (auto i : e->dir)
         {
             if (i->fs.st_mtim.tv_sec > youngest_secs ||
@@ -828,7 +840,7 @@ int BeakImplementation::mountReverseInternal(Options *settings, bool daemon)
                      &reverse_fs);
 
     loop_pid_ = fork();
-    
+
     if (loop_pid_ == 0) {
         // This is the child process. Serve the virtual file system.
         fuse_loop_mt (fuse_);
@@ -841,31 +853,144 @@ int BeakImplementation::shell(Options *settings)
 {
     int rc = 0;
 
-    std::vector<char> stdout;
+    std::vector<char> out;
     std::vector<std::string> args;
     args.push_back("ls");
     args.push_back(settings->remote);
-    rc = sys_->invoke("rclone", args, &stdout);
+    rc = sys_->invoke("rclone", args, &out);
 
-    auto i = stdout.begin();
+    auto i = out.begin();
     bool eof, err;
 
     for (;;) {
-        eatWhitespace(stdout, i, &eof);
+        eatWhitespace(out, i, &eof);
         if (eof) break;
-        string size = eatTo(stdout, i, ' ', 64, &eof, &err);
+        string size = eatTo(out, i, ' ', 64, &eof, &err);
         if (eof || err) break;
-        string name = eatTo(stdout, i, '\n', 4096, &eof, &err);
+        string name = eatTo(out, i, '\n', 4096, &eof, &err);
         if (err) break;
-        
     }
     return rc;
 }
 
+// Copy the remote index files to the local storage.
+RC BeakImplementation::fetchPointsInTime(string remote, string cache)
+{
+    RC rc = OK;
+    std::vector<char> out;
+    std::vector<std::string> args;
+    args.push_back("copy");
+    args.push_back("--include");
+    args.push_back("/z01*");
+    args.push_back(remote);
+    args.push_back(cache);
+    UI::clearLine();
+    UI::output("Copying index files from %s", remote.c_str());
+    fflush(stdout);
+    rc = sys_->invoke("rclone", args, &out);
+
+    out.clear();
+    args.clear();
+    args.push_back("ls");
+    args.push_back(remote);
+    UI::clearLine();
+    UI::output("Listing files in %s", remote.c_str());
+    fflush(stdout);
+    rc = sys_->invoke("rclone", args, &out);
+    Path *p = Path::lookup(cache);
+    string r = remote;
+    r.pop_back();
+    p = p->appendName(Atom::lookup(r+".ls"));
+    writeVector(&out, p);
+    UI::clearLine();
+    fflush(stdout);
+
+    return rc;
+}
+
+// List the remote index files.
+RC BeakImplementation::findPointsInTime(std::string path, std::vector<struct timespec> *v)
+{
+    RC rc = OK;
+    std::vector<char> out;
+    std::vector<std::string> args;
+    args.push_back("ls");
+    args.push_back("--include");
+    args.push_back("/z01*");
+    args.push_back(path);
+    rc = sys_->invoke("rclone", args, &out);
+
+    if (rc != OK) return ERR;
+
+    auto i = out.begin();
+    bool eof, err;
+
+    for (;;) {
+	// Example line:
+	// 12288 z01_001506595429.268937346_0_7eb62d8e0097d5eaa99f332536236e6ba9dbfeccf0df715ec96363f8ddd495b6_0.gz
+        eatWhitespace(out, i, &eof);
+        if (eof) break;
+        string size = eatTo(out, i, ' ', 64, &eof, &err);
+        if (eof || err) break;
+        eatTo(out, i, '_', 64, &eof, &err);
+        if (eof || err) break;
+        string secs = eatTo(out, i, '.', 64, &eof, &err);
+        if (eof || err) break;
+        string nanos = eatTo(out, i, '_', 64, &eof, &err);
+        if (eof || err) break;
+        eatTo(out, i, '\n', 4096, &eof, &err);
+        if (err) break;
+	struct timespec ts;
+	ts.tv_sec = atol(secs.c_str());
+	ts.tv_nsec = atoi(nanos.c_str());
+	v->push_back(ts);
+    }
+
+    if (err) return ERR;
+
+    std::sort(v->begin(), v->end(),
+	      [](struct timespec &a, struct timespec &b)->bool {
+		  return (b.tv_sec < a.tv_sec) ||
+		      (b.tv_sec == a.tv_sec &&
+		       b.tv_nsec < a.tv_nsec);
+	      });
+
+    return OK;
+}
+
 int BeakImplementation::status(Options *settings)
 {
-    int rc = 0;
+    RC rc = OK;
 
+    for (auto rule : configuration_->sortedRules()) {
+	UI::output("%-20s %s\n", rule->name.c_str(), rule->path.c_str());
+
+	{
+	    std::vector<struct timespec> points;
+	    rc = findPointsInTime(rule->local.target, &points);
+	    if (points.size() > 0) {
+		std::string ago = timeAgo(&points.front());
+		UI::output("%-20s %s\n", ago.c_str(), "local");
+	    } else {
+		UI::output("%-20s %s\n", "No backup!", "local");
+	    }
+	}
+
+	for (auto remote : rule->sortedRemotes()) {
+	    rc = fetchPointsInTime(remote->target, rule->cache_path);
+	    if (rc != OK) continue;
+
+	    std::vector<struct timespec> points;
+	    rc = findPointsInTime(remote->target, &points);
+	    if (points.size() > 0) {
+		std::string ago = timeAgo(&points.front());
+		UI::output("%-20s %s\n", ago.c_str(), remote->target.c_str());
+	    } else {
+		UI::output("%-20s %s\n", "No backup!", remote->target.c_str());
+	    }
+	}
+	UI::output("\n");
+    }
 
     return rc;
 }
@@ -876,11 +1001,11 @@ int BeakImplementation::store(Options *settings)
 
     auto ffs  = newForwardTarredFS(file_system_);
     auto view = ffs->asFileSystem();
-    
+
     rc = ffs->scanFileSystem(settings);
 
     view->recurse([](Path *p){
-            
+
         });
     return rc;
 }
@@ -926,7 +1051,7 @@ void BeakImplementation::printHelp(Command cmd)
 
 void BeakImplementation::printVersion()
 {
-    fprintf(stdout, "tarredfs " XSTR(TARREDFS_VERSION) "\n");
+    fprintf(stdout, "beak " XSTR(BEAK_VERSION) "\n");
 }
 
 void BeakImplementation::printLicense()

@@ -22,6 +22,12 @@
 
 // When compiling on a platform without fuse support. Use this header instead.
 
+struct fuse_args {
+    int argc;
+    char **argv;
+    int allocated;
+};
+
 typedef int (*fuse_fill_dir_t)(void *buf, const char *data, void *p, int l);
 
 struct FuseContext {
@@ -42,4 +48,10 @@ struct fuse_operations {
 
 int fuse_main(int argc, char **argv, fuse_operations *op, void *user_data);
 
+struct fuse * fuse_new (struct fuse_chan *chan, struct fuse_args *args,
+                        const struct fuse_operations *op, size_t op_size, void *private_data);
+void fuse_exit(struct fuse *fuse);
+struct fuse_chan *fuse_mount (const char *mountpoint, struct fuse_args *args);
+void fuse_unmount(const char *s, struct fuse_chan *chan);
+int fuse_loop_mt(struct fuse *f);
 #endif

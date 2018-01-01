@@ -15,16 +15,25 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include"log.h"
-#include"match.h"
+#include "filesystem.h"
+#include "log.h"
+#include "match.h"
+#include "util.h"
 
-static ComponentId MAIN = registerLogComponent("main");
+using namespace std;
+
+static ComponentId TEST = registerLogComponent("test");
 
 void testMatch(std::string pattern, const char *path, bool should_match)
     throw (std::string);
 
 bool verbose_ = false;
 bool err_found_ = false;
+
+std::unique_ptr<FileSystem> fs;
+void testMatching();
+void testRandom();
+void testFileSystem();
 
 int main(int argc, char *argv[])
 {
@@ -37,24 +46,12 @@ int main(int argc, char *argv[])
         setLogComponents("all");
     }
     try {
-        testMatch("/Alfa/**", "Alfa/beta/gamma", false);
-        testMatch("/Alfa/**", "/Alfa/beta/gamma", true);
-        testMatch("/Alfa/beta/**", "/Alfa/beta/gamma", true);
-        testMatch("/Alfa/beta/**", "/Alfa/betagamma", false);
+        fs = newDefaultFileSystem();
 
-        testMatch("Alfa/**", "Alfa/beta/gamma", true);
-        testMatch("Alfa/**", "AlfaBeta/gamma", false);
-        testMatch("Alfa/**", "/xx/yy/Alfa/gamma", true);
+        testMatching();
+        testRandom();
+        testFileSystem();
 
-        testMatch("*.jpg", "alfa.jpg", true);
-        testMatch("*.jpg", "/Alfa/betA/x.jpg", true);
-        testMatch("*.jpg", ".jpgalfa", false);        
-
-        testMatch("log*", "log.txt", true);
-        testMatch("loggo*", "/Alfa/Beta/loggo*", true);
-        testMatch("log*", "/log", true);
-        testMatch("log*", "alfalog", false);        
-        
         if (!err_found_) {
             printf("OK\n");
         } else {
@@ -66,25 +63,45 @@ int main(int argc, char *argv[])
     }
 }
 
+void testMatching()
+{
+    testMatch("/Alfa/**", "Alfa/beta/gamma", false);
+    testMatch("/Alfa/**", "/Alfa/beta/gamma", true);
+    testMatch("/Alfa/beta/**", "/Alfa/beta/gamma", true);
+    testMatch("/Alfa/beta/**", "/Alfa/betagamma", false);
+
+    testMatch("Alfa/**", "Alfa/beta/gamma", true);
+    testMatch("Alfa/**", "AlfaBeta/gamma", false);
+    testMatch("Alfa/**", "/xx/yy/Alfa/gamma", true);
+
+    testMatch("*.jpg", "alfa.jpg", true);
+    testMatch("*.jpg", "/Alfa/betA/x.jpg", true);
+    testMatch("*.jpg", ".jpgalfa", false);
+
+    testMatch("log*", "log.txt", true);
+    testMatch("loggo*", "/Alfa/Beta/loggo*", true);
+    testMatch("log*", "/log", true);
+    testMatch("log*", "alfalog", false);
+}
 
 void testMatch(std::string pattern, const char *path, bool should_match)
     throw (std::string)
 {
     if (should_match) {
-        verbose(MAIN,"\"%s\" matches pattern \"%s\" ", path, pattern.c_str());
+        verbose(TEST,"\"%s\" matches pattern \"%s\" ", path, pattern.c_str());
     }
     else {
-        verbose(MAIN,"\"%s\" should not match pattern \"%s\" ", path, pattern.c_str());
+        verbose(TEST,"\"%s\" should not match pattern \"%s\" ", path, pattern.c_str());
     }
     Match m;
     m.use(pattern);
     bool r = m.match(path);
 
     if (r == should_match) {
-        verbose(MAIN, "OK\n");
+        verbose(TEST, "OK\n");
     }
     else {
-        verbose(MAIN, "ERR!\n");
+        verbose(TEST, "ERR!\n");
         err_found_ = true;
     }
 
@@ -95,4 +112,20 @@ void testMatch(std::string pattern, const char *path, bool should_match)
             throw std::string("Failure: ")+pattern+" should "+s+" match "+path;
         }
     }
+}
+
+void testRandom()
+{
+    for (int i=0; i<100; ++i) {
+        string s = randomUpperCaseCharacterString(6);
+        printf("RND=>%s<\n", s.c_str());
+    }
+}
+
+
+void testFileSystem()
+{
+    Path *p = fs->mkTempDir("beak_test");
+
+    printf("TEMP=>%s<\n", p->c_str());
 }
