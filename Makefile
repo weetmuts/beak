@@ -25,12 +25,12 @@ endif
 VERBOSE?=@
 
 release:
-	@echo Building release
-	$(VERBOSE)$(MAKE) --no-print-directory -C $(BUILDDIR) release
+	@echo Building release for $(words $(BUILDDIR)) host\(s\).
+	@for x in $(BUILDDIR); do echo; echo Bulding $$(basename $$x) ; $(MAKE) --no-print-directory -C $$x release ; done
 
 debug:
-	@echo Building debug
-	$(VERBOSE)$(MAKE) --no-print-directory -C $(BUILDDIR) debug
+	@echo Building debug for $(words $(BUILDDIR)) host\(s\).
+	@for x in $(BUILDDIR); do echo; echo Bulding $$(basename $$x) ; $(MAKE) --no-print-directory -C $$x debug ; done
 
 test_release:
 	@echo Running tests
