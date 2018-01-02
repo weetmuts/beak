@@ -142,8 +142,15 @@ struct Path
     int depth() { return depth_; }
     Path *subpath(int from, int len = -1);
     Path *prepend(Path *p);
-    Path *append(std::string &p);
+    Path *append(std::string p);
     bool isRoot() { return depth_ == 1 && atom_->c_str_len() == 0; }
+    #ifdef PLATFORM_WINAPI
+    bool isDrive() {
+        const char *s = c_str();
+        return depth_ == 2 && str().length()==2 && s[1] == ':' &&
+            ( (s[0]>='A' && s[0]<='Z') || (s[0]>='a' && s[0]<='z'));
+    }
+    #endif
     Path *unRoot() {
 	if (isRoot()) return NULL;
 	if (c_str()[0] != '/') {
@@ -157,6 +164,8 @@ struct Path
         while (t != NULL && t != p) { t = t->parent_; }
         return (t == p);
     }
+    Path *realpath();
+    bool mkdir();
 
     private:
 
@@ -169,6 +178,7 @@ struct Path
 
     std::deque<Path*> nodes();
     Path *reparent(Path *p);
+    static bool makeDirHelper(const char *);
 };
 
 struct depthFirstSortPath
@@ -225,6 +235,7 @@ struct FileSystem
     virtual void recurse(std::function<void(Path *p)> cb) = 0;
     virtual bool stat(Path *p, FileStat *fs) = 0;
     virtual Path *mkTempDir(std::string prefix) = 0;
+    virtual Path *mkDir(Path *p, std::string name) = 0;
 };
 
 std::unique_ptr<FileSystem> newDefaultFileSystem();
@@ -242,7 +253,6 @@ mode_t stringToPermission(std::string s);
 uid_t geteuid();
 gid_t getegid();
 
-char *realpath(const char *path, char *resolved_path);
 char *mkdtemp(char *pattern);
 int fork();
 

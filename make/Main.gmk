@@ -93,7 +93,7 @@ TESTINTERNALS_OBJS:=$($(PLATFORM)_TESTINTERNALS_OBJS)
 $(OUTPUT_ROOT)/$(TYPE)/beak.o: $(OUTPUT_ROOT)/generated_autocomplete.h
 
 $(OUTPUT_ROOT)/$(TYPE)/%.o: $(SRC_ROOT)/src/%.cc $(HEADERS)
-	@echo Compiling $$(basename $<)
+	@echo Compiling $(PLATFORM) $$(basename $<)
 	$(VERBOSE)$(CXX) $(CXXFLAGS_$(TYPE)) $(CXXFLAGS) -I$(OUTPUT_ROOT) $< -c -o $@
 
 $(OUTPUT_ROOT)/$(TYPE)/beak: $(BEAK_OBJS)

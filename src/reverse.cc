@@ -486,7 +486,7 @@ bool ReverseTarredFS::lookForPointsInTime(PointInTimeFormat f, Path *path)
     bool ok;
     if (path == NULL) return false;
 
-    std::vector<Path*> contents;
+    vector<Path*> contents;
     if (!file_system_->readdir(path, &contents)) {
         return false;
     }
@@ -509,7 +509,7 @@ bool ReverseTarredFS::lookForPointsInTime(PointInTimeFormat f, Path *path)
             history_.push_back(p);
         }
     }
-    std::sort(history_.begin(), history_.end(),
+    sort(history_.begin(), history_.end(),
               [](PointInTime &a, PointInTime &b)->bool {
                   return (b.ts.tv_sec < a.ts.tv_sec) ||
                       (b.ts.tv_sec == a.ts.tv_sec &&

@@ -38,8 +38,6 @@
 #include "tar.h"
 #include "util.h"
 
-using namespace std;
-
 struct Entry
 {
     Entry(FileStat s, size_t o, Path *p) :
@@ -53,9 +51,9 @@ struct Entry
     FileStat fs;
     size_t offset;
     Path *path;
-    string tar;
-    vector<Entry*> dir;
-    string link;
+    std::string tar;
+    std::vector<Entry*> dir;
+    std::string link;
     bool is_sym_link;
     bool loaded;
 
@@ -70,14 +68,14 @@ enum PointInTimeFormat : short {
 struct PointInTime {
     int key;
     struct timespec ts;
-    string ago;
-    string datetime;
-    string direntry;
-    string filename;
+    std::string ago;
+    std::string datetime;
+    std::string direntry;
+    std::string filename;
 
-    map<Path*,Entry> entries_;
-    map<Path*,Path*> gz_files_;
-    set<Path*> loaded_gz_files_;
+    std::map<Path*,Entry> entries_;
+    std::map<Path*,Path*> gz_files_;
+    std::set<Path*> loaded_gz_files_;
 };
 
 struct ReverseTarredFS
@@ -93,16 +91,16 @@ struct ReverseTarredFS
                struct fuse_file_info *fi);
     int readlinkCB(const char *path, char *buf, size_t s);
 
-    int parseTarredfsContent(PointInTime *point, vector<char> &v, vector<char>::iterator &i,
+    int parseTarredfsContent(PointInTime *point, std::vector<char> &v, std::vector<char>::iterator &i,
                              Path *dir_to_prepend);
-    int parseTarredfsTars(PointInTime *point, vector<char> &v, vector<char>::iterator &i);
+    int parseTarredfsTars(PointInTime *point, std::vector<char> &v, std::vector<char>::iterator &i);
     bool loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend);
     void loadCache(PointInTime *point, Path *path);
 
     bool lookForPointsInTime(PointInTimeFormat f, Path *src);
-    vector<PointInTime> &history() { return history_; }
-    PointInTime *findPointInTime(string s);
-    bool setPointInTime(string g);
+    std::vector<PointInTime> &history() { return history_; }
+    PointInTime *findPointInTime(std::string s);
+    bool setPointInTime(std::string g);
 
     ReverseTarredFS(FileSystem *fs);
 
@@ -116,8 +114,8 @@ struct ReverseTarredFS
     Path *root_dir_;
     Path *mount_dir_;
 
-    vector<PointInTime> history_;
-    map<string,PointInTime*> points_in_time_;
+    std::vector<PointInTime> history_;
+    std::map<std::string,PointInTime*> points_in_time_;
     PointInTime *single_point_in_time_;
     PointInTime *most_recent_point_in_time_;
 

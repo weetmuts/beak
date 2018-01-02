@@ -23,6 +23,7 @@
 #include "forward.h"
 #include "reverse.h"
 #include "system.h"
+#include "tarfile.h"
 #include "ui.h"
 
 const char *autocomplete =
@@ -53,6 +54,7 @@ const char *autocomplete =
 #include <utility>
 #include <vector>
 
+using namespace std;
 
 static ComponentId MAIN = registerLogComponent("main");
 static ComponentId COMMANDLINE = registerLogComponent("commandline");
@@ -78,7 +80,7 @@ struct BeakImplementation : Beak {
     bool lookForPointsInTime(Options *settings);
     vector<PointInTime> &history();
     bool setPointInTime(string g);
-    RC findPointsInTime(string path, std::vector<struct timespec> *v);
+    RC findPointsInTime(string path, vector<struct timespec> *v);
     RC fetchPointsInTime(string remote, string local);
 
     int configure(Options *settings);
@@ -98,7 +100,7 @@ struct BeakImplementation : Beak {
     int status(Options *settings);
     int store(Options *settings);
 
-    void genAutoComplete(std::string filename);
+    void genAutoComplete(string filename);
 
     private:
 
@@ -120,18 +122,18 @@ struct BeakImplementation : Beak {
 
     Command parseCommand(string s);
     OptionEntry *parseOption(string s, bool *has_value, string *value);
-    std::unique_ptr<Configuration> configuration_;
+    unique_ptr<Configuration> configuration_;
 
     struct fuse_chan *chan_;
     struct fuse *fuse_;
     pid_t loop_pid_;
 
-    std::unique_ptr<System> sys_;
+    unique_ptr<System> sys_;
     FileSystem *file_system_;
 };
 
-std::unique_ptr<Beak> newBeak(FileSystem *fs) {
-    return std::unique_ptr<Beak>(new BeakImplementation(fs));
+unique_ptr<Beak> newBeak(FileSystem *fs) {
+    return unique_ptr<Beak>(new BeakImplementation(fs));
 }
 
 struct CommandEntry {
@@ -489,32 +491,31 @@ int BeakImplementation::parseCommandLine(int argc, char **argv, Command *cmd, Op
                     debug(COMMANDLINE, "Translating %s to %s\n", src.c_str(), rule->path.c_str());
                     src = rule->path;
                 }
-                if (src.find(':') != std::string::npos) {
+                if (src.find(':') != string::npos) {
                     // Assume this is an rclone remote target.
                     settings->remote = src;
                     settings->src = NULL;
                 } else {
-                    char tmp[PATH_MAX];
-                    const char *rc = realpath(src.c_str(), tmp);
-                    if (!rc)
+                    Path *rp = Path::lookup(src)->realpath();
+                    if (!rp)
                     {
                         error(COMMANDLINE, "Could not find real path for %s\n", src.c_str());
                     }
-                    assert(rc == tmp);
-                    settings->src = Path::lookup(tmp);
+                    settings->src = rp;
                 }
             }
             else if (settings->dst == NULL)
             {
                 string dst = *i;
-                char tmp[PATH_MAX];
-                const char *rc = realpath(dst.c_str(), tmp);
-                if (rc) {
-                    settings->dst = Path::lookup(tmp);
+                Path *rp = Path::lookup(dst)->realpath();
+                if (rp) {
+                    // Path exists.
+                    settings->dst = rp;
                 }
                 else
                 {
-                    if (dst.find(':') != std::string::npos) {
+                    // Path does not exist...
+                    if (dst.find(':') != string::npos) {
                         // Assume this is an rclone remote target.
                         settings->remote = dst;
                         settings->dst = NULL;
@@ -609,7 +610,7 @@ int BeakImplementation::push(Options *settings)
     // Spawn virtual filesystem.
     int rc = mountForward(&forward_settings);
 
-    std::vector<std::string> args;
+    vector<string> args;
     args.push_back("copy");
     args.push_back("-v");
     args.push_back(mount->c_str());
@@ -654,7 +655,7 @@ static int open_callback(const char *path, struct fuse_file_info *fi)
 
 int BeakImplementation::umountDaemon(Options *settings)
 {
-    std::vector<std::string> args;
+    vector<string> args;
     args.push_back("-u");
     args.push_back(settings->src->str());
     return sys_->invoke("fusermount", args, NULL);
@@ -853,8 +854,8 @@ int BeakImplementation::shell(Options *settings)
 {
     int rc = 0;
 
-    std::vector<char> out;
-    std::vector<std::string> args;
+    vector<char> out;
+    vector<string> args;
     args.push_back("ls");
     args.push_back(settings->remote);
     rc = sys_->invoke("rclone", args, &out);
@@ -877,8 +878,8 @@ int BeakImplementation::shell(Options *settings)
 RC BeakImplementation::fetchPointsInTime(string remote, string cache)
 {
     RC rc = OK;
-    std::vector<char> out;
-    std::vector<std::string> args;
+    vector<char> out;
+    vector<string> args;
     args.push_back("copy");
     args.push_back("--include");
     args.push_back("/z01*");
@@ -909,11 +910,11 @@ RC BeakImplementation::fetchPointsInTime(string remote, string cache)
 }
 
 // List the remote index files.
-RC BeakImplementation::findPointsInTime(std::string path, std::vector<struct timespec> *v)
+RC BeakImplementation::findPointsInTime(string path, vector<struct timespec> *v)
 {
     RC rc = OK;
-    std::vector<char> out;
-    std::vector<std::string> args;
+    vector<char> out;
+    vector<string> args;
     args.push_back("ls");
     args.push_back("--include");
     args.push_back("/z01*");
@@ -948,7 +949,7 @@ RC BeakImplementation::findPointsInTime(std::string path, std::vector<struct tim
 
     if (err) return ERR;
 
-    std::sort(v->begin(), v->end(),
+    sort(v->begin(), v->end(),
 	      [](struct timespec &a, struct timespec &b)->bool {
 		  return (b.tv_sec < a.tv_sec) ||
 		      (b.tv_sec == a.tv_sec &&
@@ -966,10 +967,10 @@ int BeakImplementation::status(Options *settings)
 	UI::output("%-20s %s\n", rule->name.c_str(), rule->path.c_str());
 
 	{
-	    std::vector<struct timespec> points;
+	    vector<struct timespec> points;
 	    rc = findPointsInTime(rule->local.target, &points);
 	    if (points.size() > 0) {
-		std::string ago = timeAgo(&points.front());
+		string ago = timeAgo(&points.front());
 		UI::output("%-20s %s\n", ago.c_str(), "local");
 	    } else {
 		UI::output("%-20s %s\n", "No backup!", "local");
@@ -980,10 +981,10 @@ int BeakImplementation::status(Options *settings)
 	    rc = fetchPointsInTime(remote->target, rule->cache_path);
 	    if (rc != OK) continue;
 
-	    std::vector<struct timespec> points;
+	    vector<struct timespec> points;
 	    rc = findPointsInTime(remote->target, &points);
 	    if (points.size() > 0) {
-		std::string ago = timeAgo(&points.front());
+		string ago = timeAgo(&points.front());
 		UI::output("%-20s %s\n", ago.c_str(), remote->target.c_str());
 	    } else {
 		UI::output("%-20s %s\n", "No backup!", remote->target.c_str());
@@ -1004,7 +1005,17 @@ int BeakImplementation::store(Options *settings)
 
     rc = ffs->scanFileSystem(settings);
 
-    view->recurse([](Path *p){
+    for (auto& e : ffs->tar_storage_directories) {
+        Path *dir = e.second->path()->prepend(settings->dst);
+        printf("DIR %s\n", dir->c_str());
+        dir->mkdir();
+        for (auto& f : e.second->tars()) {
+            Path *tar = f->path()->prepend(settings->dst);
+            printf("    TAR %s\n", tar->c_str());
+        }
+    }
+
+    view->recurse([](Path *p) {
 
         });
     return rc;
@@ -1056,11 +1067,18 @@ void BeakImplementation::printVersion()
 
 void BeakImplementation::printLicense()
 {
-    fprintf(stdout, "Beak contains software:\n"
-            " Copyright (C) 2016-2017 Fredrik Öhrström\n\n");
+    fprintf(stdout, "Beak contains software developed:\n"
+            " by Fredrik Öhrström Copyright (C) 2016-2017\n\n"
+            "Includes third party libraries:\n"
+            " openssl-1.0.2l\n"
+            " zlib-1.2.11\n"
+            #ifdef PLATFORM_WINAPI
+            " winsfp\n"
+            #endif
+            "\n");
 }
 
-void BeakImplementation::genAutoComplete(std::string filename)
+void BeakImplementation::genAutoComplete(string filename)
 {
     FILE *f = fopen(filename.c_str(),"wb");
     if (!f) {

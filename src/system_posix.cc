@@ -29,14 +29,14 @@ static ComponentId SYSTEM = registerLogComponent("system");
 
 struct SystemImplementation : System
 {
-    int invoke(std::string program,
-               std::vector<std::string> args,
-               std::vector<char> *stdout);
+    int invoke(string program,
+               vector<string> args,
+               vector<char> *stdout);
 };
 
-std::unique_ptr<System> newSystem()
+unique_ptr<System> newSystem()
 {
-    return std::unique_ptr<System>(new SystemImplementation());
+    return unique_ptr<System>(new SystemImplementation());
 }
 
 string protect_(string arg)
@@ -44,9 +44,9 @@ string protect_(string arg)
     return arg;
 }
 
-int SystemImplementation::invoke(std::string program,
-                                 std::vector<std::string> args,
-                                 std::vector<char> *stdout)
+int SystemImplementation::invoke(string program,
+                                 vector<string> args,
+                                 vector<char> *stdout)
 {
     int link[2];
     const char **argv = new const char*[args.size()+2];

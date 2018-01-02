@@ -20,28 +20,32 @@
 #include "match.h"
 #include "util.h"
 
+#include <assert.h>
+
 using namespace std;
 
-static ComponentId TEST = registerLogComponent("test");
+static ComponentId TEST_MATCH = registerLogComponent("test_match");
+static ComponentId TEST_RANDOM = registerLogComponent("test_random");
+static ComponentId TEST_FILESYSTEM = registerLogComponent("test_filesystem");
 
-void testMatch(std::string pattern, const char *path, bool should_match)
-    throw (std::string);
+void testMatch(string pattern, const char *path, bool should_match)
+    throw (string);
 
 bool verbose_ = false;
 bool err_found_ = false;
 
-std::unique_ptr<FileSystem> fs;
+unique_ptr<FileSystem> fs;
 void testMatching();
 void testRandom();
 void testFileSystem();
 
 int main(int argc, char *argv[])
 {
-    if (argc > 1 && std::string("--verbose") == argv[1]) {
+    if (argc > 1 && string("--verbose") == argv[1]) {
         setLogLevel(VERBOSE);
         verbose_ = true;
     }
-    if (argc > 1 && std::string("--debug") == argv[1]) {
+    if (argc > 1 && string("--debug") == argv[1]) {
         setLogLevel(DEBUG);
         setLogComponents("all");
     }
@@ -58,7 +62,7 @@ int main(int argc, char *argv[])
             printf("Errors detected!\n");
         }
     }
-    catch (std::string e) {
+    catch (string e) {
         fprintf(stderr, "%s\n", e.c_str());
     }
 }
@@ -84,32 +88,32 @@ void testMatching()
     testMatch("log*", "alfalog", false);
 }
 
-void testMatch(std::string pattern, const char *path, bool should_match)
-    throw (std::string)
+void testMatch(string pattern, const char *path, bool should_match)
+    throw (string)
 {
     if (should_match) {
-        verbose(TEST,"\"%s\" matches pattern \"%s\" ", path, pattern.c_str());
+        verbose(TEST_MATCH,"\"%s\" matches pattern \"%s\" ", path, pattern.c_str());
     }
     else {
-        verbose(TEST,"\"%s\" should not match pattern \"%s\" ", path, pattern.c_str());
+        verbose(TEST_MATCH,"\"%s\" should not match pattern \"%s\" ", path, pattern.c_str());
     }
     Match m;
     m.use(pattern);
     bool r = m.match(path);
 
     if (r == should_match) {
-        verbose(TEST, "OK\n");
+        verbose(TEST_MATCH, "OK\n");
     }
     else {
-        verbose(TEST, "ERR!\n");
+        verbose(TEST_MATCH, "ERR!\n");
         err_found_ = true;
     }
 
     if (!verbose_) {
         if (r != should_match) {
-            std::string s = "";
+            string s = "";
             if (!should_match) s = " NOT ";
-            throw std::string("Failure: ")+pattern+" should "+s+" match "+path;
+            throw string("Failure: ")+pattern+" should "+s+" match "+path;
         }
     }
 }
@@ -118,14 +122,29 @@ void testRandom()
 {
     for (int i=0; i<100; ++i) {
         string s = randomUpperCaseCharacterString(6);
-        printf("RND=>%s<\n", s.c_str());
+        verbose(TEST_RANDOM, "RND=>%s<\n", s.c_str());
     }
 }
-
 
 void testFileSystem()
 {
     Path *p = fs->mkTempDir("beak_test");
+    fs->mkDir(p, "alfa");
+    fs->mkDir(p, "beta");
 
-    printf("TEMP=>%s<\n", p->c_str());
+    vector<Path*> contents;
+    bool b = fs->readdir(p, &contents);
+    if (!b) {
+        assert(0);
+    } else {
+        for (auto i : contents) {
+            verbose(TEST_FILESYSTEM,"DIRENTRY %s\n", i->c_str());
+        }
+    }
+
+    Path *test = p->append("x/y/z");
+    assert(test->mkdir());
+
+    Path *rp = contents[0]->realpath();
+    verbose(TEST_FILESYSTEM,"REALPATH %s %s\n", contents[0]->c_str(), rp->c_str());
 }

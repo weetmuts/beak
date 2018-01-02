@@ -81,7 +81,7 @@ using namespace std;
 
 ComponentId MATCH = registerLogComponent("match");
 
-bool Match::use(std::string pattern)
+bool Match::use(string pattern)
 {
     pattern_ = pattern;
     assert(pattern_.length() > 0);

@@ -33,6 +33,7 @@ struct FileSystemFuseAPIImplementation : FileSystem
     void recurse(function<void(Path *p)> cb);
     bool stat(Path *p, FileStat *fs);
     Path *mkTempDir(string prefix);
+    Path *mkDir(Path *p, string name);
 
     FileSystemFuseAPIImplementation(FuseAPI *api);
     private:
@@ -81,6 +82,11 @@ Path *FileSystemFuseAPIImplementation::mkTempDir(string prefix)
     return NULL;
 }
 
+Path *FileSystemFuseAPIImplementation::mkDir(Path *p, string name)
+{
+    return NULL;
+}
+
 size_t basepos(string &s)
 {
     return s.find_last_of('/');
@@ -112,6 +118,14 @@ string basename_(string &s)
  * dirname_("/") returns NULL
  * dirname_("a") returns NULL
  * dirname_("a/") returns NULL
+ *
+ * For winapi, there is always a hidden root below the drive letter.
+ * I.e. the drive letter is the first subdirectory.
+ * dirname_("Z:") return "" ie the root
+ * dirname_("Z:/") return "" ie the root
+ * dirname_("Z:/b") returns "Z:"
+ * dirname_("Z:/b/c") returns "Z:/b"
+ * dirname_("/Z:/") not valid string, but still returns "" ie the root
  */
 static pair<string, bool> dirname_(string &s)
 {
@@ -125,10 +139,19 @@ static pair<string, bool> dirname_(string &s)
         return pair<string, bool>("", false);
     }
     size_t p = s.find_last_of('/');
-    if (p == string::npos)
+    if (p == string::npos) {
+        #ifdef PLATFORM_WINAPI
+        if (s.length()==2 && s[1] == ':' && ( (s[0]>='A' && s[0]<='Z') || (s[0]>='a' && s[0]<='z')))
+        {
+            // This was a drive letter. Insert an implicit root above it!
+            return pair<string, bool>("", true);
+        }
+        #endif
         return pair<string, bool>("", false);
-    if (p == 0)
+    }
+    if (p == 0) {
         return pair<string, bool>("", true);
+    }
     return pair<string, bool>(s.substr(0, p), true);
 }
 
@@ -397,7 +420,7 @@ Path* Path::subpath(int from, int len)
 Path* Path::prepend(Path *p)
 {
     string concat;
-    if (p->str().front() == '/' && str().front() == '/') {
+    if (str().front() == '/') {
         concat = p->str() + str();
     } else {
         concat = p->str() + "/" + str();
@@ -406,9 +429,15 @@ Path* Path::prepend(Path *p)
     return pa;
 }
 
-Path* Path::append(string &p)
+Path* Path::append(string p)
 {
-    string concat = str()+"/"+p;
+    string concat;
+    printf("CONCAT >%s< >%s<\n", str().c_str(), p.c_str());
+    if (p.front() == '/') {
+        concat = str() + p;
+    } else {
+        concat = str() + "/" + p;
+    }
     Path *pa = lookup(concat);
     return pa;
 }
@@ -643,4 +672,16 @@ void FileStat::storeIn(struct stat *sb)
 #else
 #error HAS_ST_MTIM or HAS_ST_TIME must be true!
 #endif
+}
+
+bool Path::mkdir()
+{
+    if (parent() && parent()->str().length() > 0) {
+        bool rc = parent()->mkdir();
+        if (!rc) return false;
+    }
+    #ifdef PLATFORM_WINAPI
+    if (isDrive()) return true;
+    #endif
+    return makeDirHelper(c_str());
 }

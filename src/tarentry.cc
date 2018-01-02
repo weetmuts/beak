@@ -104,18 +104,18 @@ TarEntry::TarEntry(Path *ap, Path *p, const struct stat *b, TarHeaderStyle ths) 
         string s;
         s.append(permissionString(&fs_));
         s.append(separator_string);
-        s.append(std::to_string(fs_.st_uid));
+        s.append(to_string(fs_.st_uid));
         s.append("/");
-        s.append(std::to_string(fs_.st_gid));
+        s.append(to_string(fs_.st_gid));
         tv_line_left = s;
 
         s = "";
         if (isRegularFile()) {
-            s = std::to_string(fs_.st_size);
+            s = to_string(fs_.st_size);
         } else if (isCharacterDevice() || isBlockDevice()) {
-            s = std::to_string(MajorDev(fs_.st_rdev)) + "," + std::to_string(MinorDev(fs_.st_rdev));
+            s = to_string(MajorDev(fs_.st_rdev)) + "," + to_string(MinorDev(fs_.st_rdev));
         } else {
-            s = std::to_string(0);
+            s = to_string(0);
         }
         tv_line_size = s;
 
@@ -297,7 +297,7 @@ bool sanityCheck(const char *x, const char *y) {
     return true;
 }
 
-void TarEntry::setContent(std::vector<unsigned char> &c) {
+void TarEntry::setContent(vector<unsigned char> &c) {
     content = c;
     virtual_file_ = true;
     assert((size_t)fs_.st_size == c.size());
@@ -443,7 +443,7 @@ void TarEntry::addEntry(TarEntry *te) {
 }
 
 void TarEntry::sortEntries() {
-    std::sort(entries_.begin(), entries_.end(),
+    sort(entries_.begin(), entries_.end(),
               [](TarEntry *a, TarEntry *b)->bool {
                   return TarSort::lessthan(a->path(), b->path());
               });
@@ -453,7 +453,7 @@ void TarEntry::calculateHash() {
     calculateSHA256Hash();
 }
 
-std::vector<char> &TarEntry::hash() {
+vector<char> &TarEntry::hash() {
     return sha256_hash_;
 }
 
@@ -512,7 +512,7 @@ void cookEntry(string *listing, TarEntry *entry) {
     listing->append(separator_string);
     listing->append(entry->tarFile()->name());
     listing->append(separator_string);
-    listing->append(std::to_string(entry->tarOffset()+entry->headerSize()));
+    listing->append(to_string(entry->tarOffset()+entry->headerSize()));
     listing->append(separator_string);
     listing->append("0"); // content hash not used
     listing->append(separator_string);
@@ -521,7 +521,7 @@ void cookEntry(string *listing, TarEntry *entry) {
     listing->append(separator_string);
 }
 
-bool eatEntry(std::vector<char> &v, std::vector<char>::iterator &i, Path *dir_to_prepend,
+bool eatEntry(vector<char> &v, vector<char>::iterator &i, Path *dir_to_prepend,
               FileStat *fs, size_t *offset, string *tar, Path **path,
               string *link, bool *is_sym_link,
               bool *eof, bool *err)
@@ -559,7 +559,7 @@ bool eatEntry(std::vector<char> &v, std::vector<char>::iterator &i, Path *dir_to
 
     // Extract modify time, secs and nanos from string.
     {
-        std::vector<char> sn(secs_and_nanos.begin(), secs_and_nanos.end());
+        vector<char> sn(secs_and_nanos.begin(), secs_and_nanos.end());
         auto j = sn.begin();
         string se = eatTo(sn, j, '.', 64, eof, err);
         if (*err || *eof) return false;
@@ -575,7 +575,7 @@ bool eatEntry(std::vector<char> &v, std::vector<char>::iterator &i, Path *dir_to
 
     // Extract access time, secs and nanos from string.
     {
-        std::std::vector<char> sn(secs_and_nanos.begin(), secs_and_nanos.end());
+        vector<char> sn(secs_and_nanos.begin(), secs_and_nanos.end());
         auto j = sn.begin();
         string se = eatTo(sn, j, '.', 64, eof, err);
         if (*err || *eof) return false;
@@ -590,7 +590,7 @@ bool eatEntry(std::vector<char> &v, std::vector<char>::iterator &i, Path *dir_to
 
     // Extract change time, secs and nanos from string.
     {
-        std::std::vector<char> sn(secs_and_nanos.begin(), secs_and_nanos.end());
+        vector<char> sn(secs_and_nanos.begin(), secs_and_nanos.end());
         auto j = sn.begin();
         string se = eatTo(sn, j, '.', 64, eof, err);
         if (*err || *eof) return false;

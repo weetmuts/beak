@@ -29,8 +29,8 @@ using namespace std;
 
 static ComponentId FILESYSTEM = registerLogComponent("filesystem");
 
-bool FileStat::isRegularFile() { return true; }
-bool FileStat::isDirectory() { return false; }
+bool FileStat::isRegularFile() { return S_ISREG(st_mode); }
+bool FileStat::isDirectory() { return S_ISDIR(st_mode); }
 bool FileStat::isSymbolicLink() { return false; }
 bool FileStat::isCharacterDevice() { return false; }
 bool FileStat::isBlockDevice() { return false; }
@@ -53,13 +53,13 @@ bool FileStat::isIWOTH() { return false; }
 bool FileStat::isIXOTH() { return false; }
 
 
-std::string FileStat::uidName()
+string FileStat::uidName()
 {
     return "Woot!";
 
 }
 
-std::string FileStat::gidName()
+string FileStat::gidName()
 {
     return "Woot!";
 }
@@ -79,18 +79,19 @@ int MinorDev(dev_t d)
     return 0;
 }
 
-std::string ownergroupString(uid_t uid, gid_t gid)
+string ownergroupString(uid_t uid, gid_t gid)
 {
     return "";
 }
 
 struct FileSystemImplementationWinapi : FileSystem
 {
-    bool readdir(Path *p, std::vector<Path*> *vec);
+    bool readdir(Path *p, vector<Path*> *vec);
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
-    void recurse(std::function<void(Path *p)> cb);
+    void recurse(function<void(Path *p)> cb);
     bool stat(Path *p, FileStat *fs);
-    Path *mkTempDir(std::string prefix);
+    Path *mkTempDir(string prefix);
+    Path *mkDir(Path *p, string name);
 
 private:
 
@@ -105,14 +106,14 @@ FileSystem *defaultFileSystem()
     return default_file_system_;
 }
 
-std::unique_ptr<FileSystem> newDefaultFileSystem()
+unique_ptr<FileSystem> newDefaultFileSystem()
 {
     default_file_system_ = new FileSystemImplementationWinapi();
-    return std::unique_ptr<FileSystem>(default_file_system_);
+    return unique_ptr<FileSystem>(default_file_system_);
 }
 
 
-bool FileSystemImplementationWinapi::readdir(Path *p, std::vector<Path*> *vec)
+bool FileSystemImplementationWinapi::readdir(Path *p, vector<Path*> *vec)
 {
     HANDLE find;
     WIN32_FIND_DATA find_data;
@@ -137,7 +138,7 @@ ssize_t FileSystemImplementationWinapi::pread(Path *p, char *buf, size_t count, 
     return 0;
 }
 
-void FileSystemImplementationWinapi::recurse(std::function<void(Path *p)> cb)
+void FileSystemImplementationWinapi::recurse(function<void(Path *p)> cb)
 {
 }
 
@@ -146,7 +147,7 @@ bool FileSystemImplementationWinapi::stat(Path *p, FileStat *fs)
     return false;
 }
 
-Path *FileSystemImplementationWinapi::mkTempDir(std::string prefix)
+Path *FileSystemImplementationWinapi::mkTempDir(string prefix)
 {
     int attempts = 0;
     string buf;
@@ -174,7 +175,15 @@ Path *FileSystemImplementationWinapi::mkTempDir(std::string prefix)
     return tmp_dir;
 }
 
-int loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
+Path *FileSystemImplementationWinapi::mkDir(Path *p, string name)
+{
+    Path *n = p->append(name);
+    int rc = CreateDirectory(n->c_str(), NULL);
+    if (rc == 0) error(FILESYSTEM, "Could not create directory: \"%s\"\n", n->c_str());
+    return n;
+}
+
+int loadVector(Path *file, size_t blocksize, vector<char> *buf)
 {
     /*
     char block[blocksize+1];
@@ -203,7 +212,7 @@ int loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
     return 0;
 }
 
-int writeVector(std::vector<char> *buf, Path *file)
+int writeVector(vector<char> *buf, Path *file)
 {
     /*
     int fd = open(file->c_str(), O_WRONLY | O_CREAT, 0666);
@@ -243,12 +252,34 @@ gid_t getegid()
     return 0;
 }
 
-char *realpath(const char *path, char *resolved_path)
+char *mkdtemp(char *pattern)
 {
     return NULL;
 }
 
-char *mkdtemp(char *pattern)
+Path *Path::realpath()
 {
-    return NULL;
+    char tmp[PATH_MAX];
+    size_t n = GetFullPathName(c_str(), PATH_MAX, tmp, NULL);
+    if (n == 0 || n >= PATH_MAX)
+    {
+        error(FILESYSTEM, "Could not find real path for %s\n", c_str());
+    }
+    unsigned int attr = GetFileAttributes(tmp);
+    if (attr == INVALID_FILE_ATTRIBUTES) return NULL;
+    return Path::lookup(tmp);
+}
+
+bool Path::makeDirHelper(const char *s)
+{
+    printf("MKDIR %s ", s);
+    int rc = CreateDirectory(s, NULL);
+    if (rc == 0) {
+        int err = GetLastError();
+        if (err != ERROR_ALREADY_EXISTS) { printf("error!\n"); return false; }
+        printf("existed!\n");
+    } else {
+        printf("created!\n");
+    }
+    return true;
 }

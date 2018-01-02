@@ -85,6 +85,7 @@ struct FileSystemImplementationPosix : FileSystem
     void recurse(function<void(Path *p)> cb);
     bool stat(Path *p, FileStat *fs);
     Path *mkTempDir(string prefix);
+    Path *mkDir(Path *p, string name);
 
 private:
 
@@ -157,6 +158,14 @@ Path *FileSystemImplementationPosix::mkTempDir(string prefix)
         error(FILESYSTEM, "Could not create temp directory!");
     }
     return Path::lookup(mount);
+}
+
+Path *FileSystemImplementationPosix::mkDir(Path *p, string name)
+{
+    Path *n = p->append(name);
+    RC rc = mkdir(n->c_str(), 0775);
+    if (rc != OK) error(FILESYSTEM, "Could not create directory: \"%s\"\n", n->c_str());
+    return n;
 }
 
 dev_t MakeDev(int maj, int min)
@@ -280,4 +289,26 @@ string ownergroupString(uid_t uid, gid_t gid)
     }
 
     return s;
+}
+
+Path *Path::realpath()
+{
+    char tmp[PATH_MAX];
+    const char *rc = ::realpath(c_str(), tmp);
+    if (!rc) return NULL;
+    assert(rc == tmp);
+    return Path::lookup(tmp);
+}
+
+bool Path::makeDirHelper(const char *s)
+{
+    printf("MKDIR %s ", s);
+    if (::mkdir(s, 0775) == -1)
+    {
+        if (errno != EEXIST) { printf("error!\n"); return false; }
+        printf("existed!\n");
+    } else {
+        printf("created!\n");
+    }
+    return true;
 }

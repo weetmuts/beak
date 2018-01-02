@@ -49,9 +49,14 @@ static ComponentId TMP = registerLogComponent("tmp");
 
 #define KB 1024ul
 
+extern struct timespec start_time_; // Inside util.cc
 
 void captureStartTime() {
-    //clock_gettime(CLOCK_REALTIME, &start_time_);
+    time_t t;
+    time(&t);
+
+    start_time_.tv_sec = t;
+    start_time_.tv_nsec = 0;
 }
 
 #pragma pack(push, 1)

@@ -52,6 +52,8 @@
 
 static_assert (sizeof(TarHeaderContents) == T_BLOCKSIZE, "TarHeaderContents size is not correct!");
 
+using namespace std;
+
 static ComponentId TAR = registerLogComponent("tar");
 
 bool store_path_(Path *path, char *name_str, size_t nlen) {
@@ -254,9 +256,9 @@ TarHeader::TarHeader(FileStat *fs, Path *tarpath, Path *link, bool is_hard_link,
         memcpy(content.members.uname_, "beak", 5);
         memcpy(content.members.gname_, "beak", 5);
     } else {
-        std::string pw_name = fs->uidName();
+        string pw_name = fs->uidName();
         strncpy(content.members.uname_, pw_name.c_str(), 31);
-        std::string gr_name = fs->gidName();
+        string gr_name = fs->gidName();
         strncpy(content.members.gname_, gr_name.c_str(), 31);
     }
 

@@ -34,8 +34,6 @@
 
 struct TarEntry;
 
-using namespace std;
-
 enum TarContents
 {
     REG_FILE, DIR_TAR, SMALL_FILES_TAR, MEDIUM_FILES_TAR, SINGLE_LARGE_FILE_TAR
@@ -53,9 +51,9 @@ struct TarFileName {
     time_t secs;
     long nsecs;
     size_t size;
-    string header_hash;
-    string content_hash;
-    string suffix;
+    std::string header_hash;
+    std::string content_hash;
+    std::string suffix;
 };
 
 struct TarFile
@@ -64,7 +62,7 @@ struct TarFile
     {
     }
     TarFile(TarEntry *d, TarContents tc, int n);
-    string name()
+    std::string name()
     {
         return name_;
     }
@@ -83,14 +81,14 @@ struct TarFile
     void addEntryFirst(TarEntry *entry);
 
     void finishHash();
-    pair<TarEntry*, size_t> findTarEntry(size_t offset);
+    std::pair<TarEntry*, size_t> findTarEntry(size_t offset);
 
     void calculateHash();
-    void calculateHash(vector<TarFile*> &tars, string &contents);
-    vector<char> &hash();
+    void calculateHash(std::vector<TarFile*> &tars, std::string &contents);
+    std::vector<char> &hash();
 
     void fixName();
-    void setName(string s);
+    void setName(std::string s);
 
     size_t currentTarOffset()
     {
@@ -102,7 +100,7 @@ struct TarFile
     }
     void updateMtim(struct timespec *mtim);
 
-    string line(Path *p);
+    std::string line(Path *p);
 
     char chartype() {
         switch (tar_contents) {
@@ -126,7 +124,7 @@ struct TarFile
         return false;
     }
 
-    static bool parseFileName(string &name, TarFileName *c);
+    static bool parseFileName(std::string &name, TarFileName *c);
 
 private:
 
@@ -135,20 +133,20 @@ private:
     TarContents tar_contents = SMALL_FILES_TAR;
 
     // Name of the tar, tar00000000.tar taz00000000.tar tal00000000.tar tam00000000.tar
-    string name_;
+    std::string name_;
     Path *path_;
     uint32_t hash_;
     bool hash_initialized = false;
     size_t size_;
-    map<size_t, TarEntry*> contents_;
-    vector<size_t> offsets;
+    std::map<size_t, TarEntry*> contents_;
+    std::vector<size_t> offsets;
     size_t current_tar_offset_ = 0;
     struct timespec mtim_;
 
     void calculateSHA256Hash();
-    void calculateSHA256Hash(vector<TarFile*> &tars, string &content);
+    void calculateSHA256Hash(std::vector<TarFile*> &tars, std::string &content);
 
-    vector<char> sha256_hash_;
+    std::vector<char> sha256_hash_;
 };
 
 #endif

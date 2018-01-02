@@ -161,8 +161,10 @@ void ForwardTarredFS::findTarCollectionDirs() {
     for(auto & e : files) {
         TarEntry *te = e.second;
         Path *dir = te->path()->parent();
+        printf("FTCD %s %s\n", e.first->c_str(), dir?dir->c_str():"NULL");
         if (dir) {
             TarEntry *parent = directories[dir];
+            printf("    parent >%s<\n", parent?parent->path()->c_str():"NULL");
             assert(parent != NULL);
             te->registerParent(parent);
             parent->addChildrenSize(te->childrenSize());
@@ -279,12 +281,14 @@ void ForwardTarredFS::pruneDirectories() {
     set<Path*> paths;
     map<string,string> paths_lowercase;
 
+    #ifdef PLATFORM_POSIX
     string lcn = getLocale()->name();
     string utf8 = ".UTF-8";
     if (utf8.size() > lcn.size() ||
         !equal(utf8.rbegin(), utf8.rend(), lcn.rbegin())) {
         error(FORWARD, "Tarredfs expects your locale to use the encoding UTF-8!\n");
     }
+    #endif
 
     for (auto & p : tar_storage_directories) {
         Path *s = p.first;
@@ -588,13 +592,13 @@ size_t ForwardTarredFS::groupFilesIntoTars() {
         gzfile_contents.append("#uids");
         for (auto & x : uids) {
             gzfile_contents.append(" ");
-            gzfile_contents.append(std::to_string(x));
+            gzfile_contents.append(to_string(x));
         }
         gzfile_contents.append("\n");
         gzfile_contents.append("#gids");
         for (auto & x : gids) {
             gzfile_contents.append(" ");
-            gzfile_contents.append(std::to_string(x));
+            gzfile_contents.append(to_string(x));
         }
         gzfile_contents.append("\n");
         //gzfile_contents.append("#columns permissions uid/gid mtime_readable mtime_secs.nanos atime_secs.nanos ctime_secs.nanos filename link_information tar_file_name offset_inside_tar content_hash header_hash\n");
@@ -764,7 +768,7 @@ TarFile *ForwardTarredFS::findTarFromPath(Path *path) {
     return NULL;
 }
 
-bool ForwardTarredFS::readdir(Path *p, std::vector<Path*> *vec)
+bool ForwardTarredFS::readdir(Path *p, vector<Path*> *vec)
 {
     return true;
 }
@@ -774,7 +778,7 @@ ssize_t ForwardTarredFS::pread(Path *p, char *buf, size_t size, off_t offset)
     return 0;
 }
 
-void ForwardTarredFS::recurse(std::function<void(Path *p)> cb)
+void ForwardTarredFS::recurse(function<void(Path *p)> cb)
 {
 }
 
@@ -783,7 +787,12 @@ bool ForwardTarredFS::stat(Path *p, FileStat *fs)
     return false;
 }
 
-Path *ForwardTarredFS::mkTempDir(std::string prefix)
+Path *ForwardTarredFS::mkTempDir(string prefix)
+{
+    return NULL;
+}
+
+Path *ForwardTarredFS::mkDir(Path *p, string name)
 {
     return NULL;
 }
@@ -1036,7 +1045,7 @@ int ForwardTarredFS::scanFileSystem(Options *settings)
     return OK;
 }
 
-std::unique_ptr<ForwardTarredFS> newForwardTarredFS(FileSystem *fs)
+unique_ptr<ForwardTarredFS> newForwardTarredFS(FileSystem *fs)
 {
-    return std::unique_ptr<ForwardTarredFS>(new ForwardTarredFS(fs));
+    return unique_ptr<ForwardTarredFS>(new ForwardTarredFS(fs));
 }

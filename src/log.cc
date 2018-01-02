@@ -83,7 +83,7 @@ void listLogComponents()
     for (int i=0; i<num_components; ++i) {
         c.push_back(all_components[i]);
     }
-    std::sort(c.begin(), c.end());
+    sort(c.begin(), c.end());
     for (auto & s : c) {
         printf("%s\n", s.c_str());
     }

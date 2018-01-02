@@ -39,17 +39,6 @@ int main(int argc, char *argv[])
     switch (cmd) {
 
     case check_cmd:
-    {
-        vector<Path*> contents;
-        bool b = fs->readdir(Path::lookup("Test"), &contents);
-        if (!b) {
-            printf("ERROR\n");
-        } else {
-            for (auto i : contents) {
-                printf("DIRENTRY %s\n", i->c_str());
-            }
-        }
-    }
         break;
 
     case config_cmd:

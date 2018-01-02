@@ -42,33 +42,33 @@ struct ConfigurationImplementation : public Configuration
     bool load();
     int configure();
 
-    Rule *rule(std::string name);
-    std::vector<Rule*> sortedRules();
+    Rule *rule(string name);
+    vector<Rule*> sortedRules();
 
     // Map rule name to rule.
-    std::map<std::string,Rule> rules_;
+    map<string,Rule> rules_;
 
     // Map path to rule.
-    std::map<std::string,Rule*> paths_;
+    map<string,Rule*> paths_;
 
     FileSystem *fs_;
 
-    bool load(std::vector<char> *buf);
+    bool load(vector<char> *buf);
     void editRule();
     void createNewRule();
 
-    bool okRuleName(std::string name);
+    bool okRuleName(string name);
 };
 
-std::unique_ptr<Configuration> newConfiguration(FileSystem *fs) {
-    return std::unique_ptr<Configuration>(new ConfigurationImplementation(fs));
+unique_ptr<Configuration> newConfiguration(FileSystem *fs) {
+    return unique_ptr<Configuration>(new ConfigurationImplementation(fs));
 }
 
 ConfigurationImplementation::ConfigurationImplementation(FileSystem *fs) {
     fs_ = fs;
 }
 
-std::string handlePath(std::string path, std::string more, std::string name)
+string handlePath(string path, string more, string name)
 {
     if (more.front() == '/') {
 	return more;
@@ -108,7 +108,7 @@ bool ConfigurationImplementation::load() {
                 current_rule = &rules_[name];
                 current_rule->name = name;
             } else {
-                std::vector<char> line(block.begin(), block.end());
+                vector<char> line(block.begin(), block.end());
                 while (line.back() == '\\') {
                     line.pop_back();
                     block = eatTo(buf,i,'\n', 1024*1024, &eof, &err);
@@ -162,7 +162,7 @@ bool ConfigurationImplementation::load() {
 }
 
 bool ConfigurationImplementation::load(vector<char> *buf) {
-    int loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
+    int loadVector(Path *file, size_t blocksize, vector<char> *buf);
 
     char block[512];
     int fd = open("/home/fredrik/.config/beak/beak.conf", O_RDONLY);
@@ -189,13 +189,13 @@ bool ConfigurationImplementation::load(vector<char> *buf) {
     return true;
 }
 
-std::vector<Storage*> Rule::sortedRemotes()
+vector<Storage*> Rule::sortedRemotes()
 {
-    std::vector<Storage*> v;
+    vector<Storage*> v;
     for (auto & r : remotes) {
 	v.push_back(&r.second);
     }
-    std::sort(v.begin(), v.end(),
+    sort(v.begin(), v.end(),
               [](Storage *a, Storage *b)->bool {
                   return (a->target > b->target);
 	      });
@@ -203,13 +203,13 @@ std::vector<Storage*> Rule::sortedRemotes()
     return v;
 }
 
-std::vector<Rule*> ConfigurationImplementation::sortedRules()
+vector<Rule*> ConfigurationImplementation::sortedRules()
 {
-    std::vector<Rule*> v;
+    vector<Rule*> v;
     for (auto & r : rules_) {
 	v.push_back(&r.second);
     }
-    std::sort(v.begin(), v.end(),
+    sort(v.begin(), v.end(),
               [](Rule *a, Rule *b)->bool {
                   return (a->name > b->name);
 	      });
@@ -217,7 +217,7 @@ std::vector<Rule*> ConfigurationImplementation::sortedRules()
     return v;
 }
 
-Rule *ConfigurationImplementation::rule(std::string name)
+Rule *ConfigurationImplementation::rule(string name)
 {
     if (rules_.count(name) == 0) return NULL;
     return &rules_[name];
@@ -254,7 +254,7 @@ KeepOrChange keepOrChange()
 {
     for (;;) {
         UI::outputPrompt("Keep or change?\nk/c>");
-        std::string c = UI::inputString();
+        string c = UI::inputString();
         if (c == "k") {
             return Keep;
         }
@@ -268,7 +268,7 @@ KeepOrChange keepOrChangeOrDiscard()
 {
     for (;;) {
         UI::outputPrompt("Keep,change or discard?\nk/c/d>");
-        std::string c = UI::inputString();
+        string c = UI::inputString();
         if (c == "k") {
             return Keep;
         }
@@ -302,7 +302,7 @@ Path *inputDirectory(const char *prompt) {
     }
 }
 
-bool ConfigurationImplementation::okRuleName(std::string name)
+bool ConfigurationImplementation::okRuleName(string name)
 {
     if (rules_.count(name) > 0) {
         UI::output("Rule name already exists.\n");
@@ -351,7 +351,7 @@ void ConfigurationImplementation::createNewRule() {
         break;
     }
 
-    std::vector<std::string> v = {
+    vector<string> v = {
         "Local and remote backups",
         "Remote backups only",
         "Remote mount"
@@ -379,7 +379,7 @@ void ConfigurationImplementation::createNewRule() {
         }
     }
 
-    std::string keep;
+    string keep;
 
     for (;;) {
         UI::output("\nProposed setting for keeping/pruning backups\n");
@@ -454,9 +454,9 @@ int ConfigurationImplementation::configure() {
     return 0;
 }
 
-std::string keep_keys[] = { "all", "minutely", "hourly", "daily", "weekly", "monthly", "yearly" };
+string keep_keys[] = { "all", "minutely", "hourly", "daily", "weekly", "monthly", "yearly" };
 
-size_t calcTime(std::string s)
+size_t calcTime(string s)
 {
     char c = s.back();
     size_t scale = 0;
@@ -467,12 +467,12 @@ size_t calcTime(std::string s)
     return scale;
 }
 
-Keep::Keep(std::string s)
+Keep::Keep(string s)
 {
 /*    // Example:    "all:7d daily:2w weekly:2m monthly:2y yearly:forever"
     // Example:    "all:2d daily:1w monthly:12m"
 
-    std::vector<char> data(s.begin(), s.end());
+    vector<char> data(s.begin(), s.end());
     auto i = data.begin();
 
     bool eof, err;

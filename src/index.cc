@@ -25,6 +25,8 @@
 #include "tarfile.h"
 #include "util.h"
 
+using namespace std;
+
 ComponentId INDEX = registerLogComponent("index");
 
 int Index::loadIndex(vector<char> &v,
@@ -39,7 +41,7 @@ int Index::loadIndex(vector<char> &v,
     bool eof, err;
     string header = eatTo(v, i, separator, 30 * 1024 * 1024, &eof, &err);
 
-    std::vector<char> data(header.begin(), header.end());
+    vector<char> data(header.begin(), header.end());
     auto j = data.begin();
 
     string type = eatTo(data, j, '\n', 64, &eof, &err);
@@ -90,7 +92,7 @@ int Index::loadIndex(vector<char> &v,
 
     string tar_header = eatTo(v, i, separator, 30 * 1024 * 1024, &eof, &err);
 
-    std::vector<char> tar_data(tar_header.begin(), tar_header.end());
+    vector<char> tar_data(tar_header.begin(), tar_header.end());
     j = tar_data.begin();
 
     string tars = eatTo(data, j, '\n', 64, &eof, &err);

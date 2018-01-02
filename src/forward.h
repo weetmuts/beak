@@ -103,6 +103,7 @@ struct ForwardTarredFS : FileSystem, FuseAPI
     void recurse(std::function<void(Path *p)> cb);
     bool stat(Path *p, FileStat *fs);
     Path *mkTempDir(std::string prefix);
+    Path *mkDir(Path *p, std::string name);
 
     // Implement a FUSE API
     int getattrCB(const char *path, struct stat *stbuf);
@@ -120,8 +121,6 @@ private:
     void calculateNumTars(TarEntry *te, size_t *nst, size_t *nmt, size_t *nlt,
                           size_t *sfs, size_t *mfs, size_t *lfs,
                           size_t *sc, size_t *mc);
-    Path *tar_list_file_ = NULL;
-    std::vector<std::string> tar_list_; // Contents to be stored in the tar_list_file
     std::string message_;
     TarHeaderStyle tarheaderstyle_;
 

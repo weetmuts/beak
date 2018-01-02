@@ -26,14 +26,14 @@ static ComponentId SYSTEM = registerLogComponent("system");
 
 struct SystemImplementationWinapi : System
 {
-    int invoke(std::string program,
-               std::vector<std::string> args,
-               std::vector<char> *out);
+    int invoke(string program,
+               vector<string> args,
+               vector<char> *out);
 };
 
-std::unique_ptr<System> newSystem()
+unique_ptr<System> newSystem()
 {
-    return std::unique_ptr<System>(new SystemImplementationWinapi());
+    return unique_ptr<System>(new SystemImplementationWinapi());
 }
 
 string protect_(string arg)
@@ -41,9 +41,9 @@ string protect_(string arg)
     return arg;
 }
 
-int SystemImplementationWinapi::invoke(std::string program,
-                                       std::vector<std::string> args,
-                                       std::vector<char> *out)
+int SystemImplementationWinapi::invoke(string program,
+                                       vector<string> args,
+                                       vector<char> *out)
 {
     return OK;
 }

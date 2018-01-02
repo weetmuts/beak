@@ -292,31 +292,31 @@ void hex2bin(string s, vector<char> *target)
 #define LOCALE_STRING ""
 #endif
 
-std::locale const user_locale(LOCALE_STRING);
+locale const user_locale(LOCALE_STRING);
 
-std::locale const *getLocale()
+locale const *getLocale()
 {
     return &user_locale;
 }
 
-std::wstring to_wstring(std::string const& s)
+wstring to_wstring(string const& s)
 {
-    std::wstring_convert<std::codecvt_utf8<wchar_t> > conv;
+    wstring_convert<codecvt_utf8<wchar_t> > conv;
     return conv.from_bytes(s);
 }
 
-std::string wto_string(std::wstring const& s)
+string wto_string(wstring const& s)
 {
-    std::wstring_convert<std::codecvt_utf8<wchar_t> > conv;
+    wstring_convert<codecvt_utf8<wchar_t> > conv;
     return conv.to_bytes(s);
 }
 
-std::string tolowercase(std::string const& s)
+string tolowercase(string const& s)
 {
     auto ss = to_wstring(s);
     for (auto& c : ss)
     {
-        c = std::tolower(c, user_locale);
+        c = tolower(c, user_locale);
     }
     return wto_string(ss);
 }
@@ -389,8 +389,8 @@ void fixEndian(long *t)
 
 struct Entropy {
     SHA256_CTX sha256ctx;
-    std::vector<char> sha256_hash_;
-    std::vector<char> pool_;
+    vector<char> sha256_hash_;
+    vector<char> pool_;
 
     Entropy() {
         uint64_t a, b;

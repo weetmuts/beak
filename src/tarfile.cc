@@ -29,6 +29,8 @@
 #include "tarentry.h"
 #include "util.h"
 
+using namespace std;
+
 ComponentId TARFILE = registerLogComponent("tarfile");
 ComponentId HASHING = registerLogComponent("hashing");
 
@@ -195,7 +197,7 @@ string TarFile::line(Path *p)
     s.append("/");
     s.append(name());
     s.append(separator_string);
-    s.append(std::to_string(size()));
+    s.append(to_string(size()));
 
     char secs_and_nanos[32];
     memset(secs_and_nanos, 0, sizeof(secs_and_nanos));

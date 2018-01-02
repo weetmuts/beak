@@ -20,6 +20,8 @@
 
 #include <stdarg.h>
 
+using namespace std;
+
 void UI::output(const char *fmt, ...)
 {
     va_list args;
@@ -28,7 +30,7 @@ void UI::output(const char *fmt, ...)
     va_end(args);
 }
 
-void UI::output(std::string msg)
+void UI::output(string msg)
 {
     output(msg.c_str());
 }
@@ -43,36 +45,36 @@ void UI::outputPrompt(const char *msg)
     printf("%s", msg);
 }
 
-void UI::outputPrompt(std::string msg)
+void UI::outputPrompt(string msg)
 {
     printf("%s", msg.c_str());
 }
 
-std::string UI::inputString()
+string UI::inputString()
 {
     char buf[1024*1024];
     if (fgets (buf, sizeof(buf)-1, stdin) == NULL)
         return "";
-    std::string s = buf;
+    string s = buf;
     if (s.back() == '\n') s.pop_back();
     return s;
 }
 
 Path *UI::inputPath()
 {
-    std::string s = inputString();
+    string s = inputString();
     Path *p = Path::lookup(s);
     return p;
 }
 
 size_t UI::inputSize()
 {
-    std::string s = inputString();
+    string s = inputString();
     long long l = atol(s.c_str());
     return l;
 }
 
-int UI::inputChoice(std::string msg, std::string prompt, std::vector<std::string> choices)
+int UI::inputChoice(string msg, string prompt, vector<string> choices)
 {
     int c = -1;
     while (true)
@@ -82,7 +84,7 @@ int UI::inputChoice(std::string msg, std::string prompt, std::vector<std::string
             output("%d) %s\n", i+1, choices[i].c_str());
         }
         outputPrompt(prompt);
-        std::string s = inputString();
+        string s = inputString();
 
         size_t i = atoi(s.c_str());
         if (i >= 1 && i <= choices.size()) {
