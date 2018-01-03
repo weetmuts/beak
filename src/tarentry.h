@@ -118,7 +118,7 @@ struct TarEntry
     }
 
     void calculateTarpath(Path *storage_dir);
-    void setContent(std::vector<unsigned char> &c);
+    void setContent(std::vector<char> &c);
     size_t copy(char *buf, size_t size, size_t from, FileSystem *fs);
     void updateSizes();
     void rewriteIntoHardLink(TarEntry *target);
@@ -130,46 +130,46 @@ struct TarEntry
     void registerTazFile();
     void registerGzFile();
     void enableTazFile()
-	{
-            taz_file_in_use_ = true;
-	}
+    {
+        taz_file_in_use_ = true;
+    }
     void enableGzFile()
-	{
-            gz_file_in_use_ = true;
-	}
+    {
+        gz_file_in_use_ = true;
+    }
     bool hasTazFile()
-	{
-            return taz_file_in_use_;
-	}
+    {
+        return taz_file_in_use_;
+    }
     bool hasGzFile()
-	{
-            return gz_file_in_use_;
-	}
+    {
+        return gz_file_in_use_;
+    }
     TarFile *tarFile()
-	{
-            return tar_file_;
-	}
+    {
+        return tar_file_;
+    }
     TarFile *tazFile()
-	{
-            return taz_file_;
-	}
+    {
+        return taz_file_;
+    }
     TarFile *gzFile()
-	{
-            return gz_file_;
-	}
+    {
+        return gz_file_;
+    }
     size_t tarOffset()
-	{
-            return tar_offset_;
-	}
+    {
+        return tar_offset_;
+    }
 
     std::vector<TarEntry*>& dirs()
-	{
-            return dirs_;
-	}
+    {
+        return dirs_;
+    }
     std::vector<std::string>& files()
-	{
-            return files_;
-	}
+    {
+        return files_;
+    }
 
     void createSmallTar(int i);
     void createMediumTar(int i);
@@ -177,57 +177,57 @@ struct TarEntry
 
     std::vector<TarFile*> &tars() { return tars_; }
     TarFile *smallTar(int i)
-	{
-            return small_tars_[i];
-	}
+    {
+        return small_tars_[i];
+    }
     TarFile *mediumTar(int i)
-	{
-            return medium_tars_[i];
-	}
+    {
+        return medium_tars_[i];
+    }
     TarFile *largeTar(uint32_t hash)
-	{
-            return large_tars_[hash];
-	}
+    {
+        return large_tars_[hash];
+    }
     bool hasLargeTar(uint32_t hash)
-	{
-            return large_tars_.count(hash) > 0;
-	}
+    {
+        return large_tars_.count(hash) > 0;
+    }
     TarFile *smallHashTar(std::vector<char> i)
-	{
-            return small_hash_tars_[i];
-	}
+    {
+        return small_hash_tars_[i];
+    }
     TarFile *mediumHashTar(std::vector<char> i)
-	{
-            return medium_hash_tars_[i];
-	}
+    {
+        return medium_hash_tars_[i];
+    }
     TarFile *largeHashTar(std::vector<char> i)
-	{
-            return large_hash_tars_[i];
-	}
+    {
+        return large_hash_tars_[i];
+    }
     std::map<size_t, TarFile*>& smallTars()
-	{
-            return small_tars_;
-	}
+    {
+        return small_tars_;
+    }
     std::map<size_t, TarFile*>& mediumTars()
-	{
-            return medium_tars_;
-	}
+    {
+        return medium_tars_;
+    }
     std::map<size_t, TarFile*>& largeTars()
-	{
-            return large_tars_;
-	}
+    {
+        return large_tars_;
+    }
     std::map<std::vector<char>, TarFile*>& smallHashTars()
-	{
-            return small_hash_tars_;
-	}
+    {
+        return small_hash_tars_;
+    }
     std::map<std::vector<char>, TarFile*>& mediumHashTars()
-	{
-            return medium_hash_tars_;
-	}
+    {
+        return medium_hash_tars_;
+    }
     std::map<std::vector<char>, TarFile*>& largeHashTars()
-	{
-            return large_hash_tars_;
-	}
+    {
+        return large_hash_tars_;
+    }
 
     void registerParent(TarEntry *p);
     void addChildrenSize(size_t s);
@@ -235,25 +235,25 @@ struct TarEntry
     void secsAndNanos(char *buf, size_t len);
     void injectHash(const char *buf, size_t len);
     void setAsStorageDir()
-	{
-            is_tar_storage_dir_ = true;
-	}
+    {
+        is_tar_storage_dir_ = true;
+    }
     void setAsAddedToDir()
-	{
-            is_added_to_directory_ = true;
-	}
+    {
+        is_added_to_directory_ = true;
+    }
     void addDir(TarEntry *dir);
     void addEntry(TarEntry *te);
     std::vector<TarEntry*>& entries()
-	{
-            return entries_;
-	}
+    {
+        return entries_;
+    }
     void sortEntries();
 
     void appendFileName(std::string name)
-	{
-            files_.push_back(name);
-	}
+    {
+        files_.push_back(name);
+    }
 
     void calculateHash();
     std::vector<char> &hash();
@@ -313,7 +313,7 @@ struct TarEntry
     TarEntry *tar_collection_dir = NULL; // This entry is stored in this tar collection dir.
     bool is_added_to_directory_ = false;
     bool virtual_file_ = false;
-    std::vector<unsigned char> content;
+    std::vector<char> content;
 
     void calculateSHA256Hash();
 

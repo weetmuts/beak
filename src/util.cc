@@ -35,6 +35,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <utility>
+#include <zlib.h>
 
 using namespace std;
 
@@ -447,4 +448,98 @@ string randomUpperCaseCharacterString(int len)
         }
     }
     return s;
+}
+
+#define CHUNK_SIZE 128*1024
+
+void compress_memory(char *in, size_t len, vector<char> *to)
+{
+    char chunk[CHUNK_SIZE];
+
+    z_stream strm;
+    strm.zalloc = 0;
+    strm.zfree = 0;
+    strm.next_in = (uchar*)in;
+    strm.avail_in = len;
+    strm.next_out = (uchar*)chunk;
+    strm.avail_out = CHUNK_SIZE;
+
+    gz_header head;
+    memset(&head, 0, sizeof(head));
+
+    int rc = deflateInit2_(&strm, Z_BEST_COMPRESSION, Z_DEFLATED, MAX_WBITS + 16, MAX_MEM_LEVEL,
+                           Z_DEFAULT_STRATEGY, ZLIB_VERSION, (int)sizeof(z_stream));
+    assert(rc == Z_OK);
+
+    rc = deflateSetHeader(&strm, &head);
+    assert(rc == Z_OK);
+
+    while (strm.avail_in != 0)
+    {
+        int res = deflate(&strm, Z_NO_FLUSH);
+        assert(res == Z_OK);
+        if (strm.avail_out == 0)
+        {
+            to->insert(to->end(), chunk, chunk+CHUNK_SIZE);
+            strm.next_out = (uchar*)chunk;
+            strm.avail_out = CHUNK_SIZE;
+        }
+    }
+
+    int deflate_res = Z_OK;
+    while (deflate_res == Z_OK)
+    {
+        if (strm.avail_out == 0)
+        {
+            to->insert(to->end(), chunk, chunk + CHUNK_SIZE);
+            strm.next_out = (uchar*)chunk;
+            strm.avail_out = CHUNK_SIZE;
+        }
+        deflate_res = deflate(&strm, Z_FINISH);
+    }
+
+    assert(deflate_res == Z_STREAM_END);
+    to->insert(to->end(), chunk, chunk+CHUNK_SIZE-strm.avail_out);
+    deflateEnd(&strm);
+}
+
+int gzipit(string *from, vector<char> *to)
+{
+    compress_memory(&(*from)[0], from->length(), to);
+    return OK;
+}
+
+void decompress_memory(char *in, size_t len, std::vector<char> *to)
+{
+    char chunk[CHUNK_SIZE];
+
+    z_stream strm;
+    strm.zalloc = 0;
+    strm.zfree = 0;
+    strm.next_in = (uchar*)in;
+    strm.avail_in = len;
+    strm.next_out = (uchar*)chunk;
+    strm.avail_out = CHUNK_SIZE;
+
+    int rc = inflateInit2(&strm, MAX_WBITS + 16);
+    assert(rc == Z_OK);
+
+    do {
+        strm.avail_out = CHUNK_SIZE;
+        strm.next_out = (uchar*)chunk;
+        rc = inflate(&strm, Z_NO_FLUSH);
+        assert(rc != Z_STREAM_ERROR);
+
+        size_t have = CHUNK_SIZE-strm.avail_out;
+        to->insert(to->end(), chunk, chunk+have);
+    } while (strm.avail_out == 0);
+
+    assert(rc == Z_STREAM_END);
+    inflateEnd(&strm);
+}
+
+int gunzipit(vector<char> *from, vector<char> *to)
+{
+    decompress_memory(&(*from)[0], from->size(), to);
+    return OK;
 }

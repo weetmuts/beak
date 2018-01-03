@@ -27,6 +27,7 @@ using namespace std;
 static ComponentId TEST_MATCH = registerLogComponent("test_match");
 static ComponentId TEST_RANDOM = registerLogComponent("test_random");
 static ComponentId TEST_FILESYSTEM = registerLogComponent("test_filesystem");
+static ComponentId TEST_GZIP = registerLogComponent("test_filesystem");
 
 void testMatch(string pattern, const char *path, bool should_match)
     throw (string);
@@ -38,6 +39,7 @@ unique_ptr<FileSystem> fs;
 void testMatching();
 void testRandom();
 void testFileSystem();
+void testGzip();
 
 int main(int argc, char *argv[])
 {
@@ -55,6 +57,7 @@ int main(int argc, char *argv[])
         testMatching();
         testRandom();
         testFileSystem();
+        testGzip();
 
         if (!err_found_) {
             printf("OK\n");
@@ -147,4 +150,27 @@ void testFileSystem()
 
     Path *rp = contents[0]->realpath();
     verbose(TEST_FILESYSTEM,"REALPATH %s %s\n", contents[0]->c_str(), rp->c_str());
+}
+
+
+void testGzip() {
+    string s = "Hejsan Hoppsan ";
+    string w;
+    for (int i=0; i<10; ++i) {
+        w += s;
+    }
+
+    vector<char> buf;
+    gzipit(&w, &buf);
+    vector<char> out;
+    gunzipit(&buf, &out);
+
+    string r(out.begin(), out.end());
+
+//    printf("FROM \"%s\"\n", w.c_str());
+//    printf("TO   \"%s\"\n", r.c_str());
+    if (w != r) {
+        verbose(TEST_GZIP, "Gzip Gunzip fail!\n");
+        err_found_ = true;
+    }
 }

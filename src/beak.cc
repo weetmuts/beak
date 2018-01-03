@@ -1007,11 +1007,10 @@ int BeakImplementation::store(Options *settings)
 
     for (auto& e : ffs->tar_storage_directories) {
         Path *dir = e.second->path()->prepend(settings->dst);
-        printf("DIR %s\n", dir->c_str());
         dir->mkdir();
         for (auto& f : e.second->tars()) {
             Path *tar = f->path()->prepend(settings->dst);
-            printf("    TAR %s\n", tar->c_str());
+            f->writeToFile(tar, file_system_);
         }
     }
 

@@ -161,10 +161,8 @@ void ForwardTarredFS::findTarCollectionDirs() {
     for(auto & e : files) {
         TarEntry *te = e.second;
         Path *dir = te->path()->parent();
-        printf("FTCD %s %s\n", e.first->c_str(), dir?dir->c_str():"NULL");
         if (dir) {
             TarEntry *parent = directories[dir];
-            printf("    parent >%s<\n", parent?parent->path()->c_str():"NULL");
             assert(parent != NULL);
             te->registerParent(parent);
             parent->addChildrenSize(te->childrenSize());
@@ -647,7 +645,7 @@ size_t ForwardTarredFS::groupFilesIntoTars() {
             gzfile_contents.append(separator_string);
         }
 
-        vector<unsigned char> compressed_gzfile_contents;
+        vector<char> compressed_gzfile_contents;
         gzipit(&gzfile_contents, &compressed_gzfile_contents);
 
         TarEntry *dirs = new TarEntry(compressed_gzfile_contents.size(), tarheaderstyle_);
@@ -894,8 +892,7 @@ int ForwardTarredFS::readdirCB(const char *path_char_string, void *buf, fuse_fil
 int ForwardTarredFS::readCB(const char *path_char_string, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
     pthread_mutex_lock(&global);
-    size_t org_size = size;
-
+    size_t n;
     debug(FUSE,"readCB >%s< size %zu offset %zu\n", path_char_string, size, offset);
     string path_string = path_char_string;
     Path *path = Path::lookup(path_string);
@@ -905,44 +902,14 @@ int ForwardTarredFS::readCB(const char *path_char_string, char *buf, size_t size
         goto err;
     }
 
-    if ((size_t)offset >= tar->size()) {
-        goto zero;
-    }
-
-    while (size>0) {
-        pair<TarEntry*,size_t> r = tar->findTarEntry(offset);
-        TarEntry *te = r.first;
-        size_t tar_offset = r.second;
-        assert(te != NULL);
-        size_t l =  te->copy(buf, size, offset - tar_offset, file_system_);
-        debug(FORWARD, "readCB copy size=%ju result=%ju\n", size, l);
-        size -= l;
-        buf += l;
-        offset += l;
-        if (l==0) break;
-    }
-
-    if (offset >= (ssize_t)(tar->size()-T_BLOCKSIZE*2)) {
-        // Last two zero pages?
-        size_t l = T_BLOCKSIZE;
-        if (size < l) {
-            l = size;
-        }
-        memset(buf,0,l);
-        size -= l;
-        debug(FORWARD, "readCB clearing last pages.");
-    }
+    n = tar->copy(buf, size, offset, file_system_);
 
     pthread_mutex_unlock(&global);
-    return org_size-size;
+    return n;
 
 err:
     pthread_mutex_unlock(&global);
     return -ENOENT;
-
-zero:
-    pthread_mutex_unlock(&global);
-    return 0;
 }
 
 int ForwardTarredFS::readlinkCB(const char *path_char_string, char *buf, size_t s)

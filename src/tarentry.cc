@@ -297,7 +297,7 @@ bool sanityCheck(const char *x, const char *y) {
     return true;
 }
 
-void TarEntry::setContent(vector<unsigned char> &c) {
+void TarEntry::setContent(vector<char> &c) {
     content = c;
     virtual_file_ = true;
     assert((size_t)fs_.st_size == c.size());

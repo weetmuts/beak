@@ -21,7 +21,6 @@
 #include"always.h"
 #include"configuration.h"
 
-#include<cstdint>
 #include<deque>
 #include<memory.h>
 #include<stddef.h>
@@ -71,9 +70,10 @@ uint64_t clockGetUnixTime();
 // Microseconds since the computer was started.
 uint64_t clockGetTime();
 void captureStartTime();
-int gzipit(std::string *from, std::vector<unsigned char> *to);
+int gzipit(std::string *from, std::vector<char> *to);
 int gunzipit(std::vector<char> *from, std::vector<char> *to);
 std::string randomUpperCaseCharacterString(int len);
+
 //
 //
 ///////////////////////////////////////////////////////

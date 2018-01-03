@@ -302,13 +302,9 @@ Path *Path::realpath()
 
 bool Path::makeDirHelper(const char *s)
 {
-    printf("MKDIR %s ", s);
     if (::mkdir(s, 0775) == -1)
     {
-        if (errno != EEXIST) { printf("error!\n"); return false; }
-        printf("existed!\n");
-    } else {
-        printf("created!\n");
+        if (errno != EEXIST) { return false; }
     }
     return true;
 }

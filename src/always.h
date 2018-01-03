@@ -27,6 +27,8 @@
 #define ERR 1
 typedef int RC;
 
+typedef unsigned char uchar;
+
 #define XSTR(s) STR(s)
 #define STR(s) #s
 

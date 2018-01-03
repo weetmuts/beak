@@ -135,7 +135,12 @@ bool FileSystemImplementationWinapi::readdir(Path *p, vector<Path*> *vec)
 
 ssize_t FileSystemImplementationWinapi::pread(Path *p, char *buf, size_t count, off_t offset)
 {
-    return 0;
+    FILE * f = fopen(p->c_str(), "rb");
+    if (!f) return ERR;
+    fseek(f, offset, SEEK_SET);
+    ssize_t n = fread(buf, 1, count, f);
+    fclose(f);
+    return n;
 }
 
 void FileSystemImplementationWinapi::recurse(function<void(Path *p)> cb)
@@ -272,14 +277,10 @@ Path *Path::realpath()
 
 bool Path::makeDirHelper(const char *s)
 {
-    printf("MKDIR %s ", s);
     int rc = CreateDirectory(s, NULL);
     if (rc == 0) {
         int err = GetLastError();
-        if (err != ERROR_ALREADY_EXISTS) { printf("error!\n"); return false; }
-        printf("existed!\n");
-    } else {
-        printf("created!\n");
+        if (err != ERROR_ALREADY_EXISTS) { return false; }
     }
     return true;
 }

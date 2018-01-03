@@ -24,6 +24,7 @@
 #include <cstdio>
 #include <functional>
 #include <iterator>
+#include <stdlib.h>
 
 #include "log.h"
 #include "tarentry.h"
@@ -295,5 +296,63 @@ bool TarFile::parseFileName(string &name, TarFileName *c)
     if (!k) return false;
 
     c->suffix = name.substr(p6+1);
+    return true;
+}
+
+size_t TarFile::copy(char *buf, size_t bufsiz, off_t offset, FileSystem *fs)
+{
+    size_t org_size = bufsiz;
+
+    if (offset < 0) return 0;
+    if ((size_t)offset >= size()) return 0;
+
+    while (bufsiz>0) {
+        pair<TarEntry*,size_t> r = findTarEntry(offset);
+        TarEntry *te = r.first;
+        size_t tar_offset = r.second;
+        assert(te != NULL);
+        size_t l =  te->copy(buf, bufsiz, offset - tar_offset, fs);
+        debug(TARFILE, "copy size=%ju result=%ju\n", bufsiz, l);
+        bufsiz -= l;
+        buf += l;
+        offset += l;
+        if (l==0) break;
+    }
+
+    /*
+    if (offset >= (ssize_t)(size()-T_BLOCKSIZE*2)) {
+        // Last two zero pages?
+        size_t l = T_BLOCKSIZE;
+        if (bufsiz < l) {
+            l = bufsiz;
+        }
+        memset(buf,0,l);
+        bufsiz -= l;
+        debug(TARFILE, "copy clearing last pages.");
+    }
+    */
+    return org_size-bufsiz;
+}
+
+
+bool TarFile::writeToFile(Path *p, FileSystem *fs)
+{
+    char buf[65536];
+    size_t offset = 0, remaining = size();
+
+    FILE *f = fopen(p->c_str(),"wb");
+
+    debug(TARFILE,"Write %ju bytes to file %s\n", size(), p->c_str());
+    while (remaining > 0) {
+        debug(TARFILE, "Remaining bytes to writes: %ju\n", remaining);
+        size_t n = copy(buf, 65536, offset, fs);
+        debug(TARFILE, "Wrote %ju bytes.\n", n);
+        fwrite(buf, n, 1, f);
+        if (n > remaining) break;
+        remaining -= n;
+        offset += n;
+    }
+
+    fclose(f);
     return true;
 }

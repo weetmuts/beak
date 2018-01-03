@@ -432,7 +432,6 @@ Path* Path::prepend(Path *p)
 Path* Path::append(string p)
 {
     string concat;
-    printf("CONCAT >%s< >%s<\n", str().c_str(), p.c_str());
     if (p.front() == '/') {
         concat = str() + p;
     } else {

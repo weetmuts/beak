@@ -16,42 +16,41 @@
 help:
 	@echo "Usage: make (release|debug|clean|clean-all)"
 
-BUILDDIR:=$(dir $(realpath $(wildcard build/*/spec.gmk)))
+BUILDDIRS:=$(dir $(realpath $(wildcard build/*/spec.gmk)))
 
-ifeq (,$(BUILDDIR))
+ifeq (,$(BUILDDIRS))
     $(error Run configure first!)
 endif
 
 VERBOSE?=@
 
 release:
-	@echo Building release for $(words $(BUILDDIR)) host\(s\).
-	@for x in $(BUILDDIR); do echo; echo Bulding $$(basename $$x) ; $(MAKE) --no-print-directory -C $$x release ; done
+	@echo Building release for $(words $(BUILDDIRS)) host\(s\).
+	@for x in $(BUILDDIRS); do echo; echo Bulding $$(basename $$x) ; $(MAKE) --no-print-directory -C $$x release ; done
 
 debug:
-	@echo Building debug for $(words $(BUILDDIR)) host\(s\).
-	@for x in $(BUILDDIR); do echo; echo Bulding $$(basename $$x) ; $(MAKE) --no-print-directory -C $$x debug ; done
+	@echo Building debug for $(words $(BUILDDIRS)) host\(s\).
+	@for x in $(BUILDDIRS); do echo; echo Bulding $$(basename $$x) ; $(MAKE) --no-print-directory -C $$x debug ; done
 
 test_release:
 	@echo Running tests
-	./test.sh $(BUILDDIR)/release/beak
+	./test.sh $(BUILDDIRS)/release/beak
 
 test_debug:
 	@echo Running tests
-	./test.sh $(BUILDDIR)/debug/beak
+	./test.sh $(BUILDDIRS)/debug/beak
 
 clean:
 	@echo Removing release and debug builds
-	$(VERBOSE)rm -rf $(BUILDDIR)/release $(BUILDDIR)/debug
-	$(VERBOSE)rm -rf $(BUILDDIR)/generated_autocomplete.h
+	@for x in $(BUILDDIRS); do echo; rm -rf $$x/release $$x/debug $$x/generated_autocomplete.h; done
 
 clean-all:
 	@echo Removing configuration and artifacts
-	$(VERBOSE)rm -rf $(BUILDDIR)
+	$(VERBOSE)rm -rf $(BUILDDIRS)
 
 DESTDIR?=/usr/local
 install:
-	install -Dm 755 -s $(BUILDDIR)/release/beak $(DESTDIR)/bin/beak
+	install -Dm 755 -s $(BUILDDIRS)/release/beak $(DESTDIR)/bin/beak
 	install -Dm 644 beak.1 $(DESTDIR)/man/man1/beak.1
 
 uninstall:

@@ -126,6 +126,12 @@ struct TarFile
 
     static bool parseFileName(std::string &name, TarFileName *c);
 
+    // Write size bytes of the contents of the tar file into buf,
+    // start reading at offest in the tar file.
+    size_t copy(char *buf, size_t size, off_t offset, FileSystem *fs);
+
+    bool writeToFile(Path *file, FileSystem *fs);
+
 private:
 
     TarEntry *in_directory_;
