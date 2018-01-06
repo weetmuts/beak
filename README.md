@@ -1,4 +1,4 @@
-Beak is a mirror-share-backup-rotation-retention tool that is designed
+Beak is a backup-mirror-share-rotation-pruning tool that is designed
 to co-exist with the storage (cloud and otherwise) of your
 choice. Beak enables push/pull to share the remotely stored backups
 between multiple client computers.
