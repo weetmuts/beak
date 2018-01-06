@@ -41,6 +41,9 @@ int main(int argc, char *argv[])
     case check_cmd:
         break;
 
+    case checkout_cmd:
+        break;
+
     case config_cmd:
         rc = beak->configure(&settings);
         break;
@@ -65,6 +68,9 @@ int main(int argc, char *argv[])
     case genmounttrigger_cmd:
         break;
 
+    case history_cmd:
+        break;
+
     case mount_cmd:
     {
         bool has_history = beak->lookForPointsInTime(&settings);
@@ -79,9 +85,6 @@ int main(int argc, char *argv[])
         }
     }
     break;
-
-    case pack_cmd:
-        break;
 
     case prune_cmd:
         break;

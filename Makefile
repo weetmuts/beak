@@ -13,6 +13,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
+
+all: release
+
 help:
 	@echo "Usage: make (release|debug|clean|clean-all)"
 
@@ -32,13 +35,15 @@ debug:
 	@echo Building debug for $(words $(BUILDDIRS)) host\(s\).
 	@for x in $(BUILDDIRS); do echo; echo Bulding $$(basename $$x) ; $(MAKE) --no-print-directory -C $$x debug ; done
 
+test: test_release
+
 test_release:
-	@echo Running tests
-	./test.sh $(BUILDDIRS)/release/beak
+	@echo Running tests on release
+	@for x in $(BUILDDIRS); do echo; ./test.sh $$x/release/beak ; done
 
 test_debug:
 	@echo Running tests
-	./test.sh $(BUILDDIRS)/debug/beak
+	@for x in $(BUILDDIRS); do echo; ./test.sh $$x/debug/beak ; done
 
 clean:
 	@echo Removing release and debug builds
@@ -57,4 +62,4 @@ uninstall:
 	rm -f $(DESTDIR)/bin/beak
 	rm -f $(DESTDIR)/man/man1/beak.1
 
-.PHONY: release debug test clean clean-all help
+.PHONY: all release debug test test_release test_debug clean clean-all help

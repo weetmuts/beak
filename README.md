@@ -3,6 +3,8 @@ to co-exist with the storage (cloud and otherwise) of your
 choice. Beak enables push/pull to share the remotely stored backups
 between multiple client computers.
 
+Beak is work in progress. The text below describes the goal!
+
 ## Manual push
 
 beak is the tool for the impatient who wants to initiate a backup
@@ -16,7 +18,7 @@ The push created a _point in time_, which is defined to be the modify
 timestamp of the most recently changed file/directory within the backup.
 (I.e. it is not the time when the push was initiated.)
 
-`work: is a beak configuration to backup one of your directories, for example: /home/fredrik/Work`
+`work: is a beak configuration to backup one of your directories, for example: /home/you/Work`
 
 (the to be backed up directory is also known as a _source directory_)
 
@@ -45,11 +47,15 @@ to. You can have the same backup in multiple _backup directories_.
 @3 2017-07-01 08:23 2 months ago to s3_work_crypt:
 ```
 
-After a while you probably want to remove unnecessary backups.
+You can check the status of your configured _source directories_ with:
+
+`beak status`
+
+After a while you probably want to remove backups to save space.
 
 `beak prune gd_work_crypt:`
 
-The default rule is to keep:
+The default _keep rule_ is:
 ```
 All points in time for the last 7 days.
 One point in time per day for the last 14 days.
@@ -79,9 +85,13 @@ chunky directory remains the same.
 
 ```
 For example:
-/sources/myproject/a lot of files and subdirectories
+/home/you/Work/rclonesrc/a lot of files and subdirectories
+/home/you/Work/gamesrc/a lot of files and subdirectories
+/home/you/Work/only the two subdirectories above.
 becomes
-/sources/myproject/s01.tar z01.gz
+/home/you/Work/rclonesrc/s01.tar y01.tar z01.gz
+/home/you/Work/gamesrc/s01.tar y01.tar z01.gz
+/home/you/Work/y01.tar z01.gz
 ```
 
 The order and selection of the chunky directories is deterministic (and depth first),
@@ -96,28 +106,41 @@ using tar.  In fact, there is a shell script that can do the proper
 extraction for you.
 
 Why discuss the storage format? Because the storage format _is_ the
-backup system.  There are not other meta-data files needed. This means
+backup system.  There are no other meta-data files needed. This means
 that you can roll your own backups without any configuration if you
 wish.
 
 `beak mount /home/you/Work TestBeakFS`
 
 Explore the directory `TestBeakFS` to see how beak has chunkified your
-_source directory_. Now do `rclone copy TestBeakFS /home/you/Backup`
-and you have a proper backup!
+_source directory_. Now do:
+
+`rclone copy TestBeakFS /home/you/Backup`
+
+and you have a proper backup! To unmount the chunky filesystem:
 
 `beak umount TestBeakFS`
 
-Now remount again and rclone. Rclone will exit early because there is nothing to do.
+Now remount and rclone again. Rclone will exit early because there is nothing to do.
+Logical, since you have not changed your _source directory_.
 
 To access the backed up data do:
 
-`beak mount /home/you/Backup OldStuff`
+`beak mount /home/you/Backup@0 OldStuff`
 
 Now explore OldStuff and do `diff -rq /home/you/Work OldStuff`. There should be no differences.
+The @0 means to mount the most recent _point in time_ in the _backup directory_.
 
-(You can skip the rclone step if you are storing in a local _backup directory_. Then simply do:
-`beak store /home/you/Work Backup` which will store any chunk files that are missing into Backup.)
+You can skip the rclone step if you are storing in a local _backup directory_. Then simply do:
+
+`beak store /home/you/Work Backup`
+
+which will store any chunk files that are missing into Backup.
+
+Cloud storages often has case-insensitive filesystems and can only store plain files.
+The chunks however, will properly store your case-sensitive filesystem with symbolic links etc.
+(If you for some reason have gamesrc and Gamesrc and they end up as two separate chunked directories,
+beak will complain, but this is rare.)
 
 ## Naming the chunky files
 
@@ -139,28 +162,45 @@ The hash is the hash of the all the archives pointed to by this index file.
 
 `z01_--seconds---.--nanos--_0_----------metadata-hash-----------------------------------------_0.gz`
 
-Assuming that your _source directory_ `/home/you/work/` above contained `rclonesrc/` and `gamesrc/`
+(Those y01...tar files stores timestamps for directories and hard links and are only used
+when extracting the backup using the shell script.)
+
+Assuming that your _source directory_ `/home/you/Work/` above contained `rclonesrc/` and `gamesrc/`
 and you made the backup to `/home/you/Backup`. Now modify a file in `gamesrc/` and do another backup:
 
-`beak store /home/you/work /home/you/Backup`
+`beak store /home/you/Work /home/you/Backup`
 
-You now have two points in time store in the Backup directory. Since you made no changes
-to the `rclonesrc` the new index file will point to the existing rclonesrc/chunks.
+You now have two _points in time_ stored in the _backup directory_. Since you made no changes
+to `rclonesrc` the new index file will point to the existing rclonesrc/chunks.
 
 ![Beak FS](./doc/beak_fs.png)
 
 If you know how git stores files or how btrfs stores files or how
-clojure deals with data structures, or any other old system that reuse
-old nodes in new trees, then you will feel right at home.
+clojure deals with data structures, or any other system that reuse
+old nodes in new trees, then you will feel right at home. :smiley:
 
-As you can see, all files are write only! New backups only write new files.
-
-# Efficiency
+## Efficiency
 
 Of course if the chunk file is 10MiB and we changed a single byte in
-a small file, then there is a lot of unnecessary backed up data. But
+a small file, then there is a lot of unnecessarily backed up data. But
 if we store local backups, then beak can create diff chunks and diff chunks can
-even be created inside an existing backup. (Similar to how git packs its files.)
+even be created inside an existing backup using:
+
+`git pack s3_work_crypt:`
+
+You can get information on a _backup directory_ using:
+
+`beak info s3_work_crypt:`
+
+You can check the integrity and garbage collect any loose chunks that
+are no longer referenced from index files, using:
+
+`beak check s3_work_crypt:`
+
+Local backups are useful if you want to revert a mistake you yourself
+did, like erasing a file or breaking some source code. If you have
+btrfs or another snapshotting filesystem then beak can use snapshots for
+its local backup storage to save space.
 
 Remember, the intent of beak is to push the changes now! Quickly.
 You probably have the bandwidth and the storage space. And on my 1Gbit/s internet
@@ -173,176 +213,116 @@ to rewrite old archive files or update meta-data. As a consequence
 beak cannot destroy the previous backup if the current backup is
 interrupted halfway.
 
+If a _backup directory_ (local or remote) is later packed, the new
+diff chunks are first uploaded and verified to have reach their
+destination, before the non-diff chunks are removed. The pack can be
+done by a different computer than the computer that pushed.
+
 ## Use cases
 
-A typical use case for me: happily programming on your laptop and the
-suddenly, the kids must see frozen and you have to relinguish the
-laptop before child-induced calamity ensues. beak comes to the rescue:
-`beak push work: gd_work_crypt:` done!
+As you might have guessed, beak is not the best tool to restore your whole
+hard disk image from scratch after a hard disk failure. If you are re-installing
+on an empty disk you can use `beak checkout s3_work_crypt: work:` after
+re-configuring rclone and beak. You can store your home directory in beak.
+
+beak is more like a Swiss army knife for backing up, mirroring,
+off-site storage etc. As you have seen, you can do everything by hand
+using: `beak mount` `beak store` and `rclone`.  But to speed up common tasks you
+can configure _source directories_ like `work:` with `beak config`.
+
+A configured _source directory_ can be of a type:
+
+```
+LocalAndRemoteBackups = A push first stores locally and the rclones to the remote. Diff chunks are possible.
+RemoteBackupsOnly     = A push rclones directly to the remote from a virtual BeakFS.
+MountOnly             = Only mount off-site storage
+```
+
+A _source directory_ can have multiple remotes pre-configured and push round-robin
+or to all of them at every push.
+
+You can have separate configurations your Work, your Media, your
+Archive, your Home directory etc.  If you use S3 you can have separate
+passwords for the remote storage locations to create safety barriers.
+
+You can have different _keep rules_ for all _backup directories_. Your local backup
+can be kept at a minimum and if you are using btrfs it can use snapshots.
+
+You can move your work between computers using beak. A typical use case for me is:
+happily programming on your laptop and the suddenly, the kids must see frozen
+and you have to relinguish the laptop before child-induced calamity ensues.
+beak comes to the rescue:
+
+`beak push work: gd_work_crypt:`
 
 You then sit down in front of the desktop computer and perform:
-`beak pull work: gd_work_crypt:` done!
+
+`beak pull work: gd_work_crypt:`
+
+Pull will fetch remote chunk files and then update your _source directory_
+accordingly and try to merge the contents if possible. This can be done
+in separate steps using `beak fetch` and `beak merge`.
+
+You can examine the differences between your current _source directory_
+and a backup, or the difference between two backups using:
+
+`beak diff work: s3_work_crypt@0`
+
+`beak diff s3_work_crypt@0 s3_work_crypt@1`
+
+If you do not have a user file system (FUSE) available you can use:
+
+`beak shell s3_work_crypt:`
+
+To start a minimal shell to simply find and copy data from the backup.
 
 
-You do not have to switch computer to do a `push`. Do it whenever you
-have done some useful work: and want to make sure it is not lost. You
-can push to any rclone remote storage locations, like:
-`gd_work_crypt:` `s3_work_crypt:` or you can push to a local usb
-drive: `/media/myself/usbdevice/work`.
+## Configuration options
 
-Each push registers as a point in time (assuming data actually has
-changed).  The data accumulates in the storage location. Once per week
-or per month, you might want to do `beak prune gd_work_crypt:` to prune
-older points in time and keep typically one per day for the last week,
-one per week for the last month and one per month for the last year.
+A standard setup of the _source directory_ `work:` above, would place
+a beak directory here: `/home/you/Work/.beak`. Beak avoids
+backing up any files inside a .beak directory.
 
-Now, you can configure push rules that rotate between different remotes
-or triggers automatically when you insert a specific USB drive.
-With those rules in place you can also schedule a `beak backup work:`
-or `beak backup -all` to let beak chose the push destination (or destinations).
+Within `.beak` there is:
 
-## Summary
+`.beak/local` where the local backup is stored before it is pushed to
+the remote.  The local storage is also used to create diff chunks. If
+btrfs snapshots are used, then they are stored here as well.
 
-Commands: `beak push` `beak pull` `beak checkout` `beak mount`
+`.beak/cache` stores downloaded chunks when you mount remote _backup directories_
+or mount them all using the history command.
 
-Low level commands: `beak view` `beak store` `beak merge` `beak fetch` `beak prune`
+`.beak/history` is the default location to place the _point in time_ history,
+if `beak history work:` is invoked without a target directory.
 
-# Best way to understand beak is to understand its storage format
-
-`beak mount` and `beak store` are the low level plumbing tools.
-All the other features build on top of these. You can use
-these tools directly if you like.
-
-Try this command: `mkdir Test; beak mount /home/you/Work Test`
-
-Now browse the Test directory. You will see that beak has created virtual
-tar files, beginning with s01_ and y_01. You can view the contents of the
-tar files using for example the `less` command. However, the full information
-of where the files are stored is inside the index files, those named z01_....gz.
-You can view those too using `less`.
-
-Now do: `mkdir Again; beak mount Test BackAgain`
-
-When you browse BackAgain, you will see your original files. The mount command
-will detect if you are mounting a backup or the original filesystem.
-
-To remove: `beak umount BackAgain`  `beak umount Test` (or use `fusermount -u BackAgain`)
-
-You noticed that mounting the backup was quick. This is possible because it only
-scans the metadata of all the files. Beak trusts your timestamps. The s01, y01 and z01 files
-are virtual, when you read the s01 tar files, beak will relay the read to the original file.
-
-Take some other directory that is not too big:
-
-You can access any point in time not yet pruned away by mounting the storage location.
-For example: `beak mount gd_work_crypt: OldWork`
-
-When you do: `ls OldWork` you will see directories named as the points in time stored at that location:
+## Command summary
 
 ```
-@0 2017-09-07 14:27 2 minutes ago
-@1 2017-09-07 14:25 3 minutes ago
-@2 2017-09-05 10:01 2 days ago
-@3 2017-07-01 08:23 2 months ago
+beak push      beak pull      beak history
+
+beak fetch     beak merge     beak diff
+
+beak mount     beak store     beak checkout      beak shell
+
+beak config
+
+beak status    beak info      beak check
+
+beak prune     beak pack
 ```
 
-Simply cd enter the point in time you are interested in a copy out the old data that you need.
-You can also mount the latest version directly using: `beak mount gd_work_crypt:@0 LatestPush`
+## Development
 
-To get a status report of where and when you pushed, do: `beak status`
-
-##Rclone
-
-Beak uses rclone to copy the data to the storage locations. Thus
-gdrivecrypt: is an rclone target that you configure with `rclone
-config`. Beak takes care of wrapping several small files into larger
-archive files, this is neccessary since cloud storage locations often
-have a transfer limit of two files per second. Source code, with many small
-files, can therefore take a ridiculous time to rclone to the cloud!
-
-Also beak takes care of storing symlinks and other unix:like stuff, which cannot be stored
-as such in cloud providers buckets.
-
-# Example Commands
-
-Run `beak config` to setup directories that you want to mirror-backup-share.
-
-Run `beak push work: gd_work_crypt:` to push your work to a cloud drive.
-Run `beak push work: /media/myself/usbdrive/work` to push your work to a local drive.
-
-Run `beak mount gd_work_crypt:` gives you access to the remote data in the virtual
-directories .beak/gdrivecrypt/work
-
-Run `beak prune gd_work_crypt:` to prune the points in time stored in gdrivecrypt: for work.
-
-```
-keep = all for 7-14d days then oneperday for 2w
-       then oneperweek for 4w
-       then onepermonth for 12m
-```
-
-week | month | mon tue wed thu fri sat sun
-```
-
-# Development
 * Clone: `git clone git@github.com:weetmuts/beak.git ; cd beak`
 * Configure: `./configure`
-* Build: `make` Your executables are now in `build/tarredfs*`.
-* Test: `make test`
+* Build: `make` Your executable is now in `build/x86_64-pc-linux-gnu/release/beak`.
+* Build: `make debug` Your executable is now in `build/x86_64-pc-linux-gnu/debug/beak`.
+* Test:  `make test`
+* Test:  `make test_debug`
 * Install: `sudo make install` Installs in /usr/local/bin
 
-Hosts to be supported: x86_64-linux-gnu x86_64-w64-mingw32 arm-linux-gnueabihf
+Hosts supported: x86_64-pc-linux-gnu x86_64-w64-mingw32 arm-linux-gnueabihf
 
-# Cross compiling
+## Cross compiling
 
 `./configure --host=x86_64-w64-mingw32 --with-zlib=3rdparty/zlib-1.2.11/ --with-openssl=3rdparty/openssl-1.0.2l`
-
-# Beak Internals
-
-
-**Tell him the good part Randolph!** The good part, is that the
-archive tree can be completely virtual, it does not take up any disk
-space, and it can be generated quickly (since it only scans the
-meta-data of the source tree).
-
-What beak does is: whip up the virtual archive tree from your source tree, then rclone it to the other
-side. As always, rclone skips any archive files already copied.
-
-# Even more internals
-
-For fun, if you want to study the archive tree, you can mount any directory (does not have to be
-configured) like this:
-
-`beak mount src_tree_dir archive_tree_dir`
-
-You can now examine the contents of the archive_tree_dir. Copy the contents from archive_tree_dir
-to another directory Backups (e.g. `rclone copy archive_tree_dir/ Backups` or simply
-`cp -a archive_tree_dir/* Backups`) Then do `fusermount -u archive_tree_dir`
-
-Change something inside src_tree_dir. Again do: `beak mount src_tree_dir archive_tree_dir`
-Copy the contents to Backups. Preferrably using rclone or rsync, which will skip identical files.
-Unmount `fusermount -u archive_tree_dir`
-
-Now mount the Backups. `beak mount Backups OldStuff`
-Change into OldStuff and see the points in time found and the files inside those points in time.
-
-# Even even more internals
-
-Tarredfs generates a tarred directory (ie it contains virtual tar files) when
-the size of the directory contents (including subdirectories, excluding already
-tarred subdirectories) is greater than the tar trigger size (default
-20MB). The search for potentially tarred directories is performed from leaf
-directories to the root. Tar files are always generated in the root
-and by default also in the immediate subdirectories to the root.
-
-All directories are stored in the tar files. Directories that are
-necessary to reach the tarred directories are visible in the
-tarred file system.
-
-Thus tarredfs makes the original filesystem more chunky, ie reduces
-the number of files and directories, while keeping the remaining directory structure
-intact.  This is beneficial when syncing data to a
-remote storage service that have high a transfer bandwidth but allows
-few files to be transferred per second. Tarredfs is also a work around
-for other remote storage service limitations, like case-insensitive
-and lack of symbolic links.

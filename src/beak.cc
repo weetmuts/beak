@@ -362,6 +362,9 @@ int BeakImplementation::parseCommandLine(int argc, char **argv, Command *cmd, Op
                 }
             }
             switch (op) {
+            case cache_option:
+                settings->cache = value;
+                break;
             case depth_option:
                 settings->depth = atoi(value.c_str());
                 if (settings->depth < 1) {

@@ -129,7 +129,7 @@ bool ConfigurationImplementation::load() {
 
                 if (key == "type") {
 		}
-                else if (key == "path") {
+                else if (key == "source") {
 		    if (value.back() == '/' && value.length()>1) {
 			value.pop_back();
 		    }
@@ -420,8 +420,8 @@ int ConfigurationImplementation::configure() {
 
     for (;;) {
         UI::output("Current rules:\n\n");
-        UI::output("%-20s %-20s\n", "Name", "Path");
-        UI::output("%-20s %-20s\n", "====", "====");
+        UI::output("%-20s %-20s\n", "Name", "Source");
+        UI::output("%-20s %-20s\n", "====", "======");
 
         for (auto &l : rules_) {
             UI::output("%-20s %s\n", l.second.name.c_str(), l.second.path.c_str());

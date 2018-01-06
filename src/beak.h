@@ -70,22 +70,24 @@ struct Beak {
 
 std::unique_ptr<Beak> newBeak(FileSystem *fs);
 
+
 #define LIST_OF_COMMANDS                                                \
     X(check,"Check the integrity of an archive.")                       \
     X(config,"Configure backup rules.")                                 \
+    X(checkout,"Overwrite your local directory with a backup.")         \
     X(diff,"Show changes since last backup.")                           \
     X(help,"Show help. Also: beak push help")                           \
     X(genautocomplete,"Output bash completion script for beak.")        \
-    X(genmounttrigger,"Output systemd rule to trigger backup when USB drive is mounted.")        \
+    X(genmounttrigger,"Output systemd rule to trigger backup when USB drive is mounted.") \
     X(info,"List points in time and other info about archive.")         \
-    X(mount,"Mount a backup as a virtual file system.")                 \
-    X(pack,"Update the backup to use incremental changes.")             \
-    X(prune,"Discard old backups according to the backup retention policy.") \
-    X(pull,"Restore a backup to a directory.")                          \
+    X(mount,"Mount your file system as a backup, or vice versa.")       \
+    X(history,"Mount all known storages for your backup.")              \
+    X(prune,"Discard old backups according to the keep rule.")          \
+    X(pull,"Merge a backup from a remote.")                             \
     X(push,"Backup a directory to a remote.")                           \
-    X(shell,"Start a minimal shell with access to the remote backup.")  \
+    X(shell,"Start a minimal shell to explore a backup.")               \
     X(status,"Show the status of your backups both locally and remotly.") \
-    X(store,"Store the virtual file system into a directory.")          \
+    X(store,"Store your file system into a backup, or vice versa.")    \
     X(umount,"Unmount a virtual file system.")                          \
     X(version,"Show version.")                                          \
     X(nosuch,"No such command.")                                        \
@@ -97,6 +99,7 @@ LIST_OF_COMMANDS
 };
 
 #define LIST_OF_OPTIONS \
+    X(c,cache,std::string,true,"Directory to store cached files when mounting a remote storage.") \
     X(d,depth,int,true,"Force all dirs at this depth to contain tars.\n" \
       "                           1 is the root, 2 is the first subdir. The default is 2.")    \
     X(f,foreground,bool,false,"When mounting do not spawn a daemon.")   \
