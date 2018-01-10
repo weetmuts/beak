@@ -82,7 +82,7 @@ struct FileSystemImplementationPosix : FileSystem
 {
     bool readdir(Path *p, vector<Path*> *vec);
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
-    void recurse(function<void(Path *p)> cb);
+    void recurse(function<void(Path *path, FileStat *stat)> cb);
     bool stat(Path *p, FileStat *fs);
     Path *mkTempDir(string prefix);
     Path *mkDir(Path *p, string name);
@@ -133,7 +133,7 @@ ssize_t FileSystemImplementationPosix::pread(Path *p, char *buf, size_t size, of
     return rc;
 }
 
-void FileSystemImplementationPosix::recurse(function<void(Path *p)> cb)
+void FileSystemImplementationPosix::recurse(function<void(Path *path, FileStat *stat)> cb)
 {
     //int rc = nftw(root_dir.c_str(), addEntry, 256, FTW_PHYS|FTW_ACTIONRETVAL);
 }

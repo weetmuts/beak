@@ -98,7 +98,8 @@ struct BeakImplementation : Beak {
 
     int shell(Options *settings);
     int status(Options *settings);
-    int store(Options *settings);
+    int storeForward(Options *settings);
+    int storeReverse(Options *settings);
 
     void genAutoComplete(string filename);
 
@@ -773,63 +774,20 @@ int BeakImplementation::mountReverseInternal(Options *settings, bool daemon)
     reverse_tarredfs_ops.readdir = reverseReaddir;
     reverse_tarredfs_ops.readlink = reverseReadlink;
 
-    reverse_fs.setRootDir(settings->src);
-    reverse_fs.setMountDir(settings->dst);
-
-    if (settings->log.length() > 0) {
-        setLogComponents(settings->log.c_str());
-        setLogLevel(DEBUG);
-    }
-
     if (settings->pointintime != "") {
         int rc = setPointInTime(settings->pointintime);
         if (!rc) return ERR;
     }
-    for (auto &point : reverse_fs.history()) {
-        string name = point.filename;
-        debug(MAIN,"Found backup for %s\n", point.ago.c_str());
 
-        // Check that it is a proper file.
-        struct stat sb;
-        Path *gz = Path::lookup(reverse_fs.rootDir()->str() + "/" + name);
+    RC rc = reverse_fs.scanFileSystem(settings);
+    if (rc != OK) return ERR;
 
-        int rc = stat(gz->c_str(), &sb);
-        if (rc || !S_ISREG(sb.st_mode))
-        {
-            error(MAIN, "Not a regular file %s\n", gz->c_str());
-        }
-
-        // Populate the list of all tars from the root z01 gz file.
-        bool ok = reverse_fs.loadGz(&point, gz, Path::lookupRoot());
-        if (!ok) {
-            error(MAIN, "Fatal error, could not load root z01 file for backup %s!\n", point.ago.c_str());
-        }
-
-        // Populate the root directory with its contents.
-        reverse_fs.loadCache(&point, Path::lookupRoot());
-
-        Entry *e = reverse_fs.findEntry(&point, Path::lookupRoot());
-        assert(e != NULL);
-
-        // Look for the youngest timestamp inside root to
-        // be used as the timestamp for the root directory.
-        // The root directory is by definition not defined inside gz file.
-        time_t youngest_secs = 0, youngest_nanos = 0;
-        for (auto i : e->dir)
-        {
-            if (i->fs.st_mtim.tv_sec > youngest_secs ||
-                (i->fs.st_mtim.tv_sec == youngest_secs &&
-                 i->fs.st_mtim.tv_nsec > youngest_nanos))
-            {
-                youngest_secs = i->fs.st_mtim.tv_sec;
-                youngest_nanos = i->fs.st_mtim.tv_nsec;
-            }
-        }
-        e->fs.st_mtim.tv_sec = youngest_secs;
-        e->fs.st_mtim.tv_nsec = youngest_nanos;
-    }
     if (daemon) {
-        return fuse_main(settings->fuse_argc, settings->fuse_argv, &reverse_tarredfs_ops, &reverse_fs);
+        return fuse_main(settings->fuse_argc, settings->fuse_argv, &reverse_tarredfs_ops,
+                         &reverse_fs); // The reverse fs structure is passed as private data.
+                                       // It is then extracted with
+                                       // (ReverseTarredFS*)fuse_get_context()->private_data;
+                                       // in the static fuse getters/setters.
     }
 
     struct fuse_args args;
@@ -841,7 +799,7 @@ int BeakImplementation::mountReverseInternal(Options *settings, bool daemon)
                      &args,
                      &reverse_tarredfs_ops,
                      sizeof(reverse_tarredfs_ops),
-                     &reverse_fs);
+                     &reverse_fs); // Passed as private data to fuse context.
 
     loop_pid_ = fork();
 
@@ -999,12 +957,12 @@ int BeakImplementation::status(Options *settings)
     return rc;
 }
 
-int BeakImplementation::store(Options *settings)
+int BeakImplementation::storeForward(Options *settings)
 {
     int rc = 0;
 
     auto ffs  = newForwardTarredFS(file_system_);
-    auto view = ffs->asFileSystem();
+//    auto view = ffs->asFileSystem();
 
     rc = ffs->scanFileSystem(settings);
 
@@ -1016,9 +974,26 @@ int BeakImplementation::store(Options *settings)
             f->writeToFile(tar, file_system_);
         }
     }
+    return rc;
+}
 
-    view->recurse([](Path *p) {
+int BeakImplementation::storeReverse(Options *settings)
+{
+    RC rc = OK;
 
+    auto rfs  = newReverseTarredFS(file_system_);
+    auto view = rfs->asFileSystem();
+
+    rfs->lookForPointsInTime(PointInTimeFormat::absolute_point, settings->src);
+
+    rfs->setPointInTime("@0");
+    assert(rfs->singlePointInTime());
+
+    rc = rfs->scanFileSystem(settings);
+
+    view->recurse([] (Path *path, FileStat *stat) {
+            string permissions = permissionString(stat);
+            printf("%s %s %ju\n", path->c_str(), permissions.c_str(), stat->st_size);
         });
     return rc;
 }
@@ -1028,9 +1003,7 @@ void BeakImplementation::printHelp(Command cmd)
     switch (cmd) {
     case nosuch_cmd:
         fprintf(stdout,
-                "Beak is a mirroring-backup-rotation/retention tool that is\n"
-                "designed to co-exist with the (cloud) storage of your choice\n"
-                "and allow push/pull to share the backups between multiple client computers.\n"
+                "Beak is a backup-mirroring-sharing-rotation-pruning tool\n"
                 "\n"
                 "Usage:\n"
                 "  beak [command] [options] [src] [dst]\n"

@@ -19,6 +19,7 @@
 
 #include "filesystem.h"
 #include "index.h"
+#include "beak.h"
 #include "tarfile.h"
 
 #include <algorithm>
@@ -560,4 +561,126 @@ bool ReverseTarredFS::setPointInTime(string g) {
     }
     single_point_in_time_ = &history_[gg];
     return true;
+}
+
+RC ReverseTarredFS::scanFileSystem(Options *settings)
+{
+    setRootDir(settings->src);
+    setMountDir(settings->dst);
+
+    for (auto &point : history()) {
+        string name = point.filename;
+        debug(REVERSE,"Found backup for %s\n", point.ago.c_str());
+
+        // Check that it is a proper file.
+        struct stat sb;
+        Path *gz = Path::lookup(rootDir()->str() + "/" + name);
+
+        int rc = stat(gz->c_str(), &sb);
+        if (rc || !S_ISREG(sb.st_mode))
+        {
+            error(REVERSE, "Not a regular file %s\n", gz->c_str());
+        }
+
+        // Populate the list of all tars from the root z01 gz file.
+        bool ok = loadGz(&point, gz, Path::lookupRoot());
+        if (!ok) {
+            error(REVERSE, "Fatal error, could not load root z01 file for backup %s!\n", point.ago.c_str());
+        }
+
+        // Populate the root directory with its contents.
+        loadCache(&point, Path::lookupRoot());
+
+        Entry *e = findEntry(&point, Path::lookupRoot());
+        assert(e != NULL);
+
+        // Look for the youngest timestamp inside root to
+        // be used as the timestamp for the root directory.
+        // The root directory is by definition not defined inside gz file.
+        time_t youngest_secs = 0, youngest_nanos = 0;
+        for (auto i : e->dir)
+        {
+            if (i->fs.st_mtim.tv_sec > youngest_secs ||
+                (i->fs.st_mtim.tv_sec == youngest_secs &&
+                 i->fs.st_mtim.tv_nsec > youngest_nanos))
+            {
+                youngest_secs = i->fs.st_mtim.tv_sec;
+                youngest_nanos = i->fs.st_mtim.tv_nsec;
+            }
+        }
+        e->fs.st_mtim.tv_sec = youngest_secs;
+        e->fs.st_mtim.tv_nsec = youngest_nanos;
+    }
+    return OK;
+}
+
+struct ReverseFileSystem : FileSystem
+{
+    ReverseTarredFS *rev_;
+    PointInTime *point_;
+
+    bool readdir(Path *p, std::vector<Path*> *vec)
+    {
+        return false;
+    }
+    ssize_t pread(Path *p, char *buf, size_t size, off_t offset)
+    {
+        return 0;
+    }
+
+    void recurseInto(Entry *d, std::function<void(Path*,FileStat*)> cb)
+    {
+        FileStat stat;
+
+        Entry *dd = rev_->findEntry(point_, d->path);
+        assert(d == dd);
+
+        printf("DIR >%s<\n", d->path->c_str());
+        for (auto e : d->dir) {
+            if (e->fs.isDirectory()) {
+                recurseInto(e, cb);
+            }
+        }
+        for (auto e : d->dir) {
+            if (!e->fs.isDirectory()) {
+                cb(e->path, &e->fs);
+            }
+        }
+    }
+
+    void recurse(std::function<void(Path *path, FileStat *stat)> cb)
+    {
+        point_ = rev_->singlePointInTime();
+        assert(point_);
+
+        Entry *d = rev_->findEntry(point_, Path::lookupRoot());
+        assert(d);
+        recurseInto(d, cb);
+    }
+
+    bool stat(Path *p, FileStat *fs)
+    {
+        return false;
+    }
+    Path *mkTempDir(std::string prefix)
+    {
+        return NULL;
+    }
+    Path *mkDir(Path *p, std::string name)
+    {
+        return NULL;
+    }
+
+    ReverseFileSystem(ReverseTarredFS *rev) : rev_(rev) { }
+};
+
+
+FileSystem *ReverseTarredFS::asFileSystem()
+{
+    return new ReverseFileSystem(this);
+}
+
+unique_ptr<ReverseTarredFS> newReverseTarredFS(FileSystem *fs)
+{
+    return unique_ptr<ReverseTarredFS>(new ReverseTarredFS(fs));
 }

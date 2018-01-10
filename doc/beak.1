@@ -1,129 +1,52 @@
-
 .TH BEAK 1
 .SH NAME
-beak \- mirroring-sharing-versioning-backup-rotation-retention tool that is designed to co-exist
-with the (cloud) storage of your choice and allow push/pull to share the backups
-between multiple client computers.
+beak \- a backup-mirror-share-rotation-pruning tool
+
 .SH SYNOPSIS
 .B beak
-[\fB\-r\fR|\fB\--reverse\fR]
-[\fB\-i\fR \fIREGEX\fR]
-[\fB\-x\fR \fIREGEX\fR]
+[\fB\-i\fR \fIPATTERN\fR]
+[\fB\-x\fR \fIPATTERN\fR]
 [\fB\-p\fR \fIDEPTH\fR]
 [\fB\-ta\fR \fISIZE\fR]
 [\fB\-tr\fR \fISIZE\fR]
-[\fB\-tx\fR \fIREGEX\fR]
+[\fB\-tx\fR \fIPATTERN\fR]
+[\fB\--log=<tags>\fR
 [\fB\-d\fR|\fB\--debug\fR]
 [\fB\-v\fR|\fB\--verbose\fR]
 [\fB\-V\fR|\fB\--version\fR]
 [\fB\-h\fR]
-\fIroot\fR \fImount\fR
+\fI<args>\fR
 
 .SH DESCRIPTION
 .B beak
-mounts a source file system (\fIroot\fR) and presents a new
-file system (\fImount\fR) filled with virtual tar files.
-All files are put into tars; smaller files are grouped together to make the
-tars reach the target size (default 10-20MB), larger files get their own tar files.
 
-The tar files are not compressed. This makes it possible to mount the
-tarred file system quickly, because no data is stored on disk. The tar
-headers and other meta data are generated on mount and served from ram
-while the tar contents are served from the source files.
-
-Tarredfs generates a tarred directory (ie it contains virtual tar files) when
-the size of the directory contents (including subdirectories, excluding already
-tarred subdirectories) is greater than the tar trigger size (default
-20MB). The search for potentially tarred directories is performed from leaf
-directories to the root. Tar files are always generated in the root
-and by default also in the immediate subdirectories to the root.
-
-All directories are stored in the tar files. Directories that are
-necessary to reach the tarred directories are visible in the
-tarred file system.
-
-Thus tarredfs makes the original file system more chunky, ie reduces
-the number of files and directories, while keeping the remaining directory structure
-intact.  This is beneficial when syncing data to a
-remote storage service that have high a transfer bandwidth but allows
-few files to be transferred per second. Tarredfs is also a work around
-for other remote storage service limitations, like case-insensitive
-and lack of symbolic links.
-
-The tarred file system is read only, and will not update itself, nor give a warning,
-if the source filesystem changes.
-
-Example:    % tarredfs /home/you/Storage /home/you/TarredFS
-
-.B tarredfs reverse mount
-
-Adding -r (or --reverse) will mount a tarred filesystem and present the original file system.
-This is a fast operation since tarredfs stores an index file in each tarred directory.
-
-Example:    % tarredfs -r /home/you/TarredFS /home/you/StorageCopy
-
-Since a directory with virtual tars is self contained, you can mount a part of
-the tarred file system.
-
-Example:    % tarredfs -r /home/you/TarredFS/Project /home/you/ProjectCopy
-
-.B tarredfs-untar
-will untar the virtual tar files in the correct order to reconstruct the file system
-in the current directory as if the file system was stored in a single tar file.
-
-Example:    % tarredfs-untar x /home/you/TarredFS
-
-Since a directory with virtual tars are self contained, you can untar a part of
-the tarred file system:
-
-Example:    % tarredfs-untar x TarredFS/Project
-
-tarredfs-untar invokes the system tar (that is expected to support the GNU extensions)
-and performs the extraction in the right order to properly recreate the timestamps of
-both files and directories. This extraction does not (currently) make use of the index files.
-Thus to extracta small subset of the tarredfs, doing \fBcp -a\fR from a reverse mount
-is much faster.
-
-.B tarredfs-diff
-will compare two tarred file systems and present a human readable explanation of
-the differences. This is useful to understand how much will be synced to a remote storage
-service.
+Example:    % beak push /home/you/Work /media/you/USBDrive
 
 .SH OPTIONS
 .TP
-.BR \-r ", " \-\-reverse
-Mount a tarredfs and present the original content.
+.BR \-i " " PATTERN
+Only include files and directories with paths that match the pattern.
 
 .TP
-.BR \-i " " REGEX
-Only include files and directories with paths that match the regex.
-
-.TP
-.BR \-x " " REGEX
-Exclude files and directories with paths that match the regex.
+.BR \-x " " PATTERN
+Exclude files and directories with paths that match the pattern.
 
 .TP
 .BR \-p " " DEPTH
 Trigger tar generation at this depth, even if the trigger size has not been reached.
-The default is 1.
+The default is 2, aka the first subdirectory level below the source directory.
 
 .TP
 .BR \-ta " " SIZE
 Set the target tar size.
 
-Example: tarredfs -ta 50M Storage TarredFS
-
 .TP
 .BR \-tr " " SIZE
 Set the tar trigger size.
 
-Example: tarredfs -ta 100K -tr 1M Storage TarredFS
-
 .TP
-.BR \-tx " " REGEX
-Trigger tar generation when the path of the directory matches the regex.
-
-Example: tarredfs -tx '/snapshot_....-..-..$' Storage TarredFS
+.BR \-tx " " PATTERN
+Trigger tar generation when the path of the directory matches the pattern.
 
 .TP
 .BR \-f
@@ -133,24 +56,23 @@ Run in foreground, ie do not start daemon.
 .BR \-d
 Run in debug mode foreground, a lot of output.
 
-
 .SH EXAMPLES
 .TP
 
-Store all all virtual tar files in the root directory. The target size of each virtual tar is 100K.
+Store all all virtual tar files in the source directory, ie no subdirectories.
 
-% tarredfs -p 0 -ta 50M -tr 1T Storage TarredFS
+% beak store -p 0 -ta 50M -tr 1T /home/you/Work WorkArchive
 
 .TP
 Tar the dev directory but exclude file/paths that contains the text "shm". Which are the share memory buffers, not suitable for archiving.
 
-% tarredfs -x shm /dev TarredFS
+% beak mount -x shm /dev Test
 
 .SH AUTHOR
 Written by Fredrik Öhrström.
 
 .SH COPYRIGHT
-Copyright \(co 2016 Fredrik Öhrström.
+Copyright \(co 2016-2017 Fredrik Öhrström.
 .br
 License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.
 .br

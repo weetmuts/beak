@@ -88,7 +88,7 @@ struct FileSystemImplementationWinapi : FileSystem
 {
     bool readdir(Path *p, vector<Path*> *vec);
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
-    void recurse(function<void(Path *p)> cb);
+    void recurse(function<void(Path*,FileStat*)> cb);
     bool stat(Path *p, FileStat *fs);
     Path *mkTempDir(string prefix);
     Path *mkDir(Path *p, string name);
@@ -143,7 +143,7 @@ ssize_t FileSystemImplementationWinapi::pread(Path *p, char *buf, size_t count, 
     return n;
 }
 
-void FileSystemImplementationWinapi::recurse(function<void(Path *p)> cb)
+void FileSystemImplementationWinapi::recurse(function<void(Path *,FileStat*)> cb)
 {
 }
 

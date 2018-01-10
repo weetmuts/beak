@@ -30,7 +30,7 @@ struct FileSystemFuseAPIImplementation : FileSystem
 {
     bool readdir(Path *p, vector<Path*> *vec);
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
-    void recurse(function<void(Path *p)> cb);
+    void recurse(function<void(Path *path, FileStat *stat)> cb);
     bool stat(Path *p, FileStat *fs);
     Path *mkTempDir(string prefix);
     Path *mkDir(Path *p, string name);
@@ -68,7 +68,7 @@ ssize_t FileSystemFuseAPIImplementation::pread(Path *p, char *buf, size_t size, 
     return 0; // rc;
 }
 
-void FileSystemFuseAPIImplementation::recurse(function<void(Path *p)> cb)
+void FileSystemFuseAPIImplementation::recurse(function<void(Path *path, FileStat *stat)> cb)
 {
 }
 

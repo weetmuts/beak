@@ -19,6 +19,7 @@
 #define REVERSE_H
 
 #include "always.h"
+#include "beak.h"
 
 #ifdef FUSE_USE_VERSION
 #include <fuse/fuse.h>
@@ -33,6 +34,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "tar.h"
@@ -80,6 +82,8 @@ struct PointInTime {
 
 struct ReverseTarredFS
 {
+    RC scanFileSystem(Options *settings);
+
     pthread_mutex_t global;
 
     Entry *findEntry(PointInTime *point, Path *path);
@@ -97,6 +101,7 @@ struct ReverseTarredFS
     bool loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend);
     void loadCache(PointInTime *point, Path *path);
 
+    PointInTime *singlePointInTime() { return single_point_in_time_; }
     bool lookForPointsInTime(PointInTimeFormat f, Path *src);
     std::vector<PointInTime> &history() { return history_; }
     PointInTime *findPointInTime(std::string s);
@@ -108,6 +113,8 @@ struct ReverseTarredFS
     Path *mountDir() { return mount_dir_; }
     void setRootDir(Path *p) { root_dir_ = p; }
     void setMountDir(Path *p) { mount_dir_ = p; }
+
+    FileSystem *asFileSystem();
 
     private:
 
@@ -121,5 +128,7 @@ struct ReverseTarredFS
 
     FileSystem *file_system_;
 };
+
+std::unique_ptr<ReverseTarredFS> newReverseTarredFS(FileSystem *fs);
 
 #endif

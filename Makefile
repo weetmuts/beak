@@ -18,6 +18,10 @@ all: release
 
 help:
 	@echo "Usage: make (release|debug|clean|clean-all)"
+	@echo "       if you have both posix and winapi configured builds,"
+	@echo "       then add winapi or posix to build for that particular host."
+	@echo "E.g.:  make debug winapi"
+	@echo "       make release posix"
 
 BUILDDIRS:=$(dir $(realpath $(wildcard build/*/spec.gmk)))
 
@@ -26,6 +30,14 @@ ifeq (,$(BUILDDIRS))
 endif
 
 VERBOSE?=@
+
+ifeq (winapi,$(findstring winapi,$(MAKECMDGOALS)))
+BUILDDIRS:=$(filter %mingw32/,$(BUILDDIRS))
+endif
+
+ifeq (posix,$(findstring posix,$(MAKECMDGOALS)))
+BUILDDIRS:=$(filter %linux-gnu/,$(BUILDDIRS))
+endif
 
 release:
 	@echo Building release for $(words $(BUILDDIRS)) host\(s\).
@@ -55,11 +67,15 @@ clean-all:
 
 DESTDIR?=/usr/local
 install:
-	install -Dm 755 -s $(BUILDDIRS)/release/beak $(DESTDIR)/bin/beak
-	install -Dm 644 beak.1 $(DESTDIR)/man/man1/beak.1
+	install -Dm 755 -s build/x86_64-pc-linux-gnu/release/beak $(DESTDIR)/bin/beak
+	install -Dm 644 doc/beak.1 $(DESTDIR)/man/man1/beak.1
 
 uninstall:
 	rm -f $(DESTDIR)/bin/beak
 	rm -f $(DESTDIR)/man/man1/beak.1
 
-.PHONY: all release debug test test_release test_debug clean clean-all help
+winapi:
+
+posix:
+
+.PHONY: all release debug test test_release test_debug clean clean-all help winapi posix

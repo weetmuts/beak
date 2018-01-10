@@ -15,7 +15,10 @@
    id="svg2"
    version="1.1"
    inkscape:version="0.91 r13725"
-   sodipodi:docname="beak_fs.svg">
+   sodipodi:docname="beak_fs.svg"
+   inkscape:export-filename="/home/fredrik/Work/beak/doc/beak_fs.svg.png"
+   inkscape:export-xdpi="122.34"
+   inkscape:export-ydpi="122.34">
   <defs
      id="defs4">
     <marker
@@ -207,7 +210,7 @@
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
      inkscape:zoom="1.4"
-     inkscape:cx="396.14977"
+     inkscape:cx="336.50692"
      inkscape:cy="146.83607"
      inkscape:document-units="px"
      inkscape:current-layer="layer1"

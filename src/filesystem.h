@@ -65,7 +65,7 @@ struct FileStat {
     struct timespec st_mtim;
     struct timespec st_ctim;
 
-    FileStat() { memset(this, 0,sizeof(FileStat)); };
+    FileStat() { memset(this, 0,sizeof(FileStat)); st_mode = S_IFREG; };
     FileStat(const struct stat *sb) {
         loadFrom(sb);
     }
@@ -232,7 +232,7 @@ struct FileSystem
 {
     virtual bool readdir(Path *p, std::vector<Path*> *vec) = 0;
     virtual ssize_t pread(Path *p, char *buf, size_t size, off_t offset) = 0;
-    virtual void recurse(std::function<void(Path *p)> cb) = 0;
+    virtual void recurse(std::function<void(Path *path, FileStat *stat)> cb) = 0;
     virtual bool stat(Path *p, FileStat *fs) = 0;
     virtual Path *mkTempDir(std::string prefix) = 0;
     virtual Path *mkDir(Path *p, std::string name) = 0;

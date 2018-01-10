@@ -766,35 +766,6 @@ TarFile *ForwardTarredFS::findTarFromPath(Path *path) {
     return NULL;
 }
 
-bool ForwardTarredFS::readdir(Path *p, vector<Path*> *vec)
-{
-    return true;
-}
-
-ssize_t ForwardTarredFS::pread(Path *p, char *buf, size_t size, off_t offset)
-{
-    return 0;
-}
-
-void ForwardTarredFS::recurse(function<void(Path *p)> cb)
-{
-}
-
-bool ForwardTarredFS::stat(Path *p, FileStat *fs)
-{
-    return false;
-}
-
-Path *ForwardTarredFS::mkTempDir(string prefix)
-{
-    return NULL;
-}
-
-Path *ForwardTarredFS::mkDir(Path *p, string name)
-{
-    return NULL;
-}
-
 int ForwardTarredFS::getattrCB(const char *path_char_string, struct stat *stbuf) {
     pthread_mutex_lock(&global);
 
@@ -1010,6 +981,11 @@ int ForwardTarredFS::scanFileSystem(Options *settings)
             scan_time / 1000, group_time / 1000);
 
     return OK;
+}
+
+FileSystem *ForwardTarredFS::asFileSystem()
+{
+    return NULL;
 }
 
 unique_ptr<ForwardTarredFS> newForwardTarredFS(FileSystem *fs)

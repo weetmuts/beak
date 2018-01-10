@@ -57,7 +57,8 @@ struct Beak {
 
     virtual int shell(Options *settings) = 0;
     virtual int status(Options *settings) = 0;
-    virtual int store(Options *settings) = 0;
+    virtual int storeForward(Options *settings) = 0;
+    virtual int storeReverse(Options *settings) = 0;
 
     virtual void printHelp(Command cmd) = 0;
     virtual void printVersion() = 0;
@@ -74,7 +75,7 @@ std::unique_ptr<Beak> newBeak(FileSystem *fs);
 #define LIST_OF_COMMANDS                                                \
     X(check,"Check the integrity of an archive.")                       \
     X(config,"Configure backup rules.")                                 \
-    X(checkout,"Overwrite your local directory with a backup.")         \
+    X(checkout,"Overwrite your source directory with a backup.")        \
     X(diff,"Show changes since last backup.")                           \
     X(help,"Show help. Also: beak push help")                           \
     X(genautocomplete,"Output bash completion script for beak.")        \
@@ -86,8 +87,8 @@ std::unique_ptr<Beak> newBeak(FileSystem *fs);
     X(pull,"Merge a backup from a remote.")                             \
     X(push,"Backup a directory to a remote.")                           \
     X(shell,"Start a minimal shell to explore a backup.")               \
-    X(status,"Show the status of your backups both locally and remotly.") \
-    X(store,"Store your file system into a backup, or vice versa.")    \
+    X(status,"Show the status of your backups both locally and remotely.") \
+    X(store,"Store your file system into a backup, or vice versa.")     \
     X(umount,"Unmount a virtual file system.")                          \
     X(version,"Show version.")                                          \
     X(nosuch,"No such command.")                                        \

@@ -48,12 +48,11 @@ struct Filter {
 };
 
 typedef int (*FileCB)(const char *,const struct stat *,int,struct FTW *);
-
 typedef int (*GetAttrCB)(const char*, struct stat*);
 typedef int (*ReaddirCB)(const char*,void*,fuse_fill_dir_t,off_t,struct fuse_file_info*);
 typedef int (*ReadCB)(const char *,char *,size_t,off_t,struct fuse_file_info *);
 
-struct ForwardTarredFS : FileSystem, FuseAPI
+struct ForwardTarredFS : FuseAPI
 {
     int scanFileSystem(Options *settings);
 
@@ -95,15 +94,7 @@ struct ForwardTarredFS : FileSystem, FuseAPI
     TarEntry *findNearestStorageDirectory(TarEntry *te);
 
     TarFile *findTarFromPath(Path *path);
-    FileSystem *asFileSystem() { return this; }
-
-    // Implement a FileSystem API
-    bool readdir(Path *p, std::vector<Path*> *vec);
-    ssize_t pread(Path *p, char *buf, size_t size, off_t offset);
-    void recurse(std::function<void(Path *p)> cb);
-    bool stat(Path *p, FileStat *fs);
-    Path *mkTempDir(std::string prefix);
-    Path *mkDir(Path *p, std::string name);
+    FileSystem *asFileSystem();
 
     // Implement a FUSE API
     int getattrCB(const char *path, struct stat *stbuf);

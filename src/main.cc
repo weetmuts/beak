@@ -105,9 +105,19 @@ int main(int argc, char *argv[])
         break;
 
     case store_cmd:
-        rc = beak->store(&settings);
+    {
+        bool has_history = beak->lookForPointsInTime(&settings);
+        if (!has_history || settings.forceforward) {
+            // src contains your files, to be backed up
+            // the backup files will be stored in dst
+            rc = beak->storeForward(&settings);
+        } else {
+            // src has a history of backup files, thus
+            // store the extracted files into dst.
+            rc = beak->storeReverse(&settings);
+        }
         break;
-
+    }
     case umount_cmd:
         rc = beak->umountDaemon(&settings);
         break;
