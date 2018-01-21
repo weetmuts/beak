@@ -50,9 +50,6 @@ struct Path;
 struct FuseAPI;
 struct FileSystem;
 
-int loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
-int writeVector(std::vector<char> *buf, Path *file);
-
 struct FileStat {
     ino_t st_ino;
     mode_t st_mode;
@@ -165,7 +162,6 @@ struct Path
         return (t == p);
     }
     Path *realpath();
-    bool mkdir();
 
     private:
 
@@ -178,7 +174,6 @@ struct Path
 
     std::deque<Path*> nodes();
     Path *reparent(Path *p);
-    static bool makeDirHelper(const char *);
 };
 
 struct depthFirstSortPath
@@ -233,9 +228,22 @@ struct FileSystem
     virtual bool readdir(Path *p, std::vector<Path*> *vec) = 0;
     virtual ssize_t pread(Path *p, char *buf, size_t size, off_t offset) = 0;
     virtual void recurse(std::function<void(Path *path, FileStat *stat)> cb) = 0;
-    virtual bool stat(Path *p, FileStat *fs) = 0;
+    virtual RC stat(Path *p, FileStat *fs) = 0;
     virtual Path *mkTempDir(std::string prefix) = 0;
+            bool mkDirp(Path *p);
     virtual Path *mkDir(Path *p, std::string name) = 0;
+    virtual int loadVector(Path *file, size_t blocksize, std::vector<char> *buf) = 0;
+
+    virtual int createFile(Path *file, std::vector<char> *buf) = 0;
+
+    // file: The filename to be created or overwritten.
+    // stat: The size and permissions of the to be created file.
+    // cb: Callback to fetch the data to be written into the file.
+    virtual bool createFile(Path *file,
+                            FileStat *stat,
+                            std::function<size_t(off_t offset, char *buffer, size_t len)> cb) = 0;
+
+    virtual bool createLink(Path *file, FileStat *stat, std::string target) = 0;
 };
 
 std::unique_ptr<FileSystem> newDefaultFileSystem();

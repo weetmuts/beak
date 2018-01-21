@@ -459,9 +459,9 @@ void compress_memory(char *in, size_t len, vector<char> *to)
     z_stream strm;
     strm.zalloc = 0;
     strm.zfree = 0;
-    strm.next_in = (uchar*)in;
+    strm.next_in = (unsigned char*)in;
     strm.avail_in = len;
-    strm.next_out = (uchar*)chunk;
+    strm.next_out = (unsigned char*)chunk;
     strm.avail_out = CHUNK_SIZE;
 
     gz_header head;
@@ -481,7 +481,7 @@ void compress_memory(char *in, size_t len, vector<char> *to)
         if (strm.avail_out == 0)
         {
             to->insert(to->end(), chunk, chunk+CHUNK_SIZE);
-            strm.next_out = (uchar*)chunk;
+            strm.next_out = (unsigned char*)chunk;
             strm.avail_out = CHUNK_SIZE;
         }
     }
@@ -492,7 +492,7 @@ void compress_memory(char *in, size_t len, vector<char> *to)
         if (strm.avail_out == 0)
         {
             to->insert(to->end(), chunk, chunk + CHUNK_SIZE);
-            strm.next_out = (uchar*)chunk;
+            strm.next_out = (unsigned char*)chunk;
             strm.avail_out = CHUNK_SIZE;
         }
         deflate_res = deflate(&strm, Z_FINISH);
@@ -516,9 +516,9 @@ void decompress_memory(char *in, size_t len, std::vector<char> *to)
     z_stream strm;
     strm.zalloc = 0;
     strm.zfree = 0;
-    strm.next_in = (uchar*)in;
+    strm.next_in = (unsigned char*)in;
     strm.avail_in = len;
-    strm.next_out = (uchar*)chunk;
+    strm.next_out = (unsigned char*)chunk;
     strm.avail_out = CHUNK_SIZE;
 
     int rc = inflateInit2(&strm, MAX_WBITS + 16);
@@ -526,7 +526,7 @@ void decompress_memory(char *in, size_t len, std::vector<char> *to)
 
     do {
         strm.avail_out = CHUNK_SIZE;
-        strm.next_out = (uchar*)chunk;
+        strm.next_out = (unsigned char*)chunk;
         rc = inflate(&strm, Z_NO_FLUSH);
         assert(rc != Z_STREAM_ERROR);
 

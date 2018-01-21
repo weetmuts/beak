@@ -83,9 +83,15 @@ struct FileSystemImplementationPosix : FileSystem
     bool readdir(Path *p, vector<Path*> *vec);
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
     void recurse(function<void(Path *path, FileStat *stat)> cb);
-    bool stat(Path *p, FileStat *fs);
+    RC stat(Path *p, FileStat *fs);
     Path *mkTempDir(string prefix);
+    Path *mkDirp(Path *p);
     Path *mkDir(Path *p, string name);
+    int loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
+    int createFile(Path *file, std::vector<char> *buf);
+    bool createFile(Path *path, FileStat *stat,
+                     std::function<size_t(off_t offset, char *buffer, size_t len)> cb);
+    bool createLink(Path *path, FileStat *stat, string link);
 
 private:
 
@@ -139,13 +145,13 @@ void FileSystemImplementationPosix::recurse(function<void(Path *path, FileStat *
 }
 
 
-bool FileSystemImplementationPosix::stat(Path *p, FileStat *fs)
+RC FileSystemImplementationPosix::stat(Path *p, FileStat *fs)
 {
     struct stat sb;
     int rc = ::stat(p->c_str(), &sb);
-    if (rc) return false;
+    if (rc) return ERR;
     fs->loadFrom(&sb);
-    return true;
+    return OK;
 }
 
 Path *FileSystemImplementationPosix::mkTempDir(string prefix)
@@ -158,6 +164,12 @@ Path *FileSystemImplementationPosix::mkTempDir(string prefix)
         error(FILESYSTEM, "Could not create temp directory!");
     }
     return Path::lookup(mount);
+}
+
+Path *FileSystemImplementationPosix::mkDirp(Path *p)
+{
+
+    return p;
 }
 
 Path *FileSystemImplementationPosix::mkDir(Path *p, string name)
@@ -183,7 +195,7 @@ int MinorDev(dev_t d)
     return MINOR(d);
 }
 
-int loadVector(Path *file, size_t blocksize, vector<char> *buf)
+int FileSystemImplementationPosix::loadVector(Path *file, size_t blocksize, vector<char> *buf)
 {
     char block[blocksize+1];
 
@@ -210,9 +222,9 @@ int loadVector(Path *file, size_t blocksize, vector<char> *buf)
     return 0;
 }
 
-int writeVector(vector<char> *buf, Path *file)
+int FileSystemImplementationPosix::createFile(Path *file, vector<char> *buf)
 {
-    int fd = open(file->c_str(), O_WRONLY | O_CREAT, 0666);
+    int fd = open(file->c_str(), O_WRONLY | O_CREAT, 0600);
     if (fd == -1) {
 	failure(FILESYSTEM,"Could not open file %s errno=%d\n", file->c_str(), errno);
         return -1;
@@ -240,6 +252,49 @@ int writeVector(vector<char> *buf, Path *file)
 }
 
 
+bool FileSystemImplementationPosix::createFile(Path *file,
+                                               FileStat *stat,
+                                               std::function<size_t(off_t offset, char *buffer, size_t len)> cb)
+{
+    char buf[65536];
+    off_t offset = 0;
+    size_t remaining = stat->st_size;
+
+    int fd = open(file->c_str(), O_WRONLY | O_CREAT, stat->st_mode);
+    if (fd == -1) {
+	failure(FILESYSTEM,"Could not open file %s errno=%d\n", file->c_str(), errno);
+        return false;
+    }
+
+    debug(FILESYSTEM,"Writing %ju bytes to file %s\n", remaining, file->c_str());
+
+    while (remaining > 0) {
+        size_t read = (remaining > sizeof(buf)) ? sizeof(buf) : remaining;
+        size_t len = cb(offset, buf, read);
+        ssize_t n = write(fd, buf, len);
+        if (n == -1) {
+            if (errno == EINTR) {
+                continue;
+            }
+            failure(FILESYSTEM,"Could not write to file %s errno=%d\n", file->c_str(), errno);
+            close(fd);
+            return false;
+        }
+	offset += n;
+	remaining -= n;
+    }
+    close(fd);
+    return true;
+}
+
+bool FileSystemImplementationPosix::createLink(Path *file, FileStat *stat, std::string target)
+{
+    int rc = symlink(target.c_str(), file->c_str());
+    if (rc) {
+        error(FILESYSTEM, "Could not create symlink \"%s\" to %s\n", file->c_str(), target.c_str());
+    }
+    return true;
+}
 
 string ownergroupString(uid_t uid, gid_t gid)
 {
@@ -300,7 +355,7 @@ Path *Path::realpath()
     return Path::lookup(tmp);
 }
 
-bool Path::makeDirHelper(const char *s)
+bool makeDirHelper(const char *s)
 {
     if (::mkdir(s, 0775) == -1)
     {

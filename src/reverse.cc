@@ -32,9 +32,6 @@
 #include <cstdlib>
 #include <iterator>
 #include <memory>
-#include <pthread.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 
 #include "log.h"
 #include "tarentry.h"
@@ -62,7 +59,7 @@ bool ReverseTarredFS::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
     point->loaded_gz_files_.insert(gz);
 
     vector<char> buf;
-    rc = loadVector(gz, T_BLOCKSIZE, &buf);
+    rc = file_system_->loadVector(gz, T_BLOCKSIZE, &buf);
     if (rc) return false;
 
     vector<char> contents;
@@ -83,7 +80,7 @@ bool ReverseTarredFS::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
                          Entry *e = &(point->entries_)[ie->path];
                          e->link = ie->link;
                          e->is_sym_link = ie->is_sym_link;
-                         e->tar = ie->tar;
+                         e->tar = Path::lookup(ie->tar);
                          es.push_back(e);
                      },
                      [this,point,parsed_tars_already](IndexTar *it){
@@ -115,9 +112,25 @@ bool ReverseTarredFS::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
     return true;
 }
 
+Path *ReverseTarredFS::loadDirContents(PointInTime *point, Path *path)
+{
+    FileStat stat;
+    Path *gz = point->gz_files_[path];
+    debug(REVERSE, "Looking for z01 gz file in dir >%s< (found %p)\n", path->c_str(), gz);
+    if (gz != NULL) {
+        gz = gz->prepend(rootDir());
+        RC rc = file_system_->stat(gz, &stat);
+        debug(REVERSE, "%s --- rc=%d %d\n", gz->c_str(), rc, stat.isRegularFile());
+        if (rc == OK && stat.isRegularFile()) {
+            // Found a gz file!
+            loadGz(point, gz, path);
+        }
+    }
+    return gz;
+}
+
 void ReverseTarredFS::loadCache(PointInTime *point, Path *path)
 {
-    struct stat sb;
     Path *opath = path;
 
     if (point->entries_.count(path) == 1) {
@@ -131,27 +144,17 @@ void ReverseTarredFS::loadCache(PointInTime *point, Path *path)
     // Walk up in the directory structure until a gz file is found.
     for (;;)
     {
-        Path *gz = point->gz_files_[path];
-        debug(REVERSE, "Looking for z01 gz file in dir >%s< (found %p)\n", path->c_str(), gz);
-        if (gz != NULL) {
-            gz = gz->prepend(rootDir());
-            int rc = stat(gz->c_str(), &sb);
-            debug(REVERSE, "%s --- %s rc=%d %d\n", gz->c_str(), rc, S_ISREG(sb.st_mode));
-            if (!rc && S_ISREG(sb.st_mode)) {
-                // Found a gz file!
-                loadGz(point, gz, path);
-                if (point->entries_.count(path) == 1) {
-                    // Success
-                    debug(REVERSE, "Found %s in gz %s\n", path->c_str(), gz->c_str());
-                    return;
-                }
-                if (path != opath) {
-                    // The file, if it exists should have been found here. Therefore we
-                    // conclude that the file does not exist.
-                    debug(REVERSE, "NOT found %s in gz %s\n", path->c_str(), gz->c_str());
-                    return;
-                }
-            }
+        Path *gz = loadDirContents(point, path);
+        if (point->entries_.count(path) == 1) {
+            // Success
+            debug(REVERSE, "Found %s in gz %s\n", path->c_str(), gz->c_str());
+            return;
+        }
+        if (path != opath) {
+            // The file, if it exists should have been found here. Therefore we
+            // conclude that the file does not exist.
+            debug(REVERSE, "NOT found %s in gz %s\n", path->c_str(), gz->c_str());
+            return;
         }
         if (path->isRoot()) {
             // No gz file found anywhere! This filesystem should not have been mounted!
@@ -165,7 +168,8 @@ void ReverseTarredFS::loadCache(PointInTime *point, Path *path)
 }
 
 
-Entry *ReverseTarredFS::findEntry(PointInTime *point, Path *path) {
+Entry *ReverseTarredFS::findEntry(PointInTime *point, Path *path)
+{
     if (point->entries_.count(path) == 0)
     {
         loadCache(point, path);
@@ -443,7 +447,7 @@ int ReverseTarredFS::readCB(const char *path_char_string, char *buf,
     e = findEntry(point, path);
     if (!e) goto err;
 
-    tar = Path::lookup(rootDir()->str() + e->tar);
+    tar = e->tar->prepend(rootDir());
 
     if (offset > e->fs.st_size)
     {
@@ -545,22 +549,22 @@ PointInTime *ReverseTarredFS::findPointInTime(string s) {
     return points_in_time_[s];
 }
 
-bool ReverseTarredFS::setPointInTime(string g) {
+PointInTime *ReverseTarredFS::setPointInTime(string g) {
     if ((g.length() < 2) | (g[0] != '@')) {
         error(REVERSE,"Specify generation as @0 @1 @2 etc.\n");
     }
     for (size_t i=1; i<g.length(); ++i) {
         if (g[i] < '0' || g[i] > '9') {
-            return false;
+            return NULL;
         }
     }
     g = g.substr(1);
     size_t gg = atoi(g.c_str());
     if (gg < 0 || gg >= history_.size()) {
-        return false;
+        return NULL;
     }
     single_point_in_time_ = &history_[gg];
-    return true;
+    return single_point_in_time_;
 }
 
 RC ReverseTarredFS::scanFileSystem(Options *settings)
@@ -632,10 +636,8 @@ struct ReverseFileSystem : FileSystem
     {
         FileStat stat;
 
-        Entry *dd = rev_->findEntry(point_, d->path);
-        assert(d == dd);
+        rev_->loadDirContents(point_, d->path);
 
-        printf("DIR >%s<\n", d->path->c_str());
         for (auto e : d->dir) {
             if (e->fs.isDirectory()) {
                 recurseInto(e, cb);
@@ -658,9 +660,9 @@ struct ReverseFileSystem : FileSystem
         recurseInto(d, cb);
     }
 
-    bool stat(Path *p, FileStat *fs)
+    RC stat(Path *p, FileStat *fs)
     {
-        return false;
+        return ERR;
     }
     Path *mkTempDir(std::string prefix)
     {
@@ -669,6 +671,23 @@ struct ReverseFileSystem : FileSystem
     Path *mkDir(Path *p, std::string name)
     {
         return NULL;
+    }
+    int loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
+    {
+        return 0;
+    }
+    int createFile(Path *file, std::vector<char> *buf)
+    {
+        return 0;
+    }
+    bool createFile(Path *path, FileStat *stat,
+                     std::function<size_t(off_t offset, char *buffer, size_t len)> cb)
+    {
+        return false;
+    }
+    bool createLink(Path *file, FileStat *stat, string link)
+    {
+        return 0;
     }
 
     ReverseFileSystem(ReverseTarredFS *rev) : rev_(rev) { }

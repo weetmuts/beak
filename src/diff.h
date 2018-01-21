@@ -58,6 +58,7 @@ private:
     */
     std::map<Path*,DiffEntry,depthFirstSortPath> from_files;
     std::map<Path*,DiffEntry,depthFirstSortPath> to_files;
+    FileSystem *file_system_;
 };
 
 #endif

@@ -53,7 +53,7 @@ struct Entry
     FileStat fs;
     size_t offset;
     Path *path;
-    std::string tar;
+    Path *tar;
     std::vector<Entry*> dir;
     std::string link;
     bool is_sym_link;
@@ -99,13 +99,14 @@ struct ReverseTarredFS
                              Path *dir_to_prepend);
     int parseTarredfsTars(PointInTime *point, std::vector<char> &v, std::vector<char>::iterator &i);
     bool loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend);
+    Path *loadDirContents(PointInTime *point, Path *path);
     void loadCache(PointInTime *point, Path *path);
 
     PointInTime *singlePointInTime() { return single_point_in_time_; }
     bool lookForPointsInTime(PointInTimeFormat f, Path *src);
     std::vector<PointInTime> &history() { return history_; }
     PointInTime *findPointInTime(std::string s);
-    bool setPointInTime(std::string g);
+    PointInTime *setPointInTime(std::string g);
 
     ReverseTarredFS(FileSystem *fs);
 

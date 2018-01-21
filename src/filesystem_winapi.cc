@@ -89,9 +89,16 @@ struct FileSystemImplementationWinapi : FileSystem
     bool readdir(Path *p, vector<Path*> *vec);
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
     void recurse(function<void(Path*,FileStat*)> cb);
-    bool stat(Path *p, FileStat *fs);
+    RC stat(Path *p, FileStat *fs);
     Path *mkTempDir(string prefix);
     Path *mkDir(Path *p, string name);
+
+    int loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
+    int createFile(Path *file, std::vector<char> *buf);
+    bool createFile(Path *file,
+                    FileStat *stat,
+                    std::function<size_t(off_t offset, char *buffer, size_t len)> cb);
+    bool createLink(Path *file, FileStat *stat, string target);
 
 private:
 
@@ -147,9 +154,9 @@ void FileSystemImplementationWinapi::recurse(function<void(Path *,FileStat*)> cb
 {
 }
 
-bool FileSystemImplementationWinapi::stat(Path *p, FileStat *fs)
+RC FileSystemImplementationWinapi::stat(Path *p, FileStat *fs)
 {
-    return false;
+    return ERR;
 }
 
 Path *FileSystemImplementationWinapi::mkTempDir(string prefix)
@@ -188,7 +195,7 @@ Path *FileSystemImplementationWinapi::mkDir(Path *p, string name)
     return n;
 }
 
-int loadVector(Path *file, size_t blocksize, vector<char> *buf)
+int FileSystemImplementationWinapi::loadVector(Path *file, size_t blocksize, vector<char> *buf)
 {
     /*
     char block[blocksize+1];
@@ -217,7 +224,7 @@ int loadVector(Path *file, size_t blocksize, vector<char> *buf)
     return 0;
 }
 
-int writeVector(vector<char> *buf, Path *file)
+int FileSystemImplementationWinapi::createFile(Path *file, vector<char> *buf)
 {
     /*
     int fd = open(file->c_str(), O_WRONLY | O_CREAT, 0666);
@@ -245,6 +252,19 @@ int writeVector(vector<char> *buf, Path *file)
     }
     close(fd);*/
     return 0;
+}
+
+
+bool FileSystemImplementationWinapi::createFile(Path *file,
+                                                FileStat *stat,
+                                                std::function<size_t(off_t offset, char *buffer, size_t len)> cb)
+{
+    return false;
+}
+
+bool FileSystemImplementationWinapi::createLink(Path *file, FileStat *stat, string target)
+{
+    return false;
 }
 
 uid_t geteuid()
@@ -275,7 +295,7 @@ Path *Path::realpath()
     return Path::lookup(tmp);
 }
 
-bool Path::makeDirHelper(const char *s)
+bool makeDirHelper(const char *s)
 {
     int rc = CreateDirectory(s, NULL);
     if (rc == 0) {

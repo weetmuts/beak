@@ -31,9 +31,14 @@ struct FileSystemFuseAPIImplementation : FileSystem
     bool readdir(Path *p, vector<Path*> *vec);
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
     void recurse(function<void(Path *path, FileStat *stat)> cb);
-    bool stat(Path *p, FileStat *fs);
+    RC stat(Path *p, FileStat *fs);
     Path *mkTempDir(string prefix);
-    Path *mkDir(Path *p, string name);
+    Path *mkDir(Path *path, string name);
+    int loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
+    int createFile(Path *file, std::vector<char> *buf);
+    bool createFile(Path *path, FileStat *stat,
+                    std::function<size_t(off_t offset, char *buffer, size_t len)> cb);
+    bool createLink(Path *path, FileStat *stat, string link);
 
     FileSystemFuseAPIImplementation(FuseAPI *api);
     private:
@@ -72,9 +77,9 @@ void FileSystemFuseAPIImplementation::recurse(function<void(Path *path, FileStat
 {
 }
 
-bool FileSystemFuseAPIImplementation::stat(Path *p, FileStat *fs)
+RC FileSystemFuseAPIImplementation::stat(Path *p, FileStat *fs)
 {
-    return false;
+    return ERR;
 }
 
 Path *FileSystemFuseAPIImplementation::mkTempDir(string prefix)
@@ -85,6 +90,27 @@ Path *FileSystemFuseAPIImplementation::mkTempDir(string prefix)
 Path *FileSystemFuseAPIImplementation::mkDir(Path *p, string name)
 {
     return NULL;
+}
+
+int FileSystemFuseAPIImplementation::loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
+{
+    return 0;
+}
+
+int FileSystemFuseAPIImplementation::createFile(Path *file, std::vector<char> *buf)
+{
+    return 0;
+}
+
+bool FileSystemFuseAPIImplementation::createFile(Path *path, FileStat *stat,
+                                                 std::function<size_t(off_t offset, char *buffer, size_t len)> cb)
+{
+    return false;
+}
+
+bool FileSystemFuseAPIImplementation::createLink(Path *path, FileStat *stat, string link)
+{
+    return false;
 }
 
 size_t basepos(string &s)
@@ -673,14 +699,16 @@ void FileStat::storeIn(struct stat *sb)
 #endif
 }
 
-bool Path::mkdir()
+bool makeDirHelper(const char *path);
+
+bool FileSystem::mkDirp(Path* path)
 {
-    if (parent() && parent()->str().length() > 0) {
-        bool rc = parent()->mkdir();
+    if (path->parent() && path->parent()->str().length() > 0) {
+        bool rc = mkDirp(path->parent());
         if (!rc) return false;
     }
     #ifdef PLATFORM_WINAPI
-    if (isDrive()) return true;
+    if (path->isDrive()) return true;
     #endif
-    return makeDirHelper(c_str());
+    return makeDirHelper(path->c_str());
 }

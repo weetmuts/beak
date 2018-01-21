@@ -30,8 +30,9 @@ int main(int argc, char *argv[])
     Command cmd;
     Options settings;
 
-    auto fs = newDefaultFileSystem();
-    auto beak = newBeak(fs.get());
+    auto fs_src = newDefaultFileSystem();
+    auto fs_dst = newDefaultFileSystem();
+    auto beak = newBeak(fs_src.get(), fs_dst.get());
 
     beak->captureStartTime();
     beak->parseCommandLine(argc, argv, &cmd, &settings);

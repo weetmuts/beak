@@ -15,7 +15,7 @@ _beaksources()
 {
   local cur=${COMP_WORDS[COMP_CWORD]}
   local sources=$(grep -o \\[.*\\] ~/.config/beak/beak.conf | tr -d '[' | tr ']' ':' | sort)
-  if [ "$sources" != "" ]; then 
+  if [ "$sources" != "" ]; then
       COMPREPLY=($(compgen -W "$sources" -- $cur))
       if [ -z "$COMPREPLY" ]; then
           # No match for configured source trees. Try directories instead.
@@ -51,22 +51,24 @@ _beak()
 
     # The colon in configured sources gets its own CWORD....
     if [ "$prev" = ":" ]; then prev="$prevprev" ; prevprev="$prevprevprev"; fi
-    
+
     case "$prev" in
         push) _beaksources ;;
-        pull) _beakremotes ;;        
+        pull) _beakremotes ;;
         mount) _beaksources ;;
         umount) _beakusermounts ;;
+        store) _beaksources ;;
     esac
 
     case "$prevprev" in
         push) _beakremotes ;;
         pull) _beaksources ;;
         mount) _filedir -d ;;
+        store) _filedir -d ;;
     esac
 
     if [ -z "$COMPREPLY" ]; then
-        COMPREPLY=($(compgen -W "push pull mount umount" -- $cur))
+        COMPREPLY=($(compgen -W "push pull mount umount store" -- $cur))
     fi
 }
 

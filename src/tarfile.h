@@ -130,7 +130,13 @@ struct TarFile
     // start reading at offest in the tar file.
     size_t copy(char *buf, size_t size, off_t offset, FileSystem *fs);
 
-    bool writeToFile(Path *file, FileSystem *fs);
+    // file: Write the tarfile contents into this file.
+    // stat: With this size and permissions.
+    // src_fs: Fetch the tarfile contents from this filesystem
+    // dst_fs: Store into this filesystem
+    // off: Start storing from this offset in the tar file.
+    bool createFile(Path *file, FileStat *stat,
+                    FileSystem *src_fs, FileSystem *dst_fs, size_t off=0);
 
 private:
 

@@ -69,7 +69,7 @@ struct Beak {
     virtual void genAutoComplete(std::string filename) = 0;
 };
 
-std::unique_ptr<Beak> newBeak(FileSystem *fs);
+std::unique_ptr<Beak> newBeak(FileSystem *src_fs, FileSystem *dst_fs);
 
 
 #define LIST_OF_COMMANDS                                                \

@@ -146,7 +146,7 @@ void testFileSystem()
     }
 
     Path *test = p->append("x/y/z");
-    assert(test->mkdir());
+    assert(fs->mkDirp(test));
 
     Path *rp = contents[0]->realpath();
     verbose(TEST_FILESYSTEM,"REALPATH %s %s\n", contents[0]->c_str(), rp->c_str());

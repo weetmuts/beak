@@ -334,25 +334,14 @@ size_t TarFile::copy(char *buf, size_t bufsiz, off_t offset, FileSystem *fs)
     return org_size-bufsiz;
 }
 
-
-bool TarFile::writeToFile(Path *p, FileSystem *fs)
+bool TarFile::createFile(Path *file, FileStat *stat,
+                          FileSystem *src_fs, FileSystem *dst_fs, size_t off)
 {
-    char buf[65536];
-    size_t offset = 0, remaining = size();
-
-    FILE *f = fopen(p->c_str(),"wb");
-
-    debug(TARFILE,"Write %ju bytes to file %s\n", size(), p->c_str());
-    while (remaining > 0) {
-        debug(TARFILE, "Remaining bytes to writes: %ju\n", remaining);
-        size_t n = copy(buf, 65536, offset, fs);
-        debug(TARFILE, "Wrote %ju bytes.\n", n);
-        fwrite(buf, n, 1, f);
-        if (n > remaining) break;
-        remaining -= n;
-        offset += n;
-    }
-
-    fclose(f);
+    dst_fs->createFile(file, stat, [this,file,src_fs,off] (off_t offset, char *buffer, size_t len) {
+            debug(TARFILE,"Write %ju bytes to file %s\n", len, file->c_str());
+            size_t n = copy(buffer, len, off+offset, src_fs);
+            debug(TARFILE, "Wrote %ju bytes from %ju to %ju.\n", n, off+offset, offset);
+            return n;
+        });
     return true;
 }

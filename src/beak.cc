@@ -56,15 +56,15 @@ const char *autocomplete =
 
 using namespace std;
 
-static ComponentId MAIN = registerLogComponent("main");
 static ComponentId COMMANDLINE = registerLogComponent("commandline");
+static ComponentId STORE = registerLogComponent("store");
 
 struct CommandEntry;
 struct OptionEntry;
 
 struct BeakImplementation : Beak {
 
-    BeakImplementation(FileSystem *fs);
+    BeakImplementation(FileSystem *src_fs, FileSystem *dst_fs);
     void printCommands();
     void printOptions();
 
@@ -130,11 +130,12 @@ struct BeakImplementation : Beak {
     pid_t loop_pid_;
 
     unique_ptr<System> sys_;
-    FileSystem *file_system_;
+    FileSystem *src_file_system_;
+    FileSystem *dst_file_system_;
 };
 
-unique_ptr<Beak> newBeak(FileSystem *fs) {
-    return unique_ptr<Beak>(new BeakImplementation(fs));
+unique_ptr<Beak> newBeak(FileSystem *src_fs, FileSystem *dst_fs) {
+    return unique_ptr<Beak>(new BeakImplementation(src_fs, dst_fs));
 }
 
 struct CommandEntry {
@@ -163,10 +164,11 @@ LIST_OF_OPTIONS
 #undef X
 };
 
-BeakImplementation::BeakImplementation(FileSystem *fs) :
-    forward_fs(fs),
-    reverse_fs(fs),
-    file_system_(fs)
+BeakImplementation::BeakImplementation(FileSystem *src_fs, FileSystem *dst_fs) :
+    forward_fs(src_fs),
+    reverse_fs(src_fs),
+    src_file_system_(src_fs),
+    dst_file_system_(dst_fs)
 {
     for (auto &e : command_entries_) {
         if (e.cmd != nosuch_cmd) {
@@ -183,7 +185,7 @@ BeakImplementation::BeakImplementation(FileSystem *fs) :
         }
     }
 
-    configuration_ = newConfiguration(fs);
+    configuration_ = newConfiguration(src_fs);
     configuration_->load();
 
     sys_ = newSystem();
@@ -601,7 +603,7 @@ int BeakImplementation::configure(Options *settings)
 
 int BeakImplementation::push(Options *settings)
 {
-    Path *mount = file_system_->mkTempDir("beak_push_");
+    Path *mount = src_file_system_->mkTempDir("beak_push_");
     Options forward_settings = *settings;
     forward_settings.dst = mount;
     forward_settings.fuse_argc = 1;
@@ -863,7 +865,7 @@ RC BeakImplementation::fetchPointsInTime(string remote, string cache)
     string r = remote;
     r.pop_back();
     p = p->appendName(Atom::lookup(r+".ls"));
-    writeVector(&out, p);
+    dst_file_system_->createFile(p, &out);
     UI::clearLine();
     fflush(stdout);
 
@@ -961,39 +963,88 @@ int BeakImplementation::storeForward(Options *settings)
 {
     int rc = 0;
 
-    auto ffs  = newForwardTarredFS(file_system_);
+    auto ffs  = newForwardTarredFS(src_file_system_);
 //    auto view = ffs->asFileSystem();
 
     rc = ffs->scanFileSystem(settings);
 
     for (auto& e : ffs->tar_storage_directories) {
         Path *dir = e.second->path()->prepend(settings->dst);
-        dir->mkdir();
+        dst_file_system_->mkDirp(dir);
         for (auto& f : e.second->tars()) {
-            Path *tar = f->path()->prepend(settings->dst);
-            f->writeToFile(tar, file_system_);
+            Path *file_name = f->path()->prepend(settings->dst);
+            FileStat stat;
+            stat.st_size = f->size();
+            // TODO 0660 should be 0400, but that require identification of identical files
+            // and skipping the write to them.
+            stat.st_mode = 0660;
+            f->createFile(file_name, &stat, src_file_system_, dst_file_system_);
         }
     }
     return rc;
+}
+
+RC extractFile(FileSystem *src, Path *tar_file, off_t tar_file_offset,
+               FileSystem *dst, Path *file_to_extract, FileStat *stat)
+{
+    dst->mkDirp(file_to_extract->parent());
+    dst->createFile(file_to_extract, stat,
+        [src,tar_file_offset,file_to_extract,tar_file] (off_t offset, char *buffer, size_t len)
+        {
+            debug(STORE,"Extracting %ju bytes to file %s\n", len, file_to_extract->c_str());
+            ssize_t n = src->pread(tar_file, buffer, len, tar_file_offset + offset);
+            debug(STORE, "Extracted %ju bytes from %ju to %ju.\n", n,
+                  tar_file_offset+offset, offset);
+            return n;
+        });
+    return OK;
+}
+
+RC extractLink(FileSystem *src, string link,
+               FileSystem *dst, Path *file_to_extract, FileStat *stat)
+{
+    dst->mkDirp(file_to_extract->parent());
+    dst->createLink(file_to_extract, stat, link);
+    return OK;
 }
 
 int BeakImplementation::storeReverse(Options *settings)
 {
     RC rc = OK;
 
-    auto rfs  = newReverseTarredFS(file_system_);
+    auto rfs  = newReverseTarredFS(src_file_system_);
     auto view = rfs->asFileSystem();
 
     rfs->lookForPointsInTime(PointInTimeFormat::absolute_point, settings->src);
 
-    rfs->setPointInTime("@0");
+    auto point = rfs->setPointInTime("@0");
+    if (!point) {
+        error(STORE, "No such point in time!\n");
+    }
     assert(rfs->singlePointInTime());
 
     rc = rfs->scanFileSystem(settings);
 
-    view->recurse([] (Path *path, FileStat *stat) {
+    view->recurse([&rfs,this,point,settings] (Path *path, FileStat *stat) {
+
             string permissions = permissionString(stat);
-            printf("%s %s %ju\n", path->c_str(), permissions.c_str(), stat->st_size);
+            auto entry = rfs->findEntry(point, path);
+            auto tar_file = entry->tar->prepend(settings->src);
+            auto tar_file_offset = entry->offset;
+            auto file_to_extract = path->prepend(settings->dst);
+            if (stat->isRegularFile()) {
+                debug(STORE, "Storing file \"%s\" size %ju permissions %s\n   using tar \"%s\" offset %ju\n\n",
+                      file_to_extract->c_str(), stat->st_size, permissions.c_str(),
+                      tar_file->c_str(), tar_file_offset);
+
+                extractFile(src_file_system_, tar_file, tar_file_offset,
+                            dst_file_system_, file_to_extract, stat);
+            } else if (stat->isSymbolicLink()) {
+                debug(STORE, "Storing link %s to %s\n",
+                      file_to_extract->c_str(), entry->link.c_str());
+                extractLink(src_file_system_, entry->link,
+                            dst_file_system_, file_to_extract, stat);
+            }
         });
     return rc;
 }
