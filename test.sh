@@ -36,6 +36,8 @@ org=""
 dest=""
 do_test=""
 
+subdir=""
+
 if_test_fail_msg=""
 
 BEAK=$1
@@ -105,7 +107,7 @@ function performUnStore {
     extra="$1"
     if [ -z "$test" ]; then
         # Normal test execution, execute the store
-        eval "${BEAK} store $extra $store $check > $log"
+        eval "${BEAK} store $extra "${store}${subdir}" $check > $log"
     else
         if [ -z "$gdb" ]; then
             ${BEAK} store --log=all $extra $store $check 2>&1 | tee $log
@@ -266,7 +268,7 @@ function untarpacked {
 }
 
 function checkdiff {
-    diff -rq $root $check
+    diff -rq $root$1 $check
     if [ $? -ne 0 ]; then
         echo "$if_test_fail_msg"
         echo Failed diff for $1! Check in $dir for more information.
@@ -275,7 +277,7 @@ function checkdiff {
 }
 
 function checkls-ld {
-    (cd $root; find . -exec ls -ld \{\} \; > $org)
+    (cd $root$1; find . -exec ls -ld \{\} \; > $org)
     (cd $check; find . -exec ls -ld \{\} \; > $dest)
     diff $org $dest
     if [ $? -ne 0 ]; then
@@ -379,7 +381,7 @@ if [ $do_test ]; then
     startMountTest standardTest --tarheader=full
 fi
 
-setup basic04a "Exactly 100 char file name"
+setup basic04 "Exactly 100 char file name"
 if [ $do_test ]; then
     tmp=$root/test/test
     mkdir -p $tmp
@@ -392,7 +394,7 @@ if [ $do_test ]; then
     startMountTest standardTest --tarheader=full
 fi
 
-setup basic04b "Long paths cause problems"
+setup basic05 "Long paths cause problems"
 if [ $do_test ]; then
     mkdir -p $root/BhlcuNTyTvLedMdLYqDeSySKkGCajOLG/JelKMOzorxaHRRYilhHCH/zGtUkDjJrpaYruHVsh
     echo Hejsan > $root/BhlcuNTyTvLedMdLYqDeSySKkGCajOLG/JelKMOzorxaHRRYilhHCH/zGtUkDjJrpaYruHVsh/zTeEgnbHEROQBZhnLzfkSOWkAu
@@ -405,7 +407,7 @@ if [ $do_test ]; then
     startMountTest standardTest
 fi
 
-setup basic05 "Symbolic link"
+setup symlink "Symbolic link"
 if [ $do_test ]; then
     echo HEJSAN > $root/test
     ln -s $root/test $root/link
@@ -417,7 +419,7 @@ if [ $do_test ]; then
     startMountTest standardTest
 fi
 
-setup basic06 "Symbolic link to long target"
+setup symlink_long "Symbolic link to long target"
 if [ $do_test ]; then
     tmp=$root/01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789
     echo HEJSAN > $tmp
@@ -430,7 +432,7 @@ if [ $do_test ]; then
     startMountTest standardTest
 fi
 
-setup basic07 "Hard link"
+setup hardlink "Hard link"
 if [ $do_test ]; then
     echo HEJSAN > $root/test1
     ln $root/test1 $root/link1
@@ -448,7 +450,7 @@ if [ $do_test ]; then
     startMountTest standardTest
 fi
 
-setup basic08 "FIFO"
+setup fifo "FIFO"
 if [ $do_test ]; then
     mkfifo $root/fifo1
     mkfifo $root/fifo2
@@ -484,7 +486,7 @@ function mountFilterTest {
     stopFS
 }
 
-setup basic09 "Include exclude"
+setup filter "Include exclude"
 if [ $do_test ]; then
     echo HEJSAN > $root/Alfa
     mkdir -p $root/Beta
@@ -498,6 +500,29 @@ if [ $do_test ]; then
     startMountTest mountFilterTest "-i Beta/**"
 fi
 
+setup partial_extraction "Extract a subdirectory in the backup!"
+if [ $do_test ]; then
+    echo HEJSAN > $root/Alfa
+    echo HEJSAN > $root/Beta
+    mkdir -p $root/Gamma
+    echo HEJSAN > $root/Gamma/Delta
+    echo HEJSAN > $root/Gamma/Tau
+    performStore
+    if_test_fail_msg="Store untar test failed: "
+    untar "$store/Gamma"
+    checkdiff /Gamma
+    checkls-ld /Gamma
+    cleanCheck
+    if_test_fail_msg="Store unstor test failed: "
+    subdir="/Gamma"
+    performUnStore
+    checkdiff /Gamma
+    checkls-ld /Gamma
+    cleanCheck
+    subdir=""
+    echo OK
+fi
+
 function devTest {
     $THIS_DIR/scripts/integrity-test.sh -dd "$dir" -f "! -path '*shm*'" /dev "$mount"
     if [ $? -ne 0 ]; then
@@ -507,7 +532,7 @@ function devTest {
     stopFS nook
 }
 
-setup basic10 "block and character devices (ie the whole /dev directory)"
+setup devices "block and character devices (ie the whole /dev directory)"
 if [ $do_test ]; then
     # Testing char and block devices are difficult since they
     # require you to be root. So lets just mount /dev and
@@ -516,7 +541,7 @@ if [ $do_test ]; then
     startMountTest devTest "--tarheader=full -x '/shm/**'"
 fi
 
-setup basic11 "check that nothing gets between the directory and its contents"
+setup tar_ordering "check that nothing gets between the directory and its contents"
 if [ $do_test ]; then
     # If skrifter.zip ends up after the skrifter directory abd before alfa,
     # then tar's logic for setting the last modified time of the directory will not work.
@@ -567,7 +592,7 @@ function mtimeTestPart2 {
     stopFS
 }
 
-setup basic12 "Test last modified timestamp"
+setup mtime "Test last modified timestamp"
 if [ $do_test ]; then
     mkdir -p $root/alfa
     mkdir -p $root/beta
@@ -605,14 +630,14 @@ function timestampHashTest2 {
     stopFS
 }
 
-setup basic13 "check that timestamps influence file hash"
+setup mtime_hash "check that timestamps influence file hash"
 if [ $do_test ]; then
     mkdir -p $root/TJO
     touch -d "2015-03-03 03:03:03.1234" $root/TJO/alfa
     startMountTest timestampHashTest1
 fi
 
-setup basic14 "Test paths with spaces"
+setup paths_with_spaces "Test paths with spaces"
 if [ $do_test ]; then
     mkdir -p "$root/alfa beta/gamma"
     mkdir -p "$root/alfa beta/gam ma"
@@ -632,7 +657,7 @@ function checkExtractFile {
     stopFS
 }
 
-setup basic15 "Test single file untar"
+setup test_single_untar "Test single file untar"
 if [ $do_test ]; then
     mkdir -p "$root/alfa beta/gamma"
     mkdir -p "$root/alfa beta/gam ma"
@@ -664,14 +689,14 @@ function percentageTest {
     stopFS nook
 }
 
-setup basic16 "Test paths with percentages in them"
+setup paths_with_percentages "Test paths with percentages in them"
 if [ $do_test ]; then
     mkdir -p "$root/alfa"
     echo HEJSAN > "$root/alfa/p%25e2%2594%259c%25c3%2591vensf%25e2%2594%259c%25e2%2595%25a2.jpg"
     startMountTest percentageTest "--tarheader=full"
 fi
 
-setup basic17 "Test small/medium/large tar files"
+setup small_medium_large "Test small/medium/large tar files"
 if [ $do_test ]; then
     for i in s{1..199}; do
         dd if=/dev/zero of="$root/$i" bs=1024 count=60 > /dev/null 2>&1
@@ -694,7 +719,7 @@ function expectCaseConflict {
     echo OK
 }
 
-setup basic18 "Test that case conflicts are detected"
+setup case_conflict_detected "Test that case conflicts are detected"
 if [ $do_test ]; then
     mkdir -p $root/Alfa
     mkdir -p $root/alfa
@@ -703,7 +728,7 @@ if [ $do_test ]; then
     startMountTestExpectFail expectCaseConflict "-d 1 -ta 0"
 fi
 
-setup basic19 "Test that case conflicts can be hidden inside tars"
+setup case_conflict_hidden "Test that case conflicts can be hidden inside tars"
 if [ $do_test ]; then
     mkdir -p $root/Alfa
     mkdir -p $root/alfa
@@ -721,7 +746,7 @@ function expectLocaleFailure {
     echo OK
 }
 
-setup basic20 "Test that LC_ALL=C fails"
+setup locale_C "Test that LC_ALL=C fails"
 if [ $do_test ]; then
     mkdir -p $root/Alfa
     echo HEJSAN > $root/Alfa/a
@@ -740,7 +765,7 @@ function txTriggerTest {
     stopFS
 }
 
-setup basic21 "Test -tx to trigger tarred directories"
+setup trigger_tarred_dirs "Test -tx to trigger tarred directories"
 if [ $do_test ]; then
     mkdir -p $root/Alfa/snapshot_2016-12-30
     echo HEJSAN > $root/Alfa/a
@@ -772,7 +797,7 @@ function noAvalancheTestPart2 {
     stopFS
 }
 
-setup distribution1 "Test that added file does not create avalanche"
+setup no_avalanche "Test that added file does not create avalanche"
 if [ $do_test ]; then
     for i in s{1..199}; do
         dd if=/dev/zero of="$root/$i" bs=1024 count=60 > /dev/null 2>&1
@@ -888,7 +913,7 @@ function pointInTimeTestPart4 {
     stopFSArchive
 }
 
-setup pointInTime1 "Test that pointInTimes work"
+setup points_in_time "Test that pointInTimes work"
 if [ $do_test ]; then
     ./scripts/generate_filesystem.sh $root 3
     startMountTest pointInTimeTestPart1

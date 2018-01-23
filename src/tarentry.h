@@ -87,7 +87,10 @@ struct TarEntry
     {
 	return is_hard_linked_;
     }
-
+    FileStat *stat()
+    {
+        return &fs_;
+    }
     TarEntry *parent()
     {
 	return parent_;

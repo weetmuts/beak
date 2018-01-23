@@ -44,6 +44,7 @@ struct FileSystemFuseAPIImplementation : FileSystem
     bool createHardLink(Path *path, FileStat *stat, Path *target);
     bool createFIFO(Path *path, FileStat *stat);
     bool readLink(Path *file, string *target);
+    bool deleteFile(Path *file);
 
     FileSystemFuseAPIImplementation(FuseAPI *api);
     private:
@@ -139,6 +140,11 @@ bool FileSystemFuseAPIImplementation::createFIFO(Path *path, FileStat *stat)
 }
 
 bool FileSystemFuseAPIImplementation::readLink(Path *path, string *target)
+{
+    return false;
+}
+
+bool FileSystemFuseAPIImplementation::deleteFile(Path *path)
 {
     return false;
 }
@@ -348,6 +354,7 @@ bool Atom::lessthan(Atom *a, Atom *b)
 }
 
 static map<string, Path*> interned_paths;
+static Path *interned_root;
 
 Path *Path::lookup(string p)
 {
@@ -385,7 +392,7 @@ Path *Path::lookup(string p)
 
 Path *Path::lookupRoot()
 {
-    return lookup("");
+    return interned_root;
 }
 
 deque<Path*> Path::nodes()
@@ -520,6 +527,7 @@ Path::Initializer::Initializer()
     Atom *root = Atom::lookup("");
     string s = string("");
     interned_paths[""] = new Path(NULL, root, s);
+    interned_root = lookup("");
 }
 
 Path::Initializer Path::initializer_s;
@@ -546,6 +554,7 @@ ssize_t readlink(const char *path, char *dest, size_t len)
 {
     return -1;
 }
+
 
 string permissionString(FileStat *fs)
 {

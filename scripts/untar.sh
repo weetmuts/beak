@@ -1,5 +1,5 @@
 #!/bin/bash
-#  
+#
 #    Copyright (C) 2016 Fredrik Öhrström
 #
 #    This program is free software: you can redistribute it and/or modify
@@ -46,14 +46,14 @@ function pushDir() {
     if [ "$extract" = "true" ]; then
         mkdir -p "$tar_dir"
         pushd "$tar_dir" > /dev/null
-        if [ "$debug" == "true" ]; then echo pushd $(pwd); fi        
-    fi    
+        if [ "$debug" == "true" ]; then echo pushd $(pwd); fi
+    fi
 }
 
 function popDir() {
     if [ "$extract" = "true" ]; then
         popd > /dev/null
-        if [ "$debug" == "true" ]; then echo pop; fi        
+        if [ "$debug" == "true" ]; then echo pop; fi
     fi
 }
 
@@ -158,11 +158,11 @@ else
         gen="${gen##@}"
         gen=$((gen+1))
         generation=$(sed -n ${gen}p "$dir/generations")
-    fi    
+    fi
 fi
 
-# Find the tar files
-gunzip -c "$generation" | tr -d '\0' | grep -A5000 -m1 \#tars | grep -v z01 | grep -v \#tars | sed 's/^\///'  > "$dir/aa"
+# Extract the list of tar files from the index file.
+gunzip -c "$generation" | tr -d '\0' | grep -A1000000 -m1 \#tars | grep -v z01 | grep -v \#tars | sed 's/^\///'  > "$dir/aa"
 cat "$dir/aa" | tr -c -d '/\n' | tr / a > "$dir/bb"
 # Sort them on the number of slashes, ie handle the
 # deepest directories first, finish with the root
@@ -188,7 +188,7 @@ while IFS='' read tar_file; do
             ex="${extract_this##$tar_dir_prefix}"
             try_tar='true'
             # Also ignore not found errors from tar
-            ignore_errs="2> /dev/null"         
+            ignore_errs="2> /dev/null"
         else
             try_tar='false'
             ex=''
@@ -203,7 +203,7 @@ while IFS='' read tar_file; do
 
     if [ "$verbose" = "true" ]; then
         CMD="tar ${cmd}f \"$file\" \"$ex\" $ignore_errs"
-        if [ "$try_tar" == "true" ]; then            
+        if [ "$try_tar" == "true" ]; then
             pushDir
             if [ "$debug" == "true" ]; then echo "$CMD"; fi
             eval $CMD > $dir/tmplist
@@ -211,8 +211,14 @@ while IFS='' read tar_file; do
             if [ "$?" == "0" ]; then
                 echo Tarredfs: tar ${cmd}f \"$file\" \"$ex\"
             fi
-            # Insert the tar_dir path as a prefix of the tar contents.
-            awk '{p=match($0," [0-9][0-9]:[0-9][0-9] "); print substr($0,0,p+6)"'" $tar_dir"'/"substr($0,p+7)}' $dir/tmplist
+            if [ "$extract" == "true" ]; then
+                # GNU Tar simply prints the filename when extracting verbosely.
+                # Simply prefix the tar dir.
+                awk -v prefix="$tar_dir_prefix" '{print prefix $0}' $dir/tmplist
+            else
+                # GNU Tar prints permissions, date etc when viewing verbosely.
+                awk '{p=match($0," [0-9][0-9]:[0-9][0-9] "); print substr($0,0,p+6)"'" $tar_dir_prefix"'"substr($0,p+7)}' $dir/tmplist
+            fi
             rm $dir/tmplist
         else
             if [ "$debug" == "true" ]; then echo Skipping "$file"; fi
@@ -233,8 +239,5 @@ while IFS='' read tar_file; do
             if [ "$debug" == "true" ]; then echo Skipping "$root/$tar_file"; fi
         fi
     fi
-    
+
 done <"$dir/cc"
-
-
-

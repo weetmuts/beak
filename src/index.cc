@@ -113,8 +113,14 @@ int Index::loadIndex(vector<char> &v,
         }
         // Remove the newline at the end.
         name.pop_back();
+        name.insert(0, "/");
         Path *p = Path::lookup(name);
-        debug(INDEX,"  found tar %s in dir %s\n", p->name()->c_str(), p->parent()->c_str());
+        if (p->parent()) {
+            debug(INDEX,"  found tar %s in dir %s\n", p->name()->c_str(), p->parent()->c_str());
+        } else {
+            debug(INDEX,"  found tar %s\n", p->name()->c_str());
+        }
+
         it->path = p;
         on_tar(it);
         num_tars--;

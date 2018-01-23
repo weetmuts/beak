@@ -97,6 +97,7 @@ struct FileSystemImplementationPosix : FileSystem
     bool createHardLink(Path *path, FileStat *stat, Path *target);
     bool createFIFO(Path *path, FileStat *stat);
     bool readLink(Path *path, string *target);
+    bool deleteFile(Path *file);
 
 private:
 
@@ -153,7 +154,7 @@ void FileSystemImplementationPosix::recurse(function<void(Path *path, FileStat *
 RC FileSystemImplementationPosix::stat(Path *p, FileStat *fs)
 {
     struct stat sb;
-    int rc = ::stat(p->c_str(), &sb);
+    int rc = ::lstat(p->c_str(), &sb);
     if (rc) return ERR;
     fs->loadFrom(&sb);
     return OK;
@@ -174,7 +175,9 @@ RC FileSystemImplementationPosix::utime(Path *p, FileStat *fs)
     times[1].tv_sec = fs->st_mtim.tv_sec;
     times[1].tv_nsec = fs->st_mtim.tv_nsec;
 
-    int rc = utimensat(0, p->c_str(), times, 0);
+    // Why always AT_SYMLINK_NOFOLLOW? Because beak never intends
+    // to follow symlinks when storing files! beak stores symlinks themselves!
+    int rc = utimensat(0, p->c_str(), times, AT_SYMLINK_NOFOLLOW);
     if (rc) return ERR;
     return OK;
 }
@@ -347,6 +350,15 @@ bool FileSystemImplementationPosix::readLink(Path *file, string *target)
         return false;
     }
     *target = string(buf, n);
+    return true;
+}
+
+bool FileSystemImplementationPosix::deleteFile(Path *file)
+{
+    int rc = unlink(file->c_str());
+    if (rc) {
+        error(FILESYSTEM, "Could not delete file \"%s\"\n", file->c_str());
+    }
     return true;
 }
 

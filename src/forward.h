@@ -83,6 +83,7 @@ struct ForwardTarredFS : FuseAPI
 
     int recurse();
     int addTarEntry(const char *fpath, const struct stat *sb);
+    void findHardLinks();
     void findTarCollectionDirs();
     void recurseAddDir(Path *path, TarEntry *direntry);
     void addDirsToDirectories();
@@ -91,7 +92,7 @@ struct ForwardTarredFS : FuseAPI
     void fixTarPathsAndHardLinks();
     size_t groupFilesIntoTars();
     void sortTarCollectionEntries();
-    TarEntry *findNearestStorageDirectory(TarEntry *te);
+    TarEntry *findNearestStorageDirectory(Path *a, Path *b);
 
     TarFile *findTarFromPath(Path *path);
     FileSystem *asFileSystem();

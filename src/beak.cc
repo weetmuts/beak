@@ -1041,20 +1041,34 @@ bool extractHardLink(FileSystem *src, Path *target,
 {
     statistics->num_hard_links++;
     target = target->prepend(dst_root);
-    debug(STORE, "Storing hard link %s to %s\n", file_to_extract->c_str(), target->c_str());
-
     FileStat target_stat;
     if (OK != dst->stat(target, &target_stat)) {
         error(STORE, "Cannot extract hard link %s because target %s does not exist!\n",
               file_to_extract->c_str(), target->c_str());
     }
     if (!stat->samePermissions(&target_stat)) {
-        error(STORE, "Hard link target must have same permissions as hard link definitions!\n"
+        error(STORE, "Hard link target must have same permissions as hard link definition!\n"
               "Expected %s to have permissions %s\n", target->c_str(), permissionString(&target_stat).c_str());
     }
+    if (!stat->sameMTime(&target_stat)) {
+        error(STORE, "Hard link target must have same MTime as hard link definition!\n"
+              "Expected %s to have mtime xxx\n", target->c_str());
+    }
+    FileStat old_stat;
+    if (OK == dst->stat(file_to_extract, &old_stat)) {
+        if (stat->samePermissions(&old_stat) &&
+            target_stat.sameSize(&old_stat) && // The hard link definition does not have size.
+            stat->sameMTime(&old_stat)) {
+            debug(STORE, "Skipping hard link \"%s\"\n", file_to_extract->c_str());
+            return false;
+        }
+    }
+
+    debug(STORE, "Storing hard link %s to %s\n", file_to_extract->c_str(), target->c_str());
 
     dst->mkDirp(file_to_extract->parent());
     dst->createHardLink(file_to_extract, stat, target);
+    dst->utime(file_to_extract, stat);
     statistics->num_hard_links_stored++;
     verbose(STORE, "Stored hard link %s\n", file_to_extract->c_str());
     return true;
@@ -1104,16 +1118,29 @@ bool extractSymbolicLink(FileSystem *src, string target,
 {
     statistics->num_symbolic_links++;
     string old_target;
-    if (dst->readLink(file_to_extract, &old_target)) {
-        if (target == old_target) {
-            debug(STORE, "Skipping existing link %s\n", file_to_extract->c_str());
-            return false;
+    FileStat old_stat;
+    bool found =  OK == dst->stat(file_to_extract, &old_stat);
+    if (found) {
+        if (stat->samePermissions(&old_stat) &&
+            stat->sameSize(&old_stat) &&
+            stat->sameMTime(&old_stat)) {
+            if (dst->readLink(file_to_extract, &old_target)) {
+                if (target == old_target) {
+                    debug(STORE, "Skipping existing link %s\n", file_to_extract->c_str());
+                    return false;
+                }
+            }
         }
     }
+
     debug(STORE, "Storing symlink %s to %s\n", file_to_extract->c_str(), target.c_str());
 
     dst->mkDirp(file_to_extract->parent());
+    if (found) {
+        dst->deleteFile(file_to_extract);
+    }
     dst->createSymbolicLink(file_to_extract, stat, target);
+    dst->utime(file_to_extract, stat);
     statistics->num_symbolic_links_stored++;
     verbose(STORE, "Stored symlink %s\n", file_to_extract->c_str());
     return true;
@@ -1122,10 +1149,21 @@ bool extractSymbolicLink(FileSystem *src, string target,
 bool extractNode(FileSystem *src, FileSystem *dst, Path *file_to_extract, FileStat *stat,
                  ReverseStoreStatistics *statistics)
 {
+    FileStat old_stat;
+    if (OK == dst->stat(file_to_extract, &old_stat)) {
+        if (stat->samePermissions(&old_stat) &&
+            stat->sameMTime(&old_stat)) {
+            // Compare of size is ignored since the nodes have no size...
+            debug(STORE, "Skipping mknod of \"%s\"\n", file_to_extract->c_str());
+            return false;
+        }
+    }
+
     if (stat->isFIFO()) {
         debug(STORE, "Storing FIFO %s\n", file_to_extract->c_str());
         dst->mkDirp(file_to_extract->parent());
         dst->createFIFO(file_to_extract, stat);
+        dst->utime(file_to_extract, stat);
         verbose(STORE, "Stored fifo %s\n", file_to_extract->c_str());
     }
     return true;
@@ -1163,7 +1201,6 @@ void handleHardLinks(Path *path, FileStat *stat,
                      Options *settings, ReverseStoreStatistics *st,
                      FileSystem *src_fs, FileSystem *dst_fs)
 {
-    debug(STORE,"Handling hard links %s\n", path->c_str());
     auto entry = rfs->findEntry(point, path);
     auto file_to_extract = path->prepend(settings->dst);
 
@@ -1180,7 +1217,6 @@ void handleRegularFiles(Path *path, FileStat *stat,
                         Options *settings, ReverseStoreStatistics *st,
                         FileSystem *src_fs, FileSystem *dst_fs)
 {
-    debug(STORE,"Handling regular files %s\n", path->c_str());
     auto entry = rfs->findEntry(point, path);
     auto tar_file = entry->tar->prepend(settings->src);
     auto tar_file_offset = entry->offset;
@@ -1197,10 +1233,7 @@ void handleNodes(Path *path, FileStat *stat,
                  Options *settings, ReverseStoreStatistics *st,
                  FileSystem *src_fs, FileSystem *dst_fs)
 {
-    debug(STORE,"Handling node %s\n", path->c_str());
     auto entry = rfs->findEntry(point, path);
-    auto tar_file = entry->tar->prepend(settings->src);
-    auto tar_file_offset = entry->offset;
     auto file_to_extract = path->prepend(settings->dst);
 
     if (!entry->is_hard_link && stat->isFIFO()) {
@@ -1213,7 +1246,6 @@ void handleSymbolicLinks(Path *path, FileStat *stat,
                          Options *settings, ReverseStoreStatistics *st,
                          FileSystem *src_fs, FileSystem *dst_fs)
 {
-    debug(STORE,"Handling symlinks %s\n", path->c_str());
     auto entry = rfs->findEntry(point, path);
     auto file_to_extract = path->prepend(settings->dst);
 
@@ -1228,7 +1260,6 @@ void handleDirs(Path *path, FileStat *stat,
                 Options *settings, ReverseStoreStatistics *st,
                 FileSystem *src_fs, FileSystem *dst_fs)
 {
-    debug(STORE,"Handling dirs %s\n", path->c_str());
     auto file_to_extract = path->prepend(settings->dst);
 
     if (stat->isDirectory()) {

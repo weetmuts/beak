@@ -727,6 +727,10 @@ struct ReverseFileSystem : FileSystem
     {
         return false;
     }
+    bool deleteFile(Path *file)
+    {
+        return false;
+    }
 
 
     ReverseFileSystem(ReverseTarredFS *rev) : rev_(rev) { }

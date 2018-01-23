@@ -104,6 +104,7 @@ struct FileSystemImplementationWinapi : FileSystem
     bool createHardLink(Path *file, FileStat *stat, Path *target);
     bool createFIFO(Path *file, FileStat *stat);
     bool readLink(Path *file, string *target);
+    bool deleteFile(Path *file);
 
 private:
 
@@ -293,6 +294,11 @@ bool FileSystemImplementationWinapi::createFIFO(Path *file, FileStat *stat)
 }
 
 bool FileSystemImplementationWinapi::readLink(Path *file, string *target)
+{
+    return false;
+}
+
+bool FileSystemImplementationWinapi::deleteFile(Path *file)
 {
     return false;
 }

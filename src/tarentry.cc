@@ -316,14 +316,15 @@ void TarEntry::updateSizes() {
 }
 
 void TarEntry::rewriteIntoHardLink(TarEntry *target) {
-    link_ = target->tarpath_;
+    link_ = target->path_;
     is_hard_linked_ = true;
     updateSizes();
-    assert(isHardLink());
+    assert(link_->c_str()[0] == '/');
 }
 
 bool TarEntry::fixHardLink(Path *storage_dir)
 {
+    assert(link_->c_str()[0] == '/');
     debug(HARDLINKS, "Fix hardlink >%s< to >%s< within storage >%s<\n", path_->c_str(), link_->c_str(), storage_dir->c_str());
 
     if (storage_dir == Path::lookupRoot())
@@ -333,8 +334,9 @@ bool TarEntry::fixHardLink(Path *storage_dir)
     }
 
     Path *common = Path::commonPrefix(storage_dir, link_);
-    debug(HARDLINKS, "COMMON PREFIX >%s< >%s< = >%s<\n", storage_dir->c_str(), link_->c_str(), common?common->c_str():"NULL");
-    if (common == NULL || common->depth() < storage_dir->depth()) {
+    assert(common);
+    debug(HARDLINKS, "COMMON PREFIX >%s< >%s< = >%s<\n", storage_dir->c_str(), link_->c_str(), common->c_str());
+    if (common->depth() < storage_dir->depth()) {
     	warning(HARDLINKS, "Warning: hard link between tars detected! From %s to %s\n", path_->c_str(), link_->c_str());
     	// This hardlink needs to be pushed upwards, into a tar on a higher level!
     	return false;

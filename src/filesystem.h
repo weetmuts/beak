@@ -255,6 +255,8 @@ struct FileSystem
     virtual bool createHardLink(Path *file, FileStat *stat, Path *target) = 0;
     virtual bool createFIFO(Path *file, FileStat *stat) = 0;
     virtual bool readLink(Path *file, std::string *target) = 0;
+
+    virtual bool deleteFile(Path *file) = 0;
 };
 
 std::unique_ptr<FileSystem> newDefaultFileSystem();
