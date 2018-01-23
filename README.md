@@ -89,9 +89,9 @@ For example:
 /home/you/Work/gamesrc/a lot of files and subdirectories
 /home/you/Work/only the two subdirectories above.
 becomes
-/home/you/Work/rclonesrc/s01.tar y01.tar z01.gz
-/home/you/Work/gamesrc/s01.tar y01.tar z01.gz
-/home/you/Work/y01.tar z01.gz
+/home/you/Work/rclonesrc/s01[...]tar y01.tar z01[...]gz
+/home/you/Work/gamesrc/s01[...]tar y01[...]tar z01[...]gz
+/home/you/Work/y01[...]tar z01[...]gz
 ```
 
 The order and selection of the chunky directories is deterministic (and depth first),
@@ -133,14 +133,19 @@ The @0 means to mount the most recent _point in time_ in the _backup directory_.
 
 You can skip the rclone step if you are storing in a local _backup directory_. Then simply do:
 
-`beak store /home/you/Work Backup`
+`beak store /home/you/Work /home/you/Backup`
 
-which will store any chunk files that are missing into Backup.
+which will store any chunk files that are missing into Backup. The extraction process is symmetrical:
+
+`beak store /home/you/Backup@0 /home/you/Work`
+
+(This will not delete superfluous files. Add --delete-superfluous to remove them automatically.)
 
 Cloud storages often has case-insensitive filesystems and can only store plain files.
 The chunks however, will properly store your case-sensitive filesystem with symbolic links etc.
-(If you for some reason have gamesrc and Gamesrc and they end up as two separate chunked directories,
-beak will complain, but this is rare.)
+It is rare, but it might happen that you have gamesrc and GameSrc and they end up as two separate
+chunked directories, that would conflict on the remote storage. Beak will detect this
+and refuse to perform the backup, giving you a chance to rename the directories.
 
 ## Naming the chunky files
 
@@ -162,7 +167,7 @@ The hash is the hash of the all the archives pointed to by this index file.
 
 `z01_--seconds---.--nanos--_0_----------metadata-hash-----------------------------------------_0.gz`
 
-(Those y01...tar files stores timestamps for directories and hard links and are only used
+(Those y01[...]tar files stores directories and hard links and are only used
 when extracting the backup using the shell script.)
 
 Assuming that your _source directory_ `/home/you/Work/` above contained `rclonesrc/` and `gamesrc/`
@@ -175,7 +180,7 @@ to `rclonesrc` the new index file will point to the existing rclonesrc/chunks.
 
 ![Beak FS](./doc/beak_fs.png)
 
-If you know how git stores files or how btrfs stores files or how
+If you know how git stores directory structures or how btrfs stores files or how
 clojure deals with data structures, or any other system that reuse
 old nodes in new trees, then you will feel right at home. :smiley:
 
@@ -214,7 +219,7 @@ beak cannot destroy the previous backup if the current backup is
 interrupted halfway.
 
 If a _backup directory_ (local or remote) is later packed, the new
-diff chunks are first uploaded and verified to have reach their
+diff chunks are first uploaded and verified to have reached their
 destination, before the non-diff chunks are removed. The pack can be
 done by a different computer than the computer that pushed.
 
@@ -323,6 +328,8 @@ beak prune     beak pack
 
 Hosts supported: x86_64-pc-linux-gnu x86_64-w64-mingw32 arm-linux-gnueabihf
 
-## Cross compiling
+## Cross compiling to Winapi and Arm.
 
-`./configure --host=x86_64-w64-mingw32 --with-zlib=3rdparty/zlib-1.2.11/ --with-openssl=3rdparty/openssl-1.0.2l`
+`./configure --host=x86_64-w64-mingw32 --with-zlib=3rdparty/zlib-1.2.11/winapi --with-openssl=3rdparty/openssl-1.0.2l/winapi`
+
+`./configure --host=arm-linux-gnueabihf --with-zlib=3rdparty/zlib-1.2.11/arm --with-openssl=3rdparty/openssl-1.0.2l/arm`

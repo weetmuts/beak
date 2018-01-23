@@ -50,10 +50,8 @@ ReverseTarredFS::ReverseTarredFS(FileSystem *fs)
 bool ReverseTarredFS::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
 {
     int rc;
-    debug(REVERSE, "Loadgz %s %p >%s<\n", gz->c_str(), gz, dir_to_prepend->c_str());
     if (point->loaded_gz_files_.count(gz) == 1)
     {
-        debug(REVERSE, "Already loaded!\n");
         return true;
     }
     point->loaded_gz_files_.insert(gz);
@@ -74,12 +72,27 @@ bool ReverseTarredFS::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
     bool parsed_tars_already = point->gz_files_.size() != 0;
 
     rc = Index::loadIndex(contents, i, &index_entry, &index_tar, dir_to_prepend,
-                     [this,point,&es](IndexEntry *ie){
-                         debug(REVERSE," Adding entry for >%s<\n", ie->path->c_str());
-                         point->entries_[ie->path] = Entry(ie->fs, ie->offset, ie->path);
+             [this,point,&es,dir_to_prepend](IndexEntry *ie){
+                         if (point->entries_.count(ie->path) == 0) {
+                             debug(REVERSE, "Adding entry for >%s< %p\n", ie->path->c_str());
+                             // Trigger storage of entry.
+                             point->entries_[ie->path];
+                         } else {
+                             debug(REVERSE, "Using existing entry for >%s< %p\n", ie->path->c_str());
+                         }
                          Entry *e = &(point->entries_)[ie->path];
-                         e->link = ie->link;
+                         assert(e->path = ie->path);
+                         e->fs = ie->fs;
+                         e->offset = ie->offset;
+                         e->path = ie->path;
                          e->is_sym_link = ie->is_sym_link;
+                         e->symlink = ie->link;
+                         e->is_hard_link = ie->is_hard_link;
+                         if (e->is_hard_link) {
+                             // A Hard link as stored in the beakfs >must< point to a file
+                             // in the same directory or to a file in subdirectory.
+                             e->hard_link = dir_to_prepend->append(ie->link);
+                         }
                          e->tar = Path::lookup(ie->tar);
                          es.push_back(e);
                      },
@@ -100,9 +113,14 @@ bool ReverseTarredFS::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
         // Now iterate over the files found.
         // Some of them might be in subdirectories.
         Path *p = i->path;
+        if (!p->parent()) continue;
         Path *pp = p->parent();
+        int c = point->entries_.count(pp);
         Entry *d = &(point->entries_)[pp];
-        debug(REVERSE, "   found %s added to >%s<\n", i->path->c_str(), pp->c_str());
+        if (c == 0) {
+            d->path = pp;
+        }
+        debug(REVERSE, "Added %s %p to dir >%s< %p\n", i->path->c_str(), i, pp->c_str(), d);
         d->dir.push_back(i);
         d->loaded = true;
     }
@@ -401,10 +419,10 @@ int ReverseTarredFS::readlinkCB(const char *path_char_string, char *buf, size_t 
     e = findEntry(point, path);
     if (!e) goto err;
 
-    c = e->link.length();
+    c = e->symlink.length();
     if (c > s) c = s;
 
-    memcpy(buf, e->link.c_str(), c);
+    memcpy(buf, e->symlink.c_str(), c);
     buf[c] = 0;
     debug(REVERSE, "readlinkCB >%s< bufsiz=%ju returns buf=>%s<\n", path, s, buf);
 
@@ -567,7 +585,7 @@ PointInTime *ReverseTarredFS::setPointInTime(string g) {
     return single_point_in_time_;
 }
 
-RC ReverseTarredFS::scanFileSystem(Options *settings)
+RC ReverseTarredFS::loadBeakFileSystem(Options *settings)
 {
     setRootDir(settings->src);
     setMountDir(settings->dst);
@@ -634,13 +652,13 @@ struct ReverseFileSystem : FileSystem
 
     void recurseInto(Entry *d, std::function<void(Path*,FileStat*)> cb)
     {
-        FileStat stat;
-
         rev_->loadDirContents(point_, d->path);
 
+        // Recurse depth first.
         for (auto e : d->dir) {
             if (e->fs.isDirectory()) {
                 recurseInto(e, cb);
+                cb(e->path, &e->fs);
             }
         }
         for (auto e : d->dir) {
@@ -661,6 +679,14 @@ struct ReverseFileSystem : FileSystem
     }
 
     RC stat(Path *p, FileStat *fs)
+    {
+        return ERR;
+    }
+    RC chmod(Path *p, FileStat *fs)
+    {
+        return ERR;
+    }
+    RC utime(Path *p, FileStat *fs)
     {
         return ERR;
     }
@@ -685,14 +711,22 @@ struct ReverseFileSystem : FileSystem
     {
         return false;
     }
-    bool createLink(Path *file, FileStat *stat, string link)
+    bool createSymbolicLink(Path *file, FileStat *stat, string target)
     {
-        return 0;
+        return false;
     }
+    bool createHardLink(Path *file, FileStat *stat, Path *target)
+    {
+        return false;
+    }
+    bool readLink(Path *file, string *target)
+    {
+        return false;
+    }
+
 
     ReverseFileSystem(ReverseTarredFS *rev) : rev_(rev) { }
 };
-
 
 FileSystem *ReverseTarredFS::asFileSystem()
 {

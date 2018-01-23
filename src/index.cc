@@ -65,7 +65,7 @@ int Index::loadIndex(vector<char> &v,
         return ERR;
     }
 
-    debug(INDEX, "Loading gz contents with >%s< and %d files.\n", msg.c_str(), num_files);
+    debug(INDEX, "Loading gz for '%s' with >%s< and %d files.\n", dir_to_prepend->c_str(), msg.c_str(), num_files);
 
     eof = false;
     while (i != v.end() && !eof && num_files > 0)
@@ -73,7 +73,7 @@ int Index::loadIndex(vector<char> &v,
         ii = i;
         bool got_entry = eatEntry(v, i, dir_to_prepend, &ie->fs, &ie->offset,
                                   &ie->tar, &ie->path, &ie->link,
-                                  &ie->is_sym_link,
+                                  &ie->is_sym_link, &ie->is_hard_link,
                                   &eof, &err);
         if (err) {
             failure(INDEX, "Could not parse tarredfs-contents file in >%s<\n>%s<\n",

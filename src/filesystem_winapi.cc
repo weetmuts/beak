@@ -90,6 +90,8 @@ struct FileSystemImplementationWinapi : FileSystem
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
     void recurse(function<void(Path*,FileStat*)> cb);
     RC stat(Path *p, FileStat *fs);
+    RC chmod(Path *p, FileStat *fs);
+    RC utime(Path *p, FileStat *fs);
     Path *mkTempDir(string prefix);
     Path *mkDir(Path *p, string name);
 
@@ -98,7 +100,9 @@ struct FileSystemImplementationWinapi : FileSystem
     bool createFile(Path *file,
                     FileStat *stat,
                     std::function<size_t(off_t offset, char *buffer, size_t len)> cb);
-    bool createLink(Path *file, FileStat *stat, string target);
+    bool createSymbolicLink(Path *file, FileStat *stat, string target);
+    bool createHardLink(Path *file, FileStat *stat, Path *target);
+    bool readLink(Path *file, string *target);
 
 private:
 
@@ -155,6 +159,16 @@ void FileSystemImplementationWinapi::recurse(function<void(Path *,FileStat*)> cb
 }
 
 RC FileSystemImplementationWinapi::stat(Path *p, FileStat *fs)
+{
+    return ERR;
+}
+
+RC FileSystemImplementationWinapi::chmod(Path *p, FileStat *fs)
+{
+    return ERR;
+}
+
+RC FileSystemImplementationWinapi::utime(Path *p, FileStat *fs)
 {
     return ERR;
 }
@@ -262,7 +276,17 @@ bool FileSystemImplementationWinapi::createFile(Path *file,
     return false;
 }
 
-bool FileSystemImplementationWinapi::createLink(Path *file, FileStat *stat, string target)
+bool FileSystemImplementationWinapi::createSymbolicLink(Path *file, FileStat *stat, string target)
+{
+    return false;
+}
+
+bool FileSystemImplementationWinapi::createHardLink(Path *file, FileStat *stat, Path *target)
+{
+    return false;
+}
+
+bool FileSystemImplementationWinapi::readLink(Path *file, string *target)
 {
     return false;
 }

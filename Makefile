@@ -18,8 +18,8 @@ all: release
 
 help:
 	@echo "Usage: make (release|debug|clean|clean-all)"
-	@echo "       if you have both posix and winapi configured builds,"
-	@echo "       then add winapi or posix to build for that particular host."
+	@echo "       if you have both posix, winapi and arm configured builds,"
+	@echo "       then add posix, winapi or arm to build only for that particular host."
 	@echo "E.g.:  make debug winapi"
 	@echo "       make release posix"
 
@@ -37,6 +37,10 @@ endif
 
 ifeq (posix,$(findstring posix,$(MAKECMDGOALS)))
 BUILDDIRS:=$(filter %linux-gnu/,$(BUILDDIRS))
+endif
+
+ifeq (arm,$(findstring arm,$(MAKECMDGOALS)))
+BUILDDIRS:=$(filter %linux-gnueabihf/,$(BUILDDIRS))
 endif
 
 release:

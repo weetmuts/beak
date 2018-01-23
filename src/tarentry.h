@@ -324,7 +324,7 @@ void cookEntry(std::string *listing, TarEntry *entry);
 
 bool eatEntry(std::vector<char> &v, std::vector<char>::iterator &i, Path *dir_to_prepend,
               FileStat *fs, size_t *offset, std::string *tar, Path **path,
-              std::string *link, bool *is_sym_link,
+              std::string *link, bool *is_sym_link, bool *is_hard_link,
               bool *eof, bool *err);
 
 

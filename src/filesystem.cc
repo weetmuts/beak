@@ -32,13 +32,17 @@ struct FileSystemFuseAPIImplementation : FileSystem
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
     void recurse(function<void(Path *path, FileStat *stat)> cb);
     RC stat(Path *p, FileStat *fs);
+    RC chmod(Path *p, FileStat *stat);
+    RC utime(Path *p, FileStat *stat);
     Path *mkTempDir(string prefix);
     Path *mkDir(Path *path, string name);
     int loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
     int createFile(Path *file, std::vector<char> *buf);
     bool createFile(Path *path, FileStat *stat,
                     std::function<size_t(off_t offset, char *buffer, size_t len)> cb);
-    bool createLink(Path *path, FileStat *stat, string link);
+    bool createSymbolicLink(Path *path, FileStat *stat, string target);
+    bool createHardLink(Path *path, FileStat *stat, Path *target);
+    bool readLink(Path *file, string *target);
 
     FileSystemFuseAPIImplementation(FuseAPI *api);
     private:
@@ -82,6 +86,16 @@ RC FileSystemFuseAPIImplementation::stat(Path *p, FileStat *fs)
     return ERR;
 }
 
+RC FileSystemFuseAPIImplementation::chmod(Path *p, FileStat *fs)
+{
+    return ERR;
+}
+
+RC FileSystemFuseAPIImplementation::utime(Path *p, FileStat *fs)
+{
+    return ERR;
+}
+
 Path *FileSystemFuseAPIImplementation::mkTempDir(string prefix)
 {
     return NULL;
@@ -108,7 +122,17 @@ bool FileSystemFuseAPIImplementation::createFile(Path *path, FileStat *stat,
     return false;
 }
 
-bool FileSystemFuseAPIImplementation::createLink(Path *path, FileStat *stat, string link)
+bool FileSystemFuseAPIImplementation::createSymbolicLink(Path *path, FileStat *stat, string link)
+{
+    return false;
+}
+
+bool FileSystemFuseAPIImplementation::createHardLink(Path *path, FileStat *stat, Path *target)
+{
+    return false;
+}
+
+bool FileSystemFuseAPIImplementation::readLink(Path *path, string *target)
 {
     return false;
 }
@@ -294,6 +318,7 @@ static map<string, Atom*> interned_atoms;
 
 Atom *Atom::lookup(string n)
 {
+    assert(n.find('/') == string::npos);
     auto l = interned_atoms.find(n);
     if (l != interned_atoms.end())
     {

@@ -409,7 +409,10 @@ if [ $do_test ]; then
     tmp=$root/01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789
     echo HEJSAN > $tmp
     ln -s $tmp $root/link
-    performStore standardStoreUntarTest
+    performStore
+    standardStoreUntarTest
+    cleanCheck
+    standardStoreUnstoreTest
     cleanCheck
     startMountTest standardTest
 fi
@@ -424,7 +427,10 @@ if [ $do_test ]; then
     ln $root/alfa/beta/test2 $root/linkdeep
     mkdir -p $root/gamma/epsilon
     ln $root/alfa/beta/test2 $root/gamma/epsilon/test3
-    performStore standardStoreUntarTest
+    performStore
+    standardStoreUntarTest
+    cleanCheck
+    standardStoreUnstoreTest
     cleanCheck
     startMountTest standardTest
 fi

@@ -84,6 +84,8 @@ struct FileSystemImplementationPosix : FileSystem
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
     void recurse(function<void(Path *path, FileStat *stat)> cb);
     RC stat(Path *p, FileStat *fs);
+    RC chmod(Path *p, FileStat *stat);
+    RC utime(Path *p, FileStat *stat);
     Path *mkTempDir(string prefix);
     Path *mkDirp(Path *p);
     Path *mkDir(Path *p, string name);
@@ -91,7 +93,9 @@ struct FileSystemImplementationPosix : FileSystem
     int createFile(Path *file, std::vector<char> *buf);
     bool createFile(Path *path, FileStat *stat,
                      std::function<size_t(off_t offset, char *buffer, size_t len)> cb);
-    bool createLink(Path *path, FileStat *stat, string link);
+    bool createSymbolicLink(Path *path, FileStat *stat, string target);
+    bool createHardLink(Path *path, FileStat *stat, Path *target);
+    bool readLink(Path *path, string *target);
 
 private:
 
@@ -151,6 +155,26 @@ RC FileSystemImplementationPosix::stat(Path *p, FileStat *fs)
     int rc = ::stat(p->c_str(), &sb);
     if (rc) return ERR;
     fs->loadFrom(&sb);
+    return OK;
+}
+
+RC FileSystemImplementationPosix::chmod(Path *p, FileStat *fs)
+{
+    int rc = ::chmod(p->c_str(), fs->st_mode);
+    if (rc) return ERR;
+    return OK;
+}
+
+RC FileSystemImplementationPosix::utime(Path *p, FileStat *fs)
+{
+    struct timespec times[2];
+    times[0].tv_sec = fs->st_atim.tv_sec;
+    times[0].tv_nsec = fs->st_atim.tv_nsec;
+    times[1].tv_sec = fs->st_mtim.tv_sec;
+    times[1].tv_nsec = fs->st_mtim.tv_nsec;
+
+    int rc = utimensat(0, p->c_str(), times, 0);
+    if (rc) return ERR;
     return OK;
 }
 
@@ -287,12 +311,32 @@ bool FileSystemImplementationPosix::createFile(Path *file,
     return true;
 }
 
-bool FileSystemImplementationPosix::createLink(Path *file, FileStat *stat, std::string target)
+bool FileSystemImplementationPosix::createSymbolicLink(Path *file, FileStat *stat, string target)
 {
     int rc = symlink(target.c_str(), file->c_str());
     if (rc) {
         error(FILESYSTEM, "Could not create symlink \"%s\" to %s\n", file->c_str(), target.c_str());
     }
+    return true;
+}
+
+bool FileSystemImplementationPosix::createHardLink(Path *file, FileStat *stat, Path *target)
+{
+    int rc = link(target->c_str(), file->c_str());
+    if (rc) {
+        error(FILESYSTEM, "Could not create hard link \"%s\" to %s\n", file->c_str(), target->c_str());
+    }
+    return true;
+}
+
+bool FileSystemImplementationPosix::readLink(Path *file, string *target)
+{
+    char buf[MAX_PATH_LENGTH];
+    ssize_t n = readlink(file->c_str(), buf, sizeof(buf));
+    if (n == -1) {
+        return false;
+    }
+    *target = string(buf, n);
     return true;
 }
 

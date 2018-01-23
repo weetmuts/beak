@@ -781,7 +781,7 @@ int BeakImplementation::mountReverseInternal(Options *settings, bool daemon)
         if (!rc) return ERR;
     }
 
-    RC rc = reverse_fs.scanFileSystem(settings);
+    RC rc = reverse_fs.loadBeakFileSystem(settings);
     if (rc != OK) return ERR;
 
     if (daemon) {
@@ -928,7 +928,6 @@ int BeakImplementation::status(Options *settings)
 
     for (auto rule : configuration_->sortedRules()) {
 	UI::output("%-20s %s\n", rule->name.c_str(), rule->path.c_str());
-
 	{
 	    vector<struct timespec> points;
 	    rc = findPointsInTime(rule->local.target, &points);
@@ -959,6 +958,13 @@ int BeakImplementation::status(Options *settings)
     return rc;
 }
 
+struct ForwardStoreStatistics
+{
+    size_t num_files, num_dirs;
+    size_t num_files_stored, size_files_stored;
+    size_t num_dirs_updated;
+};
+
 int BeakImplementation::storeForward(Options *settings)
 {
     int rc = 0;
@@ -966,27 +972,113 @@ int BeakImplementation::storeForward(Options *settings)
     auto ffs  = newForwardTarredFS(src_file_system_);
 //    auto view = ffs->asFileSystem();
 
+    uint64_t start = clockGetTime();
     rc = ffs->scanFileSystem(settings);
+
+    ForwardStoreStatistics st;
+    memset(&st, 0, sizeof(st));
 
     for (auto& e : ffs->tar_storage_directories) {
         Path *dir = e.second->path()->prepend(settings->dst);
         dst_file_system_->mkDirp(dir);
         for (auto& f : e.second->tars()) {
+            st.num_files++;
             Path *file_name = f->path()->prepend(settings->dst);
             FileStat stat;
+            stat.st_atim = *f->mtim();
+            stat.st_mtim = *f->mtim();
             stat.st_size = f->size();
-            // TODO 0660 should be 0400, but that require identification of identical files
-            // and skipping the write to them.
-            stat.st_mode = 0660;
+            stat.st_mode = 0400;
+            FileStat old_stat;
+            if (OK == dst_file_system_->stat(file_name, &old_stat)) {
+                if (stat.samePermissions(&old_stat) &&
+                    stat.sameSize(&old_stat) &&
+                    stat.sameMTime(&old_stat)) {
+                    debug(STORE, "Skipping tar %s\n", file_name->c_str());
+                    continue;
+                }
+            }
+
             f->createFile(file_name, &stat, src_file_system_, dst_file_system_);
+            dst_file_system_->utime(file_name, &stat);
+            st.num_files_stored++;
+            st.size_files_stored+=stat.st_size;
+            verbose(STORE, "Stored %s\n", file_name->c_str());
         }
     }
+    uint64_t stop = clockGetTime();
+    uint64_t store_time = stop - start;
+
+    if (st.num_files_stored == 0 && st.num_dirs_updated == 0) {
+        info(STORE, "No stores needed, everything was up to date.\n");
+    } else {
+        if (st.num_files_stored > 0) {
+            string file_sizes = humanReadable(st.size_files_stored);
+
+            info(STORE, "Stored %ju beak files for a total size of %s.\n"
+                 "Time to store %jdms.\n",
+                 st.num_files_stored, file_sizes.c_str(),
+                 store_time / 1000);
+        }
+    }
+
     return rc;
 }
 
-RC extractFile(FileSystem *src, Path *tar_file, off_t tar_file_offset,
-               FileSystem *dst, Path *file_to_extract, FileStat *stat)
+struct ReverseStoreStatistics
 {
+    size_t num_files, num_symbolic_links, num_hard_links, num_device_nods, num_dirs;
+    size_t num_files_stored, size_files_stored;
+    size_t num_symbolic_links_stored;
+    size_t num_hard_links_stored;
+    size_t num_device_nodes_stored;
+    size_t num_dirs_updated;
+};
+
+bool extractHardLink(FileSystem *src, Path *target,
+                     FileSystem *dst, Path *dst_root, Path *file_to_extract, FileStat *stat,
+                     ReverseStoreStatistics *statistics)
+{
+    statistics->num_hard_links++;
+    target = target->prepend(dst_root);
+    debug(STORE, "Storing hard link %s to %s\n", file_to_extract->c_str(), target->c_str());
+
+    FileStat target_stat;
+    if (OK != dst->stat(target, &target_stat)) {
+        error(STORE, "Cannot extract hard link %s because target %s does not exist!\n",
+              file_to_extract->c_str(), target->c_str());
+    }
+    if (!stat->samePermissions(&target_stat)) {
+        error(STORE, "Hard link target must have same permissions as hard link definitions!\n"
+              "Expected %s to have permissions %s\n", target->c_str(), permissionString(&target_stat).c_str());
+    }
+
+    dst->mkDirp(file_to_extract->parent());
+    dst->createHardLink(file_to_extract, stat, target);
+    statistics->num_hard_links_stored++;
+    verbose(STORE, "Stored hard link %s\n", file_to_extract->c_str());
+    return true;
+}
+
+bool extractFile(FileSystem *src, Path *tar_file, off_t tar_file_offset,
+                 FileSystem *dst, Path *file_to_extract, FileStat *stat,
+                 ReverseStoreStatistics *statistics)
+{
+    statistics->num_files++;
+    FileStat old_stat;
+    if (OK == dst->stat(file_to_extract, &old_stat)) {
+        if (stat->samePermissions(&old_stat) &&
+            stat->sameSize(&old_stat) &&
+            stat->sameMTime(&old_stat)) {
+            debug(STORE, "Skipping file \"%s\"\n", file_to_extract->c_str());
+            return false;
+        }
+    }
+
+    debug(STORE, "Storing file \"%s\" size %ju permissions %s\n   using tar \"%s\" offset %ju\n",
+          file_to_extract->c_str(), stat->st_size, permissionString(stat).c_str(),
+          tar_file->c_str(), tar_file_offset);
+
     dst->mkDirp(file_to_extract->parent());
     dst->createFile(file_to_extract, stat,
         [src,tar_file_offset,file_to_extract,tar_file] (off_t offset, char *buffer, size_t len)
@@ -997,15 +1089,123 @@ RC extractFile(FileSystem *src, Path *tar_file, off_t tar_file_offset,
                   tar_file_offset+offset, offset);
             return n;
         });
-    return OK;
+
+    dst->utime(file_to_extract, stat);
+    statistics->num_files_stored++;
+    statistics->size_files_stored+=stat->st_size;
+    verbose(STORE, "Stored file %s (%ju %s)\n",
+            file_to_extract->c_str(), stat->st_size, permissionString(stat).c_str());
+    return true;
 }
 
-RC extractLink(FileSystem *src, string link,
-               FileSystem *dst, Path *file_to_extract, FileStat *stat)
+bool extractSymbolicLink(FileSystem *src, string target,
+                        FileSystem *dst, Path *file_to_extract, FileStat *stat,
+                        ReverseStoreStatistics *statistics)
 {
+    statistics->num_symbolic_links++;
+    string old_target;
+    if (dst->readLink(file_to_extract, &old_target)) {
+        if (target == old_target) {
+            debug(STORE, "Skipping existing link %s\n", file_to_extract->c_str());
+            return false;
+        }
+    }
+    debug(STORE, "Storing symlink %s to %s\n", file_to_extract->c_str(), target.c_str());
+
     dst->mkDirp(file_to_extract->parent());
-    dst->createLink(file_to_extract, stat, link);
-    return OK;
+    dst->createSymbolicLink(file_to_extract, stat, target);
+    statistics->num_symbolic_links_stored++;
+    verbose(STORE, "Stored symlink %s\n", file_to_extract->c_str());
+    return true;
+}
+
+bool chmodDirectory(FileSystem *dst, Path *file_to_extract, FileStat *stat,
+                    ReverseStoreStatistics *statistics)
+{
+    statistics->num_dirs++;
+
+    FileStat old_stat;
+    if (OK == dst->stat(file_to_extract, &old_stat)) {
+        if (stat->samePermissions(&old_stat) &&
+            stat->sameMTime(&old_stat)) {
+            // Compare of directory size is ignored since the size differ between
+            // different file systems.
+            debug(STORE, "Skipping chmod of dir \"%s\"\n", file_to_extract->c_str());
+            return false;
+        }
+    }
+
+    debug(STORE, "Chmodding directory %s %s\n", file_to_extract->c_str(),
+          permissionString(stat).c_str());
+
+    dst->mkDirp(file_to_extract);
+    dst->chmod(file_to_extract, stat);
+    dst->utime(file_to_extract, stat);
+    statistics->num_dirs_updated++;
+    verbose(STORE, "Updated dir %s\n", file_to_extract->c_str());
+    return true;
+}
+
+void handleHardLinks(Path *path, FileStat *stat,
+                     ReverseTarredFS *rfs, Beak *beak,PointInTime *point,
+                     Options *settings, ReverseStoreStatistics *st,
+                     FileSystem *src_fs, FileSystem *dst_fs)
+{
+    debug(STORE,"Handling hard links %s\n", path->c_str());
+    auto entry = rfs->findEntry(point, path);
+    auto file_to_extract = path->prepend(settings->dst);
+
+    if (entry->is_hard_link) {
+        // Special case since hard links are not encoded in stat structure.
+        extractHardLink(src_fs, entry->hard_link,
+                        dst_fs, settings->dst,
+                        file_to_extract, stat, st);
+    }
+}
+
+void handleRegularFiles(Path *path, FileStat *stat,
+                        ReverseTarredFS *rfs, Beak *beak,PointInTime *point,
+                        Options *settings, ReverseStoreStatistics *st,
+                        FileSystem *src_fs, FileSystem *dst_fs)
+{
+    debug(STORE,"Handling regular files %s\n", path->c_str());
+    auto entry = rfs->findEntry(point, path);
+    auto tar_file = entry->tar->prepend(settings->src);
+    auto tar_file_offset = entry->offset;
+    auto file_to_extract = path->prepend(settings->dst);
+
+    if (!entry->is_hard_link && stat->isRegularFile()) {
+        extractFile(src_fs, tar_file, tar_file_offset,
+                    dst_fs, file_to_extract, stat, st);
+    }
+}
+
+void handleSymbolicLinks(Path *path, FileStat *stat,
+                         ReverseTarredFS *rfs, Beak *beak,PointInTime *point,
+                         Options *settings, ReverseStoreStatistics *st,
+                         FileSystem *src_fs, FileSystem *dst_fs)
+{
+    debug(STORE,"Handling symlinks %s\n", path->c_str());
+    auto entry = rfs->findEntry(point, path);
+    auto file_to_extract = path->prepend(settings->dst);
+
+    if (!entry->is_hard_link && stat->isSymbolicLink()) {
+        extractSymbolicLink(src_fs, entry->symlink,
+                            dst_fs, file_to_extract, stat, st);
+    }
+}
+
+void handleDirs(Path *path, FileStat *stat,
+                ReverseTarredFS *rfs, Beak *beak,PointInTime *point,
+                Options *settings, ReverseStoreStatistics *st,
+                FileSystem *src_fs, FileSystem *dst_fs)
+{
+    debug(STORE,"Handling dirs %s\n", path->c_str());
+    auto file_to_extract = path->prepend(settings->dst);
+
+    if (stat->isDirectory()) {
+        chmodDirectory(dst_fs, file_to_extract, stat, st);
+    }
 }
 
 int BeakImplementation::storeReverse(Options *settings)
@@ -1018,34 +1218,54 @@ int BeakImplementation::storeReverse(Options *settings)
     rfs->lookForPointsInTime(PointInTimeFormat::absolute_point, settings->src);
 
     auto point = rfs->setPointInTime("@0");
+    if (settings->pointintime != "") {
+        point = rfs->setPointInTime(settings->pointintime);
+    }
     if (!point) {
         error(STORE, "No such point in time!\n");
     }
     assert(rfs->singlePointInTime());
 
-    rc = rfs->scanFileSystem(settings);
+    uint64_t start = clockGetTime();
+    rc = rfs->loadBeakFileSystem(settings);
 
-    view->recurse([&rfs,this,point,settings] (Path *path, FileStat *stat) {
+    ReverseStoreStatistics st;
+    memset(&st, 0, sizeof(st));
 
-            string permissions = permissionString(stat);
-            auto entry = rfs->findEntry(point, path);
-            auto tar_file = entry->tar->prepend(settings->src);
-            auto tar_file_offset = entry->offset;
-            auto file_to_extract = path->prepend(settings->dst);
-            if (stat->isRegularFile()) {
-                debug(STORE, "Storing file \"%s\" size %ju permissions %s\n   using tar \"%s\" offset %ju\n\n",
-                      file_to_extract->c_str(), stat->st_size, permissions.c_str(),
-                      tar_file->c_str(), tar_file_offset);
+    view->recurse([&rfs,this,point,settings,&st]
+                  (Path *path, FileStat *stat) {handleRegularFiles(path,stat,rfs.get(),this,point,settings,&st,
+                                                                src_file_system_, dst_file_system_); });
+    view->recurse([&rfs,this,point,settings,&st]
+                  (Path *path, FileStat *stat) {handleSymbolicLinks(path,stat,rfs.get(),this,point,settings,&st,
+                                                                src_file_system_, dst_file_system_); });
+    view->recurse([&rfs,this,point,settings,&st]
+                  (Path *path, FileStat *stat) {handleHardLinks(path,stat,rfs.get(),this,point,settings,&st,
+                                                                src_file_system_, dst_file_system_); });
+    view->recurse([&rfs,this,point,settings,&st]
+                  (Path *path, FileStat *stat) {handleDirs(path,stat,rfs.get(),this,point,settings,&st,
+                                                                src_file_system_, dst_file_system_); });
 
-                extractFile(src_file_system_, tar_file, tar_file_offset,
-                            dst_file_system_, file_to_extract, stat);
-            } else if (stat->isSymbolicLink()) {
-                debug(STORE, "Storing link %s to %s\n",
-                      file_to_extract->c_str(), entry->link.c_str());
-                extractLink(src_file_system_, entry->link,
-                            dst_file_system_, file_to_extract, stat);
-            }
-        });
+    uint64_t stop = clockGetTime();
+    uint64_t store_time = stop - start;
+
+    if (st.num_files_stored == 0 && st.num_symbolic_links_stored == 0 && st.num_dirs_updated == 0) {
+        info(STORE, "No stores needed, everything was up to date.\n");
+    } else {
+        if (st.num_files_stored > 0) {
+            string file_sizes = humanReadable(st.size_files_stored);
+            info(STORE, "Stored %ju files for a total size of %s.\n", st.num_files_stored, file_sizes.c_str());
+        }
+        if (st.num_symbolic_links_stored > 0) {
+            info(STORE, "Stored %ju symlinks.\n", st.num_symbolic_links_stored);
+        }
+        if (st.num_hard_links_stored > 0) {
+            info(STORE, "Stored %ju hard links.\n", st.num_hard_links_stored);
+        }
+        if (st.num_dirs_updated > 0) {
+            info(STORE, "Updated %ju dirs.\n", st.num_dirs_updated);
+        }
+        info(STORE, "Time to store %jdms.\n", store_time / 1000);
+    }
     return rc;
 }
 

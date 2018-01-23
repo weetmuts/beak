@@ -139,10 +139,12 @@ void error(ComponentId ci, const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
     if (use_syslog) {
+        syslog(LOG_ERR, "Fatal error in %s: ", all_components[ci]);
         vsyslog(LOG_ERR, fmt, args);
     }
     va_end(args);
     va_start(args, fmt);
+    fprintf(stderr, "Fatal error in %s: ", all_components[ci]);
     vfprintf(stderr, fmt, args);
     va_end(args);
     exit(1);
@@ -195,12 +197,10 @@ void logVerbose(ComponentId ci, const char* fmt, ...) {
     		 log_components.count(ci) == 1)) {
         va_list args;
         if (use_syslog) {
-	    syslog(LOG_INFO, "%s: ", all_components[ci]);
 	    va_start(args, fmt);
             vsyslog(LOG_INFO, fmt, args);
             va_end(args);
         }
-        fprintf(stdout, "%s: ", all_components[ci]);
         va_start(args, fmt);
         vfprintf(stdout, fmt, args);
         va_end(args);

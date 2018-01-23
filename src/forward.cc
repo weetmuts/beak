@@ -194,7 +194,7 @@ void ForwardTarredFS::findTarCollectionDirs() {
                 te->setAsStorageDir();
                 tar_storage_directories[te->path()] = te;
                 string hs = humanReadable(te->childrenSize());
-                verbose(FORWARD, "Tar collection dir % 5s '%s'\n", hs.c_str(), te->path()->c_str());
+                //verbose(FORWARD, "Collapsed %s\n", te->path()->c_str(), hs.c_str());
                 TarEntry *i = te;
                 while (i->parent() != NULL) {
                     i->parent()->addChildrenSize(-te->childrenSize());
@@ -438,7 +438,7 @@ void ForwardTarredFS::fixTarPathsAndHardLinks() {
                     }
                     debug(HARDLINKS, "Moving >%s< from >%s< to >%s<\n", entry->path()->c_str(), te->path()->c_str(), parent->path()->c_str());
                     to_be_moved.push_back(pair<TarEntry*,TarEntry*>(entry,parent));
-                    te->copyEntryToNewParent(entry, parent);
+                    //te->copyEntryToNewParent(entry, parent); TODO remove this line
                     entry->calculateTarpath(parent->path());
                     entry->fixHardLink(parent->path());
                     debug(HARDLINKS, "New tarpath of entry >%s< stored in >%s<\n", entry->tarpath()->c_str(), parent->path()->c_str());

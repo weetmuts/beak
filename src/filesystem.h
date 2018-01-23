@@ -62,10 +62,16 @@ struct FileStat {
     struct timespec st_mtim;
     struct timespec st_ctim;
 
-    FileStat() { memset(this, 0,sizeof(FileStat)); st_mode = S_IFREG; };
+    FileStat() { memset(this, 0,sizeof(FileStat)); };
     FileStat(const struct stat *sb) {
         loadFrom(sb);
     }
+    bool samePermissions(FileStat *b) { return (st_mode&07777) == (b->st_mode&07777); }
+    bool sameSize(FileStat *b) { return st_size == b->st_size; }
+    bool sameMTime(FileStat *b) { return st_mtim.tv_sec == b->st_mtim.tv_sec &&
+            st_mtim.tv_nsec == b->st_mtim.tv_nsec; }
+
+    mode_t permissions() { return st_mode & 07777; }
     void loadFrom(const struct stat *sb);
     void storeIn(struct stat *sb);
     bool isRegularFile();
@@ -229,6 +235,8 @@ struct FileSystem
     virtual ssize_t pread(Path *p, char *buf, size_t size, off_t offset) = 0;
     virtual void recurse(std::function<void(Path *path, FileStat *stat)> cb) = 0;
     virtual RC stat(Path *p, FileStat *fs) = 0;
+    virtual RC chmod(Path *p, FileStat *stat) = 0;
+    virtual RC utime(Path *p, FileStat *stat) = 0;
     virtual Path *mkTempDir(std::string prefix) = 0;
             bool mkDirp(Path *p);
     virtual Path *mkDir(Path *p, std::string name) = 0;
@@ -243,7 +251,9 @@ struct FileSystem
                             FileStat *stat,
                             std::function<size_t(off_t offset, char *buffer, size_t len)> cb) = 0;
 
-    virtual bool createLink(Path *file, FileStat *stat, std::string target) = 0;
+    virtual bool createSymbolicLink(Path *file, FileStat *stat, std::string target) = 0;
+    virtual bool createHardLink(Path *file, FileStat *stat, Path *target) = 0;
+    virtual bool readLink(Path *file, std::string *target) = 0;
 };
 
 std::unique_ptr<FileSystem> newDefaultFileSystem();

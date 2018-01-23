@@ -42,21 +42,20 @@
 
 struct Entry
 {
-    Entry(FileStat s, size_t o, Path *p) :
-    fs(s), offset(o), path(p) {
-        is_sym_link = false;
-        loaded = false;
-    }
-
-    Entry() { }
+    Entry() : offset(0), path(0), tar(0), is_sym_link(false), is_hard_link(false), hard_link(0), loaded(false) { }
+    Entry(FileStat s, size_t o, Path *p) : fs(s), offset(o), path(p), is_sym_link(false), is_hard_link(false), loaded(false) { }
 
     FileStat fs;
     size_t offset;
     Path *path;
     Path *tar;
     std::vector<Entry*> dir;
-    std::string link;
     bool is_sym_link;
+    // A symbolic link can be anything! Must not point to a real file.
+    std::string symlink;
+    bool is_hard_link;
+    // A hard link always points a real file stored in the same directory or in a subdirectory.
+    Path *hard_link;
     bool loaded;
 
 };
@@ -75,14 +74,14 @@ struct PointInTime {
     std::string direntry;
     std::string filename;
 
-    std::map<Path*,Entry> entries_;
+    std::map<Path*,Entry,depthFirstSortPath> entries_;
     std::map<Path*,Path*> gz_files_;
     std::set<Path*> loaded_gz_files_;
 };
 
 struct ReverseTarredFS
 {
-    RC scanFileSystem(Options *settings);
+    RC loadBeakFileSystem(Options *settings);
 
     pthread_mutex_t global;
 

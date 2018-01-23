@@ -30,6 +30,7 @@ struct IndexEntry {
     Path *path;
     std::string link;
     bool is_sym_link;
+    bool is_hard_link;
 };
 
 struct IndexTar {

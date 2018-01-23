@@ -184,9 +184,6 @@ size_t TarEntry::copy(char *buf, size_t size, size_t from, FileSystem *fs) {
         memset(tmp, 0, header_size_);
         int p = 0;
 
-	if (is_hard_linked_) {
-            // TODO?
-	}
 	TarHeader th(&fs_, tarpath_, link_, is_hard_linked_, tar_header_style_ == TarHeaderStyle::Full);
 
         if (th.numLongLinkBlocks() > 0)
@@ -216,10 +213,6 @@ size_t TarEntry::copy(char *buf, size_t size, size_t from, FileSystem *fs) {
         }
 
         memcpy(tmp+p, th.buf(), T_BLOCKSIZE);
-
-	if (is_hard_linked_) {
-	    debug(HARDLINKS, "Copying hard link header out! %s\n", path_->c_str())
-	}
 
         // Copy the header out
         size_t len = header_size_-from;
@@ -335,10 +328,9 @@ bool TarEntry::fixHardLink(Path *storage_dir)
 
     if (storage_dir == Path::lookupRoot())
     {
-	debug(HARDLINKS, "Nothing to do!\n");
+	debug(HARDLINKS, "Hard link in root, need not be fixed.\n");
 	return true;
     }
-    //num_header_blocks -= num_long_link_blocks;
 
     Path *common = Path::commonPrefix(storage_dir, link_);
     debug(HARDLINKS, "COMMON PREFIX >%s< >%s< = >%s<\n", storage_dir->c_str(), link_->c_str(), common?common->c_str():"NULL");
@@ -347,24 +339,12 @@ bool TarEntry::fixHardLink(Path *storage_dir)
     	// This hardlink needs to be pushed upwards, into a tar on a higher level!
     	return false;
     }
-    else {
+    else
+    {
 	Path *l = link_->subpath(storage_dir->depth());
 	debug(HARDLINKS, "CUT LINK >%s< to >%s<\n", link_->c_str(), l->c_str());
 	link_ = l;
     }
-    //tar_.setHardLink(l->c_str());
-    /*
-    if (tar_->th_buf.gnu_longlink != NULL) {
-        // We needed to use gnu long links, aka an extra header block
-        // plus at least one block for the file name. A link target path longer than 512
-        // bytes will need a third block etc
-        num_long_link_blocks = 2 + l->c_str_len()/T_BLOCKSIZE;
-        num_header_blocks += num_long_link_blocks;
-        debug(HARDLINKS, "Added %ju blocks for long link header for %s\n",
-              num_long_link_blocks, tarpath_->c_str(), l->c_str());
-    }
-    */
-    //tar_.calculateChecksum();
     updateSizes();
     debug(HARDLINKS, "Updated hardlink %s to %s\n", tarpath_->c_str(), link_->c_str());
     return true;
@@ -388,7 +368,7 @@ void TarEntry::copyEntryToNewParent(TarEntry *entry, TarEntry *parent) {
  */
 void TarEntry::updateMtim(struct timespec *mtim) {
     if (isInTheFuture(&fs_.st_mtim)) {
-        fprintf(stderr, "Entry %s has a future timestamp! Ignoring the timstamp.\n", path()->c_str());
+        warning(TARENTRY, "Entry %s has a future timestamp! Ignoring the timstamp.\n", path()->c_str());
     } else {
         if (fs_.st_mtim.tv_sec > mtim->tv_sec ||
             (fs_.st_mtim.tv_sec == mtim->tv_sec && fs_.st_mtim.tv_nsec > mtim->tv_nsec)) {
@@ -523,7 +503,7 @@ void cookEntry(string *listing, TarEntry *entry) {
 
 bool eatEntry(vector<char> &v, vector<char>::iterator &i, Path *dir_to_prepend,
               FileStat *fs, size_t *offset, string *tar, Path **path,
-              string *link, bool *is_sym_link,
+              string *link, bool *is_sym_link, bool *is_hard_link,
               bool *eof, bool *err)
 {
     string permission = eatTo(v, i, separator, 32, eof, err);
@@ -610,17 +590,20 @@ bool eatEntry(vector<char> &v, vector<char>::iterator &i, Path *dir_to_prepend,
     *link = eatTo(v, i, separator, 1024, eof, err);
     if (*err || *eof) return false;
     *is_sym_link = false;
+    *is_hard_link = false;
     if (link->length() > 4 && link->substr(0, 4) == " -> ")
     {
         *link = link->substr(4);
         fs->st_size = link->length();
         *is_sym_link = true;
+        *is_hard_link = false;
     }
     else if (link->length() > 9 && link->substr(0, 9) == " link to ")
     {
         *link = link->substr(9);
         fs->st_size = link->length();
         *is_sym_link = false;
+        *is_hard_link = true;
     }
     *tar = dir_to_prepend->str() + "/" + eatTo(v, i, separator, 1024, eof, err);
     if (*err || *eof) return false;
