@@ -1119,6 +1119,18 @@ bool extractSymbolicLink(FileSystem *src, string target,
     return true;
 }
 
+bool extractNode(FileSystem *src, FileSystem *dst, Path *file_to_extract, FileStat *stat,
+                 ReverseStoreStatistics *statistics)
+{
+    if (stat->isFIFO()) {
+        debug(STORE, "Storing FIFO %s\n", file_to_extract->c_str());
+        dst->mkDirp(file_to_extract->parent());
+        dst->createFIFO(file_to_extract, stat);
+        verbose(STORE, "Stored fifo %s\n", file_to_extract->c_str());
+    }
+    return true;
+}
+
 bool chmodDirectory(FileSystem *dst, Path *file_to_extract, FileStat *stat,
                     ReverseStoreStatistics *statistics)
 {
@@ -1180,6 +1192,22 @@ void handleRegularFiles(Path *path, FileStat *stat,
     }
 }
 
+void handleNodes(Path *path, FileStat *stat,
+                 ReverseTarredFS *rfs, Beak *beak,PointInTime *point,
+                 Options *settings, ReverseStoreStatistics *st,
+                 FileSystem *src_fs, FileSystem *dst_fs)
+{
+    debug(STORE,"Handling node %s\n", path->c_str());
+    auto entry = rfs->findEntry(point, path);
+    auto tar_file = entry->tar->prepend(settings->src);
+    auto tar_file_offset = entry->offset;
+    auto file_to_extract = path->prepend(settings->dst);
+
+    if (!entry->is_hard_link && stat->isFIFO()) {
+        extractNode(src_fs, dst_fs, file_to_extract, stat, st);
+    }
+}
+
 void handleSymbolicLinks(Path *path, FileStat *stat,
                          ReverseTarredFS *rfs, Beak *beak,PointInTime *point,
                          Options *settings, ReverseStoreStatistics *st,
@@ -1234,6 +1262,9 @@ int BeakImplementation::storeReverse(Options *settings)
 
     view->recurse([&rfs,this,point,settings,&st]
                   (Path *path, FileStat *stat) {handleRegularFiles(path,stat,rfs.get(),this,point,settings,&st,
+                                                                src_file_system_, dst_file_system_); });
+    view->recurse([&rfs,this,point,settings,&st]
+                  (Path *path, FileStat *stat) {handleNodes(path,stat,rfs.get(),this,point,settings,&st,
                                                                 src_file_system_, dst_file_system_); });
     view->recurse([&rfs,this,point,settings,&st]
                   (Path *path, FileStat *stat) {handleSymbolicLinks(path,stat,rfs.get(),this,point,settings,&st,

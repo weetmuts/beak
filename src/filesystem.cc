@@ -42,6 +42,7 @@ struct FileSystemFuseAPIImplementation : FileSystem
                     std::function<size_t(off_t offset, char *buffer, size_t len)> cb);
     bool createSymbolicLink(Path *path, FileStat *stat, string target);
     bool createHardLink(Path *path, FileStat *stat, Path *target);
+    bool createFIFO(Path *path, FileStat *stat);
     bool readLink(Path *file, string *target);
 
     FileSystemFuseAPIImplementation(FuseAPI *api);
@@ -128,6 +129,11 @@ bool FileSystemFuseAPIImplementation::createSymbolicLink(Path *path, FileStat *s
 }
 
 bool FileSystemFuseAPIImplementation::createHardLink(Path *path, FileStat *stat, Path *target)
+{
+    return false;
+}
+
+bool FileSystemFuseAPIImplementation::createFIFO(Path *path, FileStat *stat)
 {
     return false;
 }

@@ -719,6 +719,10 @@ struct ReverseFileSystem : FileSystem
     {
         return false;
     }
+    bool createFIFO(Path *file, FileStat *stat)
+    {
+        return false;
+    }
     bool readLink(Path *file, string *target)
     {
         return false;

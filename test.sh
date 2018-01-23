@@ -315,7 +315,20 @@ function standardPackedTest {
     stopFS
 }
 
+function fifoStoreUntarTest {
+    if_test_fail_msg="Store untar fifo test failed: "
+    untar "$store"
+    checkls-ld
+}
+
+function fifoStoreUnStoreTest {
+    if_test_fail_msg="Store unstore fifo test failed: "
+    performUnStore
+    checkls-ld
+}
+
 function fifoTest {
+    if_test_fail_msg="Mount untar fifo test failed: "
     untar "$mount"
     checkls-ld
     stopFS
@@ -439,16 +452,35 @@ setup basic08 "FIFO"
 if [ $do_test ]; then
     mkfifo $root/fifo1
     mkfifo $root/fifo2
+    performStore
+    fifoStoreUntarTest
+    cleanCheck
+    fifoStoreUnStoreTest
+    cleanCheck
     startMountTest fifoTest
 fi
 
-function filterTest {
-    untar "$mount"
+function filterCheck {
     F=$(cd $check; find . -printf "%p ")
     if [ "$F" != ". ./Beta ./Beta/delta " ]; then
         echo Failed filter test $1! Check in $dir for more information.
         exit
     fi
+}
+
+function storeUntarFilterTest {
+    untar "$store"
+    filterCheck
+}
+
+function storeUnStoreFilterTest {
+    performUnStore
+    filterCheck
+}
+
+function mountFilterTest {
+    untar "$mount"
+    filterCheck
     stopFS
 }
 
@@ -458,7 +490,12 @@ if [ $do_test ]; then
     mkdir -p $root/Beta
     echo HEJSAN > $root/Beta/delta
     echo HEJSAN > $root/BetaDelta
-    startMountTest filterTest "-i Beta/**"
+    performStore "-i Beta/**"
+    storeUntarFilterTest
+    cleanCheck
+    storeUnStoreFilterTest
+    cleanCheck
+    startMountTest mountFilterTest "-i Beta/**"
 fi
 
 function devTest {

@@ -253,6 +253,7 @@ struct FileSystem
 
     virtual bool createSymbolicLink(Path *file, FileStat *stat, std::string target) = 0;
     virtual bool createHardLink(Path *file, FileStat *stat, Path *target) = 0;
+    virtual bool createFIFO(Path *file, FileStat *stat) = 0;
     virtual bool readLink(Path *file, std::string *target) = 0;
 };
 

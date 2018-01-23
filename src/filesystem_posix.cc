@@ -95,6 +95,7 @@ struct FileSystemImplementationPosix : FileSystem
                      std::function<size_t(off_t offset, char *buffer, size_t len)> cb);
     bool createSymbolicLink(Path *path, FileStat *stat, string target);
     bool createHardLink(Path *path, FileStat *stat, Path *target);
+    bool createFIFO(Path *path, FileStat *stat);
     bool readLink(Path *path, string *target);
 
 private:
@@ -325,6 +326,15 @@ bool FileSystemImplementationPosix::createHardLink(Path *file, FileStat *stat, P
     int rc = link(target->c_str(), file->c_str());
     if (rc) {
         error(FILESYSTEM, "Could not create hard link \"%s\" to %s\n", file->c_str(), target->c_str());
+    }
+    return true;
+}
+
+bool FileSystemImplementationPosix::createFIFO(Path *file, FileStat *stat)
+{
+    int rc = mknod(file->c_str(), S_IFIFO|stat->st_mode, 0);
+    if (rc) {
+        error(FILESYSTEM, "Could not create fifo \"%s\"\n", file->c_str());
     }
     return true;
 }

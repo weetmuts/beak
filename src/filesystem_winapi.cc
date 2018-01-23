@@ -102,6 +102,7 @@ struct FileSystemImplementationWinapi : FileSystem
                     std::function<size_t(off_t offset, char *buffer, size_t len)> cb);
     bool createSymbolicLink(Path *file, FileStat *stat, string target);
     bool createHardLink(Path *file, FileStat *stat, Path *target);
+    bool createFIFO(Path *file, FileStat *stat);
     bool readLink(Path *file, string *target);
 
 private:
@@ -282,6 +283,11 @@ bool FileSystemImplementationWinapi::createSymbolicLink(Path *file, FileStat *st
 }
 
 bool FileSystemImplementationWinapi::createHardLink(Path *file, FileStat *stat, Path *target)
+{
+    return false;
+}
+
+bool FileSystemImplementationWinapi::createFIFO(Path *file, FileStat *stat)
 {
     return false;
 }
