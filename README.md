@@ -292,10 +292,13 @@ Within `.beak` there is:
 
 `.beak/local` where the local backup is stored before it is pushed to
 the remote.  The local storage is also used to create diff chunks. If
-btrfs snapshots are used, then they are stored here as well.
+using a btrfs filesystem then the btrfs snapshots are stored here as well.
+Beak will use a snapshot and recreate the old _beakfs_ from that snapshot
+instead of storing the _beakfs_ files. Thus saving disk space.
 
 `.beak/cache` stores downloaded chunks when you mount remote _backup directories_
-or mount them all using the history command.
+or mount them all using the history command. You can clean the cache
+at any time when you are not mounting or otherwise executing a beak command.
 
 `.beak/history` is the default location to place the _point in time_ history,
 if `beak history work:` is invoked without a target directory.
