@@ -325,14 +325,22 @@ beak prune     beak pack
 * Configure: `./configure`
 * Build: `make` Your executable is now in `build/x86_64-pc-linux-gnu/release/beak`.
 * Build: `make debug` Your executable is now in `build/x86_64-pc-linux-gnu/debug/beak`.
-* Test:  `make test`
-* Test:  `make test_debug`
+* Test:  `make test` or `./test.sh binary_to_test`
 * Install: `sudo make install` Installs in /usr/local/bin
 
 Hosts supported: x86_64-pc-linux-gnu x86_64-w64-mingw32 arm-linux-gnueabihf
 
 ## Cross compiling to Winapi and Arm.
 
-`./configure --host=x86_64-w64-mingw32 --with-zlib=3rdparty/zlib-1.2.11/winapi --with-openssl=3rdparty/openssl-1.0.2l/winapi`
+You can have multiple configurations enabled at the same time.
 
-`./configure --host=arm-linux-gnueabihf --with-zlib=3rdparty/zlib-1.2.11/arm --with-openssl=3rdparty/openssl-1.0.2l/arm`
+* `make` builds release for all configured hosts.
+* `make debug` builds debug for all configured hosts.
+* `make debug posix` builds only debug for posix hosts.
+* `make debug winapi` builds only debug for winapi hosts.
+
+`./configure`
+
+`./configure --host=x86_64-w64-mingw32 --with-zlib=3rdparty/zlib-1.2.11 --with-openssl=3rdparty/openssl-1.0.2`
+
+`./configure --host=arm-linux-gnueabihf --with-zlib=3rdparty/zlib-1.2.11 --with-openssl=3rdparty/openssl-1.0.2`
