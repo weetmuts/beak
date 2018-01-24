@@ -24,13 +24,25 @@
 
 tmpdir=$(mktemp -d /tmp/beak_testXXXXXXXX)
 
+# The test directory, for example: /test/beak_testXXXXX/basic01/
 dir=""
+
+# The root contains a set of files and directories
+# to be backed up using beak.
 root=""
+
+# Mount a virtual beakfs with tars here:
 mount=""
 mountreverse=""
+
+# Store a beakfs here:
 store=""
+
 checkpack=""
+
+# Recreate the files here. Typically $check should be identical to $root.
 check=""
+
 log=""
 org=""
 dest=""
@@ -38,6 +50,10 @@ do_test=""
 
 subdir=""
 
+# beakfs: Parameter to the test, where to find the beak file system.
+# Usually either $mount or $store
+beakfs=""
+# if_test_fail_msg: Message tuned to the failure of the test.
 if_test_fail_msg=""
 
 BEAK=$1
@@ -197,25 +213,19 @@ function startMountTestExpectFail {
     fi
 }
 
-function stopFS {
+function stopMount {
     (cd $mount; find . -exec ls -ld \{\} \; >> $log)
     fusermount -u $mount
     if [ -n "$test" ]; then
         sleep 2
     fi
-    if [ "$1" != "nook" ]; then
-        echo OK
-    fi
 }
 
-function stopFSArchive {
-    (cd $mount; find . -exec ls -ld \{\} \; >> $log)
+function stopMountArchive {
+    (cd $check; find . -exec ls -ld \{\} \; >> $log)
     fusermount -u $check
     if [ -n "$test" ]; then
         sleep 2
-    fi
-    if [ "$1" != "nook" ]; then
-        echo OK
     fi
 }
 
@@ -276,7 +286,7 @@ function checkdiff {
     fi
 }
 
-function checkls-ld {
+function checklsld {
     (cd $root$1; find . -exec ls -ld \{\} \; > $org)
     (cd $check; find . -exec ls -ld \{\} \; > $dest)
     diff $org $dest
@@ -291,49 +301,50 @@ function standardStoreUntarTest {
     if_test_fail_msg="Store untar test failed: "
     untar "$store"
     checkdiff
-    checkls-ld
+    checklsld
 }
 
 function standardStoreUnstoreTest {
     if_test_fail_msg="Store unstor test failed: "
     performUnStore
     checkdiff
-    checkls-ld
+    checklsld
 }
 
 function standardTest {
     if_test_fail_msg="Mount test failed: "
-    untar "$mount"
+    untar "$beakfs"
     checkdiff
-    checkls-ld
-    stopFS
+    checklsld
 }
 
 function standardPackedTest {
     pack
     untarpacked
     checkdiff
-    checkls-ld
-    stopFS
+    checklsld
+    stopMount
+    echo OK
 }
 
 function fifoStoreUntarTest {
     if_test_fail_msg="Store untar fifo test failed: "
     untar "$store"
-    checkls-ld
+    checklsld
 }
 
 function fifoStoreUnStoreTest {
     if_test_fail_msg="Store unstore fifo test failed: "
     performUnStore
-    checkls-ld
+    checklsld
 }
 
 function fifoTest {
     if_test_fail_msg="Mount untar fifo test failed: "
     untar "$mount"
-    checkls-ld
-    stopFS
+    checklsld
+    stopMount
+    echo OK
 }
 
 function cleanCheck {
@@ -345,12 +356,16 @@ setup basic01 "Short simple file (fits in 100 char name)"
 if [ $do_test ]; then
     echo HEJSAN > $root/hello.txt
     chmod 400 $root/hello.txt
+
     performStore --tarheader=full
     standardStoreUntarTest
     cleanCheck
     standardStoreUnstoreTest
     cleanCheck
+    beakfs="$mount"
     startMountTest standardTest --tarheader=full
+    stopMount
+    echo OK
 fi
 
 setup basic02 "Medium path name"
@@ -363,7 +378,10 @@ if [ $do_test ]; then
     cleanCheck
     standardStoreUnstoreTest
     cleanCheck
+    beakfs="$mount"
     startMountTest standardTest --tarheader=full
+    stopMount
+    echo OK
 fi
 
 setup basic03 "Long file name"
@@ -378,7 +396,10 @@ if [ $do_test ]; then
     cleanCheck
     standardStoreUnstoreTest
     cleanCheck
+    beakfs="$mount"
     startMountTest standardTest --tarheader=full
+    stopMount
+    echo OK
 fi
 
 setup basic04 "Exactly 100 char file name"
@@ -391,7 +412,10 @@ if [ $do_test ]; then
     cleanCheck
     standardStoreUnstoreTest
     cleanCheck
+    beakfs="$mount"
     startMountTest standardTest --tarheader=full
+    stopMount
+    echo OK
 fi
 
 setup basic05 "Long paths cause problems"
@@ -404,7 +428,10 @@ if [ $do_test ]; then
     cleanCheck
     standardStoreUnstoreTest
     cleanCheck
+    beakfs="$mount"
     startMountTest standardTest
+    stopMount
+    echo OK
 fi
 
 setup symlink "Symbolic link"
@@ -416,7 +443,10 @@ if [ $do_test ]; then
     cleanCheck
     standardStoreUnstoreTest
     cleanCheck
+    beakfs="$mount"
     startMountTest standardTest
+    stopMount
+    echo OK
 fi
 
 setup symlink_long "Symbolic link to long target"
@@ -429,7 +459,10 @@ if [ $do_test ]; then
     cleanCheck
     standardStoreUnstoreTest
     cleanCheck
+    beakfs="$mount"
     startMountTest standardTest
+    stopMount
+    echo OK
 fi
 
 setup hardlink "Hard link"
@@ -447,7 +480,10 @@ if [ $do_test ]; then
     cleanCheck
     standardStoreUnstoreTest
     cleanCheck
+    beakfs="$mount"
     startMountTest standardTest
+    stopMount
+    echo OK
 fi
 
 setup fifo "FIFO"
@@ -483,7 +519,8 @@ function storeUnStoreFilterTest {
 function mountFilterTest {
     untar "$mount"
     filterCheck
-    stopFS
+    stopMount
+    echo OK
 }
 
 setup filter "Include exclude"
@@ -511,25 +548,24 @@ if [ $do_test ]; then
     if_test_fail_msg="Store untar test failed: "
     untar "$store/Gamma"
     checkdiff /Gamma
-    checkls-ld /Gamma
+    checklsld /Gamma
     cleanCheck
     if_test_fail_msg="Store unstor test failed: "
     subdir="/Gamma"
     performUnStore
     checkdiff /Gamma
-    checkls-ld /Gamma
+    checklsld /Gamma
     cleanCheck
     subdir=""
     echo OK
 fi
 
 function devTest {
-    $THIS_DIR/scripts/integrity-test.sh -dd "$dir" -f "! -path '*shm*'" /dev "$mount"
+    $THIS_DIR/scripts/integrity-test.sh -dd "$dir" -f "! -path '*shm*'" /dev "$beakfs"
     if [ $? -ne 0 ]; then
         echo Failed file attributes diff for $1! Check in $dir for more information.
         exit
     fi
-    stopFS nook
 }
 
 setup devices "block and character devices (ie the whole /dev directory)"
@@ -538,7 +574,13 @@ if [ $do_test ]; then
     # require you to be root. So lets just mount /dev and
     # just list the contents of the tars!
     root=/dev
+    performStore "--tarheader=full -x '/shm/**'"
+    beakfs="$store"
+    devTest
+    beakfs="$mount"
     startMountTest devTest "--tarheader=full -x '/shm/**'"
+    stopMount
+    echo OK
 fi
 
 setup tar_ordering "check that nothing gets between the directory and its contents"
@@ -555,12 +597,15 @@ if [ $do_test ]; then
     echo HEJSAN > $root/libtar/.git/hooks
     echo HEJSAN > $root/libtar/.gitignore
     touch -d "2 hours ago" $root/libtar/.git/config $root/libtar/.git/hooks $root/libtar/.gitignore $root/libtar/.git
+    beakfs="$mount"
     startMountTest standardTest
+    stopMount
+    echo OK
 fi
 
 function mtimeTestPart1 {
     (cd $mount; find . -exec ls -ld \{\} \; > $org)
-    stopFS nook
+    stopMount
     touch -d "2015-03-03 03:03:03.1235" $root/beta/zz
     startMountTest mtimeTestPart2 "-d 1"
 }
@@ -589,7 +634,7 @@ function mtimeTestPart2 {
         echo Check in $dir for more information.
         exit
     fi
-    stopFS
+    stopMount
 }
 
 setup mtime "Test last modified timestamp"
@@ -602,12 +647,13 @@ if [ $do_test ]; then
     echo HEJSAN > $root/beta/ww
     touch -d "2015-03-03 03:03:03.1234" $root/alfa/* $root/beta/* $root/alfa $root/beta
     startMountTest mtimeTestPart1 "-d 1"
+    echo OK
 fi
 
 
 function timestampHashTest1 {
     rc1=$(ls $mount/TJO/s*.tar)
-    stopFS nook
+    stopMount
     touch -d "2015-03-03 03:03:03.1235" $root/TJO/alfa
     startMountTest timestampHashTest2
 }
@@ -627,7 +673,7 @@ function timestampHashTest2 {
         echo Check in $dir for more information.
         exit
     fi
-    stopFS
+    stopMount
 }
 
 setup mtime_hash "check that timestamps influence file hash"
@@ -635,6 +681,7 @@ if [ $do_test ]; then
     mkdir -p $root/TJO
     touch -d "2015-03-03 03:03:03.1234" $root/TJO/alfa
     startMountTest timestampHashTest1
+    echo OK
 fi
 
 setup paths_with_spaces "Test paths with spaces"
@@ -644,7 +691,10 @@ if [ $do_test ]; then
     echo HEJSAN > "$root/alfa beta/gamma/delta"
     echo HEJSAN > "$root/alfa beta/gamma/del ta"
     echo HEJSAN > "$root/alfa beta/gam ma/del ta"
+    beakfs="$mount"
     startMountTest standardTest
+    stopMount
+    echo OK
 fi
 
 function checkExtractFile {
@@ -654,7 +704,7 @@ function checkExtractFile {
         echo Could not extract single file! Check in $dir for more information.
         exit
     fi
-    stopFS
+    stopMount
 }
 
 setup test_single_untar "Test single file untar"
@@ -673,7 +723,7 @@ fi
 function percentageTest {
     untar "$mount"
     checkdiff
-    checkls-ld
+    checklsld
     # This error can pop up because of accidental use of printf in perl code.
     # The percentage in the file name will become a printf command.
     $THIS_DIR/scripts/integrity-test.sh -dd "$dir" "$root" "$mount"
@@ -686,7 +736,7 @@ function percentageTest {
         echo Percentage in filename was not handled properly! Check in $dir for more information.
         exit
     fi
-    stopFS nook
+    stopMount
 }
 
 setup paths_with_percentages "Test paths with percentages in them"
@@ -707,16 +757,18 @@ if [ $do_test ]; then
     for i in l{1..2}; do
         dd if=/dev/zero of="$root/$i" bs=1024 count=10240 > /dev/null 2>&1
     done
+    beakfs="$mount"
     startMountTest standardTest
+    stopMount
+    echo OK
 fi
 
 function expectCaseConflict {
     if [ "$?" == "0" ]; then
         echo Expected beak to fail startup!
-        stopFS nook
+        stopMount
         exit
     fi
-    echo OK
 }
 
 setup case_conflict_detected "Test that case conflicts are detected"
@@ -726,6 +778,7 @@ if [ $do_test ]; then
     echo HEJSAN > $root/Alfa/a
     echo HEJSAN > $root/alfa/b
     startMountTestExpectFail expectCaseConflict "-d 1 -ta 0"
+    echo OK
 fi
 
 setup case_conflict_hidden "Test that case conflicts can be hidden inside tars"
@@ -734,16 +787,18 @@ if [ $do_test ]; then
     mkdir -p $root/alfa
     echo HEJSAN > $root/Alfa/a
     echo HEJSAN > $root/alfa/b
+    beakfs="$mount"
     startMountTest standardTest "-d 1 -ta 1G"
+    stopMount
+    echo OK
 fi
 
 function expectLocaleFailure {
     if [ "$?" == "0" ]; then
         echo Expected beak to fail startup!
-        stopFS nook
+        stopMount nook
         exit
     fi
-    echo OK
 }
 
 setup locale_C "Test that LC_ALL=C fails"
@@ -751,6 +806,7 @@ if [ $do_test ]; then
     mkdir -p $root/Alfa
     echo HEJSAN > $root/Alfa/a
     startMountTestExpectFail expectLocaleFailure "-d 1 -ta 0" LC_ALL=en_US.UTF-8
+    echo OK
 fi
 
 function txTriggerTest {
@@ -760,9 +816,9 @@ function txTriggerTest {
     fi
     untar "$mount"
     checkdiff
-    checkls-ld
+    checklsld
 
-    stopFS
+    stopMount
 }
 
 setup trigger_tarred_dirs "Test -tx to trigger tarred directories"
@@ -771,11 +827,12 @@ if [ $do_test ]; then
     echo HEJSAN > $root/Alfa/a
     cp -a $root/Alfa/a $root/Alfa/snapshot_2016-12-30
     startMountTest txTriggerTest "-tx 'snapshot*'"
+    echo OK
 fi
 
 function noAvalancheTestPart1 {
     (cd $mount; find . -exec ls -ld \{\} \; > $org)
-    stopFS nook
+    stopMount
     dd if=/dev/zero of="$root/s200" bs=1024 count=60 > /dev/null 2>&1
     touch -d "2015-03-03 03:03:03.1235" "$root/s200"
     startMountTest noAvalancheTestPart2 "-ta 1M -tr 1M"
@@ -794,7 +851,7 @@ function noAvalancheTestPart2 {
         echo Check in $dir for more information.
     fi
 
-    stopFS
+    stopMount
 }
 
 setup no_avalanche "Test that added file does not create avalanche"
@@ -812,54 +869,61 @@ if [ $do_test ]; then
         touch -d "2015-03-03 03:03:03.1234" "$root/$i"
     done
     startMountTest noAvalancheTestPart1 "-ta 1M -tr 1M"
+    echo OK
 fi
 
 setup bulktest1 "Mount of generated bulk extract all default settings"
 if [ $do_test ]; then
     ./scripts/generate_filesystem.sh $root 5 10
+    beakfs="$mount"
     startMountTest standardTest
+    stopMount
+    echo OK
 fi
 
 setup bulktest2 "Mount of generated bulk, pack using xz, decompress and untar."
 if [ $do_test ]; then
     ./scripts/generate_filesystem.sh $root 5 10
     startMountTest standardPackedTest
+    echo OK
 fi
 
 function expectOneBigR01Tar {
     untar "$mount"
     checkdiff
-    checkls-ld
+    checklsld
     num=$(find $mount -name "s01*.tar" | wc --lines)
     if [ "$num" != "1" ]; then
         echo Expected a single big s01 tar! Check in $dir for more information.
         exit
     fi
-    stopFS
+    stopMount
 }
 
 setup bulktest3 "Mount of generated bulk -d 1 -ta 1G"
 if [ $do_test ]; then
     ./scripts/generate_filesystem.sh $root 5 10
     startMountTest expectOneBigR01Tar "-d 1 -ta 1G"
+    echo OK
 fi
 
 function expect8R01Tar {
     untar "$mount"
     checkdiff
-    checkls-ld
+    checklsld
     num=$(find $mount -name "s01*.tar" | wc --lines)
     if [ "$num" != "8" ]; then
         echo Expected 8 s01 tar! Check in $dir for more information.
         exit
     fi
-    stopFS
+    stopMount
 }
 
 setup bulktest4 "Mount of generated bulk -d 1 -ta 1M -tr 1G"
 if [ $do_test ]; then
     ./scripts/generate_filesystem.sh $root 5 10
     startMountTest expect8R01Tar "-d 1 -ta 1M -tr 1G"
+    echo OK
 fi
 
 function compareTwo {
@@ -876,13 +940,13 @@ setup reverse1 "Forward mount of libtar, Reverse mount back!"
 if [ $do_test ]; then
     ./scripts/generate_filesystem.sh $root 5 10
     startTwoFS compareTwo "" "-p @0"
+    echo OK
 fi
-
 
 function pointInTimeTestPart1 {
     cp -r "$mount"/* "$packed"
     chmod -R u+w "$packed"/*
-    stopFS nook
+    stopMount nook
     dd if=/dev/zero of="$root/s200" bs=1024 count=60 > /dev/null 2>&1
     startMountTest pointInTimeTestPart2
 }
@@ -890,7 +954,7 @@ function pointInTimeTestPart1 {
 function pointInTimeTestPart2 {
     cp -r "$mount"/* "$packed"
     chmod -R u+w "$packed"/*
-    stopFS nook
+    stopMount nook
     startMountTestArchive pointInTimeTestPart3 "-p @0"
 }
 
@@ -900,8 +964,9 @@ function pointInTimeTestPart3 {
         echo Check in $dir for more information.
         exit
     fi
-    stopFSArchive nook
+    stopMountArchive
     startMountTestArchive pointInTimeTestPart4 "-p @1"
+    echo OK
 }
 
 function pointInTimeTestPart4 {
@@ -910,13 +975,14 @@ function pointInTimeTestPart4 {
         echo Check in $dir for more information.
         exit
     fi
-    stopFSArchive
+    stopMountArchive
 }
 
 setup points_in_time "Test that pointInTimes work"
 if [ $do_test ]; then
     ./scripts/generate_filesystem.sh $root 3
     startMountTest pointInTimeTestPart1
+    echo OK
 fi
 
 #setup diff1 "Compare directories!"
@@ -932,6 +998,5 @@ fi
 #    ./${prefix}/diff "$root" "$check"
 #fi
 
-
-#echo All tests succeeded!
-#rm -rf $tmpdir
+echo All tests succeeded!
+rm -rf $tmpdir
