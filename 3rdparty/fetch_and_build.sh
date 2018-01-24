@@ -1,25 +1,67 @@
 #!/bin/sh
 
-echo
-echo Fetching and building OpenSSL for x86_64-w64-mingw32-
-echo
-
-git clone https://github.com/openssl/openssl.git openssl-1.0.2
-
-cd openssl-1.0.2
-git checkout OpenSSL_1_0_2-stable
-./Configure mingw64 shared --cross-compile-prefix=x86_64-w64-mingw32-
-make
-cd ..
-
-echo
-echo Fetching and building zlib for x86_64-w64-mingw32-
-echo
-
-if [ ! -d zlib-1.2.11 ]; then
-    wget https://zlib.net/zlib-1.2.11.tar.gz && tar xzf zlib-1.2.11.tar.gz
+if [ ! -d openssl-1.0.2-winapi ]; then
+    echo
+    echo Fetching OpenSSL
+    echo
+    git clone https://github.com/openssl/openssl.git openssl-1.0.2-winapi
+    if [ ! -d openssl-1.0.2-arm ]; then
+        git clone openssl-1.0.2-winapi openssl-1.0.2-arm
+    fi
 fi
 
-cd zlib-1.2.11
+cd openssl-1.0.2-winapi
+if [ ! -f ssleay32.dll ]; then
+    echo
+    echo Building OpenSSL w64
+    echo
+
+    git checkout OpenSSL_1_0_2-stable
+    ./Configure mingw64 shared --cross-compile-prefix=x86_64-w64-mingw32-
+    make
+fi
+cd ..
+
+cd openssl-1.0.2-arm
+if [ ! -f libssl.a ]; then
+    echo
+    echo Building OpenSSL arm32
+    echo
+
+    git checkout OpenSSL_1_0_2-stable
+    ./Configure linux-generic32 shared --cross-compile-prefix=arm-linux-gnueabihf-
+    make
+fi
+cd ..
+
+if [ ! -d zlib-1.2.11-winapi ]; then
+    echo
+    echo Fetching zlib
+    echo
+    wget https://zlib.net/zlib-1.2.11.tar.gz && tar xzf zlib-1.2.11.tar.gz
+    mv zlib-1.2.11 zlib-1.2.11-winapi
+fi
+
+if [ ! -d zlib-1.2.11-arm ]; then
+    tar xzf zlib-1.2.11.tar.gz
+    mv zlib-1.2.11 zlib-1.2.11-arm
+fi
+
+cd zlib-1.2.11-winapi
+if [ ! -f zlib1.dll ]; then
+    echo
+    echo Building zlib w64
+    echo
     make -f win32/Makefile.gcc SHARED_MODE=1 PREFIX=x86_64-w64-mingw32-
+fi
+cd ..
+
+cd zlib-1.2.11-arm
+if [ ! -f libz.a ]; then
+    echo
+    echo Building zlib arm32
+    echo
+    CROSS=arm-linux-gnueabihf- CC=${CROSS}gcc LD=${CROSS}ld AS=${CROSS}as ./configure
+    make
+fi
 cd ..
