@@ -128,7 +128,7 @@ TarEntry::TarEntry(Path *ap, Path *p, const struct stat *b, TarHeaderStyle ths) 
 
         char secs_and_nanos[32];
         memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
-        snprintf(secs_and_nanos, 32, "%012ju.%09lu", fs_.st_mtim.tv_sec, fs_.st_mtim.tv_nsec);
+        snprintf(secs_and_nanos, 32, "%012" PRINTF_TIME_T "u.%09lu", fs_.st_mtim.tv_sec, fs_.st_mtim.tv_nsec);
         s.append(secs_and_nanos);
 
         /*
@@ -401,7 +401,7 @@ void TarEntry::registerParent(TarEntry *p) {
 void TarEntry::secsAndNanos(char *buf, size_t len)
 {
     memset(buf, 0, len);
-    snprintf(buf, len, "%012ju.%09lu", fs_.st_mtim.tv_sec, fs_.st_mtim.tv_nsec);
+    snprintf(buf, len, "%012" PRINTF_TIME_T "u.%09lu", fs_.st_mtim.tv_sec, fs_.st_mtim.tv_nsec);
 }
 
 void TarEntry::injectHash(const char *buf, size_t len)

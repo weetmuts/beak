@@ -585,6 +585,42 @@ PACKAGE_STRING='BEAK beak'
 PACKAGE_BUGREPORT='oehrstroem@gmail.com'
 PACKAGE_URL='http://nivelleringslikaren.eu/beak'
 
+# Factoring default headers for most tests.
+ac_includes_default="\
+#include <stdio.h>
+#ifdef HAVE_SYS_TYPES_H
+# include <sys/types.h>
+#endif
+#ifdef HAVE_SYS_STAT_H
+# include <sys/stat.h>
+#endif
+#ifdef STDC_HEADERS
+# include <stdlib.h>
+# include <stddef.h>
+#else
+# ifdef HAVE_STDLIB_H
+#  include <stdlib.h>
+# endif
+#endif
+#ifdef HAVE_STRING_H
+# if !defined STDC_HEADERS && defined HAVE_MEMORY_H
+#  include <memory.h>
+# endif
+# include <string.h>
+#endif
+#ifdef HAVE_STRINGS_H
+# include <strings.h>
+#endif
+#ifdef HAVE_INTTYPES_H
+# include <inttypes.h>
+#endif
+#ifdef HAVE_STDINT_H
+# include <stdint.h>
+#endif
+#ifdef HAVE_UNISTD_H
+# include <unistd.h>
+#endif"
+
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
 LDFLAGS_release
@@ -599,6 +635,7 @@ OPENSSL_CFLAGS
 FUSE_LIBS
 FUSE_CFLAGS
 ENABLE_FUSE
+STRIP
 LD
 CXX
 EGREP
@@ -614,6 +651,7 @@ CC
 OUTPUT_ROOT
 SRC_ROOT
 CONF_NAME
+CONF_MNEMONIC
 PATH_SEP
 PLATFORM_CFLAGS
 PLATFORM
@@ -668,6 +706,7 @@ ac_subst_files=''
 ac_user_opts='
 enable_option_checking
 enable_fuse
+with_fuse
 with_openssl
 with_zlib
 '
@@ -1309,6 +1348,9 @@ Optional Features:
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
+  --with-fuse             specify prefix directory for the libfuse dev package
+                          (expecting the libraries under PATH and the headers
+                          under PATH/include)
   --with-openssl          specify prefix directory for the openssl package
                           (expecting the libraries under PATH and the headers
                           under PATH/include)
@@ -1523,6 +1565,220 @@ fi
   as_fn_set_status $ac_retval
 
 } # ac_fn_c_try_run
+
+# ac_fn_c_compute_int LINENO EXPR VAR INCLUDES
+# --------------------------------------------
+# Tries to find the compile-time value of EXPR in a program that includes
+# INCLUDES, setting VAR accordingly. Returns whether the value could be
+# computed
+ac_fn_c_compute_int ()
+{
+  as_lineno=${as_lineno-"$1"} as_lineno_stack=as_lineno_stack=$as_lineno_stack
+  if test "$cross_compiling" = yes; then
+    # Depending upon the size, compute the lo and hi bounds.
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+$4
+int
+main ()
+{
+static int test_array [1 - 2 * !(($2) >= 0)];
+test_array [0] = 0;
+return test_array [0];
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ac_lo=0 ac_mid=0
+  while :; do
+    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+$4
+int
+main ()
+{
+static int test_array [1 - 2 * !(($2) <= $ac_mid)];
+test_array [0] = 0;
+return test_array [0];
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ac_hi=$ac_mid; break
+else
+  as_fn_arith $ac_mid + 1 && ac_lo=$as_val
+			if test $ac_lo -le $ac_mid; then
+			  ac_lo= ac_hi=
+			  break
+			fi
+			as_fn_arith 2 '*' $ac_mid + 1 && ac_mid=$as_val
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  done
+else
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+$4
+int
+main ()
+{
+static int test_array [1 - 2 * !(($2) < 0)];
+test_array [0] = 0;
+return test_array [0];
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ac_hi=-1 ac_mid=-1
+  while :; do
+    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+$4
+int
+main ()
+{
+static int test_array [1 - 2 * !(($2) >= $ac_mid)];
+test_array [0] = 0;
+return test_array [0];
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ac_lo=$ac_mid; break
+else
+  as_fn_arith '(' $ac_mid ')' - 1 && ac_hi=$as_val
+			if test $ac_mid -le $ac_hi; then
+			  ac_lo= ac_hi=
+			  break
+			fi
+			as_fn_arith 2 '*' $ac_mid && ac_mid=$as_val
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  done
+else
+  ac_lo= ac_hi=
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+# Binary search between lo and hi bounds.
+while test "x$ac_lo" != "x$ac_hi"; do
+  as_fn_arith '(' $ac_hi - $ac_lo ')' / 2 + $ac_lo && ac_mid=$as_val
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+$4
+int
+main ()
+{
+static int test_array [1 - 2 * !(($2) <= $ac_mid)];
+test_array [0] = 0;
+return test_array [0];
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ac_hi=$ac_mid
+else
+  as_fn_arith '(' $ac_mid ')' + 1 && ac_lo=$as_val
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+done
+case $ac_lo in #((
+?*) eval "$3=\$ac_lo"; ac_retval=0 ;;
+'') ac_retval=1 ;;
+esac
+  else
+    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+$4
+static long int longval () { return $2; }
+static unsigned long int ulongval () { return $2; }
+#include <stdio.h>
+#include <stdlib.h>
+int
+main ()
+{
+
+  FILE *f = fopen ("conftest.val", "w");
+  if (! f)
+    return 1;
+  if (($2) < 0)
+    {
+      long int i = longval ();
+      if (i != ($2))
+	return 1;
+      fprintf (f, "%ld", i);
+    }
+  else
+    {
+      unsigned long int i = ulongval ();
+      if (i != ($2))
+	return 1;
+      fprintf (f, "%lu", i);
+    }
+  /* Do not output a trailing newline, as this causes \r\n confusion
+     on some platforms.  */
+  return ferror (f) || fclose (f) != 0;
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_run "$LINENO"; then :
+  echo >>conftest.val; read $3 <conftest.val; ac_retval=0
+else
+  ac_retval=1
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+rm -f conftest.val
+
+  fi
+  eval $as_lineno_stack; ${as_lineno_stack:+:} unset as_lineno
+  as_fn_set_status $ac_retval
+
+} # ac_fn_c_compute_int
+
+# ac_fn_c_check_header_compile LINENO HEADER VAR INCLUDES
+# -------------------------------------------------------
+# Tests whether HEADER exists and can be compiled using the include files in
+# INCLUDES, setting the cache variable VAR accordingly.
+ac_fn_c_check_header_compile ()
+{
+  as_lineno=${as_lineno-"$1"} as_lineno_stack=as_lineno_stack=$as_lineno_stack
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $2" >&5
+$as_echo_n "checking for $2... " >&6; }
+if eval \${$3+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+$4
+#include <$2>
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  eval "$3=yes"
+else
+  eval "$3=no"
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+fi
+eval ac_res=\$$3
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+  eval $as_lineno_stack; ${as_lineno_stack:+:} unset as_lineno
+
+} # ac_fn_c_check_header_compile
 cat >config.log <<_ACEOF
 This file contains any messages produced by compilers while
 running configure, to aid debugging if configure makes a mistake.
@@ -1988,16 +2244,23 @@ ac_config_headers="$ac_config_headers ${OUTPUT_ROOT}/config.h:autoconf/config.h.
 
 
 
+
 if test "${host_vendor}" = "w64"; then
    PLATFORM=WINAPI
    PATH_SEP=';'
    PLATFORM_CFLAGS=""
    FUSE_DEFAULT="no"
+   CONF_MNEMONIC="winapi64"
 else
    PLATFORM=POSIX
    PATH_SEP=':'
    PLATFORM_CFLAGS="-DUSE_SYSLOG"
    FUSE_DEFAULT="yes"
+   if test "${host_cpu}" = "arm"; then
+       CONF_MNEMONIC="arm32"
+   else
+       CONF_MNEMONIC="linux64"
+   fi
 fi
 
 mkdir -p "$OUTPUT_ROOT"
@@ -3257,8 +3520,6 @@ $as_echo "#define TIME_WITH_SYS_TIME 1" >>confdefs.h
 fi
 
 
-
-
 if test -n "$ac_tool_prefix"; then
   # Extract the first word of "${ac_tool_prefix}gcc", so it can be a program name with args.
 set dummy ${ac_tool_prefix}gcc; ac_word=$2
@@ -3553,6 +3814,104 @@ else
   LD="$ac_cv_path_LD"
 fi
 
+if test -n "$ac_tool_prefix"; then
+  # Extract the first word of "${ac_tool_prefix}strip", so it can be a program name with args.
+set dummy ${ac_tool_prefix}strip; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_path_STRIP+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $STRIP in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_STRIP="$STRIP" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_path_STRIP="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  ;;
+esac
+fi
+STRIP=$ac_cv_path_STRIP
+if test -n "$STRIP"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $STRIP" >&5
+$as_echo "$STRIP" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+fi
+if test -z "$ac_cv_path_STRIP"; then
+  ac_pt_STRIP=$STRIP
+  # Extract the first word of "strip", so it can be a program name with args.
+set dummy strip; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_path_ac_pt_STRIP+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $ac_pt_STRIP in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_ac_pt_STRIP="$ac_pt_STRIP" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_path_ac_pt_STRIP="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  ;;
+esac
+fi
+ac_pt_STRIP=$ac_cv_path_ac_pt_STRIP
+if test -n "$ac_pt_STRIP"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_pt_STRIP" >&5
+$as_echo "$ac_pt_STRIP" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+  if test "x$ac_pt_STRIP" = x; then
+    STRIP=":"
+  else
+    case $cross_compiling:$ac_tool_warned in
+yes:)
+{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: using cross tools not prefixed with host triplet" >&5
+$as_echo "$as_me: WARNING: using cross tools not prefixed with host triplet" >&2;}
+ac_tool_warned=yes ;;
+esac
+    STRIP=$ac_pt_STRIP
+  fi
+else
+  STRIP="$ac_cv_path_STRIP"
+fi
+
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for fuse" >&5
 $as_echo_n "checking for fuse... " >&6; }
@@ -3569,15 +3928,33 @@ fi
 
 
 
+
+# Check whether --with-fuse was given.
+if test "${with_fuse+set}" = set; then :
+  withval=$with_fuse;
+fi
+
+
 if test "x$ENABLE_FUSE" = xyes; then
-    if pkg-config fuse; then
-       FUSE_CFLAGS="-DFUSE_USE_VERSION=26 $(pkg-config --cflags fuse)"
-       FUSE_LIBS="$(pkg-config --libs fuse)"
-    else
-       as_fn_error $? "Please install libfuse-dev" "$LINENO" 5
-    fi
-    { $as_echo "$as_me:${as_lineno-$LINENO}: result: found" >&5
+   if test "x${with_fuse}" = "x"; then
+       if pkg-config fuse; then
+           FUSE_CFLAGS="-DFUSE_USE_VERSION=26 $(pkg-config --cflags fuse)"
+           FUSE_LIBS="$(pkg-config --libs fuse)"
+           { $as_echo "$as_me:${as_lineno-$LINENO}: result: found" >&5
 $as_echo "found" >&6; }
+       else
+           as_fn_error for example using: sudo apt install libfuse-dev "Please install fuse-dev" "$LINENO" 5
+       fi
+   else
+       with_fuse=$(realpath ${with_fuse})
+       if test ! -d "$with_fuse" ; then
+           as_fn_error $? "No such directory \"$with_fuse\"" "$LINENO" 5
+       fi
+       FUSE_CFLAGS="-DFUSE_USE_VERSION=26 -D_FILE_OFFSET_BITS=64 -I${with_fuse}/include"
+       FUSE_LIBS="$(find "${with_fuse}" -name libfuse.a) -ldl"
+       { $as_echo "$as_me:${as_lineno-$LINENO}: result: using ${with_fuse}" >&5
+$as_echo "using ${with_fuse}" >&6; }
+   fi
 else
     FUSE_CFLAGS=""
     FUSE_LIBS=""
@@ -3635,6 +4012,59 @@ else
 $as_echo "using ${with_zlib}" >&6; }
 fi
 
+
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for sizeof time_t" >&5
+$as_echo_n "checking for sizeof time_t... " >&6; }
+# On IRIX 5.3, sys/types and inttypes.h are conflicting.
+for ac_header in sys/types.h sys/stat.h stdlib.h string.h memory.h strings.h \
+		  inttypes.h stdint.h unistd.h
+do :
+  as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
+ac_fn_c_check_header_compile "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default
+"
+if eval test \"x\$"$as_ac_Header"\" = x"yes"; then :
+  cat >>confdefs.h <<_ACEOF
+#define `$as_echo "HAVE_$ac_header" | $as_tr_cpp` 1
+_ACEOF
+
+fi
+
+done
+
+
+# The cast to long int works around a bug in the HP C Compiler
+# version HP92453-01 B.11.11.23709.GP, which incorrectly rejects
+# declarations like `int a3[[(sizeof (unsigned char)) >= 0]];'.
+# This bug is HP SR number 8606223364.
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking size of time_t" >&5
+$as_echo_n "checking size of time_t... " >&6; }
+if ${ac_cv_sizeof_time_t+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if ac_fn_c_compute_int "$LINENO" "(long int) (sizeof (time_t))" "ac_cv_sizeof_time_t"        "$ac_includes_default"; then :
+
+else
+  if test "$ac_cv_type_time_t" = yes; then
+     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error 77 "cannot compute sizeof (time_t)
+See \`config.log' for more details" "$LINENO" 5; }
+   else
+     ac_cv_sizeof_time_t=0
+   fi
+fi
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_sizeof_time_t" >&5
+$as_echo "$ac_cv_sizeof_time_t" >&6; }
+
+
+
+cat >>confdefs.h <<_ACEOF
+#define SIZEOF_TIME_T $ac_cv_sizeof_time_t
+_ACEOF
 
 
 
@@ -3698,7 +4128,7 @@ $as_echo "#define HAS_ST_MTIME 1" >>confdefs.h
 
 fi
 
-CXXFLAGS="-DPLATFORM_${PLATFORM} -Wall -fmessage-length=0 -std=c++11 -Wno-unused-function"
+CXXFLAGS="-DPLATFORM_${PLATFORM} -Wall -Werror -fmessage-length=0 -std=c++11 -Wno-unused-function"
 
 CXXFLAGS_debug="-O0 -g"
 CXXFLAGS_release="-Os"

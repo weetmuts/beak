@@ -25,7 +25,7 @@
 
 using namespace std;
 
-static ComponentId UTIL = registerLogComponent("util");
+//static ComponentId UTIL = registerLogComponent("util");
 
 extern struct timespec start_time_; // Inside util.cc
 

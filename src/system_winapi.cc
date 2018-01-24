@@ -22,7 +22,7 @@
 
 using namespace std;
 
-static ComponentId SYSTEM = registerLogComponent("system");
+//static ComponentId SYSTEM = registerLogComponent("system");
 
 struct SystemImplementationWinapi : System
 {

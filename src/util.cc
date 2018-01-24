@@ -136,7 +136,8 @@ int parseHumanReadable(string s, size_t *out)
     }
     else if (c == 'T')
     {
-        mul = KB * KB * KB * KB;
+        mul = KB * KB;
+        mul *= KB * KB;
         s = s.substr(0, s.length() - 1);
     }
 

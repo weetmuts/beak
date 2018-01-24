@@ -336,11 +336,12 @@ You can have multiple configurations enabled at the same time.
 
 * `make` builds release for all configured hosts.
 * `make debug` builds debug for all configured hosts.
-* `make debug posix` builds only debug for posix hosts.
-* `make debug winapi` builds only debug for winapi hosts.
+* `make debug linux64` builds only debug for gnu/linux x86_64 hosts.
+* `make debug winapi64` builds only debug for winapi 64 bit hosts.
+* `make debug arm32` builds only debug for gnu/linux arm 32 bit hosts.
 
 `./configure`
 
 `./configure --host=x86_64-w64-mingw32 --with-zlib=3rdparty/zlib-1.2.11 --with-openssl=3rdparty/openssl-1.0.2`
 
-`./configure --host=arm-linux-gnueabihf --with-zlib=3rdparty/zlib-1.2.11 --with-openssl=3rdparty/openssl-1.0.2`
+`./configure --host=arm-linux-gnueabihf --with-fuse=3rdparty/libfuse-arm/usr --with-openssl=3rdparty/openssl-1.0.2-arm --with-zlib=3rdparty/zlib-1.2.11-arm`

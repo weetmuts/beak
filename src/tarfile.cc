@@ -168,7 +168,7 @@ void TarFile::fixName() {
 
     char secs_and_nanos[32];
     memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
-    snprintf(secs_and_nanos, 32, "%012ju.%09lu", mtim()->tv_sec, mtim()->tv_nsec);
+    snprintf(secs_and_nanos, 32, "%012" PRINTF_TIME_T "u.%09lu", mtim()->tv_sec, mtim()->tv_nsec);
 
     char buffer[256];
     char gztype[] = "gz";
@@ -202,7 +202,7 @@ string TarFile::line(Path *p)
 
     char secs_and_nanos[32];
     memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
-    snprintf(secs_and_nanos, 32, "%012ju.%09lu", mtim()->tv_sec, mtim()->tv_nsec);
+    snprintf(secs_and_nanos, 32, "%012" PRINTF_TIME_T "u.%09lu", mtim()->tv_sec, mtim()->tv_nsec);
     s.append(separator_string);
     s.append(secs_and_nanos);
 

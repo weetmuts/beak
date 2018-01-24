@@ -23,7 +23,7 @@
 
 ifeq (release,$(findstring release,$(MAKECMDGOALS)))
 TYPE:=release
-STRIP_COMMAND:=strip
+STRIP_COMMAND:=$(STRIP)
 endif
 
 ifeq (debug,$(findstring debug,$(MAKECMDGOALS)))
@@ -92,20 +92,20 @@ TESTINTERNALS_OBJS:=$($(PLATFORM)_TESTINTERNALS_OBJS)
 $(OUTPUT_ROOT)/$(TYPE)/beak.o: $(OUTPUT_ROOT)/generated_autocomplete.h
 
 $(OUTPUT_ROOT)/$(TYPE)/%.o: $(SRC_ROOT)/src/%.cc
-	@echo Compiling $(TYPE) $(PLATFORM) $$(basename $<)
+	@echo Compiling $(TYPE) $(CONF_MNEMONIC) $$(basename $<)
 	$(VERBOSE)$(CXX) $(CXXFLAGS_$(TYPE)) $(CXXFLAGS) -I$(OUTPUT_ROOT) -MMD $< -c -o $@
 
 $(OUTPUT_ROOT)/$(TYPE)/beak: $(BEAK_OBJS)
-	@echo Linking $@
-	$(VERBOSE)@$(CXX) -o $@ $(LDFLAGS_$(TYPE)) $(LDFLAGS) $(BEAK_OBJS) \
-                      $(FUSE_LIBS) $(OPENSSL_LIBS) $(ZLIB_LIBS) -lpthread
-	$(VERBOSE)@$(STRIP_COMMAND) $@
+	@echo Linking $(TYPE) $(CONF_MNEMONIC) $@
+	$(VERBOSE)$(CXX) -o $@ $(LDFLAGS_$(TYPE)) $(LDFLAGS) $(BEAK_OBJS) \
+                      $(OPENSSL_LIBS) $(ZLIB_LIBS) $(FUSE_LIBS) -lpthread
+	$(VERBOSE)$(STRIP_COMMAND) $@
 
 $(OUTPUT_ROOT)/$(TYPE)/testinternals: $(TESTINTERNALS_OBJS)
-	@echo Linking $@
-	$(VERBOSE)@$(CXX) -o $@ $(LDFLAGS_$(TYPE)) $(LDFLAGS) $(TESTINTERNALS_OBJS) \
-                      $(FUSE_LIBS) $(OPENSSL_LIBS) $(ZLIB_LIBS) -lpthread
-	$(VERBOSE)@$(STRIP_COMMAND) $@
+	@echo Linking $(TYPE) $(CONF_MNEMONIC) $@
+	$(VERBOSE)$(CXX) -o $@ $(LDFLAGS_$(TYPE)) $(LDFLAGS) $(TESTINTERNALS_OBJS) \
+                      $(OPENSSL_LIBS) $(ZLIB_LIBS) $(FUSE_LIBS) -lpthread
+	$(VERBOSE)$(STRIP_COMMAND) $@
 
 $(OUTPUT_ROOT)/$(TYPE)/libgcc_s_seh-1.dll: /usr/lib/gcc/x86_64-w64-mingw32/5.3-win32/libgcc_s_seh-1.dll
 	cp /usr/lib/gcc/x86_64-w64-mingw32/5.3-win32/libgcc_s_seh-1.dll $@

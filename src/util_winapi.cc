@@ -28,8 +28,8 @@
 
 using namespace std;
 
-static ComponentId UTIL = registerLogComponent("util");
-static ComponentId TMP = registerLogComponent("tmp");
+//static ComponentId UTIL = registerLogComponent("util");
+//static ComponentId TMP = registerLogComponent("tmp");
 
 #define KB 1024ul
 

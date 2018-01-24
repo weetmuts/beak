@@ -34,4 +34,10 @@ typedef int RC;
 #define DEFAULT_TAR_TRIGGER_SIZE 20ull*1024*1024;
 #define DEFAULT_SPLIT_TAR_SIZE 100ull*1024*1024;
 
+#if SIZEOF_TIME_T == 8
+#define PRINTF_TIME_T "z"
+#else
+#define PRINTF_TIME_T "l"
+#endif
+
 #endif

@@ -237,7 +237,7 @@ TarHeader::TarHeader(FileStat *fs, Path *tarpath, Path *link, bool is_hard_link,
     snprintf(content.members.size_, 12, "%011zo", s);
 
     // mtime
-    snprintf(content.members.mtime_, 12, "%011zo", fs->st_mtim.tv_sec);
+    snprintf(content.members.mtime_, 12, "%011" PRINTF_TIME_T "o", fs->st_mtim.tv_sec);
 
     // checksum, to be filled in later.
     memset(content.members.checksum_, ' ', 8);

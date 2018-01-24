@@ -24,7 +24,7 @@
 
 using namespace std;
 
-static ComponentId FILESYSTEM = registerLogComponent("filesystem");
+//static ComponentId FILESYSTEM = registerLogComponent("filesystem");
 
 struct FileSystemFuseAPIImplementation : FileSystem
 {

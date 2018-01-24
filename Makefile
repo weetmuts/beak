@@ -18,10 +18,10 @@ all: release
 
 help:
 	@echo "Usage: make (release|debug|clean|clean-all)"
-	@echo "       if you have both posix, winapi and arm configured builds,"
-	@echo "       then add posix, winapi or arm to build only for that particular host."
-	@echo "E.g.:  make debug winapi"
-	@echo "       make release posix"
+	@echo "       if you have both linux64, winapi64 and arm32 configured builds,"
+	@echo "       then add linux64, winapi64 or arm32 to build only for that particular host."
+	@echo "E.g.:  make debug winapi64"
+	@echo "       make release linux64"
 
 BUILDDIRS:=$(dir $(realpath $(wildcard build/*/spec.gmk)))
 
@@ -31,16 +31,16 @@ endif
 
 VERBOSE?=@
 
-ifeq (winapi,$(findstring winapi,$(MAKECMDGOALS)))
-BUILDDIRS:=$(filter %mingw32/,$(BUILDDIRS))
+ifeq (winapi64,$(findstring winapi64,$(MAKECMDGOALS)))
+BUILDDIRS:=$(filter %x86_64-w64-mingw32/,$(BUILDDIRS))
 endif
 
-ifeq (posix,$(findstring posix,$(MAKECMDGOALS)))
-BUILDDIRS:=$(filter %linux-gnu/,$(BUILDDIRS))
+ifeq (linux64,$(findstring linux64,$(MAKECMDGOALS)))
+BUILDDIRS:=$(filter %x86_64-pc-linux-gnu/,$(BUILDDIRS))
 endif
 
-ifeq (arm,$(findstring arm,$(MAKECMDGOALS)))
-BUILDDIRS:=$(filter %linux-gnueabihf/,$(BUILDDIRS))
+ifeq (arm32,$(findstring arm32,$(MAKECMDGOALS)))
+BUILDDIRS:=$(filter %arm-unknown-linux-gnueabihf/,$(BUILDDIRS))
 endif
 
 release:
@@ -82,4 +82,4 @@ winapi:
 
 posix:
 
-.PHONY: all release debug test test_release test_debug clean clean-all help winapi posix
+.PHONY: all release debug test test_release test_debug clean clean-all help linux32 winapi64 arm32

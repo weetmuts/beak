@@ -31,16 +31,23 @@ AC_CONFIG_HEADERS(${OUTPUT_ROOT}/config.h:autoconf/config.h.in)
 AC_SUBST(PLATFORM)
 AC_SUBST(PLATFORM_CFLAGS)
 AC_SUBST(PATH_SEP)
+AC_SUBST(CONF_MNEMONIC)
 if test "${host_vendor}" = "w64"; then
    PLATFORM=WINAPI
    PATH_SEP=';'
    PLATFORM_CFLAGS=""
    FUSE_DEFAULT="no"
+   CONF_MNEMONIC="winapi64"
 else
    PLATFORM=POSIX
    PATH_SEP=':'
    PLATFORM_CFLAGS="-DUSE_SYSLOG"
    FUSE_DEFAULT="yes"
+   if test "${host_cpu}" = "arm"; then
+       CONF_MNEMONIC="arm32"
+   else
+       CONF_MNEMONIC="linux64"
+   fi
 fi
 
 mkdir -p "$OUTPUT_ROOT"
@@ -56,11 +63,10 @@ AC_HEADER_STDC
 AC_HEADER_STAT
 AC_HEADER_TIME
 
-AC_SUBST(CC)
-
 AC_PATH_TOOL([CC], [gcc], [:])
 AC_PATH_TOOL([CXX], [g++], [:])
 AC_PATH_TOOL([LD], [ld], [:])
+AC_PATH_TOOL([STRIP], [strip], [:])
 
 AC_MSG_CHECKING([for fuse])
 
@@ -73,14 +79,28 @@ AC_SUBST(ENABLE_FUSE)
 AC_SUBST(FUSE_CFLAGS)
 AC_SUBST(FUSE_LIBS)
 
+AC_ARG_WITH(fuse, [AS_HELP_STRING([--with-fuse],
+      [specify prefix directory for the libfuse dev package
+      (expecting the libraries under PATH and the headers under PATH/include)])])
+
 if test "x$ENABLE_FUSE" = xyes; then
-    if pkg-config fuse; then
-       FUSE_CFLAGS="-DFUSE_USE_VERSION=26 $(pkg-config --cflags fuse)"
-       FUSE_LIBS="$(pkg-config --libs fuse)"
-    else
-       AC_MSG_ERROR(Please install libfuse-dev)
-    fi
-    AC_MSG_RESULT([found])
+   if test "x${with_fuse}" = "x"; then
+       if pkg-config fuse; then
+           FUSE_CFLAGS="-DFUSE_USE_VERSION=26 $(pkg-config --cflags fuse)"
+           FUSE_LIBS="$(pkg-config --libs fuse)"
+           AC_MSG_RESULT([found])
+       else
+           AC_MSG_ERROR(Please install fuse-dev, for example using: sudo apt install libfuse-dev)
+       fi
+   else
+       with_fuse=$(realpath ${with_fuse})
+       if test ! -d "$with_fuse" ; then
+           AC_MSG_ERROR(No such directory "$with_fuse")
+       fi
+       FUSE_CFLAGS="-DFUSE_USE_VERSION=26 -D_FILE_OFFSET_BITS=64 -I${with_fuse}/include"
+       FUSE_LIBS="$(find "${with_fuse}" -name libfuse.a) -ldl"
+       AC_MSG_RESULT([using ${with_fuse}])
+   fi
 else
     FUSE_CFLAGS=""
     FUSE_LIBS=""
@@ -128,6 +148,9 @@ fi
 AC_SUBST(ZLIB_CFLAGS)
 AC_SUBST(ZLIB_LIBS)
 
+AC_MSG_CHECKING(for sizeof time_t)
+AC_CHECK_SIZEOF([time_t])
+
 AC_MSG_CHECKING(for st_mtim.tv_nsec in struct stat)
 AC_COMPILE_IFELSE(
 [AC_LANG_PROGRAM([#include <time.h>
@@ -154,7 +177,7 @@ if test "x${have_st_mtime}" = "xyes"; then
     AC_DEFINE(HAS_ST_MTIME,1,Stat structure has st_mtime)
 fi
 
-CXXFLAGS="-DPLATFORM_${PLATFORM} -Wall -fmessage-length=0 -std=c++11 -Wno-unused-function"
+CXXFLAGS="-DPLATFORM_${PLATFORM} -Wall -Werror -fmessage-length=0 -std=c++11 -Wno-unused-function"
 
 CXXFLAGS_debug="-O0 -g"
 CXXFLAGS_release="-Os"

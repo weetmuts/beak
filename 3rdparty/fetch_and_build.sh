@@ -65,3 +65,14 @@ if [ ! -f libz.a ]; then
     make
 fi
 cd ..
+
+if [ ! -d libfuse-arm ]; then
+    echo
+    echo Fetching libfuse arm
+    echo
+    wget http://http.us.debian.org/debian/pool/main/f/fuse/libfuse-dev_2.9.0-2+deb7u2_armhf.deb
+    mkdir -p libfuse-arm
+    cd libfuse-arm
+    ar x ../libfuse-dev_2.9.0-2+deb7u2_armhf.deb
+    tar xzf data.tar.gz
+fi
