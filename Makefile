@@ -78,8 +78,10 @@ uninstall:
 	rm -f $(DESTDIR)/bin/beak
 	rm -f $(DESTDIR)/man/man1/beak.1
 
-winapi:
+linux64:
 
-posix:
+arm32:
 
-.PHONY: all release debug test test_release test_debug clean clean-all help linux32 winapi64 arm32
+winapi64:
+
+.PHONY: all release debug test test_release test_debug clean clean-all help linux64 winapi64 arm32

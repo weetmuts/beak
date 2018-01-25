@@ -89,7 +89,8 @@ struct ForwardTarredFS : FuseAPI
     void addDirsToDirectories();
     void addEntriesToTarCollectionDirs();
     void pruneDirectories();
-    void fixTarPathsAndHardLinks();
+    void fixHardLinks();
+    void fixTarPaths();
     size_t groupFilesIntoTars();
     void sortTarCollectionEntries();
     TarEntry *findNearestStorageDirectory(Path *a, Path *b);

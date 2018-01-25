@@ -395,6 +395,10 @@ int BeakImplementation::parseCommandLine(int argc, char **argv, Command *cmd, Op
                 setLogComponents(settings->log.c_str());
                 setLogLevel(DEBUG);
                 break;
+            case listlog_option:
+                listLogComponents();
+                exit(0);
+                break;
             case pointintime_option:
                 settings->pointintime = value;
                 break;
@@ -1394,4 +1398,12 @@ void BeakImplementation::genAutoComplete(string filename)
     }
     fwrite(autocomplete, 1, strlen(autocomplete), f);
     fclose(f);
+}
+
+bool Options::hasBothSrcAndDst() {
+    return src != NULL && dst != NULL;
+}
+
+bool Options::hasSrc() {
+    return src != NULL;
 }

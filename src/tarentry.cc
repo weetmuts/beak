@@ -298,6 +298,7 @@ void TarEntry::setContent(vector<char> &c) {
 
 void TarEntry::updateSizes() {
     size_t size = header_size_ = TarHeader::calculateSize(&fs_, tarpath_, link_, is_hard_linked_);
+
     if (tar_header_style_ == TarHeaderStyle::None) {
         size = header_size_ = 0;
     }
@@ -309,10 +310,7 @@ void TarEntry::updateSizes() {
     // Round size to nearest 512 byte boundary
     children_size_ = blocked_size_ = (size%T_BLOCKSIZE==0)?size:(size+T_BLOCKSIZE-(size%T_BLOCKSIZE));
 
-    assert(!is_hard_linked_ || size == T_BLOCKSIZE);
     assert(size >= header_size_ && blocked_size_ >= size);
-    //assert(TH_ISREG(tar_) || size == header_size_);
-//    assert(TH_ISDIR(tar_) || TH_ISSYM(tar_) || TH_ISFIFO(tar_) || TH_ISCHR(tar_) || TH_ISBLK(tar_) || th_get_size(tar_) == (size_t)sb.st_size);
 }
 
 void TarEntry::rewriteIntoHardLink(TarEntry *target) {
@@ -322,33 +320,12 @@ void TarEntry::rewriteIntoHardLink(TarEntry *target) {
     assert(link_->c_str()[0] == '/');
 }
 
-bool TarEntry::fixHardLink(Path *storage_dir)
+bool TarEntry::calculateHardLink(Path *storage_dir)
 {
-    assert(link_->c_str()[0] == '/');
-    debug(HARDLINKS, "Fix hardlink >%s< to >%s< within storage >%s<\n", path_->c_str(), link_->c_str(), storage_dir->c_str());
-
-    if (storage_dir == Path::lookupRoot())
-    {
-	debug(HARDLINKS, "Hard link in root, need not be fixed.\n");
-	return true;
-    }
-
-    Path *common = Path::commonPrefix(storage_dir, link_);
-    assert(common);
-    debug(HARDLINKS, "COMMON PREFIX >%s< >%s< = >%s<\n", storage_dir->c_str(), link_->c_str(), common->c_str());
-    if (common->depth() < storage_dir->depth()) {
-    	warning(HARDLINKS, "Warning: hard link between tars detected! From %s to %s\n", path_->c_str(), link_->c_str());
-    	// This hardlink needs to be pushed upwards, into a tar on a higher level!
-    	return false;
-    }
-    else
-    {
-	Path *l = link_->subpath(storage_dir->depth());
-	debug(HARDLINKS, "CUT LINK >%s< to >%s<\n", link_->c_str(), l->c_str());
-	link_ = l;
-    }
+    Path *new_link = link_->subpath(storage_dir->depth());
+    debug(HARDLINKS, "Removed prefix from >%s< to >%s<\n", link_->c_str(), new_link->c_str());
+    link_ = new_link;
     updateSizes();
-    debug(HARDLINKS, "Updated hardlink %s to %s\n", tarpath_->c_str(), link_->c_str());
     return true;
 }
 

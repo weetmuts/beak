@@ -328,7 +328,17 @@ beak prune     beak pack
 * Test:  `make test` or `./test.sh binary_to_test`
 * Install: `sudo make install` Installs in /usr/local/bin
 
-Hosts supported: x86_64-pc-linux-gnu x86_64-w64-mingw32 arm-linux-gnueabihf
+Hosts supported:
+* x86_64-pc-linux-gnu
+* x86_64-w64-mingw32
+* arm-linux-gnueabihf
+
+To have beak print detailed debug information do: `export BEAK_DEBUG_hardlinks=true`
+
+You can also for example do `--log=forward,hardlinks` on the command line. Adding `--log=all`
+will log all debug information.
+
+Use the option `--listlog` to print all possible debug parts.
 
 ## Cross compiling to Winapi and Arm.
 

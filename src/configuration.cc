@@ -27,13 +27,15 @@
 
 using namespace std;
 
-static ComponentId CONFIGURATION = registerLogComponent("configuration");
-
 const char *rule_type_names_[] = {
 #define X(name,info) #name,
 LIST_OF_TYPES
 #undef X
 };
+
+// Logging must be enabled with env var BEAK_LOG_configuration since
+// this code runs before command line parsing.
+static ComponentId CONFIGURATION = registerLogComponent("configuration");
 
 struct ConfigurationImplementation : public Configuration
 {
@@ -74,7 +76,7 @@ string handlePath(string path, string more, string name)
 	return more;
     }
     if (path == "") {
-	error(CONFIGURATION, "Error in configuration file, "
+	error(0, "Error in configuration file, "
 	      "\"path\" must be specified before a relative \"%s\" path.", name.c_str());
     }
     return path+"/"+more;
@@ -125,7 +127,7 @@ bool ConfigurationImplementation::load() {
                 trimWhitespace(&value);
                 if (err) break;
 
-                debug(CONFIGURATION,"%s = %s\n", key.c_str(), value.c_str());
+                debug(CONFIGURATION, "%s = %s\n", key.c_str(), value.c_str());
 
                 if (key == "type") {
 		}
@@ -154,7 +156,7 @@ bool ConfigurationImplementation::load() {
                 else if (key == "remote_keep") { current_remote->keep = Keep(value);  }
 		else if (key == "remote_round_robin") { current_remote->round_robin =
                                                             (value == "true") ? true: false; }
-                else { error(CONFIGURATION, "Unknown key \"%s\" in configuration file!\n", key.c_str()); }
+                else { error(0, "Unknown key \"%s\" in configuration file!\n", key.c_str()); }
             }
         }
     }
@@ -175,7 +177,7 @@ bool ConfigurationImplementation::load(vector<char> *buf) {
             if (errno == EINTR) {
                 continue;
             }
-            failure(CONFIGURATION,"Could not read from configuration file %s errno=%d\n",
+            failure(0, "Could not read from configuration file %s errno=%d\n",
                     "/home/fredrik/.beak.conf", errno);
             close(fd);
             return false;

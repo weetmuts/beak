@@ -74,6 +74,10 @@ int main(int argc, char *argv[])
 
     case mount_cmd:
     {
+        if (!settings.hasBothSrcAndDst()) {
+            fprintf(stdout, "You must supply a src and a dst.\n");
+            exit(1);
+        }
         bool has_history = beak->lookForPointsInTime(&settings);
         if (!has_history || settings.forceforward) {
             // src contains your files, to be backed up
@@ -107,6 +111,10 @@ int main(int argc, char *argv[])
 
     case store_cmd:
     {
+        if (!settings.hasBothSrcAndDst()) {
+            fprintf(stdout, "You must supply a src and a dst.\n");
+            exit(1);
+        }
         bool has_history = beak->lookForPointsInTime(&settings);
         if (!has_history || settings.forceforward) {
             // src contains your files, to be backed up
@@ -120,6 +128,10 @@ int main(int argc, char *argv[])
         break;
     }
     case umount_cmd:
+        if (!settings.hasSrc()) {
+            fprintf(stdout, "You must supply a directory unmount.\n");
+            exit(1);
+        }
         rc = beak->umountDaemon(&settings);
         break;
 

@@ -17,6 +17,7 @@
 
 #include "log.h"
 
+#include <assert.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <string.h>
@@ -40,7 +41,8 @@ LogLevel log_level = INFO;
 static set<int> log_components;
 
 static int num_components = 0;
-static const char *all_components[64];
+#define MAX_NUM_COMPONENTS 64
+static const char *all_components[MAX_NUM_COMPONENTS];
 
 bool debug_logging_ = false;
 bool verbose_logging_ = false;
@@ -68,12 +70,27 @@ static void logAll() {
     }
 }
 
-ComponentId registerLogComponent(const char *component) {
+ComponentId registerLogComponent(const char *component)
+{
     int c = findComponent(component);
     if (c >= 0) {
         return c;
     }
+    c = num_components;
     all_components[num_components] = component;
+    assert(num_components < MAX_NUM_COMPONENTS);
+
+    // Check if the log component is enabled through an env variable.
+    // Instead of the command line.
+    char name[128];
+    strcpy(name, "BEAK_DEBUG_");
+    strcat(name, component);
+    char *val = getenv(name);
+    if (val != NULL) {
+        log_components.insert(c);
+        setLogLevel(DEBUG);
+    }
+
     return num_components++;
 }
 

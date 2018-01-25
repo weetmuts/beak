@@ -110,6 +110,7 @@ LIST_OF_COMMANDS
     X(i,include,std::vector<std::string>,true,"Only matching paths are inluded. E.g. -i '*.c'") \
     X(,license,bool,false,"Show copyright holders,licenses and notices for the program.") \
     X(l,log,std::string,true,"Log debug messages for these parts. E.g. --log=reverse,hashing") \
+    X(ll,listlog,bool,false,"List all log parts available.") \
     X(p,pointintime,std::string,true,"When mounting an archive pick this point in time only.\n" \
       "                           -p @0 is always the most recent. -p @1 the second most recent.\n" \
       "                           You can also suffix @1 to the src directory." )        \
@@ -151,6 +152,9 @@ LIST_OF_OPTIONS
 
     Command help_me_on_this_cmd;
     int point_in_time; // 0 is the most recent, 1 second recent etc.
+
+    bool hasBothSrcAndDst();
+    bool hasSrc();
 };
 
 

@@ -125,7 +125,7 @@ struct TarEntry
     size_t copy(char *buf, size_t size, size_t from, FileSystem *fs);
     void updateSizes();
     void rewriteIntoHardLink(TarEntry *target);
-    bool fixHardLink(Path *storage_dir);
+    bool calculateHardLink(Path *storage_dir);
     void moveEntryToNewParent(TarEntry *entry, TarEntry *parent);
     void copyEntryToNewParent(TarEntry *entry, TarEntry *parent);
     void updateMtim(struct timespec *mtim);

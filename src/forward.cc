@@ -417,8 +417,6 @@ void ForwardTarredFS::findHardLinks() {
         TarEntry *te = e.second;
 
         if (!te->isDirectory() && te->stat()->st_nlink > 1) {
-            debug(HARDLINKS, "Found hard link '%s' to inode %ju\n",
-                  te->path()->c_str(), te->stat()->st_ino);
             TarEntry *prev = hard_links[te->stat()->st_ino];
             if (prev == NULL) {
                 // Note that the directory tree traversal goes bottom up, which means
@@ -439,7 +437,49 @@ void ForwardTarredFS::findHardLinks() {
     }
 }
 
-void ForwardTarredFS::fixTarPathsAndHardLinks() {
+void ForwardTarredFS::fixHardLinks()
+{
+    for (auto & e : tar_storage_directories) {
+        TarEntry *storage_dir = e.second;
+        vector<pair<TarEntry*,TarEntry*>> to_be_moved;
+
+        for(auto & entry : storage_dir->entries()) {
+            if (!entry->isHardLink()) continue;
+
+            // Find the common prefix of the entry and its hard link target.
+            Path *common = Path::commonPrefix(entry->path(), entry->link());
+            assert(common); // At least the root must be common!
+            // Is the common part longer or equal to the storage_dir then all is ok.
+            // We found the entry inside the storage_dir, therefore the storage dir path must be
+            // a prefix to the entry->path().
+            if (common->depth() >= storage_dir->path()->depth()) {
+                // This will remove the storage_dir prefix (ie path outside of tar) of the link and update the header.
+                entry->calculateHardLink(storage_dir->path());
+                continue;
+            }
+            // Ouch, the common prefix is shorter than the storage dir....
+            warning(HARDLINKS, "Hard link between tars detected! From %s to %s\n", entry->path()->c_str(), entry->link()->c_str());
+            // Find the nearest storage directory that share a common root between the entry and the target.
+            TarEntry *new_storage_dir = findNearestStorageDirectory(entry->path(), entry->link());
+            assert(new_storage_dir); // At least we should find the root.
+            debug(HARDLINKS, "Moving >%s< linking to >%s< from dir >%s< to dir >%s<\n",
+                  entry->path()->c_str(),
+                  entry->link()->c_str(),
+                  storage_dir->path()->c_str(),
+                  new_storage_dir->path()->c_str());
+            to_be_moved.push_back(pair<TarEntry*,TarEntry*>(entry, new_storage_dir));
+        }
+        for (auto & p : to_be_moved) {
+            TarEntry *link = p.first;
+            TarEntry *to = p.second;
+            storage_dir->moveEntryToNewParent(link, to);
+        }
+    }
+    string saving = humanReadable(hardlinksavings);
+    debug(HARDLINKS,"Saved %s bytes using hard links\n", saving.c_str());
+}
+
+void ForwardTarredFS::fixTarPaths() {
     for (auto & e : tar_storage_directories) {
         TarEntry *te = e.second;
         vector<pair<TarEntry*,TarEntry*>> to_be_moved;
@@ -448,45 +488,8 @@ void ForwardTarredFS::fixTarPathsAndHardLinks() {
             TarEntry *entry = e;
             // This will remove the prefix (ie path outside of tar) and update the hash.
             entry->calculateTarpath(te->path());
-
-            if (entry->isHardLink()) {
-                debug(HARDLINKS, "Found hardlink from >%s< to >%s<\n", entry->path()->c_str(), entry->link()->c_str());
-
-                bool rc = entry->fixHardLink(te->path());
-                if (!rc) {
-                    // The hard link must be pushed closer to the directory tree root!
-                    // Find the nearest storage directory that share a common root between the entry and the target.
-                    TarEntry *storage = findNearestStorageDirectory(entry->path(), entry->link());
-                    assert(storage);
-                    debug(HARDLINKS, "Moving >%s< linking to >%s< from dir >%s< to dir >%s<\n",
-                          entry->path()->c_str(),
-                          entry->link()->c_str(),
-                          te->path()->c_str(),
-                          storage->path()->c_str());
-
-                    to_be_moved.push_back(pair<TarEntry*,TarEntry*>(entry,storage));
-                    //te->copyEntryToNewParent(entry, parent); TODO remove this line
-                    entry->calculateTarpath(storage->path());
-                    entry->fixHardLink(storage->path());
-                    debug(HARDLINKS, "New tarpath of entry >%s< stored in >%s<\n",
-                          entry->tarpath()->c_str(), storage->path()->c_str());
-                    // Now, we have to copy the directory entries whose time stamps
-                    // will be updated when the hard link is extracted. I.e. the
-                    // sub-directories have already had their timestamps set correctly.
-                    // But a late hardlink extraction will touch those. So lets copy
-                    // the directory entries to the higher storage directory, to patch
-                    // up after the hard link is extracted.
-                    /*Path *common_path = Path::commonPrefix(entry->path(), entry->link());
-                    TarEntry *common_te = directories[common_path];
-                    common_te = findNearestStorageDirectory(common_te);*/
-                }
-            }
-        }
-        for (auto & p : to_be_moved) {
-            te->moveEntryToNewParent(p.first, p.second);
         }
     }
-
 }
 
 size_t ForwardTarredFS::groupFilesIntoTars() {
@@ -558,9 +561,6 @@ size_t ForwardTarredFS::groupFilesIntoTars() {
                 }
             }
         }
-
-        string saving = humanReadable(hardlinksavings);
-        debug(HARDLINKS,"Saved %s bytes using hard links\n", saving.c_str());
 
         // Finalize the tar files and add them to the contents listing.
         for (auto & t : te->largeTars()) {
@@ -1004,8 +1004,10 @@ int ForwardTarredFS::scanFileSystem(Options *settings)
     addDirsToDirectories();
     // Add content (files and directories) to the tar collection dirs.
     addEntriesToTarCollectionDirs();
-    // Calculate the tarpaths and fix/move the hardlinks.
-    fixTarPathsAndHardLinks();
+    // Remove prefixes from hard links, and potentially move them up.
+    fixHardLinks();
+    // Remove prefixes from paths and store the result in tarpath.
+    fixTarPaths();
     // Group the entries into tar files.
     size_t num_tars = groupFilesIntoTars();
     // Sort the entries in a tar friendly order.

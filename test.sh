@@ -486,6 +486,23 @@ if [ $do_test ]; then
     echo OK
 fi
 
+setup longhardlink "Long hard link"
+if [ $do_test ]; then
+    mkdir -p $root/Work/beak/3rdparty/openssl-1.0.2-winapi/.git/objects/pack
+    echo HEJSAN > $root/Work/beak/3rdparty/openssl-1.0.2-winapi/.git/objects/pack/pack-21499a1067865c380bfb261287724242a1fe2e9c.idx
+    mkdir -p $root/Work/beak/3rdparty/openssl-1.0.2-arm/.git/objects/pack
+    ln $root/Work/beak/3rdparty/openssl-1.0.2-winapi/.git/objects/pack/pack-21499a1067865c380bfb261287724242a1fe2e9c.idx $root/Work/beak/3rdparty/openssl-1.0.2-arm/.git/objects/pack/pack-21499a1067865c380bfb261287724242a1fe2e9c.idx
+    performStore
+    standardStoreUntarTest
+    cleanCheck
+    standardStoreUnstoreTest
+    cleanCheck
+    beakfs="$mount"
+    startMountTest standardTest
+    stopMount
+    echo OK
+fi
+
 setup fifo "FIFO"
 if [ $do_test ]; then
     mkfifo $root/fifo1

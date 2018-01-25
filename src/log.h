@@ -23,7 +23,7 @@
 enum LogLevel
 {
     // Errors and failures are always printed.
-    QUITE,      // No info, but display warnings
+    QUITE,      // No info but display warnings, failures and of course stop on errors.
     INFO,       // Normal mode
     VERBOSE,    // Verbose information
     DEBUG       // Debug information
