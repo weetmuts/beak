@@ -57,6 +57,7 @@ string UI::inputString()
         return "";
     string s = buf;
     if (s.back() == '\n') s.pop_back();
+    UI::output("\n");
     return s;
 }
 
@@ -81,18 +82,29 @@ int UI::inputChoice(string msg, string prompt, vector<string> choices)
     {
         output("%s\n", msg.c_str());
         for (size_t i=0; i<choices.size(); ++i) {
-            output("%d) %s\n", i+1, choices[i].c_str());
+            output("%d > %s\n", i+1, choices[i].c_str());
         }
         outputPrompt(prompt);
         string s = inputString();
 
         size_t i = atoi(s.c_str());
         if (i >= 1 && i <= choices.size()) {
-            c = i;
+            c = i-1;
             break;
         }
         output("Not a proper choice, please try again.\n");
     }
 
     return c;
+}
+
+void UI::inputChoice(string msg, string prompt, vector<ChoiceEntry> choices)
+{
+    vector<string> choice_strings;
+    for (auto& ce : choices) choice_strings.push_back(ce.msg);
+
+    int c = inputChoice(msg, prompt, choice_strings);
+
+    ChoiceEntry ce = choices[c];
+    ce.cb();
 }

@@ -18,15 +18,17 @@
 #ifndef SYSTEM_H
 #define SYSTEM_H
 
+#include "always.h"
+
 #include <memory>
 #include <string>
 #include <vector>
 
 struct System
 {
-    virtual int invoke(std::string program,
-                       std::vector<std::string> args,
-                       std::vector<char> *out) = 0;
+    virtual RC invoke(std::string program,
+                      std::vector<std::string> args,
+                      std::vector<char> *out) = 0;
 };
 
 std::unique_ptr<System> newSystem();

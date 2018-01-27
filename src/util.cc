@@ -45,6 +45,16 @@ struct timespec start_time_;
 
 #define KB 1024ull
 
+void strprintf(std::string &s, const char* fmt, ...)
+{
+    char buf[4096];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buf, 4095, fmt, args);
+    va_end(args);
+    s = buf;
+}
+
 string humanReadable(size_t s)
 {
     if (s < KB)
@@ -543,4 +553,14 @@ int gunzipit(vector<char> *from, vector<char> *to)
 {
     decompress_memory(&(*from)[0], from->size(), to);
     return OK;
+}
+
+int stringToType(std::string s, char **names, int n)
+{
+    for (int i=0; i<n; ++i) {
+        if (s == names[i]) {
+            return i;
+        }
+    }
+    return -1;
 }

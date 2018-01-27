@@ -22,6 +22,14 @@
 
 #include<vector>
 
+struct ChoiceEntry
+{
+    std::string msg;
+    std::function<void()> cb;
+
+    ChoiceEntry(std::string m, std::function<void()> c) : msg(m), cb(c) { }
+};
+
 struct UI {
     // Print output data
     static void output(const char *fmt, ...);
@@ -39,6 +47,7 @@ struct UI {
     static size_t inputSize();
     // Request a choice from a menu
     static int inputChoice(std::string msg, std::string prompt, std::vector<std::string> choices);
+    static void inputChoice(std::string msg, std::string prompt, std::vector<ChoiceEntry> choices);
 };
 
 #endif

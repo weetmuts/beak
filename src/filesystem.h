@@ -263,6 +263,8 @@ std::unique_ptr<FileSystem> newDefaultFileSystem();
 std::unique_ptr<FileSystem> newFileSystem(FuseAPI *api);
 FileSystem *defaultFileSystem();
 
+Path *configurationFile();
+
 dev_t MakeDev(int maj, int min);
 int MajorDev(dev_t d);
 int MinorDev(dev_t d);
@@ -275,7 +277,7 @@ uid_t geteuid();
 gid_t getegid();
 
 char *mkdtemp(char *pattern);
-int fork();
+pid_t fork();
 
 #endif
 

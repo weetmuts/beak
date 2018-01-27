@@ -25,6 +25,7 @@
 #include "system.h"
 #include "tarfile.h"
 #include "ui.h"
+#include "util.h"
 
 const char *autocomplete =
 #include"generated_autocomplete.h"
@@ -81,7 +82,7 @@ struct BeakImplementation : Beak {
     vector<PointInTime> &history();
     bool setPointInTime(string g);
     RC findPointsInTime(string path, vector<struct timespec> *v);
-    RC fetchPointsInTime(string remote, string local);
+    RC fetchPointsInTime(string remote, Path *cache);
 
     int configure(Options *settings);
     int push(Options *settings);
@@ -185,10 +186,10 @@ BeakImplementation::BeakImplementation(FileSystem *src_fs, FileSystem *dst_fs) :
         }
     }
 
-    configuration_ = newConfiguration(src_fs);
-    configuration_->load();
-
     sys_ = newSystem();
+
+    configuration_ = newConfiguration(sys_.get(), src_fs);
+    configuration_->load();
 }
 
 Command BeakImplementation::parseCommand(string s)
@@ -498,8 +499,8 @@ int BeakImplementation::parseCommandLine(int argc, char **argv, Command *cmd, Op
 		    rule = configuration_->rule(src);
 		}
                 if (rule) {
-                    debug(COMMANDLINE, "Translating %s to %s\n", src.c_str(), rule->path.c_str());
-                    src = rule->path;
+                    debug(COMMANDLINE, "Translating %s to %s\n", src.c_str(), rule->path->c_str());
+                    src = rule->path->str();
                 }
                 if (src.find(':') != string::npos) {
                     // Assume this is an rclone remote target.
@@ -842,7 +843,7 @@ int BeakImplementation::shell(Options *settings)
 }
 
 // Copy the remote index files to the local storage.
-RC BeakImplementation::fetchPointsInTime(string remote, string cache)
+RC BeakImplementation::fetchPointsInTime(string remote, Path *cache)
 {
     RC rc = OK;
     vector<char> out;
@@ -851,7 +852,7 @@ RC BeakImplementation::fetchPointsInTime(string remote, string cache)
     args.push_back("--include");
     args.push_back("/z01*");
     args.push_back(remote);
-    args.push_back(cache);
+    args.push_back(cache->str());
     UI::clearLine();
     UI::output("Copying index files from %s", remote.c_str());
     fflush(stdout);
@@ -865,7 +866,7 @@ RC BeakImplementation::fetchPointsInTime(string remote, string cache)
     UI::output("Listing files in %s", remote.c_str());
     fflush(stdout);
     rc = sys_->invoke("rclone", args, &out);
-    Path *p = Path::lookup(cache);
+    Path *p = cache;
     string r = remote;
     r.pop_back();
     p = p->appendName(Atom::lookup(r+".ls"));
@@ -931,10 +932,10 @@ int BeakImplementation::status(Options *settings)
     RC rc = OK;
 
     for (auto rule : configuration_->sortedRules()) {
-	UI::output("%-20s %s\n", rule->name.c_str(), rule->path.c_str());
+	UI::output("%-20s %s\n", rule->name.c_str(), rule->path->c_str());
 	{
 	    vector<struct timespec> points;
-	    rc = findPointsInTime(rule->local.target, &points);
+	    rc = findPointsInTime(rule->local->target->str(), &points);
 	    if (points.size() > 0) {
 		string ago = timeAgo(&points.front());
 		UI::output("%-20s %s\n", ago.c_str(), "local");
@@ -943,17 +944,17 @@ int BeakImplementation::status(Options *settings)
 	    }
 	}
 
-	for (auto remote : rule->sortedRemotes()) {
-	    rc = fetchPointsInTime(remote->target, rule->cache_path);
+	for (auto storage : rule->sortedStorages()) {
+	    rc = fetchPointsInTime(storage->target->str(), rule->cache_path);
 	    if (rc != OK) continue;
 
 	    vector<struct timespec> points;
-	    rc = findPointsInTime(remote->target, &points);
+	    rc = findPointsInTime(storage->target->str(), &points);
 	    if (points.size() > 0) {
 		string ago = timeAgo(&points.front());
-		UI::output("%-20s %s\n", ago.c_str(), remote->target.c_str());
+		UI::output("%-20s %s\n", ago.c_str(), storage->target->c_str());
 	    } else {
-		UI::output("%-20s %s\n", "No backup!", remote->target.c_str());
+		UI::output("%-20s %s\n", "No backup!", storage->target->c_str());
 	    }
 	}
 	UI::output("\n");

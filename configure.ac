@@ -63,10 +63,18 @@ AC_HEADER_STDC
 AC_HEADER_STAT
 AC_HEADER_TIME
 
-AC_PATH_TOOL([CC], [gcc], [:])
-AC_PATH_TOOL([CXX], [g++], [:])
-AC_PATH_TOOL([LD], [ld], [:])
-AC_PATH_TOOL([STRIP], [strip], [:])
+if test "x$CC" = "x"; then
+    AC_PATH_TOOL([CC], [gcc], [:])
+fi
+if test "x$CXX" = "x"; then
+    AC_PATH_TOOL([CXX], [g++], [:])
+fi
+if test "x$LD" = "x"; then
+    AC_PATH_TOOL([LD], [ld], [:])
+fi
+if test "x$STRIP" = "x"; then
+    AC_PATH_TOOL([STRIP], [strip], [:])
+fi
 
 AC_MSG_CHECKING([for fuse])
 

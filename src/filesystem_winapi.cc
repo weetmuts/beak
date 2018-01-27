@@ -340,3 +340,9 @@ bool makeDirHelper(const char *s)
     }
     return true;
 }
+
+Path *configurationFile()
+{
+    Path *home = Path::lookup(getenv("HOME"));
+    return home->append(".config/beak/beak.conf");
+}

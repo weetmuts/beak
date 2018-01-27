@@ -252,7 +252,7 @@ int FileSystemImplementationPosix::loadVector(Path *file, size_t blocksize, vect
 
 int FileSystemImplementationPosix::createFile(Path *file, vector<char> *buf)
 {
-    int fd = open(file->c_str(), O_WRONLY | O_CREAT, 0600);
+    int fd = open(file->c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
     if (fd == -1) {
 	failure(FILESYSTEM,"Could not open file %s errno=%d\n", file->c_str(), errno);
         return -1;
@@ -428,4 +428,10 @@ bool makeDirHelper(const char *s)
         if (errno != EEXIST) { return false; }
     }
     return true;
+}
+
+Path *configurationFile()
+{
+    Path *home = Path::lookup(getenv("HOME"));
+    return home->append(".config/beak/beak.conf");
 }

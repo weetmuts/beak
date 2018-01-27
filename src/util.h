@@ -29,6 +29,8 @@
 #include<sys/stat.h>
 #include<vector>
 
+void strprintf(std::string &s, const char* fmt, ...);
+
 std::string humanReadable(size_t s);
 size_t roundoffHumanReadable(size_t s);
 int parseHumanReadable(std::string s, size_t *out);
@@ -59,12 +61,6 @@ void fixEndian(uint64_t *t);
 bool isInTheFuture(struct timespec *tm);
 std::string timeAgo(struct timespec *tm);
 
-
-////////////////////////////////////////////////////////
-//
-// Platform specific code
-//
-
 // Seconds since 1970-01-01
 uint64_t clockGetUnixTime();
 // Microseconds since the computer was started.
@@ -74,9 +70,15 @@ int gzipit(std::string *from, std::vector<char> *to);
 int gunzipit(std::vector<char> *from, std::vector<char> *to);
 std::string randomUpperCaseCharacterString(int len);
 
-//
-//
-///////////////////////////////////////////////////////
+int stringToType(std::string s, char*[], size_t n);
+
+#define lookupType(key_in,Type,TypeNames,key_out,ok) \
+{ ok = false; \
+    for (unsigned int i=0; i<(sizeof(TypeNames)/sizeof(char*)); ++i) \
+    {  \
+        if (key_in == TypeNames[i]) { key_out = (Type)i; ok = true; } \
+    } \
+} \
 
 
 #endif
