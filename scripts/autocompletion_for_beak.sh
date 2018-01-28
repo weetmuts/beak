@@ -30,7 +30,7 @@ _beakremotes()
   local cur=${COMP_WORDS[COMP_CWORD]}
   local prev=${COMP_WORDS[COMP_CWORD-1]}
   if [ "$prev" = ":" ]; then prev=${COMP_WORDS[COMP_CWORD-2]}; fi
-  local remotes=$(sed -n "/^\[${prev}\]/,/^\[/p" ~/.config/beak/beak.conf | grep remote | sed 's/remote.*= \?//g' | sort)
+  local remotes=$(sed -n "/^\[${prev}\]/,/^\[/p" ~/.config/beak/beak.conf | grep -e 'remote\ *=' | sed 's/remote.*= \?//g' | sort)
   if [ "$remotes" != "" ]; then
       COMPREPLY=($(compgen -W "$remotes" -- $cur))
       if [ -z "$COMPREPLY" ]; then
