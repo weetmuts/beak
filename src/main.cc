@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2016-2017 Fredrik Öhrström
+ Copyright (C) 2016-2018 Fredrik Öhrström
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -129,7 +129,7 @@ int main(int argc, char *argv[])
     }
     case umount_cmd:
         if (!settings.hasSrc()) {
-            fprintf(stdout, "You must supply a directory unmount.\n");
+            fprintf(stdout, "You must supply a directory to unmount.\n");
             exit(1);
         }
         rc = beak->umountDaemon(&settings);

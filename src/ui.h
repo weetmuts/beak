@@ -24,16 +24,42 @@
 
 struct ChoiceEntry
 {
-    std::string msg;
+    // If number is empty, then a number is automatically selected for this choice.
+    // Otherwise the key can be for example s for save, q for quit etc.
+    std::string key; // Empty, or a number, or "q" for quit or "save" for save etc.
+    std::string keyword; // Supplementary key, usually a longer word, like the rule name.
+    std::string msg; // The text display for this choice, often identical to keyword.
     std::function<void()> cb;
 
-    ChoiceEntry(std::string m, std::function<void()> c) : msg(m), cb(c) { }
+    int index;
+
+    ChoiceEntry(std::string kw)
+    : keyword(kw), msg(kw), index(-1) { }
+    ChoiceEntry(std::string k, std::string kw, std::string m)
+    : key(k), keyword(kw), msg(m), index(-1) { }
+    ChoiceEntry(std::string m, std::function<void()> c)
+    : msg(m), cb(c), index(-1) { }
+    ChoiceEntry(std::string k, std::string kw, std::string m, std::function<void()> c)
+    : key(k), keyword(kw), msg(m), cb(c), index(-1) { }
 };
 
-struct UI {
+enum YesOrNo {
+    UIYes,
+    UINo
+};
+
+enum KeepOrChange {
+    UIKeep,
+    UIChange,
+    UIDiscard
+};
+
+struct UI
+{
     // Print output data
     static void output(const char *fmt, ...);
     static void output(std::string msg);
+    static void outputln(std::string msg);
     // Clear line, so that output will overwrite it again!
     static void clearLine();
     // Present a prompt message "name>" no newline/cr.
@@ -46,8 +72,11 @@ struct UI {
     // Request a size, 1024, 1K, 2M, 3G
     static size_t inputSize();
     // Request a choice from a menu
-    static int inputChoice(std::string msg, std::string prompt, std::vector<std::string> choices);
-    static void inputChoice(std::string msg, std::string prompt, std::vector<ChoiceEntry> choices);
+    static ChoiceEntry *inputChoice(std::string msg, std::string prompt, std::vector<ChoiceEntry> &choices);
+
+    static YesOrNo yesOrNo(std::string msg);
+    static KeepOrChange keepOrChange();
+    static KeepOrChange keepOrChangeOrDiscard();
 };
 
 #endif

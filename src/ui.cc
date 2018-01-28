@@ -18,6 +18,7 @@
 #include "ui.h"
 #include "filesystem.h"
 
+#include <assert.h>
 #include <stdarg.h>
 
 using namespace std;
@@ -33,6 +34,12 @@ void UI::output(const char *fmt, ...)
 void UI::output(string msg)
 {
     output(msg.c_str());
+}
+
+void UI::outputln(string msg)
+{
+    output(msg.c_str());
+    output("\n");
 }
 
 void UI::clearLine()
@@ -75,36 +82,87 @@ size_t UI::inputSize()
     return l;
 }
 
-int UI::inputChoice(string msg, string prompt, vector<string> choices)
+int menu(string msg, string prompt, vector<ChoiceEntry> choices)
 {
-    int c = -1;
     while (true)
     {
-        output("%s\n", msg.c_str());
+        UI::output("%s\n", msg.c_str());
         for (size_t i=0; i<choices.size(); ++i) {
-            output("%d > %s\n", i+1, choices[i].c_str());
+            UI::output("%s > %s\n", choices[i].key.c_str(), choices[i].msg.c_str());
         }
-        outputPrompt(prompt);
-        string s = inputString();
+        UI::outputPrompt(prompt);
+        string s = UI::inputString();
 
-        size_t i = atoi(s.c_str());
-        if (i >= 1 && i <= choices.size()) {
-            c = i-1;
-            break;
+        for (size_t i=0; i<choices.size(); ++i) {
+            if (s == choices[i].key || s == choices[i].keyword)
+            {
+                return i;
+            }
         }
-        output("Not a proper choice, please try again.\n");
+        UI::output("Not a proper choice, please try again.\n");
     }
-
-    return c;
+    assert(0);
 }
 
-void UI::inputChoice(string msg, string prompt, vector<ChoiceEntry> choices)
+ChoiceEntry *UI::inputChoice(string msg, string prompt, vector<ChoiceEntry> &choices)
 {
-    vector<string> choice_strings;
-    for (auto& ce : choices) choice_strings.push_back(ce.msg);
+    int c = 1;
+    for (auto& ce : choices) {
+        if (ce.key == "") {
+            ce.key = to_string(c);
+            c++;
+        }
+    }
+    c = menu(msg, prompt, choices);
 
-    int c = inputChoice(msg, prompt, choice_strings);
+    ChoiceEntry *ce = &choices[c];
+    if (ce->cb) ce->cb();
+    ce->index = c;
+    assert(ce->key.c_str());
+    return ce;
+}
 
-    ChoiceEntry ce = choices[c];
-    ce.cb();
+YesOrNo UI::yesOrNo(string msg)
+{
+    for (;;) {
+        UI::outputPrompt(msg+"\ny/n>");
+        string c = UI::inputString();
+        if (c == "y") {
+            return UIYes;
+        }
+        if (c == "n") {
+            return UINo;
+        }
+    }
+}
+
+KeepOrChange UI::keepOrChange()
+{
+    for (;;) {
+        UI::outputPrompt("Keep or change?\nk/c>");
+        string c = UI::inputString();
+        if (c == "k") {
+            return UIKeep;
+        }
+        if (c == "c") {
+            return UIChange;
+        }
+    }
+}
+
+KeepOrChange UI::keepOrChangeOrDiscard()
+{
+    for (;;) {
+        UI::outputPrompt("Keep,change or discard?\nk/c/d>");
+        string c = UI::inputString();
+        if (c == "k") {
+            return UIKeep;
+        }
+        if (c == "c") {
+            return UIChange;
+        }
+        if (c == "d") {
+            return UIDiscard;
+        }
+    }
 }

@@ -50,7 +50,8 @@ LIST_OF_STORAGE_TYPES
 #undef X
 };
 
-struct Keep {
+struct Keep
+{
     size_t all;
     size_t daily;
     size_t weekly;
@@ -63,7 +64,8 @@ struct Keep {
     std::string str();
 };
 
-struct Storage {
+struct Storage
+{
     // Either an rclone target (eg s3_work_crypt:/prod/bar) or
     // a full path to a directory (eg /home/backups/prod/bar)
     Path *target;
