@@ -389,7 +389,9 @@ void Rule::generateDefaultSettingsBasedOnPath()
     cache_path = Path::lookup(".beak/cache");
     cache_size = 10ul+1024*1024*1024;
 
-    storages[Path::lookupRoot()] = { Path::lookup(".beak/local"), FileSystemStorage, DEFAULT_KEEP };
+    string keep = getTimeZoneOffsetAsString(getTimeZoneOffset())+" "+DEFAULT_KEEP;
+
+    storages[Path::lookupRoot()] = { Path::lookup(".beak/local"), FileSystemStorage, keep };
     local = &storages[Path::lookupRoot()];
 }
 
@@ -777,38 +779,87 @@ size_t calcTime(string s)
 
 bool Keep::parse(string s)
 {
-/*    // Example:    "all:7d daily:2w weekly:2m monthly:2y yearly:forever"
-    // Example:    "all:2d daily:1w monthly:12m"
-
+    // Example:    "tz:+0100 all:7d daily:2w weekly:2m monthly:2y yearly:forever"
+    // Example:    "tz:+0100 all:2d daily:1w monthly:12m"
+    //
+    //
     vector<char> data(s.begin(), s.end());
     auto i = data.begin();
+    string tz, offset;
+    bool eof, err, ok;
+    int level = 0; // 0=all 1=daily, 2=weekly, 3=monthly, 4=yearly
 
-    bool eof, err;
+    tz_offset = all = daily = weekly = monthly = yearly = 0;
+
+    tz = eatToSkipWhitespace(data, i, ':', 16, &eof, &err);
+    if (eof || err) goto err;
+    if (tz != "tz") goto err;
+    offset = eatToSkipWhitespace(data, i, ' ', 16, &eof, &err);
+    if (err) goto err;
+    ok = parseTimeZoneOffset(offset, &tz_offset);
+    if (!ok) goto err;
 
     while (true) {
-        string key = eatTo(data, i, ':', 8, &eof, &err);
+        string key = eatToSkipWhitespace(data, i, ':', 16, &eof, &err);
         if (eof || err) goto err;
-        string value = eatTo(data, i, ' ', 16, &eof, &err);
-        if (err) goto err;
+        string value = eatToSkipWhitespace(data, i, ' ', 16, &eof, &err);
+        if (!eof && err) goto err;
+        time_t len = 0;
+        ok = parseLengthOfTime(value, &len);
 
+        if (!ok) return false;
+
+        if (key == "all") {
+            if (level > 0) return false;
+            level=1;
+            all = len;
+        }
+        else if (key == "daily") {
+            if (level > 1) return false;
+            level=2;
+            daily = len;
+        }
+        else if (key == "weekly") {
+            if (level > 2) return false;
+            level=3;
+            weekly = len;
+        }
+        else if (key == "monthly") {
+            if (level > 3) return false;
+            level=4;
+            monthly = len;
+        }
+        else if (key == "yearly") {
+            if (level > 4) return false;
+            level=5;
+            yearly = len;
+        }
 
         if (eof) break;
     }
 
-ok:
-    return;
+    return true;
 
 err:
-    error(CONFIGURATION, "Could not parse keep rule \"%s\"\n", s);
-*/
-    return true;
+    return false;
 }
 
 string Keep::str()
 {
-    // CET all:7d daily:2w weekly:2m monthly:2y yearly:forever
-    string s = "CET ";
-    s += "all:7d daily:2w weekly:2m monthly:2y yearly:forever";
+    string s = "tz:";
+
+    s += getTimeZoneOffsetAsString(tz_offset);
+    s += " ";
+    if (all == 0 && daily == 0 && weekly == 0 && monthly == 0 && yearly == 0) {
+        s += "mirror";
+    } else {
+        if (all) s += "all:"+getLengthOfTime(all)+" ";
+        if (daily) s += "daily:"+getLengthOfTime(daily)+" ";
+        if (weekly) s += "weekly:"+getLengthOfTime(weekly)+" ";
+        if (monthly) s += "monthly:"+getLengthOfTime(monthly)+" ";
+        if (yearly) s += "yearly:"+getLengthOfTime(yearly);
+    }
+    if (s.back() == ' ') s.pop_back();
     return s;
 }
 

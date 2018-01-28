@@ -34,6 +34,12 @@ void strprintf(std::string &s, const char* fmt, ...);
 std::string humanReadable(size_t s);
 size_t roundoffHumanReadable(size_t s);
 int parseHumanReadable(std::string s, size_t *out);
+bool parseTimeZoneOffset(std::string o, time_t *out);
+bool parseLengthOfTime(std::string s, time_t *out);
+std::string getLengthOfTime(time_t t);
+time_t getTimeZoneOffset();
+std::string getTimeZoneOffsetAsString(time_t t);
+
 size_t basepos(std::string& s);
 std::wstring to_wstring(std::string const& s);
 std::string wto_string(std::wstring const& s);
@@ -48,6 +54,8 @@ void eraseArg(int i, int *argc, char **argv);
 std::string eatTo(std::vector<char> &v, std::vector<char>::iterator &i, int c, size_t max, bool *eof, bool *err);
 // Eat whitespace (space and tab, not end of lines).
 void eatWhitespace(std::vector<char> &v, std::vector<char>::iterator &i, bool *eof);
+// First eat whitespace, then start eating until c is found or eof. The found string is trimmed from beginning and ending whitespace.
+std::string eatToSkipWhitespace(std::vector<char> &v, std::vector<char>::iterator &i, int c, size_t max, bool *eof, bool *err);
 // Remove leading and trailing white space
 void trimWhitespace(std::string *s);
 // Translate binary buffer with printable strings to ascii

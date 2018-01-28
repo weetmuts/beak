@@ -163,6 +163,82 @@ int parseHumanReadable(string s, size_t *out)
     return OK;
 }
 
+bool parseTimeZoneOffset(std::string o, time_t *out)
+{
+    if (o.length() != 5) return false;
+    if (o[0] != '-' && o[0] != '+') return false;
+    if (!isdigit(o[1]) || !isdigit(o[2]) || !isdigit(o[3]) || !isdigit(o[4])) return false;
+    int hh = o[1]-48;
+    int hl = o[2]-48;
+    int mh = o[3]-48;
+    int ml = o[4]-48;
+    time_t offset = 60*(ml+mh*10)+3600*(hl+hh*10);
+    if (o[0] == '-') *out = -offset;
+    else *out = offset;
+    return true;
+}
+
+string getLengthOfTime(time_t t)
+{
+    if (0 == (t % (3600*24*366))) {
+        return to_string(t/(3600*24*366))+"y";
+    }
+    if (0 == (t % (3600*24*31))) {
+        return to_string(t/(3600*24*31))+"m";
+    }
+    if (0 == (t % (3600*24*7))) {
+        return to_string(t/(3600*24*7))+"w";
+    }
+    if (0 == (t % (3600*24))) {
+        return to_string(t/(3600*24))+"d";
+    }
+    return "";
+}
+
+bool parseLengthOfTime(string s, time_t *out)
+{
+    time_t mul = 1;
+    char c = s.back();
+
+    if (s.length() > 16)
+    {
+        return false;
+    }
+    s = s.substr(0, s.length() - 1);
+    if (c == 'd')
+    {
+        mul = 3600*24;
+    }
+    else if (c == 'w')
+    {
+        mul = 3600*24*7;
+    }
+    else if (c == 'm')
+    {
+        mul = 3600*24*31;
+    }
+    else if (c == 'y')
+    {
+        mul = 3600*24*366;
+    }
+    else
+    {
+        return false;
+    }
+
+    for (auto c : s)
+    {
+        if (!isdigit(c))
+        {
+            return false;
+        }
+    }
+
+    *out = mul * atol(s.c_str());
+    if (*out == 0) return false;
+    return true;
+}
+
 
 
 void eraseArg(int i, int *argc, char **argv)
@@ -174,6 +250,20 @@ void eraseArg(int i, int *argc, char **argv)
             break;
     }
     (*argc)--;
+}
+
+string eatToSkipWhitespace(vector<char> &v, vector<char>::iterator &i, int c, size_t max, bool *eof, bool *err)
+{
+    eatWhitespace(v, i, eof);
+    if (*eof) {
+        if (c != -1) {
+            *err = true;
+        }
+        return "";
+    }
+    string s = eatTo(v,i,c,max,eof,err);
+    trimWhitespace(&s);
+    return s;
 }
 
 string eatTo(vector<char> &v, vector<char>::iterator &i, int c, size_t max, bool *eof, bool *err)
@@ -191,10 +281,6 @@ string eatTo(vector<char> &v, vector<char>::iterator &i, int c, size_t max, bool
     if (c != -1 && *i != c)
     {
         *err = true;
-        if (i == v.end()) {
-            *eof = true;
-        }
-        return "";
     }
     if (i != v.end())
     {
@@ -563,4 +649,43 @@ int stringToType(std::string s, char **names, int n)
         }
     }
     return -1;
+}
+
+time_t getTimeZoneOffset()
+{
+    time_t rawtime = time(NULL);
+    struct tm *ptm = gmtime(&rawtime);
+    time_t gmt = mktime(ptm);
+    ptm = localtime(&rawtime);
+    time_t offset = rawtime - gmt;
+    // We ignore dayligt savings here. (ptm->tm_isdst)
+    return offset;
+}
+
+string getTimeZoneOffsetAsString(time_t t)
+{
+    string s;
+
+    if (t>=0) s += "+";
+    else {    s += "-"; t = -t; }
+
+    time_t hours = t/3600;
+    time_t hoursten = hours/10;
+    time_t hoursone = hours-hoursten*10;
+
+    time_t minutes = (t-hours*3600)/60;
+    time_t minutesten = minutes/10;
+    time_t minutesone = minutes-minutesten*10;
+
+    assert(t == (hoursten*3600*10 + hoursone*3600 + minutesten*60*10 + minutes*60));
+    assert(hoursten <= 1 && hoursten >= 0);
+    assert(hoursone <= 9 && hoursone >= 0);
+    assert(minutesten <= 5 && minutesten >= 0);
+    assert(minutesone <= 9 && minutesone >= 0);
+
+    s += to_string(hoursten);
+    s += to_string(hoursone);
+    s += to_string(minutesten);
+    s += to_string(minutesone);
+    return s;
 }

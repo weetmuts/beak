@@ -27,7 +27,7 @@
 #include<string>
 #include<vector>
 
-#define DEFAULT_KEEP "CET all:2d daily:2w weekly:2m monthly:2y"
+#define DEFAULT_KEEP "all:2d daily:2w weekly:2m monthly:2y"
 
 #define LIST_OF_TYPES \
     X(LocalAndRemoteBackups,"Store locally and remotely")                          \
@@ -52,13 +52,21 @@ LIST_OF_STORAGE_TYPES
 
 struct Keep
 {
-    size_t all;
-    size_t daily;
-    size_t weekly;
-    size_t monthly;
-    size_t yearly;
+    // Time zone offset. E.g. CET(Central European) = 3600 IST (Indian Standard) = 5.5*3600
+    time_t tz_offset;
+    // The following values are absolute number of seconds back in time from now.
+    // Number of seconds to keep all points in time. Zero means do not store using this interval.
+    time_t all;
+    // Number of seconds to keep the last one per day
+    time_t daily;
+    // Number of seconds to keep the last one per week
+    time_t weekly;
+    // Number of seconds to keep the last one per month
+    time_t monthly;
+    // Number of seconds to keep the last one per year
+    time_t yearly;
 
-    Keep() : all(0), daily(0), weekly(0), monthly(0), yearly(0) { }
+    Keep() : tz_offset(0), all(0), daily(0), weekly(0), monthly(0), yearly(0) { }
     Keep(std::string s) { parse(s); }
     bool parse(std::string s);
     std::string str();

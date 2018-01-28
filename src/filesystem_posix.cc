@@ -415,9 +415,19 @@ string ownergroupString(uid_t uid, gid_t gid)
 Path *Path::realpath()
 {
     char tmp[PATH_MAX];
+    tmp[0] = 0;
     const char *rc = ::realpath(c_str(), tmp);
-    if (!rc) return NULL;
-    assert(rc == tmp);
+    if (!rc) {
+        // realpath somtimes return NULL, despite properly
+        // finding the full path!
+        if (errno == 2 && tmp[0] == 0) {
+            return NULL;
+        }
+        // Odd realpath behaviour, let us use the tmp anyway.
+    } else {
+        assert(rc == tmp);
+    }
+
     return Path::lookup(tmp);
 }
 
