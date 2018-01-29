@@ -73,6 +73,8 @@ struct FileStat {
 
     mode_t permissions() { return st_mode & 07777; }
     void loadFrom(const struct stat *sb);
+    void setAsRegularFile();
+    void setAsDirectory();
     void storeIn(struct stat *sb);
     bool isRegularFile();
     bool isDirectory();

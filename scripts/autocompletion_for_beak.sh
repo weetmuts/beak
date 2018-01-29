@@ -11,12 +11,12 @@ _beakusermounts()
     return 0
 }
 
-_beaksources()
+_beakrules()
 {
   local cur=${COMP_WORDS[COMP_CWORD]}
-  local sources=$(grep -o \\[.*\\] ~/.config/beak/beak.conf | tr -d '[' | tr ']' ':' | sort)
-  if [ "$sources" != "" ]; then
-      COMPREPLY=($(compgen -W "$sources" -- $cur))
+  local rules=$(grep -o \\[.*\\] ~/.config/beak/beak.conf | tr -d '[' | tr ']' ':' | sort)
+  if [ "$rules" != "" ]; then
+      COMPREPLY=($(compgen -W "$rules" -- $cur))
       if [ -z "$COMPREPLY" ]; then
           # No match for configured source trees. Try directories instead.
           _filedir -d
@@ -49,26 +49,28 @@ _beak()
     prevprev=${COMP_WORDS[COMP_CWORD-2]}
     prevprevprev=${COMP_WORDS[COMP_CWORD-3]}
 
-    # The colon in configured sources gets its own CWORD....
+    # The colon in configured rules gets its own CWORD....
     if [ "$prev" = ":" ]; then prev="$prevprev" ; prevprev="$prevprevprev"; fi
 
     case "$prev" in
-        push) _beaksources ;;
-        pull) _beakremotes ;;
-        mount) _beaksources ;;
+        push) _beakrules ;;
+        pull) _beakrules ;;
+        prune) _beakrules ;;
+        mount) _beakrules ;;
         umount) _beakusermounts ;;
-        store) _beaksources ;;
+        store) _beakrules ;;
     esac
 
     case "$prevprev" in
         push) _beakremotes ;;
-        pull) _beaksources ;;
+        pull) _beakremotes ;;
+        prune) _beakremotes ;;
         mount) _filedir -d ;;
         store) _filedir -d ;;
     esac
 
     if [ -z "$COMPREPLY" ]; then
-        COMPREPLY=($(compgen -W "push pull mount umount store" -- $cur))
+        COMPREPLY=($(compgen -W "push pull prune mount umount store" -- $cur))
     fi
 }
 

@@ -19,6 +19,7 @@
 #define BEAK_H
 
 #include "always.h"
+#include "configuration.h"
 #include "filesystem.h"
 #include "util.h"
 
@@ -45,6 +46,7 @@ struct Beak {
 
     virtual int configure(Options *settings) = 0;
     virtual int push(Options *settings) = 0;
+    virtual int prune(Options *settings) = 0;
 
     virtual int umountDaemon(Options *settings) = 0;
 
@@ -152,6 +154,7 @@ LIST_OF_OPTIONS
 
     Command help_me_on_this_cmd;
     int point_in_time; // 0 is the most recent, 1 second recent etc.
+    Rule *rule;
 
     bool hasBothSrcAndDst();
     bool hasSrc();

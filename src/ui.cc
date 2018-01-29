@@ -29,6 +29,7 @@ void UI::output(const char *fmt, ...)
     va_start(args, fmt);
     vfprintf(stdout, fmt, args);
     va_end(args);
+    fflush(stdout);
 }
 
 void UI::output(string msg)
@@ -40,6 +41,7 @@ void UI::outputln(string msg)
 {
     output(msg.c_str());
     output("\n");
+    fflush(stdout);
 }
 
 void UI::clearLine()
@@ -50,11 +52,13 @@ void UI::clearLine()
 void UI::outputPrompt(const char *msg)
 {
     printf("%s", msg);
+    fflush(stdout);
 }
 
 void UI::outputPrompt(string msg)
 {
     printf("%s", msg.c_str());
+    fflush(stdout);
 }
 
 string UI::inputString()

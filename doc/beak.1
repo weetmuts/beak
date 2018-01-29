@@ -20,7 +20,9 @@ beak \- a backup-mirror-share-rotation-pruning tool
 .SH DESCRIPTION
 .B beak
 
-Example:    % beak push /home/you/Work /media/you/USBDrive
+Examples:    % beak store /home/you/Work /media/you/USBDrive
+             % beak push work: s3_work_crypt:
+             % beak mount /media/you/USBDrive@0 /home/you/Lookback
 
 .SH OPTIONS
 .TP
@@ -61,7 +63,7 @@ Run in debug mode foreground, a lot of output.
 
 Store all all virtual tar files in the source directory, ie no subdirectories.
 
-% beak store -p 0 -ta 50M -tr 1T /home/you/Work WorkArchive
+% beak store -d 1 -ta 50M -tr 1T /home/you/Work WorkArchive
 
 .TP
 Tar the dev directory but exclude file/paths that contains the text "shm". Which are the share memory buffers, not suitable for archiving.

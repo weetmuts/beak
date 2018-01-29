@@ -92,6 +92,7 @@ int main(int argc, char *argv[])
     break;
 
     case prune_cmd:
+        rc = beak->prune(&settings);
         break;
 
     case push_cmd:

@@ -458,7 +458,7 @@ void ForwardTarredFS::fixHardLinks()
                 continue;
             }
             // Ouch, the common prefix is shorter than the storage dir....
-            warning(HARDLINKS, "Hard link between tars detected! From %s to %s\n", entry->path()->c_str(), entry->link()->c_str());
+            verbose(HARDLINKS, "Hard link between tars detected! From %s to %s\n", entry->path()->c_str(), entry->link()->c_str());
             // Find the nearest storage directory that share a common root between the entry and the target.
             TarEntry *new_storage_dir = findNearestStorageDirectory(entry->path(), entry->link());
             assert(new_storage_dir); // At least we should find the root.
@@ -762,7 +762,7 @@ TarFile *ForwardTarredFS::findTarFromPath(Path *path) {
     hex2bin(tfn.header_hash, &hash);
 
     debug(FORWARD, "Hash >%s< hash len %d >%s<\n", tfn.header_hash.c_str(), hash.size(), toHex(hash).c_str());
-    debug(FORWARD, "Type is %d suffix is %s \n", tfn.type, tfn.suffix);
+    debug(FORWARD, "Type is %d suffix is %s \n", tfn.type, tfn.suffix.c_str());
 
     if (tfn.type == REG_FILE && tfn.suffix == "gz") {
         if (!te->hasGzFile()) {
@@ -1024,9 +1024,105 @@ int ForwardTarredFS::scanFileSystem(Options *settings)
     return OK;
 }
 
+struct ForwardFileSystem : FileSystem
+{
+    ForwardTarredFS *forw_;
+
+    bool readdir(Path *p, std::vector<Path*> *vec)
+    {
+        return false;
+    }
+    ssize_t pread(Path *p, char *buf, size_t size, off_t offset)
+    {
+        return 0;
+    }
+
+    void recurse(std::function<void(Path *path, FileStat *stat)> cb)
+    {
+        for (auto& e : forw_->tar_storage_directories)
+        {
+            for (auto& f : e.second->tars()) {
+                Path *file_name = f->path(); //->prepend(forw_root_dir_path;
+
+                FileStat stat;
+                stat.st_atim = *f->mtim();
+                stat.st_mtim = *f->mtim();
+                stat.st_size = f->size();
+                stat.st_mode = 0400;
+                stat.setAsRegularFile();
+                if (stat.st_size > 0) {
+                    cb(file_name, &stat);
+                }
+            }
+            Path *dir = e.second->path(); //->prepend(settings->dst);
+            FileStat stat;
+            stat.st_mode = 0600;
+            stat.setAsDirectory();
+            cb(dir, &stat);
+        }
+    }
+
+    RC stat(Path *p, FileStat *fs)
+    {
+        return ERR;
+    }
+    RC chmod(Path *p, FileStat *fs)
+    {
+        return ERR;
+    }
+    RC utime(Path *p, FileStat *fs)
+    {
+        return ERR;
+    }
+    Path *mkTempDir(std::string prefix)
+    {
+        return NULL;
+    }
+    Path *mkDir(Path *p, std::string name)
+    {
+        return NULL;
+    }
+    int loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
+    {
+        return 0;
+    }
+    int createFile(Path *file, std::vector<char> *buf)
+    {
+        return 0;
+    }
+    bool createFile(Path *path, FileStat *stat,
+                     std::function<size_t(off_t offset, char *buffer, size_t len)> cb)
+    {
+        return false;
+    }
+    bool createSymbolicLink(Path *file, FileStat *stat, string target)
+    {
+        return false;
+    }
+    bool createHardLink(Path *file, FileStat *stat, Path *target)
+    {
+        return false;
+    }
+    bool createFIFO(Path *file, FileStat *stat)
+    {
+        return false;
+    }
+    bool readLink(Path *file, string *target)
+    {
+        return false;
+    }
+    bool deleteFile(Path *file)
+    {
+        return false;
+    }
+
+
+    ForwardFileSystem(ForwardTarredFS *forw) : forw_(forw) { }
+};
+
 FileSystem *ForwardTarredFS::asFileSystem()
 {
-    return NULL;
+    return new ForwardFileSystem(this);
 }
 
 unique_ptr<ForwardTarredFS> newForwardTarredFS(FileSystem *fs)

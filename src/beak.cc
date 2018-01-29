@@ -86,6 +86,7 @@ struct BeakImplementation : Beak {
 
     int configure(Options *settings);
     int push(Options *settings);
+    int prune(Options *settings);
 
     int umountDaemon(Options *settings);
 
@@ -493,14 +494,13 @@ int BeakImplementation::parseCommandLine(int argc, char **argv, Command *cmd, Op
                     }
                 }
 
-                Rule *rule = NULL;
 		if (src.back() == ':') {
 		    src.pop_back();
-		    rule = configuration_->rule(src);
+		    settings->rule = configuration_->rule(src);
 		}
-                if (rule) {
-                    debug(COMMANDLINE, "Translating %s to %s\n", src.c_str(), rule->path->c_str());
-                    src = rule->path->str();
+                if (settings->rule) {
+                    debug(COMMANDLINE, "Translating %s to %s\n", src.c_str(), settings->rule->path->c_str());
+                    src = settings->rule->path->str();
                 }
                 if (src.find(':') != string::npos) {
                     // Assume this is an rclone remote target.
@@ -540,20 +540,27 @@ int BeakImplementation::parseCommandLine(int argc, char **argv, Command *cmd, Op
         }
     }
 
-    if (*cmd == mount_cmd || *cmd == push_cmd) {
+    if (*cmd == mount_cmd || *cmd == store_cmd) {
         if (!settings->src) {
-            error(COMMANDLINE,"You have to specify a src directory.\n");
+            failure(COMMANDLINE,"You have to specify a src directory.\n");
+            return ERR;
         }
     }
     if (*cmd == mount_cmd) {
         if (!settings->dst) {
-            error(COMMANDLINE,"You have to specify a dst directory.\n");
+            failure(COMMANDLINE,"You have to specify a dst directory.\n");
+            return ERR;
         }
         settings->fuse_args.push_back(settings->dst->c_str());
     }
     if (*cmd == push_cmd) {
+        if (!settings->rule) {
+            failure(COMMANDLINE,"When pushing you have to specify a rule.\n");
+            return ERR;
+        }
         if (!settings->dst && settings->remote == "") {
-            error(COMMANDLINE,"You have to specify a remote or a dst directory.\n");
+            failure(COMMANDLINE,"When pushing you have to specify a remote or a directory.\n");
+            return ERR;
         }
     }
 
@@ -608,6 +615,7 @@ int BeakImplementation::configure(Options *settings)
 
 int BeakImplementation::push(Options *settings)
 {
+    assert(settings->rule);
     Path *mount = src_file_system_->mkTempDir("beak_push_");
     Options forward_settings = *settings;
     forward_settings.dst = mount;
@@ -635,6 +643,14 @@ int BeakImplementation::push(Options *settings)
     // Unmount virtual filesystem.
     rc = umountForward(&forward_settings);
     rmdir(mount->c_str());
+
+    return rc;
+}
+
+int BeakImplementation::prune(Options *settings)
+{
+    RC rc = OK;
+
 
     return rc;
 }
@@ -965,17 +981,93 @@ int BeakImplementation::status(Options *settings)
 
 struct ForwardStoreStatistics
 {
-    size_t num_files, num_dirs;
+    size_t num_files, size_files, num_dirs;
+
     size_t num_files_stored, size_files_stored;
     size_t num_dirs_updated;
+
+    size_t num_files_handled, size_files_handled;
+    size_t num_dirs_handled;
+
+    uint64_t prev, start;
+
+    ForwardStoreStatistics() {
+        memset(this, 0, sizeof(ForwardStoreStatistics));
+        start = prev = clockGetTime();
+    }
+    //Tar emot objekt: 100% (814178/814178), 669.29 MiB | 6.71 MiB/s, klart.
+    //Analyserar delta: 100% (690618/690618), klart.
+
+    void displayProgress() {
+        uint64_t now = clockGetTime();
+        //if ((now-prev) < 500000) return;
+        prev = now;
+        UI::clearLine();
+        int percentage = (int)(100.0*(float)num_files_handled / (float)num_files);
+        float mibs = ((float)(size_files_handled/1024))/100.0;
+        float secs = ((float)(now-start))/10000000.0;
+        float speed = mibs / secs;
+        UI::output("Storing: %d%% (%ju/%ju), %.2f MiB | %.2f MiB/s %.2f s", percentage, num_files_handled, num_files, mibs, speed, secs);
+    }
+
+    void finishProgress() {
+        UI::clearLine();
+        uint64_t now = clockGetTime();
+        float mibs = ((float)(size_files_handled/1024))/100.0;
+        float secs = ((float)(now-start))/1000000.0;
+        float speed = mibs / secs;
+        UI::output("Storing: %d%% (%ju/%ju), %.2f MiB | %.2f MiB/s, done.\n", 100, num_files_handled, num_files, mibs, speed);
+    }
+
 };
+
+void calculateForwardWork(Path *path, FileStat *stat,
+                          ForwardTarredFS *rfs, Beak *beak,
+                          Options *settings, ForwardStoreStatistics *st,
+                          FileSystem *src_fs, FileSystem *dst_fs)
+{
+    if (stat->isRegularFile()) { st->num_files++; st->size_files+=stat->st_size; }
+    else if (stat->isDirectory()) st->num_dirs++;
+}
+
+void handleFile(Path *path, FileStat *stat,
+                ForwardTarredFS *rfs, Beak *beak,
+                Options *settings, ForwardStoreStatistics *st,
+                FileSystem *src_fs, FileSystem *dst_fs)
+{
+    if (!stat->isRegularFile()) return;
+
+    debug(STORE, "PATH %s\n", path->c_str());
+    TarFile *tar = rfs->findTarFromPath(path);
+    assert(tar);
+    Path *file_name = tar->path()->prepend(settings->dst);
+    dst_fs->mkDirp(file_name->parent());
+    FileStat old_stat;
+    if (OK == dst_fs->stat(file_name, &old_stat) &&
+        stat->samePermissions(&old_stat) &&
+        stat->sameSize(&old_stat) &&
+        stat->sameMTime(&old_stat)) {
+
+        debug(STORE, "Skipping %s\n", file_name->c_str());
+    } else {
+        tar->createFile(file_name, stat, src_fs, dst_fs);
+        dst_fs->utime(file_name, stat);
+        st->num_files_stored++;
+        st->size_files_stored += stat->st_size;
+
+        verbose(STORE, "Stored %s\n", file_name->c_str());
+    }
+    st->num_files_handled++;
+    st->size_files_handled += stat->st_size;
+    st->displayProgress();
+}
 
 int BeakImplementation::storeForward(Options *settings)
 {
     int rc = 0;
 
     auto ffs  = newForwardTarredFS(src_file_system_);
-//    auto view = ffs->asFileSystem();
+    auto view = ffs->asFileSystem();
 
     uint64_t start = clockGetTime();
     rc = ffs->scanFileSystem(settings);
@@ -983,36 +1075,19 @@ int BeakImplementation::storeForward(Options *settings)
     ForwardStoreStatistics st;
     memset(&st, 0, sizeof(st));
 
-    for (auto& e : ffs->tar_storage_directories) {
-        Path *dir = e.second->path()->prepend(settings->dst);
-        dst_file_system_->mkDirp(dir);
-        for (auto& f : e.second->tars()) {
-            st.num_files++;
-            Path *file_name = f->path()->prepend(settings->dst);
-            FileStat stat;
-            stat.st_atim = *f->mtim();
-            stat.st_mtim = *f->mtim();
-            stat.st_size = f->size();
-            stat.st_mode = 0400;
-            FileStat old_stat;
-            if (OK == dst_file_system_->stat(file_name, &old_stat)) {
-                if (stat.samePermissions(&old_stat) &&
-                    stat.sameSize(&old_stat) &&
-                    stat.sameMTime(&old_stat)) {
-                    debug(STORE, "Skipping tar %s\n", file_name->c_str());
-                    continue;
-                }
-            }
+    view->recurse([&ffs,this,settings,&st]
+                  (Path *path, FileStat *stat) {calculateForwardWork(path,stat,ffs.get(),this,settings,&st,
+                                                                     src_file_system_, dst_file_system_); });
 
-            f->createFile(file_name, &stat, src_file_system_, dst_file_system_);
-            dst_file_system_->utime(file_name, &stat);
-            st.num_files_stored++;
-            st.size_files_stored+=stat.st_size;
-            verbose(STORE, "Stored %s\n", file_name->c_str());
-        }
-    }
+    debug(STORE, "Work to be done: num_files=%ju num_dirs=%ju\n", st.num_files, st.num_dirs);
+
+    view->recurse([&ffs,this,settings,&st]
+                  (Path *path, FileStat *stat) {handleFile(path,stat,ffs.get(),this,settings,&st,
+                                                           src_file_system_, dst_file_system_); });
     uint64_t stop = clockGetTime();
     uint64_t store_time = stop - start;
+
+    st.finishProgress();
 
     if (st.num_files_stored == 0 && st.num_dirs_updated == 0) {
         info(STORE, "No stores needed, everything was up to date.\n");
@@ -1032,19 +1107,25 @@ int BeakImplementation::storeForward(Options *settings)
 
 struct ReverseStoreStatistics
 {
-    size_t num_files, num_symbolic_links, num_hard_links, num_device_nods, num_dirs;
+    size_t num_hard_links, num_files, size_files, num_symbolic_links, num_nodes, num_dirs;
+
+    size_t num_hard_links_stored;
     size_t num_files_stored, size_files_stored;
     size_t num_symbolic_links_stored;
-    size_t num_hard_links_stored;
     size_t num_device_nodes_stored;
     size_t num_dirs_updated;
+
+    void displayProgress() {
+        //UI::clearLine();
+        UI::output("%ju / %ju\n", num_files_stored, num_files);
+    }
 };
+
 
 bool extractHardLink(FileSystem *src, Path *target,
                      FileSystem *dst, Path *dst_root, Path *file_to_extract, FileStat *stat,
                      ReverseStoreStatistics *statistics)
 {
-    statistics->num_hard_links++;
     target = target->prepend(dst_root);
     FileStat target_stat;
     if (OK != dst->stat(target, &target_stat)) {
@@ -1076,6 +1157,7 @@ bool extractHardLink(FileSystem *src, Path *target,
     dst->utime(file_to_extract, stat);
     statistics->num_hard_links_stored++;
     verbose(STORE, "Stored hard link %s\n", file_to_extract->c_str());
+    statistics->displayProgress();
     return true;
 }
 
@@ -1083,7 +1165,6 @@ bool extractFile(FileSystem *src, Path *tar_file, off_t tar_file_offset,
                  FileSystem *dst, Path *file_to_extract, FileStat *stat,
                  ReverseStoreStatistics *statistics)
 {
-    statistics->num_files++;
     FileStat old_stat;
     if (OK == dst->stat(file_to_extract, &old_stat)) {
         if (stat->samePermissions(&old_stat) &&
@@ -1112,8 +1193,9 @@ bool extractFile(FileSystem *src, Path *tar_file, off_t tar_file_offset,
     dst->utime(file_to_extract, stat);
     statistics->num_files_stored++;
     statistics->size_files_stored+=stat->st_size;
-    verbose(STORE, "Stored file %s (%ju %s)\n",
+    verbose(STORE, "Stored %s (%ju %s)\n",
             file_to_extract->c_str(), stat->st_size, permissionString(stat).c_str());
+    statistics->displayProgress();
     return true;
 }
 
@@ -1121,7 +1203,6 @@ bool extractSymbolicLink(FileSystem *src, string target,
                         FileSystem *dst, Path *file_to_extract, FileStat *stat,
                         ReverseStoreStatistics *statistics)
 {
-    statistics->num_symbolic_links++;
     string old_target;
     FileStat old_stat;
     bool found =  OK == dst->stat(file_to_extract, &old_stat);
@@ -1148,6 +1229,7 @@ bool extractSymbolicLink(FileSystem *src, string target,
     dst->utime(file_to_extract, stat);
     statistics->num_symbolic_links_stored++;
     verbose(STORE, "Stored symlink %s\n", file_to_extract->c_str());
+    statistics->displayProgress();
     return true;
 }
 
@@ -1170,6 +1252,7 @@ bool extractNode(FileSystem *src, FileSystem *dst, Path *file_to_extract, FileSt
         dst->createFIFO(file_to_extract, stat);
         dst->utime(file_to_extract, stat);
         verbose(STORE, "Stored fifo %s\n", file_to_extract->c_str());
+        statistics->displayProgress();
     }
     return true;
 }
@@ -1177,8 +1260,6 @@ bool extractNode(FileSystem *src, FileSystem *dst, Path *file_to_extract, FileSt
 bool chmodDirectory(FileSystem *dst, Path *file_to_extract, FileStat *stat,
                     ReverseStoreStatistics *statistics)
 {
-    statistics->num_dirs++;
-
     FileStat old_stat;
     if (OK == dst->stat(file_to_extract, &old_stat)) {
         if (stat->samePermissions(&old_stat) &&
@@ -1198,7 +1279,21 @@ bool chmodDirectory(FileSystem *dst, Path *file_to_extract, FileStat *stat,
     dst->utime(file_to_extract, stat);
     statistics->num_dirs_updated++;
     verbose(STORE, "Updated dir %s\n", file_to_extract->c_str());
+    statistics->displayProgress();
     return true;
+}
+
+void calculateReverseWork(Path *path, FileStat *stat,
+                          ReverseTarredFS *rfs, Beak *beak, PointInTime *point,
+                          Options *settings, ReverseStoreStatistics *st,
+                          FileSystem *src_fs, FileSystem *dst_fs)
+{
+    auto entry = rfs->findEntry(point, path);
+    if (entry->is_hard_link) st->num_hard_links++;
+    else if (stat->isRegularFile()) { st->num_files++; st->size_files+=stat->st_size; }
+    else if (stat->isSymbolicLink()) st->num_symbolic_links++;
+    else if (stat->isDirectory()) st->num_dirs++;
+    else if (stat->isFIFO()) st->num_nodes++;
 }
 
 void handleHardLinks(Path *path, FileStat *stat,
@@ -1293,8 +1388,14 @@ int BeakImplementation::storeReverse(Options *settings)
     uint64_t start = clockGetTime();
     rc = rfs->loadBeakFileSystem(settings);
 
-    ReverseStoreStatistics st;
+    ReverseStoreStatistics st = { 0 };
     memset(&st, 0, sizeof(st));
+
+    view->recurse([&rfs,this,point,settings,&st]
+                  (Path *path, FileStat *stat) {calculateReverseWork(path,stat,rfs.get(),this,point,settings,&st,
+                                                                     src_file_system_, dst_file_system_); });
+    debug(STORE, "Work to be done: num_files=%ju num_hardlinks=%ju num_symlinks=%ju num_nodes=%ju num_dirs=%ju\n",
+          st.num_files, st.num_hard_links, st.num_symbolic_links, st.num_nodes, st.num_dirs);
 
     view->recurse([&rfs,this,point,settings,&st]
                   (Path *path, FileStat *stat) {handleRegularFiles(path,stat,rfs.get(),this,point,settings,&st,
