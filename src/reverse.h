@@ -40,11 +40,14 @@
 #include "tar.h"
 #include "util.h"
 
+enum UpdateDisk {
+    NoUpdate,
+    UpdatePermissions,
+    Store
+};
+
 struct Entry
 {
-    Entry() : offset(0), path(0), tar(0), is_sym_link(false), is_hard_link(false), hard_link(0), loaded(false) { }
-    Entry(FileStat s, size_t o, Path *p) : fs(s), offset(o), path(p), is_sym_link(false), is_hard_link(false), loaded(false) { }
-
     FileStat fs;
     size_t offset;
     Path *path;
@@ -57,7 +60,15 @@ struct Entry
     // A hard link always points a real file stored in the same directory or in a subdirectory.
     Path *hard_link;
     bool loaded;
+    UpdateDisk disk_update;
 
+    Entry() : offset(0), path(0), tar(0), is_sym_link(false), is_hard_link(false),
+        hard_link(0), loaded(false), disk_update(NoUpdate) { }
+    Entry(FileStat s, size_t o, Path *p) : fs(s), offset(o), path(p),
+        is_sym_link(false), is_hard_link(false), loaded(false),
+        disk_update(NoUpdate) { }
+
+    void checkStat(FileSystem *dst, Path *target); // Compare with stat of target and set disk_update properly.
 };
 
 enum PointInTimeFormat : short {

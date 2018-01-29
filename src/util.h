@@ -32,6 +32,7 @@
 void strprintf(std::string &s, const char* fmt, ...);
 
 std::string humanReadable(size_t s);
+std::string humanReadableTwoDecimals(size_t s);
 size_t roundoffHumanReadable(size_t s);
 int parseHumanReadable(std::string s, size_t *out);
 bool parseTimeZoneOffset(std::string o, time_t *out);

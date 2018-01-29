@@ -745,3 +745,21 @@ unique_ptr<ReverseTarredFS> newReverseTarredFS(FileSystem *fs)
 {
     return unique_ptr<ReverseTarredFS>(new ReverseTarredFS(fs));
 }
+
+void Entry::checkStat(FileSystem *dst, Path *target)
+{
+    FileStat old_stat;
+    RC rc = dst->stat(target, &old_stat);
+    if (rc != OK) { disk_update = Store; return; }
+    if (fs.sameSize(&old_stat) && fs.sameMTime(&old_stat))
+    {
+        if (!fs.samePermissions(&old_stat))
+        {
+            disk_update = UpdatePermissions;
+            return;
+        }
+        disk_update = NoUpdate;
+        return;
+    }
+    disk_update = Store;
+}

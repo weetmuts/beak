@@ -979,9 +979,10 @@ int BeakImplementation::status(Options *settings)
     return rc;
 }
 
-struct ForwardStoreStatistics
+struct StoreStatistics
 {
     size_t num_files, size_files, num_dirs;
+    size_t num_hard_links, num_symbolic_links, num_nodes;
 
     size_t num_files_stored, size_files_stored;
     size_t num_dirs_updated;
@@ -989,10 +990,16 @@ struct ForwardStoreStatistics
     size_t num_files_handled, size_files_handled;
     size_t num_dirs_handled;
 
+    size_t num_hard_links_stored;
+    size_t num_symbolic_links_stored;
+    size_t num_device_nodes_stored;
+
+    size_t num_total, num_total_handled;
+
     uint64_t prev, start;
 
-    ForwardStoreStatistics() {
-        memset(this, 0, sizeof(ForwardStoreStatistics));
+    StoreStatistics() {
+        memset(this, 0, sizeof(StoreStatistics));
         start = prev = clockGetTime();
     }
     //Tar emot objekt: 100% (814178/814178), 669.29 MiB | 6.71 MiB/s, klart.
@@ -1000,30 +1007,27 @@ struct ForwardStoreStatistics
 
     void displayProgress() {
         uint64_t now = clockGetTime();
-        //if ((now-prev) < 500000) return;
+        if ((now-prev) < 500000) return;
         prev = now;
         UI::clearLine();
-        int percentage = (int)(100.0*(float)num_files_handled / (float)num_files);
-        float mibs = ((float)(size_files_handled/1024))/100.0;
-        float secs = ((float)(now-start))/10000000.0;
-        float speed = mibs / secs;
-        UI::output("Storing: %d%% (%ju/%ju), %.2f MiB | %.2f MiB/s %.2f s", percentage, num_files_handled, num_files, mibs, speed, secs);
+        int percentage = (int)(100.0*(float)size_files_handled / (float)size_files);
+        string mibs = humanReadableTwoDecimals(size_files_handled);
+        float secs = ((float)((now-start)/1000))/1000.0;
+        string speed = humanReadableTwoDecimals(((double)size_files_handled)/secs);
+        UI::output("Storing: %d%% (%ju/%ju), %s | %.2f s %s/s ",
+                   percentage, num_files_handled, num_files, mibs.c_str(), secs, speed.c_str());
     }
 
     void finishProgress() {
-        UI::clearLine();
-        uint64_t now = clockGetTime();
-        float mibs = ((float)(size_files_handled/1024))/100.0;
-        float secs = ((float)(now-start))/1000000.0;
-        float speed = mibs / secs;
-        UI::output("Storing: %d%% (%ju/%ju), %.2f MiB | %.2f MiB/s, done.\n", 100, num_files_handled, num_files, mibs, speed);
+        displayProgress();
+        UI::output(", done.\n");
     }
 
 };
 
 void calculateForwardWork(Path *path, FileStat *stat,
                           ForwardTarredFS *rfs, Beak *beak,
-                          Options *settings, ForwardStoreStatistics *st,
+                          Options *settings, StoreStatistics *st,
                           FileSystem *src_fs, FileSystem *dst_fs)
 {
     if (stat->isRegularFile()) { st->num_files++; st->size_files+=stat->st_size; }
@@ -1032,7 +1036,7 @@ void calculateForwardWork(Path *path, FileStat *stat,
 
 void handleFile(Path *path, FileStat *stat,
                 ForwardTarredFS *rfs, Beak *beak,
-                Options *settings, ForwardStoreStatistics *st,
+                Options *settings, StoreStatistics *st,
                 FileSystem *src_fs, FileSystem *dst_fs)
 {
     if (!stat->isRegularFile()) return;
@@ -1072,8 +1076,7 @@ int BeakImplementation::storeForward(Options *settings)
     uint64_t start = clockGetTime();
     rc = ffs->scanFileSystem(settings);
 
-    ForwardStoreStatistics st;
-    memset(&st, 0, sizeof(st));
+    StoreStatistics st;
 
     view->recurse([&ffs,this,settings,&st]
                   (Path *path, FileStat *stat) {calculateForwardWork(path,stat,ffs.get(),this,settings,&st,
@@ -1105,26 +1108,9 @@ int BeakImplementation::storeForward(Options *settings)
     return rc;
 }
 
-struct ReverseStoreStatistics
-{
-    size_t num_hard_links, num_files, size_files, num_symbolic_links, num_nodes, num_dirs;
-
-    size_t num_hard_links_stored;
-    size_t num_files_stored, size_files_stored;
-    size_t num_symbolic_links_stored;
-    size_t num_device_nodes_stored;
-    size_t num_dirs_updated;
-
-    void displayProgress() {
-        //UI::clearLine();
-        UI::output("%ju / %ju\n", num_files_stored, num_files);
-    }
-};
-
-
 bool extractHardLink(FileSystem *src, Path *target,
                      FileSystem *dst, Path *dst_root, Path *file_to_extract, FileStat *stat,
-                     ReverseStoreStatistics *statistics)
+                     StoreStatistics *statistics)
 {
     target = target->prepend(dst_root);
     FileStat target_stat;
@@ -1163,13 +1149,18 @@ bool extractHardLink(FileSystem *src, Path *target,
 
 bool extractFile(FileSystem *src, Path *tar_file, off_t tar_file_offset,
                  FileSystem *dst, Path *file_to_extract, FileStat *stat,
-                 ReverseStoreStatistics *statistics)
+                 StoreStatistics *statistics)
 {
     FileStat old_stat;
     if (OK == dst->stat(file_to_extract, &old_stat)) {
-        if (stat->samePermissions(&old_stat) &&
-            stat->sameSize(&old_stat) &&
+        if (stat->sameSize(&old_stat) &&
             stat->sameMTime(&old_stat)) {
+
+            if (!stat->samePermissions(&old_stat)) {
+                dst->chmod(file_to_extract, stat);
+                verbose(STORE, "Updating permissions for file \"%s\" to %o\n", file_to_extract->c_str(), stat->st_mode);
+                return false;
+            }
             debug(STORE, "Skipping file \"%s\"\n", file_to_extract->c_str());
             return false;
         }
@@ -1193,15 +1184,15 @@ bool extractFile(FileSystem *src, Path *tar_file, off_t tar_file_offset,
     dst->utime(file_to_extract, stat);
     statistics->num_files_stored++;
     statistics->size_files_stored+=stat->st_size;
-    verbose(STORE, "Stored %s (%ju %s)\n",
-            file_to_extract->c_str(), stat->st_size, permissionString(stat).c_str());
+    verbose(STORE, "Stored %s (%ju %s %06o)\n",
+            file_to_extract->c_str(), stat->st_size, permissionString(stat).c_str(), stat->st_mode);
     statistics->displayProgress();
     return true;
 }
 
 bool extractSymbolicLink(FileSystem *src, string target,
                         FileSystem *dst, Path *file_to_extract, FileStat *stat,
-                        ReverseStoreStatistics *statistics)
+                        StoreStatistics *statistics)
 {
     string old_target;
     FileStat old_stat;
@@ -1234,7 +1225,7 @@ bool extractSymbolicLink(FileSystem *src, string target,
 }
 
 bool extractNode(FileSystem *src, FileSystem *dst, Path *file_to_extract, FileStat *stat,
-                 ReverseStoreStatistics *statistics)
+                 StoreStatistics *statistics)
 {
     FileStat old_stat;
     if (OK == dst->stat(file_to_extract, &old_stat)) {
@@ -1258,7 +1249,7 @@ bool extractNode(FileSystem *src, FileSystem *dst, Path *file_to_extract, FileSt
 }
 
 bool chmodDirectory(FileSystem *dst, Path *file_to_extract, FileStat *stat,
-                    ReverseStoreStatistics *statistics)
+                    StoreStatistics *statistics)
 {
     FileStat old_stat;
     if (OK == dst->stat(file_to_extract, &old_stat)) {
@@ -1285,7 +1276,7 @@ bool chmodDirectory(FileSystem *dst, Path *file_to_extract, FileStat *stat,
 
 void calculateReverseWork(Path *path, FileStat *stat,
                           ReverseTarredFS *rfs, Beak *beak, PointInTime *point,
-                          Options *settings, ReverseStoreStatistics *st,
+                          Options *settings, StoreStatistics *st,
                           FileSystem *src_fs, FileSystem *dst_fs)
 {
     auto entry = rfs->findEntry(point, path);
@@ -1298,7 +1289,7 @@ void calculateReverseWork(Path *path, FileStat *stat,
 
 void handleHardLinks(Path *path, FileStat *stat,
                      ReverseTarredFS *rfs, Beak *beak,PointInTime *point,
-                     Options *settings, ReverseStoreStatistics *st,
+                     Options *settings, StoreStatistics *st,
                      FileSystem *src_fs, FileSystem *dst_fs)
 {
     auto entry = rfs->findEntry(point, path);
@@ -1314,7 +1305,7 @@ void handleHardLinks(Path *path, FileStat *stat,
 
 void handleRegularFiles(Path *path, FileStat *stat,
                         ReverseTarredFS *rfs, Beak *beak,PointInTime *point,
-                        Options *settings, ReverseStoreStatistics *st,
+                        Options *settings, StoreStatistics *st,
                         FileSystem *src_fs, FileSystem *dst_fs)
 {
     auto entry = rfs->findEntry(point, path);
@@ -1323,14 +1314,17 @@ void handleRegularFiles(Path *path, FileStat *stat,
     auto file_to_extract = path->prepend(settings->dst);
 
     if (!entry->is_hard_link && stat->isRegularFile()) {
+        entry->checkStat(dst_fs, file_to_extract);
         extractFile(src_fs, tar_file, tar_file_offset,
                     dst_fs, file_to_extract, stat, st);
+        st->num_files_handled++;
+        st->size_files_handled += stat->st_size;
     }
 }
 
 void handleNodes(Path *path, FileStat *stat,
                  ReverseTarredFS *rfs, Beak *beak,PointInTime *point,
-                 Options *settings, ReverseStoreStatistics *st,
+                 Options *settings, StoreStatistics *st,
                  FileSystem *src_fs, FileSystem *dst_fs)
 {
     auto entry = rfs->findEntry(point, path);
@@ -1343,7 +1337,7 @@ void handleNodes(Path *path, FileStat *stat,
 
 void handleSymbolicLinks(Path *path, FileStat *stat,
                          ReverseTarredFS *rfs, Beak *beak,PointInTime *point,
-                         Options *settings, ReverseStoreStatistics *st,
+                         Options *settings, StoreStatistics *st,
                          FileSystem *src_fs, FileSystem *dst_fs)
 {
     auto entry = rfs->findEntry(point, path);
@@ -1357,7 +1351,7 @@ void handleSymbolicLinks(Path *path, FileStat *stat,
 
 void handleDirs(Path *path, FileStat *stat,
                 ReverseTarredFS *rfs, Beak *beak,PointInTime *point,
-                Options *settings, ReverseStoreStatistics *st,
+                Options *settings, StoreStatistics *st,
                 FileSystem *src_fs, FileSystem *dst_fs)
 {
     auto file_to_extract = path->prepend(settings->dst);
@@ -1371,6 +1365,7 @@ int BeakImplementation::storeReverse(Options *settings)
 {
     RC rc = OK;
 
+    umask(0);
     auto rfs  = newReverseTarredFS(src_file_system_);
     auto view = rfs->asFileSystem();
 
@@ -1388,8 +1383,7 @@ int BeakImplementation::storeReverse(Options *settings)
     uint64_t start = clockGetTime();
     rc = rfs->loadBeakFileSystem(settings);
 
-    ReverseStoreStatistics st = { 0 };
-    memset(&st, 0, sizeof(st));
+    StoreStatistics st;
 
     view->recurse([&rfs,this,point,settings,&st]
                   (Path *path, FileStat *stat) {calculateReverseWork(path,stat,rfs.get(),this,point,settings,&st,
@@ -1415,6 +1409,8 @@ int BeakImplementation::storeReverse(Options *settings)
 
     uint64_t stop = clockGetTime();
     uint64_t store_time = stop - start;
+
+    st.finishProgress();
 
     if (st.num_files_stored == 0 && st.num_symbolic_links_stored == 0 && st.num_dirs_updated == 0) {
         info(STORE, "No stores needed, everything was up to date.\n");

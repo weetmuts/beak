@@ -59,30 +59,67 @@ string humanReadable(size_t s)
 {
     if (s < KB)
     {
-        return to_string(s);
+        return to_string(s) + "B";
     }
     if (s < KB * KB)
     {
         s /= KB;
-        return to_string(s) + "K";
+        return to_string(s) + "KiB";
     }
     if (s < KB * KB * KB)
     {
         s /= KB * KB;
-        return to_string(s) + "M";
+        return to_string(s) + "MiB";
     }
     if (s < KB * KB * KB * KB)
     {
         s /= KB * KB * KB;
-        return to_string(s) + "G";
+        return to_string(s) + "GiB";
     }
     if (s < KB * KB * KB * KB * KB)
     {
         s /= KB * KB * KB * KB;
-        return to_string(s) + "T";
+        return to_string(s) + "TiB";
     }
     s /= KB * KB * KB * KB * KB;
-    return to_string(s) + "P";
+    return to_string(s) + "PiB";
+}
+
+string helper(size_t scale, size_t s, string suffix)
+{
+    size_t o = s;
+    s /= scale;
+    size_t diff = o-(s*scale);
+    if (diff == 0) {
+        return to_string(s) + ".00 "+suffix;
+    }
+    size_t dec = (int)(100*(diff+1) / scale);
+    return to_string(s) + ((dec<10)?".0":".") + to_string(dec) + " "+suffix;
+}
+
+string humanReadableTwoDecimals(size_t s)
+{
+    if (s < KB)
+    {
+        return to_string(s) + "B";
+    }
+    if (s < KB * KB)
+    {
+        return helper(KB, s, "KiB");
+    }
+    if (s < KB * KB * KB)
+    {
+        return helper(KB*KB, s, "MiB");
+    }
+    if (s < KB * KB * KB * KB)
+    {
+        return helper(KB*KB*KB, s, "GiB");
+    }
+    if (s < KB * KB * KB * KB * KB)
+    {
+        return helper(KB*KB*KB*KB, s, "TiB");
+    }
+    return helper(KB*KB*KB*KB*KB, s, "PiB");
 }
 
 size_t roundoffHumanReadable(size_t s)

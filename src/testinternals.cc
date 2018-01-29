@@ -29,6 +29,7 @@ static ComponentId TEST_RANDOM = registerLogComponent("test_random");
 static ComponentId TEST_FILESYSTEM = registerLogComponent("test_filesystem");
 static ComponentId TEST_GZIP = registerLogComponent("test_filesystem");
 static ComponentId TEST_KEEP = registerLogComponent("test_keep");
+static ComponentId TEST_HUMANREADABLE = registerLogComponent("human_readable");
 
 void testMatch(string pattern, const char *path, bool should_match)
     throw (string);
@@ -42,6 +43,7 @@ void testRandom();
 void testFileSystem();
 void testGzip();
 void testKeeps();
+void testHumanReadable();
 
 int main(int argc, char *argv[])
 {
@@ -61,6 +63,7 @@ int main(int argc, char *argv[])
         testFileSystem();
         testGzip();
         testKeeps();
+        testHumanReadable();
 
         if (!err_found_) {
             printf("OK\n");
@@ -220,4 +223,25 @@ void testKeeps()
              0/*all*/, 0/*daily*/, 3600*24*366/*weekly*/, 0/*monthly*/, 0/*yearly*/);
     testKeep("tz:+1001 yearly:10y", 3600*10+60,
              0/*all*/, 0/*daily*/, 0/*weekly*/, 0/*monthly*/, 3600*24*366*10/*yearly*/);
+}
+
+void testHR(size_t v, string expected) {
+    string s = humanReadableTwoDecimals(v);
+    if (s == expected) {
+        debug(TEST_HUMANREADABLE,"%ju = %s\n", v, s.c_str());
+    } else {
+        err_found_ = true;
+        debug(TEST_HUMANREADABLE,"%ju = %s but expected %s\n", v, s.c_str(), expected.c_str());
+    }
+}
+
+void testHumanReadable()
+{
+    testHR(65536, "64.00 KiB");
+    testHR(66000, "64.45 KiB");
+    testHR(65536+1024*3.5, "67.50 KiB");
+    testHR(65536+1024*3.02, "67.02 KiB");
+    testHR(1024*1024*3.5, "3.50 MiB");
+    testHR(1024*1024*1024*512.77, "512.77 GiB");
+    testHR(1024*1024*1024*1023.99, "1023.99 GiB");
 }
