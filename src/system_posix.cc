@@ -31,7 +31,9 @@ struct SystemImplementation : System
 {
     int invoke(string program,
                vector<string> args,
-               vector<char> *stdout);
+               vector<char> *out,
+               Capture capture,
+               function<void(vector<char>::iterator i)> cb);
 };
 
 unique_ptr<System> newSystem()
@@ -46,7 +48,9 @@ string protect_(string arg)
 
 int SystemImplementation::invoke(string program,
                                  vector<string> args,
-                                 vector<char> *stdout)
+                                 vector<char> *output,
+                                 Capture capture,
+                                 function<void(vector<char>::iterator i)> cb)
 {
     int link[2];
     const char **argv = new const char*[args.size()+2];
@@ -62,7 +66,7 @@ int SystemImplementation::invoke(string program,
 
     debug(SYSTEM, "\n");
 
-    if (stdout) {
+    if (output) {
         if (pipe(link) == -1) {
             error(SYSTEM, "Could not create pipe!\n");
         }
@@ -72,8 +76,13 @@ int SystemImplementation::invoke(string program,
     int status;
     if (pid == 0) {
         // I am the child!
-        if (stdout) {
-            dup2 (link[1], STDOUT_FILENO);
+        if (output) {
+            if (capture == CaptureBoth || capture == CaptureStdout) {
+                dup2 (link[1], STDOUT_FILENO);
+            }
+            if (capture == CaptureBoth || capture == CaptureStderr) {
+                dup2 (link[1], STDERR_FILENO);
+            }
             close(link[0]);
             close(link[1]);
         }
@@ -86,14 +95,25 @@ int SystemImplementation::invoke(string program,
             error(SYSTEM, "Could not fork!\n");
         }
 
-        close(link[1]);
-        if (stdout) {
+        if (output) {
+            close(link[1]);
+
             char buf[4096 + 1];
 
             int n = 0;
-            while (0 != (n = read(link[0], buf, sizeof(buf)))) {
-                stdout->insert(stdout->end(), buf, buf+n);
-                debug(SYSTEM,"Stdout: \"%.*s\"\n", n, buf);
+
+            for (;;) {
+                n = read(link[0], buf, sizeof(buf));
+                if (n > 0) {
+                    //auto presize = output->size();
+                    output->insert(output->end(), buf, buf+n);
+                    //auto i = output->begin()+presize;
+                    //if (cb) { cb(i); }
+                    debug(SYSTEM,"Stdout: \"%.*s\"\n", n, buf);
+                } else {
+                    // No more data to read.
+                    break;
+                }
             }
         }
         debug(SYSTEM,"Waiting for child %d.\n", pid);

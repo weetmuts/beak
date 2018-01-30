@@ -74,7 +74,7 @@ int ForwardTarredFS::recurse() {
     int rc = nftw(root_dir.c_str(), addEntry, 256, FTW_PHYS|FTW_ACTIONRETVAL);
 
     if (rc  == -1) {
-        error(FORWARD,"Could not scan files");
+        error(FORWARD,"Error while scanning files: %s", strerror(errno));
         exit(EXIT_FAILURE);
     }
     return 0;

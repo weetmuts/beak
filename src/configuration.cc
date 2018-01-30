@@ -102,6 +102,7 @@ public:
     void copyRule();
     void outputRule(Rule *r, std::vector<ChoiceEntry> *buf = NULL);
     void outputStorage(Storage *s, std::vector<ChoiceEntry> *buf = NULL);
+    Rule *deleteStorage(Rule *r);
 
     bool okRuleName(string name);
     pair<bool,StorageType> okStorage(string storage);
@@ -203,7 +204,7 @@ bool ConfigurationImplementation::parseRow(string key, string value,
             break;
         case type_key:
         {
-            RuleType rt = LocalAndRemoteBackups;
+            RuleType rt = LocalThenRemoteBackup;
             lookupType(value,RuleType,rule_type_names_,rt,ok);
             if (!ok) error(CONFIGURATION, "No such rule type \"%s\"\n", value.c_str());
             current_rule->type = rt;
@@ -345,8 +346,10 @@ bool ConfigurationImplementation::save()
         conf += "history = " + relativePathIfPossible(rule->path, rule->history_path)->str() + "\n";
         conf += "cache = " + relativePathIfPossible(rule->path, rule->cache_path)->str() + "\n";
         conf += "cache_size = " + humanReadable(rule->cache_size) + "\n";
-        conf += "local = " + relativePathIfPossible(rule->path, rule->local->target)->str() + "\n";
-        conf += "local_keep = " + rule->local->keep.str() + "\n";
+        if (rule->type == LocalThenRemoteBackup) {
+            conf += "local = " + relativePathIfPossible(rule->path, rule->local->target)->str() + "\n";
+            conf += "local_keep = " + rule->local->keep.str() + "\n";
+        }
 
         for (auto storage : rule->sortedStorages())
         {
@@ -399,7 +402,9 @@ void ConfigurationImplementation::editName(Rule *r)
 {
     for (;;) {
         UI::outputPrompt("name>");
+        string old_name = r->name;
         r->name = UI::inputString();
+        if (r->name != old_name) r->needs_saving = true;
         if (okRuleName(r->name)) break;
     }
 }
@@ -510,13 +515,15 @@ void ConfigurationImplementation::outputRule(Rule *r, std::vector<ChoiceEntry> *
     if (!buf) UI::outputln(msg);
     else buf->push_back(ChoiceEntry( msg, [=](){ editCacheSize(r); }));
 
-    strprintf(msg, "Local:        %s", relativePathIfPossible(r->path, r->local->target)->c_str());
-    if (!buf) UI::outputln(msg);
-    else buf->push_back(ChoiceEntry( msg, [=](){ editLocalPath(r); }));
+    if (r->type == LocalThenRemoteBackup) {
+        strprintf(msg, "Local:        %s", relativePathIfPossible(r->path, r->local->target)->c_str());
+        if (!buf) UI::outputln(msg);
+        else buf->push_back(ChoiceEntry( msg, [=](){ editLocalPath(r); }));
 
-    strprintf(msg, "Keep:         %s", r->local->keep.str().c_str());
-    if (!buf) UI::outputln(msg);
-    else buf->push_back(ChoiceEntry( msg, [=](){ editLocalKeep(r); }));
+        strprintf(msg, "Keep:         %s", r->local->keep.str().c_str());
+        if (!buf) UI::outputln(msg);
+        else buf->push_back(ChoiceEntry( msg, [=](){ editLocalKeep(r); }));
+    }
 
     for (auto &s : r->sortedStorages()) {
         if (s != r->local) {
@@ -611,14 +618,31 @@ void ConfigurationImplementation::editRule()
     for (;;) {
         vector<ChoiceEntry> c;
         outputRule(r, &c);
-        c.push_back({"s", "", "Save"});
-        c.push_back({"d", "", "Discard changes"});
-        auto ce = UI::inputChoice("Which data to edit:", ">", c);
+        c.push_back({"a", "", "Add storage"});
+        c.push_back({"e", "", "Erase storage"});
+        if (r->needs_saving) {
+            c.push_back({"s", "", "Save (unsaved data exists!)"});
+            c.push_back({"d", "", "Discard changes"});
+        } else {
+            c.push_back({"q", "", "Exit to main menu"});
+        }
+        auto ce = UI::inputChoice("Which rule data to edit:", "\n>", c);
+        if (ce->key == "a") {
+            Storage storage;
+            bool b = editRemoteTarget(&storage);
+            if (b) {
+                editRemoteKeep(&storage);
+                r->storages[storage.target] = storage;
+            }
+        }
+        else if (ce->key == "e") {
+            r = deleteStorage(r);
+        } else
         if (ce->key == "s") {
             save();
             break;
-        }
-        if (ce->key == "d") {
+        } else
+        if (ce->key == "d" || ce->key == "q") {
             break;
         }
     }
@@ -664,8 +688,9 @@ void ConfigurationImplementation::loadRCloneStorages()
     vector<string> args;
     args.push_back("listremotes");
     args.push_back("-l");
-    RC rc = sys_->invoke("rclone", args, &out);
-
+    RC rc = sys_->invoke("rclone", args, &out, CaptureBoth,
+                         [=](vector<char>::iterator i) { fprintf(stderr, "RCLONE GURKA:\n");
+                                                         while (i!=out.end()) { fprintf(stderr, "%c", *i); i++; } fprintf(stderr, "\n\n"); });
     if (rc == OK) {
         auto i = out.begin();
         bool eof, err;
@@ -685,8 +710,6 @@ void ConfigurationImplementation::loadRCloneStorages()
 
 void ConfigurationImplementation::createNewRule()
 {
-    loadRCloneStorages();
-
     Rule rule;
     editName(&rule);
     editPath(&rule);
@@ -737,15 +760,36 @@ void ConfigurationImplementation::deleteRule()
     }
 }
 
+Rule *ConfigurationImplementation::deleteStorage(Rule *r)
+{
+    vector<ChoiceEntry> choices;
+    for (auto s : r->sortedStorages()) {
+        choices.push_back( { s->target->str() } );
+    }
+    auto ce = UI::inputChoice("Which storage to delete:", "storage>", choices);
+    string s = ce->keyword;
+
+    auto answer = UI::yesOrNo("Really delete?");
+
+    if (answer == UIYes) {
+        string rule_name = r->name;
+        r->storages.erase(Path::lookup(s));
+        save();
+        return &rules_[rule_name];
+    }
+    return r;
+}
+
 int ConfigurationImplementation::configure()
 {
+    loadRCloneStorages();
+
     vector<ChoiceEntry> choices;
     choices.push_back( { "e", "", "Edit existing rule",         [=]() { editRule(); } } );
     choices.push_back( { "n", "", "New rule",                   [=]() { createNewRule(); } } );
     choices.push_back( { "d", "", "Delete rule",                [=]() { deleteRule(); } } );
     choices.push_back( { "r", "", "Rename rule",                [=]() { renameRule(); } } );
     choices.push_back( { "c", "", "Copy rule",                  [=]() { copyRule(); } } );
-    choices.push_back( { "s", "", "Set configuration password", [=]() {  } } );
     choices.push_back( { "q", "", "Quit config",                [=]() {  } } );
 
     for (;;) {
@@ -779,10 +823,8 @@ size_t calcTime(string s)
 
 bool Keep::parse(string s)
 {
-    // Example:    "tz:+0100 all:7d daily:2w weekly:2m monthly:2y yearly:forever"
+    // Example:    "tz:+0100 all:2d daily:2w weekly:2m monthly:2y"
     // Example:    "tz:+0100 all:2d daily:1w monthly:12m"
-    //
-    //
     vector<char> data(s.begin(), s.end());
     auto i = data.begin();
     string tz, offset;
@@ -867,13 +909,18 @@ void ConfigurationImplementation::outputStorage(Storage *s, std::vector<ChoiceEn
 {
     string msg;
 
-    strprintf(msg, "    Remote: %s", s->target->c_str());
+    strprintf(msg, "      Remote: %s", s->target->c_str());
     if (!buf) UI::outputln(msg);
     else buf->push_back(ChoiceEntry(msg, [=](){ editRemoteTarget(s); }));
 
-    if (!buf) UI::output("    Type:   %s", storage_type_names_[s->type]);
+    strprintf(msg, "        Type: %s", storage_type_names_[s->type]);
+    if (!buf) UI::output(msg);
+    else {
+        buf->push_back(ChoiceEntry(msg));
+        buf->back().available = false;
+    }
 
-    strprintf(msg, "    Keep:   %s", s->keep.str().c_str());
+    strprintf(msg, "        Keep: %s", s->keep.str().c_str());
     if (!buf) UI::outputln(msg);
     else buf->push_back(ChoiceEntry(msg, [=](){ editRemoteKeep(s); }));
 }

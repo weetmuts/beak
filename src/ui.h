@@ -32,15 +32,16 @@ struct ChoiceEntry
     std::function<void()> cb;
 
     int index;
+    bool available;
 
     ChoiceEntry(std::string kw)
-    : keyword(kw), msg(kw), index(-1) { }
+    : keyword(kw), msg(kw), index(-1), available(true) { }
     ChoiceEntry(std::string k, std::string kw, std::string m)
-    : key(k), keyword(kw), msg(m), index(-1) { }
+    : key(k), keyword(kw), msg(m), index(-1), available(true)  { }
     ChoiceEntry(std::string m, std::function<void()> c)
-    : msg(m), cb(c), index(-1) { }
+    : msg(m), cb(c), index(-1), available(true)  { }
     ChoiceEntry(std::string k, std::string kw, std::string m, std::function<void()> c)
-    : key(k), keyword(kw), msg(m), cb(c), index(-1) { }
+    : key(k), keyword(kw), msg(m), cb(c), index(-1), available(true)  { }
 };
 
 enum YesOrNo {

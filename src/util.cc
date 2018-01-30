@@ -59,30 +59,30 @@ string humanReadable(size_t s)
 {
     if (s < KB)
     {
-        return to_string(s) + "B";
+        return to_string(s) + " B";
     }
     if (s < KB * KB)
     {
         s /= KB;
-        return to_string(s) + "KiB";
+        return to_string(s) + " KiB";
     }
     if (s < KB * KB * KB)
     {
         s /= KB * KB;
-        return to_string(s) + "MiB";
+        return to_string(s) + " MiB";
     }
     if (s < KB * KB * KB * KB)
     {
         s /= KB * KB * KB;
-        return to_string(s) + "GiB";
+        return to_string(s) + " GiB";
     }
     if (s < KB * KB * KB * KB * KB)
     {
         s /= KB * KB * KB * KB;
-        return to_string(s) + "TiB";
+        return to_string(s) + " TiB";
     }
     s /= KB * KB * KB * KB * KB;
-    return to_string(s) + "PiB";
+    return to_string(s) + " PiB";
 }
 
 string helper(size_t scale, size_t s, string suffix)
@@ -160,32 +160,37 @@ size_t roundoffHumanReadable(size_t s)
 int parseHumanReadable(string s, size_t *out)
 {
     size_t mul = 1;
+    string suffix;
     char c = s.back();
+
+    while (c < '0' || c > '9') {
+        if (c != ' ') {
+            suffix = s.back() + suffix;
+        }
+        s.pop_back();
+        c = s.back();
+    }
 
     if (s.length() > 256)
     {
         return ERR;
     }
-    if (c == 'K')
+    if (suffix == "K" || suffix == "KiB")
     {
         mul = KB;
-        s = s.substr(0, s.length() - 1);
     }
-    else if (c == 'M')
+    else if (suffix == "M" || suffix == "MiB")
     {
         mul = KB * KB;
-        s = s.substr(0, s.length() - 1);
     }
-    else if (c == 'G')
+    else if (suffix == "G" || suffix == "GiB")
     {
         mul = KB * KB * KB;
-        s = s.substr(0, s.length() - 1);
     }
-    else if (c == 'T')
+    else if (suffix == "T" || suffix == "TiB")
     {
         mul = KB * KB;
         mul *= KB * KB;
-        s = s.substr(0, s.length() - 1);
     }
 
     for (auto c : s)

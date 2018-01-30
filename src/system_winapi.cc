@@ -28,7 +28,10 @@ struct SystemImplementationWinapi : System
 {
     int invoke(string program,
                vector<string> args,
-               vector<char> *out);
+               vector<char> *output,
+               Capture capture,
+               function<void(char *buffer, size_t len)> cb);
+
 };
 
 unique_ptr<System> newSystem()
@@ -43,7 +46,9 @@ string protect_(string arg)
 
 int SystemImplementationWinapi::invoke(string program,
                                        vector<string> args,
-                                       vector<char> *out)
+                                       vector<char> *out,
+                                       Capture capture,
+                                       function<void(char *buffer, size_t len)> cb)
 {
     return OK;
 }

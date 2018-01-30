@@ -638,7 +638,14 @@ int BeakImplementation::push(Options *settings)
     } else {
         args.push_back(settings->remote);
     }
-    rc = sys_->invoke("rclone", args, NULL);
+    vector<char> output;
+    fprintf(stderr, "LENGTH OF GURKA1 %ju\n", output.size());
+    rc = sys_->invoke("rclone", args, &output, CaptureBoth,
+                      [=](vector<char>::iterator i) { fprintf(stderr, "RCLONE COPY:\n");
+                                                      while (i!=output.end()) { fprintf(stderr, "%c", *i); i++; } fprintf(stderr, "\n\n"); });
+    fprintf(stderr, "LENGTH OF GURKA2 %ju\n", output.size());
+    // Parse verbose output and look for:
+    // 2018/01/29 20:05:36 INFO  : code/src/s01_001517180913.689221661_11659264_b6f526ca4e988180fe6289213a338ab5a4926f7189dfb9dddff5a30ab50fc7f3_0.tar: Copied (new)
 
     // Unmount virtual filesystem.
     rc = umountForward(&forward_settings);
@@ -685,7 +692,7 @@ int BeakImplementation::umountDaemon(Options *settings)
     vector<string> args;
     args.push_back("-u");
     args.push_back(settings->src->str());
-    return sys_->invoke("fusermount", args, NULL);
+    return sys_->invoke("fusermount", args);
 }
 
 int BeakImplementation::mountForwardDaemon(Options *settings)
@@ -984,6 +991,7 @@ struct StoreStatistics
     size_t num_files, size_files, num_dirs;
     size_t num_hard_links, num_symbolic_links, num_nodes;
 
+    size_t num_files_to_store, size_files_to_store;
     size_t num_files_stored, size_files_stored;
     size_t num_dirs_updated;
 
@@ -1006,19 +1014,26 @@ struct StoreStatistics
     //Analyserar delta: 100% (690618/690618), klart.
 
     void displayProgress() {
+        if (num_files == 0 || num_files_to_store == 0) return;
         uint64_t now = clockGetTime();
         if ((now-prev) < 500000) return;
         prev = now;
         UI::clearLine();
-        int percentage = (int)(100.0*(float)size_files_handled / (float)size_files);
-        string mibs = humanReadableTwoDecimals(size_files_handled);
+        int percentage = (int)(100.0*(float)size_files_stored / (float)size_files_to_store);
+        string mibs = humanReadableTwoDecimals(size_files_stored);
         float secs = ((float)((now-start)/1000))/1000.0;
-        string speed = humanReadableTwoDecimals(((double)size_files_handled)/secs);
-        UI::output("Storing: %d%% (%ju/%ju), %s | %.2f s %s/s ",
-                   percentage, num_files_handled, num_files, mibs.c_str(), secs, speed.c_str());
+        string speed = humanReadableTwoDecimals(((double)size_files_stored)/secs);
+        if (num_files > num_files_to_store) {
+            UI::output("Incremental store: %d%% (%ju/%ju), %s | %.2f s %s/s ",
+                       percentage, num_files_stored, num_files_to_store, mibs.c_str(), secs, speed.c_str());
+        } else {
+            UI::output("Full store: %d%% (%ju/%ju), %s | %.2f s %s/s ",
+                       percentage, num_files_stored, num_files_to_store, mibs.c_str(), secs, speed.c_str());
+        }
     }
 
     void finishProgress() {
+        if (num_files == 0 || num_files_to_store == 0) return;
         displayProgress();
         UI::output(", done.\n");
     }
@@ -1147,23 +1162,19 @@ bool extractHardLink(FileSystem *src, Path *target,
     return true;
 }
 
-bool extractFile(FileSystem *src, Path *tar_file, off_t tar_file_offset,
+bool extractFile(Entry *entry,
+                 FileSystem *src, Path *tar_file, off_t tar_file_offset,
                  FileSystem *dst, Path *file_to_extract, FileStat *stat,
                  StoreStatistics *statistics)
 {
-    FileStat old_stat;
-    if (OK == dst->stat(file_to_extract, &old_stat)) {
-        if (stat->sameSize(&old_stat) &&
-            stat->sameMTime(&old_stat)) {
-
-            if (!stat->samePermissions(&old_stat)) {
-                dst->chmod(file_to_extract, stat);
-                verbose(STORE, "Updating permissions for file \"%s\" to %o\n", file_to_extract->c_str(), stat->st_mode);
-                return false;
-            }
-            debug(STORE, "Skipping file \"%s\"\n", file_to_extract->c_str());
-            return false;
-        }
+    if (entry->disk_update == NoUpdate) {
+        debug(STORE, "Skipping file \"%s\"\n", file_to_extract->c_str());
+        return false;
+    }
+    if (entry->disk_update == UpdatePermissions) {
+        dst->chmod(file_to_extract, stat);
+        verbose(STORE, "Updating permissions for file \"%s\" to %o\n", file_to_extract->c_str(), stat->st_mode);
+        return false;
     }
 
     debug(STORE, "Storing file \"%s\" size %ju permissions %s\n   using tar \"%s\" offset %ju\n",
@@ -1280,8 +1291,16 @@ void calculateReverseWork(Path *path, FileStat *stat,
                           FileSystem *src_fs, FileSystem *dst_fs)
 {
     auto entry = rfs->findEntry(point, path);
+    auto file_to_extract = path->prepend(settings->dst);
+
     if (entry->is_hard_link) st->num_hard_links++;
-    else if (stat->isRegularFile()) { st->num_files++; st->size_files+=stat->st_size; }
+    else if (stat->isRegularFile()) {
+        entry->checkStat(dst_fs, file_to_extract);
+        if (entry->disk_update == Store) {
+            st->num_files_to_store++; st->size_files_to_store+=stat->st_size;
+        }
+        st->num_files++; st->size_files+=stat->st_size;
+    }
     else if (stat->isSymbolicLink()) st->num_symbolic_links++;
     else if (stat->isDirectory()) st->num_dirs++;
     else if (stat->isFIFO()) st->num_nodes++;
@@ -1314,8 +1333,7 @@ void handleRegularFiles(Path *path, FileStat *stat,
     auto file_to_extract = path->prepend(settings->dst);
 
     if (!entry->is_hard_link && stat->isRegularFile()) {
-        entry->checkStat(dst_fs, file_to_extract);
-        extractFile(src_fs, tar_file, tar_file_offset,
+        extractFile(entry, src_fs, tar_file, tar_file_offset,
                     dst_fs, file_to_extract, stat, st);
         st->num_files_handled++;
         st->size_files_handled += stat->st_size;

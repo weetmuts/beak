@@ -92,7 +92,19 @@ int menu(string msg, string prompt, vector<ChoiceEntry> choices)
     {
         UI::output("%s\n", msg.c_str());
         for (size_t i=0; i<choices.size(); ++i) {
-            UI::output("%s > %s\n", choices[i].key.c_str(), choices[i].msg.c_str());
+            if (choices[i].available) {
+                const char *info = "%s > %s\n";
+                if (choices.size() > 9) {
+                    info = "%-2s > %s\n";
+                }
+                UI::output(info, choices[i].key.c_str(), choices[i].msg.c_str());
+            } else {
+                const char *info = "    %s\n";
+                if (choices.size() > 9) {
+                    info = "     %s\n";
+                }
+                UI::output(info, choices[i].msg.c_str());
+            }
         }
         UI::outputPrompt(prompt);
         string s = UI::inputString();
@@ -112,7 +124,7 @@ ChoiceEntry *UI::inputChoice(string msg, string prompt, vector<ChoiceEntry> &cho
 {
     int c = 1;
     for (auto& ce : choices) {
-        if (ce.key == "") {
+        if (ce.key == "" && ce.available) {
             ce.key = to_string(c);
             c++;
         }

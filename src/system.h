@@ -24,11 +24,19 @@
 #include <string>
 #include <vector>
 
+enum Capture {
+    CaptureStdout,
+    CaptureStderr,
+    CaptureBoth
+};
+
 struct System
 {
     virtual RC invoke(std::string program,
                       std::vector<std::string> args,
-                      std::vector<char> *out) = 0;
+                      std::vector<char> *output = NULL,
+                      Capture capture = CaptureStdout,
+                      std::function<void(std::vector<char>::iterator i)> output_cb = NULL) = 0;
 };
 
 std::unique_ptr<System> newSystem();

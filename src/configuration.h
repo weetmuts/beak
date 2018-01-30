@@ -30,9 +30,9 @@
 #define DEFAULT_KEEP "all:2d daily:2w weekly:2m monthly:2y"
 
 #define LIST_OF_TYPES \
-    X(LocalAndRemoteBackups,"Store locally and remotely")                          \
-    X(RemoteBackupsOnly,"Minimize local backup space")                             \
-    X(RemoteMount,"Only mount remote backups")                                     \
+    X(LocalThenRemoteBackup,"Store locally then remotely")           \
+    X(RemoteBackup,"Store remotely")                                 \
+    X(RemoteMount,"Mount remote backup")                             \
 
 enum RuleType : short {
 #define X(name,info) name,
@@ -122,8 +122,11 @@ struct Rule {
     size_t cache_size;
 
     // Use this storage for local backups. Then this local backups is rcloned to remote storages.
-    // It points to storages[""]
+    // It points to storages[""] if NULL, then type is RemoteBackupsOnly or RemoteMount.
     Storage *local;
+
+    // If modified by the configuration ui, and not yet saved,
+    bool needs_saving;
 
     // All storages for this rule. Can be filesystems or rclone storages.
     std::map<Path*,Storage> storages;
