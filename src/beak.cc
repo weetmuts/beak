@@ -1045,7 +1045,15 @@ void calculateForwardWork(Path *path, FileStat *stat,
                           Options *settings, StoreStatistics *st,
                           FileSystem *src_fs, FileSystem *dst_fs)
 {
-    if (stat->isRegularFile()) { st->num_files++; st->size_files+=stat->st_size; }
+    auto file_to_extract = path->prepend(settings->dst);
+
+    if (stat->isRegularFile()) {
+        stat->checkStat(dst_fs, file_to_extract);
+        if (stat->disk_update == Store) {
+            st->num_files_to_store++; st->size_files_to_store+=stat->st_size;
+        }
+        st->num_files++; st->size_files+=stat->st_size;
+    }
     else if (stat->isDirectory()) st->num_dirs++;
 }
 
@@ -1167,11 +1175,11 @@ bool extractFile(Entry *entry,
                  FileSystem *dst, Path *file_to_extract, FileStat *stat,
                  StoreStatistics *statistics)
 {
-    if (entry->disk_update == NoUpdate) {
+    if (stat->disk_update == NoUpdate) {
         debug(STORE, "Skipping file \"%s\"\n", file_to_extract->c_str());
         return false;
     }
-    if (entry->disk_update == UpdatePermissions) {
+    if (stat->disk_update == UpdatePermissions) {
         dst->chmod(file_to_extract, stat);
         verbose(STORE, "Updating permissions for file \"%s\" to %o\n", file_to_extract->c_str(), stat->st_mode);
         return false;
@@ -1295,8 +1303,8 @@ void calculateReverseWork(Path *path, FileStat *stat,
 
     if (entry->is_hard_link) st->num_hard_links++;
     else if (stat->isRegularFile()) {
-        entry->checkStat(dst_fs, file_to_extract);
-        if (entry->disk_update == Store) {
+        stat->checkStat(dst_fs, file_to_extract);
+        if (stat->disk_update == Store) {
             st->num_files_to_store++; st->size_files_to_store+=stat->st_size;
         }
         st->num_files++; st->size_files+=stat->st_size;

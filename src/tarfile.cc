@@ -44,6 +44,7 @@ TarFile::TarFile(TarEntry *d, TarContents tc, int n)
     memset(&mtim_, 0, sizeof(mtim_));
     // This is a temporary name! It will be overwritten when the hash is finalized!
     name_ = "";
+    disk_update = NoUpdate;
 }
 
 void TarFile::addEntryLast(TarEntry *entry)

@@ -40,12 +40,6 @@
 #include "tar.h"
 #include "util.h"
 
-enum UpdateDisk {
-    NoUpdate,
-    UpdatePermissions,
-    Store
-};
-
 struct Entry
 {
     FileStat fs;

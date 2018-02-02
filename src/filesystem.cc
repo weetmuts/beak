@@ -752,3 +752,21 @@ bool FileSystem::mkDirp(Path* path)
     #endif
     return makeDirHelper(path->c_str());
 }
+
+void FileStat::checkStat(FileSystem *dst, Path *target)
+{
+    FileStat old_stat;
+    RC rc = dst->stat(target, &old_stat);
+    if (rc != OK) { disk_update = Store; return; }
+    if (sameSize(&old_stat) && sameMTime(&old_stat))
+    {
+        if (!samePermissions(&old_stat))
+        {
+            disk_update = UpdatePermissions;
+            return;
+        }
+        disk_update = NoUpdate;
+        return;
+    }
+    disk_update = Store;
+}

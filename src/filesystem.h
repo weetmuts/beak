@@ -50,6 +50,12 @@ struct Path;
 struct FuseAPI;
 struct FileSystem;
 
+enum UpdateDisk {
+    NoUpdate,
+    UpdatePermissions,
+    Store
+};
+
 struct FileStat {
     ino_t st_ino;
     mode_t st_mode;
@@ -62,6 +68,8 @@ struct FileStat {
     struct timespec st_mtim;
     struct timespec st_ctim;
 
+    UpdateDisk disk_update;
+
     FileStat() { memset(this, 0,sizeof(FileStat)); };
     FileStat(const struct stat *sb) {
         loadFrom(sb);
@@ -70,6 +78,7 @@ struct FileStat {
     bool sameSize(FileStat *b) { return st_size == b->st_size; }
     bool sameMTime(FileStat *b) { return st_mtim.tv_sec == b->st_mtim.tv_sec &&
             st_mtim.tv_nsec == b->st_mtim.tv_nsec; }
+    void checkStat(FileSystem *dst, Path *target);
 
     mode_t permissions() { return st_mode & 07777; }
     void loadFrom(const struct stat *sb);
@@ -102,6 +111,7 @@ struct FileStat {
     std::string uidName();
     std::string gidName();
 };
+
 
 extern char separator;
 extern std::string separator_string;

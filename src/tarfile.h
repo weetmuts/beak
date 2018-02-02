@@ -154,6 +154,7 @@ private:
     std::vector<size_t> offsets;
     size_t current_tar_offset_ = 0;
     struct timespec mtim_;
+    UpdateDisk disk_update;
 
     void calculateSHA256Hash();
     void calculateSHA256Hash(std::vector<TarFile*> &tars, std::string &content);
