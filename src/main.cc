@@ -27,15 +27,15 @@ using namespace std;
 int main(int argc, char *argv[])
 {
     int rc = 0;
-    Command cmd;
     Options settings;
 
     auto fs_src = newDefaultFileSystem();
     auto fs_dst = newDefaultFileSystem();
-    auto beak = newBeak(fs_src.get(), fs_dst.get());
+    auto beak = newBeak(fs_src, fs_dst);
 
     beak->captureStartTime();
-    beak->parseCommandLine(argc, argv, &cmd, &settings);
+    Command cmd = beak->parseCommandLine(argc, argv, &settings);
+    beak->verifyCommandLine(cmd, &settings);
 
     switch (cmd) {
 
@@ -57,12 +57,12 @@ int main(int argc, char *argv[])
         break;
 
     case genautocomplete_cmd:
-        if (settings.src == NULL) {
+        if (settings.from.path == NULL) {
             beak->genAutoComplete("/etc/bash_completion.d/beak");
             printf("Wrote /etc/bash_completion.d/beak\n");
         } else {
-            beak->genAutoComplete(settings.src->str());
-            printf("Wrote %s\n", settings.src->c_str());
+            beak->genAutoComplete(settings.from.path->str());
+            printf("Wrote %s\n", settings.from.path->c_str());
         }
         break;
 
@@ -74,10 +74,7 @@ int main(int argc, char *argv[])
 
     case mount_cmd:
     {
-        if (!settings.hasBothSrcAndDst()) {
-            fprintf(stdout, "You must supply a src and a dst.\n");
-            exit(1);
-        }
+
         bool has_history = beak->lookForPointsInTime(&settings);
         if (!has_history || settings.forceforward) {
             // src contains your files, to be backed up
@@ -112,10 +109,10 @@ int main(int argc, char *argv[])
 
     case store_cmd:
     {
-        if (!settings.hasBothSrcAndDst()) {
+        /*if (!settings.hasBothSrcAndDst()) {
             fprintf(stdout, "You must supply a src and a dst.\n");
             exit(1);
-        }
+            }*/
         bool has_history = beak->lookForPointsInTime(&settings);
         if (!has_history || settings.forceforward) {
             // src contains your files, to be backed up
@@ -129,10 +126,10 @@ int main(int argc, char *argv[])
         break;
     }
     case umount_cmd:
-        if (!settings.hasSrc()) {
+        /*if (!settings.hasSrc()) {
             fprintf(stdout, "You must supply a directory to unmount.\n");
             exit(1);
-        }
+            }*/
         rc = beak->umountDaemon(&settings);
         break;
 

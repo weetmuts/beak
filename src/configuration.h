@@ -40,9 +40,50 @@ LIST_OF_TYPES
 #undef X
 };
 
+// Keep examples:
+// tz:+0100 all:2d daily:2w weekly:2m monthly:2y
+// tz:+0100 all:forever
+// tz:+0100 weekly:forever
+// tz:+0100 daily:100d
+// tz:+0100 mirror
+
+struct Keep
+{
+    // Time zone offset. E.g. CET(Central European) = 3600 IST (Indian Standard) = 5.5*3600
+    time_t tz_offset {};
+
+    // The following values are absolute number of seconds back in time from now.
+    // Number of seconds to keep all points in time. Zero means do not store using this interval.
+    time_t all {};
+
+    // Number of seconds to keep the last one per day
+    time_t daily {};
+
+    // Number of seconds to keep the last one per week
+    time_t weekly {};
+
+    // Number of seconds to keep the last one per month
+    time_t monthly {};
+
+    // Number of seconds to keep the last one per year
+    time_t yearly {};
+
+    // Never keep more than the latest backup. I.e. mirror.
+    bool mirror {};
+
+    Keep() = default;
+    Keep(std::string s) { parse(s); }
+    bool parse(std::string s);
+    std::string str();
+    // By default it keeps everything forever.
+    bool keepAllForever() { return all==0 && daily==0 && weekly==0 && monthly==0 && yearly==0 and mirror==false; }
+};
+
 #define LIST_OF_STORAGE_TYPES \
+    X(NoSuchStorage, "Not a storage")                                   \
     X(FileSystemStorage, "Push to a directory")                         \
     X(RCloneStorage,     "Push using rclone")                           \
+    X(RSyncStorage,      "Push using rsync")                            \
 
 enum StorageType : short {
 #define X(name,info) name,
@@ -50,47 +91,18 @@ LIST_OF_STORAGE_TYPES
 #undef X
 };
 
-struct Keep
-{
-    // Time zone offset. E.g. CET(Central European) = 3600 IST (Indian Standard) = 5.5*3600
-    time_t tz_offset;
-    // The following values are absolute number of seconds back in time from now.
-    // Number of seconds to keep all points in time. Zero means do not store using this interval.
-    time_t all;
-    // Number of seconds to keep the last one per day
-    time_t daily;
-    // Number of seconds to keep the last one per week
-    time_t weekly;
-    // Number of seconds to keep the last one per month
-    time_t monthly;
-    // Number of seconds to keep the last one per year
-    time_t yearly;
-
-    Keep() : tz_offset(0), all(0), daily(0), weekly(0), monthly(0), yearly(0) { }
-    Keep(std::string s) { parse(s); }
-    bool parse(std::string s);
-    std::string str();
-};
-
 struct Storage
 {
-    // Either an rclone target (eg s3_work_crypt:/prod/bar) or
-    // a full path to a directory (eg /home/backups/prod/bar)
-    Path *target;
-    // How the target string should be interpreted, filesystem, rclone, rsync, or command line.
-    StorageType type;
-    // The keep rule for the storage
+    // Store or retrieve to/from local file system, rclone target, or rsync target.
+    StorageType type {};
+    // Target is either a filesystem path, or an rclone target (eg s3_work_crypt: or s3:/prod/bar)
+    // or an rsync target (eg backup@192.168.0.1:/backups/)
+    Path *target_path {};
+    // The keep rule for the storage, default setting is keep everything.
     Keep keep;
-    // If pushes should round robin through the available storages
-    // The push happens to the storage with the least recent timestamp.
-    bool round_robin;
-    // If the target is a path to a removable storage (typically USB drive)
-    // then trigger a push when it is mounted.
-    bool on_mount;
 
-    Storage() { };
-    Storage(Path *t, StorageType e, std::string k) :
-    target(t), type(e), keep(k), round_robin(false), on_mount(false) { }
+    Storage() = default;
+    Storage(StorageType ty, Path *ta, std::string ke) : type(ty), target_path(ta), keep(ke) { }
     void output(std::vector<ChoiceEntry> *buf = NULL);
 
     void editTarget();
@@ -99,34 +111,34 @@ struct Storage
 
 struct Rule {
     // The rule identifier.
-    std::string name;
+    std::string name {};
 
     // LocalAndRemote backups, Remote backups only, or Remote mount only.
-    RuleType type;
+    RuleType type {};
 
     // The path in the local file system to back up.
-    Path *path;
+    Path *origin_path {};
 
     // Additional arguments that affect how the tar files are choosen and sized.
     std::string args;
 
     // After "beak history work:" the full backup history, from local and remote
     // backup locations is mounted as a virtual file system on this path.
-    Path *history_path;
+    Path *history_path {};
 
     // When mounting a remote storage for direct access, the tar files are
     // temporarily cached here, to speed up access.
-    Path *cache_path;
+    Path *cache_path {};
 
     // Maximum size of cache, before removing least recently used data.
-    size_t cache_size;
+    size_t cache_size {};
 
     // Use this storage for local backups. Then this local backups is rcloned to remote storages.
     // It points to storages[""] if NULL, then type is RemoteBackupsOnly or RemoteMount.
-    Storage *local;
+    Storage *local {};
 
     // If modified by the configuration ui, and not yet saved,
-    bool needs_saving;
+    bool needs_saving {};
 
     // All storages for this rule. Can be filesystems or rclone storages.
     std::map<Path*,Storage> storages;
@@ -134,6 +146,7 @@ struct Rule {
     void output(std::vector<ChoiceEntry> *buf = NULL);
     void status();
     std::vector<Storage*> sortedStorages();
+    Storage *storage(std::string name);
 
     void generateDefaultSettingsBasedOnPath();
 };
@@ -149,8 +162,10 @@ struct Configuration
 
     virtual Rule *rule(std::string name) = 0;
     virtual std::vector<Rule*> sortedRules() = 0;
+
+    virtual ~Configuration() = default;
 };
 
-std::unique_ptr<Configuration> newConfiguration(System *sys, FileSystem *fs);
+std::unique_ptr<Configuration> newConfiguration(ptr<System> sys, ptr<FileSystem> fs);
 
 #endif

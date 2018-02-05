@@ -269,10 +269,12 @@ struct FileSystem
     virtual bool readLink(Path *file, std::string *target) = 0;
 
     virtual bool deleteFile(Path *file) = 0;
+
+    virtual ~FileSystem() = default;
 };
 
 std::unique_ptr<FileSystem> newDefaultFileSystem();
-std::unique_ptr<FileSystem> newFileSystem(FuseAPI *api);
+FileSystem *newFileSystem(FuseAPI *api);
 FileSystem *defaultFileSystem();
 
 Path *configurationFile();

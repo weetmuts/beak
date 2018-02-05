@@ -41,8 +41,8 @@ static ComponentId COMMANDLINE = registerLogComponent("commandline");
 static ComponentId FORWARD = registerLogComponent("forward");
 static ComponentId HARDLINKS = registerLogComponent("hardlinks");
 static ComponentId FUSE = registerLogComponent("fuse");
-ForwardTarredFS::ForwardTarredFS(FileSystem *fs) {
-    file_system_ = fs;
+ForwardTarredFS::ForwardTarredFS(ptr<FileSystem> fs) {
+    file_system_ = fs.get();
 }
 
 thread_local ForwardTarredFS *current_fs;
@@ -929,10 +929,14 @@ int ForwardTarredFS::scanFileSystem(Options *settings)
 {
     bool ok;
 
-    root_dir_path = settings->src;
-    root_dir = settings->src->str();
-    mount_dir_path = settings->dst;
-    mount_dir = settings->dst->str();
+    if (settings->from.type == ArgPath && settings->from.path) {
+        root_dir_path = settings->from.path;
+    } else if (settings->from.type == ArgRule && settings->from.rule) {
+        root_dir_path = settings->from.rule->origin_path;
+    } else {
+        assert(0);
+    }
+    root_dir = root_dir_path->str();
 
     for (auto &e : settings->include) {
         Match m;
@@ -1125,7 +1129,7 @@ FileSystem *ForwardTarredFS::asFileSystem()
     return new ForwardFileSystem(this);
 }
 
-unique_ptr<ForwardTarredFS> newForwardTarredFS(FileSystem *fs)
+unique_ptr<ForwardTarredFS> newForwardTarredFS(ptr<FileSystem> fs)
 {
     return unique_ptr<ForwardTarredFS>(new ForwardTarredFS(fs));
 }

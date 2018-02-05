@@ -76,3 +76,10 @@ if [ ! -d libfuse-arm ]; then
     ar x ../libfuse-dev_2.9.0-2+deb7u2_armhf.deb
     tar xzf data.tar.gz
 fi
+
+if [ ! -d winfsp ]; then
+    echo
+    echo Fetching Winfsp
+    echo
+    git clone https://github.com/billziss-gh/winfsp
+fi

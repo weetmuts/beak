@@ -27,18 +27,25 @@
 #include<string>
 #include<vector>
 
+#define DEFAULT_DEPTH_TO_FORCE_TARS 2
+#define DEFAULT_KEEP_RULE "all:2d daily:2w weekly:2m monthly:2y"
+#define KEEP_RULE_SHORTHAND_TWOS "all:2d daily:2w weekly:2m monthly:2y"
+#define KEEP_RULE_SHORTHAND_ONES "all:1d daily:1w weekly:1m monthly:1y"
+
 enum Command : short;
-struct Options;
-
 enum PointInTimeFormat : short;
-struct PointInTime;
-
 enum TarHeaderStyle : short;
+struct Options;
+struct PointInTime;
+struct Rule;
+struct Storage;
 
-struct Beak {
+struct Beak
+{
     virtual void captureStartTime() = 0;
     virtual std::string argsToVector(int argc, char **argv, std::vector<std::string> *args) = 0;
-    virtual int parseCommandLine(int argc, char **argv, Command *cmd, Options *settings) = 0;
+    virtual Command parseCommandLine(int argc, char **argv, Options *settings) = 0;
+    virtual void verifyCommandLine(Command cmd, Options *settings) = 0;
     virtual int printInfo(Options *settings) = 0;
     virtual bool lookForPointsInTime(Options *settings) = 0;
     virtual std::vector<PointInTime> &history() = 0;
@@ -69,10 +76,11 @@ struct Beak {
     virtual void printOptions() = 0;
 
     virtual void genAutoComplete(std::string filename) = 0;
+
+    virtual ~Beak() = default;
 };
 
-std::unique_ptr<Beak> newBeak(FileSystem *src_fs, FileSystem *dst_fs);
-
+std::unique_ptr<Beak> newBeak(ptr<FileSystem> src_fs, ptr<FileSystem> dst_fs);
 
 #define LIST_OF_COMMANDS                                                \
     X(check,"Check the integrity of an archive.")                       \
@@ -115,7 +123,7 @@ LIST_OF_COMMANDS
     X(ll,listlog,bool,false,"List all log parts available.") \
     X(p,pointintime,std::string,true,"When mounting an archive pick this point in time only.\n" \
       "                           -p @0 is always the most recent. -p @1 the second most recent.\n" \
-      "                           You can also suffix @1 to the src directory." )        \
+      "                           You can also suffix @1 to the storage directory." )        \
     X(pf,pointintimeformat,PointInTimeFormat,true,"How to present the point in time.\n" \
       "                           E.g. absolute,relative or both. Default is both.")    \
     X(,tarheader,TarHeaderStyle,true,"Style of tar headers used. E.g. --tarheader=simple\n"   \
@@ -139,25 +147,42 @@ LIST_OF_OPTIONS
 #undef X
 };
 
-struct Options {
-    Path *src;
-    Path *dst;
-    std::string remote;
+enum ArgumentType
+{
+    ArgUnspecified,
+    ArgPath,
+    ArgRule,
+    ArgStorage
+};
 
-#define X(shortname,name,type,requirevalue,info) type name; bool name##_supplied;
+struct Argument
+{
+    ArgumentType type {};
+
+    Path *path {};
+    Rule *rule {};
+    Storage backup;
+    std::string point_in_time;
+
+    bool parse(ptr<System> sys, ptr<Configuration> conf, std::string arg);
+};
+
+struct Options
+{
+    Argument from, to;
+
+#define X(shortname,name,type,requirevalue,info) type name {}; bool name##_supplied {};
 LIST_OF_OPTIONS
 #undef X
 
     std::vector<std::string> fuse_args;
-    int fuse_argc;
-    char **fuse_argv;
+    int fuse_argc {};
+    char **fuse_argv {};
 
-    Command help_me_on_this_cmd;
-    int point_in_time; // 0 is the most recent, 1 second recent etc.
-    Rule *rule;
+    Command help_me_on_this_cmd {};
+    int point_in_time {};
 
-    bool hasBothSrcAndDst();
-    bool hasSrc();
+    Options copy() { return *this; }
 };
 
 

@@ -36,7 +36,8 @@ struct System
                       std::vector<std::string> args,
                       std::vector<char> *output = NULL,
                       Capture capture = CaptureStdout,
-                      std::function<void(std::vector<char>::iterator i)> output_cb = NULL) = 0;
+                      std::function<void(char *buf, size_t len)> output_cb = NULL) = 0;
+    virtual ~System() = default;
 };
 
 std::unique_ptr<System> newSystem();

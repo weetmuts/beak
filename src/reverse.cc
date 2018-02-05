@@ -40,10 +40,10 @@ using namespace std;
 
 ComponentId REVERSE = registerLogComponent("reverse");
 
-ReverseTarredFS::ReverseTarredFS(FileSystem *fs)
+ReverseTarredFS::ReverseTarredFS(ptr<FileSystem> fs)
 {
     single_point_in_time_ = NULL;
-    file_system_ = fs;
+    file_system_ = fs.get();
 }
 
 // The gz file to load, and the dir to populate with its contents.
@@ -587,8 +587,8 @@ PointInTime *ReverseTarredFS::setPointInTime(string g) {
 
 RC ReverseTarredFS::loadBeakFileSystem(Options *settings)
 {
-    setRootDir(settings->src);
-    setMountDir(settings->dst);
+    setRootDir(settings->from.path);
+    setMountDir(settings->to.path);
 
     for (auto &point : history()) {
         string name = point.filename;
@@ -741,7 +741,7 @@ FileSystem *ReverseTarredFS::asFileSystem()
     return new ReverseFileSystem(this);
 }
 
-unique_ptr<ReverseTarredFS> newReverseTarredFS(FileSystem *fs)
+unique_ptr<ReverseTarredFS> newReverseTarredFS(ptr<FileSystem> fs)
 {
     return unique_ptr<ReverseTarredFS>(new ReverseTarredFS(fs));
 }

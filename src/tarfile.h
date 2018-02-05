@@ -54,6 +54,17 @@ struct TarFileName {
     std::string header_hash;
     std::string content_hash;
     std::string suffix;
+
+    bool equals(TarFileName *tfn) {
+        return tfn->type == type &&
+            tfn->version == version &&
+            tfn->secs == secs &&
+            tfn->nsecs == nsecs &&
+            tfn->size == size &&
+            tfn->header_hash == header_hash &&
+            tfn->content_hash == content_hash &&
+            tfn->suffix == suffix;
+    }
 };
 
 struct TarFile

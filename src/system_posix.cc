@@ -18,6 +18,7 @@
 #include "log.h"
 #include "system.h"
 
+#include <memory.h>
 #include <sys/types.h>
 #include <wait.h>
 
@@ -33,7 +34,9 @@ struct SystemImplementation : System
                vector<string> args,
                vector<char> *out,
                Capture capture,
-               function<void(vector<char>::iterator i)> cb);
+               function<void(char *buf, size_t len)> cb);
+
+    ~SystemImplementation() = default;
 };
 
 unique_ptr<System> newSystem()
@@ -50,7 +53,7 @@ int SystemImplementation::invoke(string program,
                                  vector<string> args,
                                  vector<char> *output,
                                  Capture capture,
-                                 function<void(vector<char>::iterator i)> cb)
+                                 function<void(char *buf, size_t len)> cb)
 {
     int link[2];
     const char **argv = new const char*[args.size()+2];
@@ -103,15 +106,15 @@ int SystemImplementation::invoke(string program,
             int n = 0;
 
             for (;;) {
+                memset(buf, 0, sizeof(buf));
                 n = read(link[0], buf, sizeof(buf));
                 if (n > 0) {
-                    //auto presize = output->size();
                     output->insert(output->end(), buf, buf+n);
-                    //auto i = output->begin()+presize;
-                    //if (cb) { cb(i); }
-                    debug(SYSTEM,"Stdout: \"%.*s\"\n", n, buf);
+                    if (cb) { cb(buf, n); }
+                    //fprintf(stderr, "BANANAS >%*s<\n", n, buf);
                 } else {
                     // No more data to read.
+                    fprintf(stderr, "NOMORE GURKA\n");
                     break;
                 }
             }

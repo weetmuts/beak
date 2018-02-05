@@ -3820,7 +3820,8 @@ else
 fi
 
 fi
-if test -n "$ac_tool_prefix"; then
+if test "x$STRIP" = "x"; then
+    if test -n "$ac_tool_prefix"; then
   # Extract the first word of "${ac_tool_prefix}strip", so it can be a program name with args.
 set dummy ${ac_tool_prefix}strip; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
@@ -3918,6 +3919,7 @@ else
   STRIP="$ac_cv_path_STRIP"
 fi
 
+fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for fuse" >&5
 $as_echo_n "checking for fuse... " >&6; }
@@ -4070,6 +4072,39 @@ $as_echo "$ac_cv_sizeof_time_t" >&6; }
 
 cat >>confdefs.h <<_ACEOF
 #define SIZEOF_TIME_T $ac_cv_sizeof_time_t
+_ACEOF
+
+
+# The cast to long int works around a bug in the HP C Compiler
+# version HP92453-01 B.11.11.23709.GP, which incorrectly rejects
+# declarations like `int a3[[(sizeof (unsigned char)) >= 0]];'.
+# This bug is HP SR number 8606223364.
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking size of size_t" >&5
+$as_echo_n "checking size of size_t... " >&6; }
+if ${ac_cv_sizeof_size_t+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if ac_fn_c_compute_int "$LINENO" "(long int) (sizeof (size_t))" "ac_cv_sizeof_size_t"        "$ac_includes_default"; then :
+
+else
+  if test "$ac_cv_type_size_t" = yes; then
+     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error 77 "cannot compute sizeof (size_t)
+See \`config.log' for more details" "$LINENO" 5; }
+   else
+     ac_cv_sizeof_size_t=0
+   fi
+fi
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_sizeof_size_t" >&5
+$as_echo "$ac_cv_sizeof_size_t" >&6; }
+
+
+
+cat >>confdefs.h <<_ACEOF
+#define SIZEOF_SIZE_T $ac_cv_sizeof_size_t
 _ACEOF
 
 

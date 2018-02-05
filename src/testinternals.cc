@@ -242,6 +242,8 @@ void testHumanReadable()
     testHR(65536+1024*3.5, "67.50 KiB");
     testHR(65536+1024*3.02, "67.02 KiB");
     testHR(1024*1024*3.5, "3.50 MiB");
+#if SIZEOF_TIME_T == 8
     testHR(1024*1024*1024*512.77, "512.77 GiB");
     testHR(1024*1024*1024*1023.99, "1023.99 GiB");
+#endif
 }

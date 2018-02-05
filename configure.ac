@@ -158,6 +158,7 @@ AC_SUBST(ZLIB_LIBS)
 
 AC_MSG_CHECKING(for sizeof time_t)
 AC_CHECK_SIZEOF([time_t])
+AC_CHECK_SIZEOF([size_t])
 
 AC_MSG_CHECKING(for st_mtim.tv_nsec in struct stat)
 AC_COMPILE_IFELSE(

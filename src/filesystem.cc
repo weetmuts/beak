@@ -52,9 +52,9 @@ struct FileSystemFuseAPIImplementation : FileSystem
     FuseAPI *api_;
 };
 
-unique_ptr<FileSystem> newFileSystem(FuseAPI *api)
+FileSystem *newFileSystem(FuseAPI *api)
 {
-    return unique_ptr<FileSystem>(new FileSystemFuseAPIImplementation(api));
+    return new FileSystemFuseAPIImplementation(api);
 }
 
 FileSystemFuseAPIImplementation::FileSystemFuseAPIImplementation(FuseAPI *api)

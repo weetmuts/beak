@@ -30,7 +30,7 @@
 using namespace std;
 
 #define LIST_OF_RULE_KEYWORDS                                                       \
-    X(path,"Directory to be backed up.")                                            \
+    X(origin,"Directory to be backed up.")                                            \
     X(type,"How to backup the directory, LocalAndRemote, RemoteOnly or MountOnly.") \
     X(history,"Default mount for history command.")                                 \
     X(cache,"When mounting remote storages cache files here.")                      \
@@ -86,7 +86,7 @@ static ComponentId CONFIGURATION = registerLogComponent("configuration");
 class ConfigurationImplementation : public Configuration
 {
 public:
-    ConfigurationImplementation(System *sys, FileSystem *fs);
+    ConfigurationImplementation(ptr<System> sys, ptr<FileSystem> fs);
 
     bool load();
     bool save();
@@ -106,8 +106,6 @@ public:
 
     bool okRuleName(string name);
     pair<bool,StorageType> okStorage(string storage);
-
-    void loadRCloneStorages();
 
     void editName(Rule *r);
     void editPath(Rule *r);
@@ -134,20 +132,21 @@ private:
     // Map rclone storage name: (including its colon suffix) to its type.
     map<string,string> rclone_storages_;
 
-    System *sys_;
-    FileSystem *fs_;
+    ptr<System> sys_;
+    ptr<FileSystem> fs_;
 };
 
-unique_ptr<Configuration> newConfiguration(System *sys, FileSystem *fs) {
+unique_ptr<Configuration> newConfiguration(ptr<System> sys, ptr<FileSystem> fs) {
     return unique_ptr<Configuration>(new ConfigurationImplementation(sys, fs));
 }
 
-ConfigurationImplementation::ConfigurationImplementation(System *sys, FileSystem *fs)
+ConfigurationImplementation::ConfigurationImplementation(ptr<System> sys, ptr<FileSystem> fs)
     : sys_(sys), fs_(fs)
 {
 }
 
-Path *inputDirectory(const char *prompt) {
+Path *inputDirectory(const char *prompt)
+{
     for (;;) {
         UI::outputPrompt(prompt);
         Path *path = UI::inputPath();
@@ -197,9 +196,9 @@ bool ConfigurationImplementation::parseRow(string key, string value,
     lookupType(key,RuleKeyWord,rule_keywords_,rkw,ok);
     if (ok) {
         switch (rkw) {
-        case path_key:
-            current_rule->path = Path::lookup(value);
-            paths_[current_rule->path] = current_rule;
+        case origin_key:
+            current_rule->origin_path = Path::lookup(value);
+            paths_[current_rule->origin_path] = current_rule;
             current_rule->generateDefaultSettingsBasedOnPath();
             break;
         case type_key:
@@ -211,10 +210,10 @@ bool ConfigurationImplementation::parseRow(string key, string value,
         }
             break;
         case history_key:
-            current_rule->history_path = realPath(current_rule->path, value);
+            current_rule->history_path = realPath(current_rule->origin_path, value);
             break;
         case cache_key:
-            current_rule->cache_path = realPath(current_rule->path, value);
+            current_rule->cache_path = realPath(current_rule->origin_path, value);
             break;
         case cache_size_key:
             {
@@ -226,7 +225,7 @@ bool ConfigurationImplementation::parseRow(string key, string value,
             {
                 Storage *local = &current_rule->storages[Path::lookupRoot()];
                 current_rule->local = local;
-                local->target = realPath(current_rule->path, value);
+                local->target_path = realPath(current_rule->origin_path, value);
                 local->type = FileSystemStorage;
             }
             break;
@@ -250,16 +249,18 @@ bool ConfigurationImplementation::parseRow(string key, string value,
         case remote_key:
             if (value == "") error(CONFIGURATION, "Remote storage cannot be empty.\n");
             *current_storage = &current_rule->storages[Path::lookup(value)];
-            (*current_storage)->target = Path::lookup(value);
+            (*current_storage)->target_path = Path::lookup(value);
             break;
         case remote_type_key:
             if (!current_storage) {
                 error(CONFIGURATION, "Remote must be specified before type.\n");
             }
-            StorageType st;
-            lookupType(value,StorageType,storage_type_names_,st,ok);
-            if (!ok) error(CONFIGURATION, "No such storage type \"%s\"\n", value.c_str());
-            (*current_storage)->type = st;
+            {
+                StorageType st {};
+                lookupType(value,StorageType,storage_type_names_,st,ok);
+                if (!ok) error(CONFIGURATION, "No such storage type \"%s\"\n", value.c_str());
+                (*current_storage)->type = st;
+            }
             break;
         case remote_keep_key:
             if (!(*current_storage)) {
@@ -341,20 +342,20 @@ bool ConfigurationImplementation::save()
     for (auto rule : sortedRules())
     {
         conf += "[" + rule->name + "]\n";
-        conf += "path = " + rule->path->str() + "\n";
+        conf += "origin = " + rule->origin_path->str() + "\n";
         conf += "type = " + string(rule_type_names_[rule->type]) + "\n";
-        conf += "history = " + relativePathIfPossible(rule->path, rule->history_path)->str() + "\n";
-        conf += "cache = " + relativePathIfPossible(rule->path, rule->cache_path)->str() + "\n";
+        conf += "history = " + relativePathIfPossible(rule->origin_path, rule->history_path)->str() + "\n";
+        conf += "cache = " + relativePathIfPossible(rule->origin_path, rule->cache_path)->str() + "\n";
         conf += "cache_size = " + humanReadable(rule->cache_size) + "\n";
         if (rule->type == LocalThenRemoteBackup) {
-            conf += "local = " + relativePathIfPossible(rule->path, rule->local->target)->str() + "\n";
+            conf += "local = " + relativePathIfPossible(rule->origin_path, rule->local->target_path)->str() + "\n";
             conf += "local_keep = " + rule->local->keep.str() + "\n";
         }
 
         for (auto storage : rule->sortedStorages())
         {
             if (storage != rule->local) {
-                conf += "remote = " + storage->target->str() + "\n";
+                conf += "remote = " + storage->target_path->str() + "\n";
                 conf += "remote_type = " + string(storage_type_names_[storage->type]) + "\n";
                 conf += "remote_keep = " + storage->keep.str() + "\n";
             }
@@ -377,16 +378,25 @@ vector<Storage*> Rule::sortedStorages()
     }
     sort(v.begin(), v.end(),
               [](Storage *a, Storage *b)->bool {
-                  return (a->target < b->target);
+             return (a->target_path->str() < b->target_path->str());
 	      });
 
     return v;
 }
 
+Storage* Rule::storage(string target)
+{
+    Path *t = Path::lookup(target);
+    if (storages.count(t) > 0) {
+        return &storages[t];
+    }
+    return NULL;
+}
+
 void Rule::generateDefaultSettingsBasedOnPath()
 {
-    history_path = realPath(path, ".beak/history");
-    cache_path = realPath(path, ".beak/cache");
+    history_path = realPath(origin_path, ".beak/history");
+    cache_path = realPath(origin_path, ".beak/cache");
 
     Path::lookup(".beak/history");
     cache_path = Path::lookup(".beak/cache");
@@ -394,7 +404,7 @@ void Rule::generateDefaultSettingsBasedOnPath()
 
     string keep = getTimeZoneOffsetAsString(getTimeZoneOffset())+" "+DEFAULT_KEEP;
 
-    storages[Path::lookupRoot()] = { Path::lookup(".beak/local"), FileSystemStorage, keep };
+    storages[Path::lookupRoot()] = { FileSystemStorage, Path::lookup(".beak/local"), keep };
     local = &storages[Path::lookupRoot()];
 }
 
@@ -411,7 +421,7 @@ void ConfigurationImplementation::editName(Rule *r)
 
 void ConfigurationImplementation::editPath(Rule *r)
 {
-    r->path = inputDirectory("path>");
+    r->origin_path = inputDirectory("path>");
 }
 
 void ConfigurationImplementation::editType(Rule *r)
@@ -449,7 +459,7 @@ void ConfigurationImplementation::editCacheSize(Rule *r)
 void ConfigurationImplementation::editLocalPath(Rule *r)
 {
     assert(r->local);
-    r->local->target = inputDirectory("local path>");
+    r->local->target_path = inputDirectory("local path>");
 }
 
 void ConfigurationImplementation::editLocalKeep(Rule *r)
@@ -495,7 +505,7 @@ void ConfigurationImplementation::outputRule(Rule *r, std::vector<ChoiceEntry> *
     if (!buf) UI::outputln(msg);
     else buf->push_back(ChoiceEntry( msg, [=](){ editName(r); }));
 
-    strprintf(msg, "Path:         %s", r->path->c_str());
+    strprintf(msg, "Path:         %s", r->origin_path->c_str());
     if (!buf) UI::outputln(msg);
     else buf->push_back(ChoiceEntry( msg, [=](){ editPath(r); }));
 
@@ -503,11 +513,11 @@ void ConfigurationImplementation::outputRule(Rule *r, std::vector<ChoiceEntry> *
     if (!buf) UI::outputln(msg);
     else buf->push_back(ChoiceEntry( msg, [=](){ editType(r); }));
 
-    strprintf(msg, "History path: %s", relativePathIfPossible(r->path, r->history_path)->c_str());
+    strprintf(msg, "History path: %s", relativePathIfPossible(r->origin_path, r->history_path)->c_str());
     if (!buf) UI::outputln(msg);
     else buf->push_back(ChoiceEntry( msg, [=](){ editHistoryPath(r); }));
 
-    strprintf(msg, "Cache path:   %s", relativePathIfPossible(r->path, r->cache_path)->c_str());
+    strprintf(msg, "Cache path:   %s", relativePathIfPossible(r->origin_path, r->cache_path)->c_str());
     if (!buf) UI::outputln(msg);
     else buf->push_back(ChoiceEntry( msg, [=](){ editCachePath(r); }));
 
@@ -516,7 +526,7 @@ void ConfigurationImplementation::outputRule(Rule *r, std::vector<ChoiceEntry> *
     else buf->push_back(ChoiceEntry( msg, [=](){ editCacheSize(r); }));
 
     if (r->type == LocalThenRemoteBackup) {
-        strprintf(msg, "Local:        %s", relativePathIfPossible(r->path, r->local->target)->c_str());
+        strprintf(msg, "Local:        %s", relativePathIfPossible(r->origin_path, r->local->target_path)->c_str());
         if (!buf) UI::outputln(msg);
         else buf->push_back(ChoiceEntry( msg, [=](){ editLocalPath(r); }));
 
@@ -632,7 +642,7 @@ void ConfigurationImplementation::editRule()
             bool b = editRemoteTarget(&storage);
             if (b) {
                 editRemoteKeep(&storage);
-                r->storages[storage.target] = storage;
+                r->storages[storage.target_path] = storage;
             }
         }
         else if (ce->key == "e") {
@@ -681,33 +691,6 @@ void ConfigurationImplementation::copyRule()
     save();
 }
 
-
-void ConfigurationImplementation::loadRCloneStorages()
-{
-    vector<char> out;
-    vector<string> args;
-    args.push_back("listremotes");
-    args.push_back("-l");
-    RC rc = sys_->invoke("rclone", args, &out, CaptureBoth,
-                         [=](vector<char>::iterator i) { fprintf(stderr, "RCLONE GURKA:\n");
-                                                         while (i!=out.end()) { fprintf(stderr, "%c", *i); i++; } fprintf(stderr, "\n\n"); });
-    if (rc == OK) {
-        auto i = out.begin();
-        bool eof, err;
-
-        for (;;) {
-            eatWhitespace(out, i, &eof);
-            if (eof) break;
-            string target = eatTo(out, i, ':', 4096, &eof, &err);
-            if (eof || err) break;
-            string type = eatTo(out, i, '\n', 64, &eof, &err);
-            if (err) break;
-            trimWhitespace(&type);
-            rclone_storages_[target+":"] = type;
-        }
-    }
-}
-
 void ConfigurationImplementation::createNewRule()
 {
     Rule rule;
@@ -723,7 +706,7 @@ void ConfigurationImplementation::createNewRule()
         bool b = editRemoteTarget(&storage);
         if (!b) break;
         editRemoteKeep(&storage);
-        rule.storages[storage.target] = storage;
+        rule.storages[storage.target_path] = storage;
     }
 
     UI::output("Proposed new rule:\n\n");
@@ -764,7 +747,7 @@ Rule *ConfigurationImplementation::deleteStorage(Rule *r)
 {
     vector<ChoiceEntry> choices;
     for (auto s : r->sortedStorages()) {
-        choices.push_back( { s->target->str() } );
+        choices.push_back( { s->target_path->str() } );
     }
     auto ce = UI::inputChoice("Which storage to delete:", "storage>", choices);
     string s = ce->keyword;
@@ -782,8 +765,6 @@ Rule *ConfigurationImplementation::deleteStorage(Rule *r)
 
 int ConfigurationImplementation::configure()
 {
-    loadRCloneStorages();
-
     vector<ChoiceEntry> choices;
     choices.push_back( { "e", "", "Edit existing rule",         [=]() { editRule(); } } );
     choices.push_back( { "n", "", "New rule",                   [=]() { createNewRule(); } } );
@@ -794,11 +775,11 @@ int ConfigurationImplementation::configure()
 
     for (;;) {
         UI::output("Current rules:\n\n");
-        UI::output("%-20s %-20s\n", "Name", "Source");
+        UI::output("%-20s %-20s\n", "Name", "Origin");
         UI::output("%-20s %-20s\n", "====", "======");
 
         for (auto &l : rules_) {
-            UI::output("%-20s %s\n", l.second.name.c_str(), l.second.path->c_str());
+            UI::output("%-20s %s\n", l.second.name.c_str(), l.second.origin_path->c_str());
         }
 
         auto ce = UI::inputChoice("","e/n/d/r/c/s/q>", choices);
@@ -808,7 +789,7 @@ int ConfigurationImplementation::configure()
     return 0;
 }
 
-string keep_keys[] = { "all", "minutely", "hourly", "daily", "weekly", "monthly", "yearly" };
+string keep_keys[] = { "all", "minutely", "hourly", "daily", "weekly", "monthly", "yearly", "mirror" };
 
 size_t calcTime(string s)
 {
@@ -817,7 +798,7 @@ size_t calcTime(string s)
     if (c == 'i') scale = 60;
     if (c == 'h') scale = 3600;
     if (c == 'd') scale = 3600*24;
-    if (c == 'd') scale = 3600*24;
+    if (c == 'w') scale = 3600*24;
     return scale;
 }
 
@@ -825,6 +806,7 @@ bool Keep::parse(string s)
 {
     // Example:    "tz:+0100 all:2d daily:2w weekly:2m monthly:2y"
     // Example:    "tz:+0100 all:2d daily:1w monthly:12m"
+    // Example:    "tz:+0100 mirror"
     vector<char> data(s.begin(), s.end());
     auto i = data.begin();
     string tz, offset;
@@ -876,6 +858,11 @@ bool Keep::parse(string s)
             level=5;
             yearly = len;
         }
+        else if (key == "mirror") {
+            if (level > 5) return false;
+            level=6;
+            mirror = true;
+        }
 
         if (eof) break;
     }
@@ -892,15 +879,11 @@ string Keep::str()
 
     s += getTimeZoneOffsetAsString(tz_offset);
     s += " ";
-    if (all == 0 && daily == 0 && weekly == 0 && monthly == 0 && yearly == 0) {
-        s += "mirror";
-    } else {
-        if (all) s += "all:"+getLengthOfTime(all)+" ";
-        if (daily) s += "daily:"+getLengthOfTime(daily)+" ";
-        if (weekly) s += "weekly:"+getLengthOfTime(weekly)+" ";
-        if (monthly) s += "monthly:"+getLengthOfTime(monthly)+" ";
-        if (yearly) s += "yearly:"+getLengthOfTime(yearly);
-    }
+    if (all) s += "all:"+getLengthOfTime(all)+" ";
+    if (daily) s += "daily:"+getLengthOfTime(daily)+" ";
+    if (weekly) s += "weekly:"+getLengthOfTime(weekly)+" ";
+    if (monthly) s += "monthly:"+getLengthOfTime(monthly)+" ";
+    if (yearly) s += "yearly:"+getLengthOfTime(yearly);
     if (s.back() == ' ') s.pop_back();
     return s;
 }
@@ -909,7 +892,7 @@ void ConfigurationImplementation::outputStorage(Storage *s, std::vector<ChoiceEn
 {
     string msg;
 
-    strprintf(msg, "      Remote: %s", s->target->c_str());
+    strprintf(msg, "      Remote: %s", s->target_path->c_str());
     if (!buf) UI::outputln(msg);
     else buf->push_back(ChoiceEntry(msg, [=](){ editRemoteTarget(s); }));
 
@@ -933,7 +916,7 @@ bool ConfigurationImplementation::editRemoteTarget(Storage *s)
         if (storage == "") return false;
         auto r = okStorage(storage);
         if (!r.first) continue;
-        s->target = Path::lookup(storage);
+        s->target_path = Path::lookup(storage);
         s->type = r.second;
         break;
     }

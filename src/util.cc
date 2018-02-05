@@ -111,6 +111,7 @@ string humanReadableTwoDecimals(size_t s)
     {
         return helper(KB*KB, s, "MiB");
     }
+#if SIZEOF_SIZE_T == 8
     if (s < KB * KB * KB * KB)
     {
         return helper(KB*KB*KB, s, "GiB");
@@ -120,6 +121,9 @@ string humanReadableTwoDecimals(size_t s)
         return helper(KB*KB*KB*KB, s, "TiB");
     }
     return helper(KB*KB*KB*KB*KB, s, "PiB");
+#else
+    return helper(KB*KB*KB, s, "GiB");
+#endif
 }
 
 size_t roundoffHumanReadable(size_t s)

@@ -107,7 +107,9 @@ struct ForwardTarredFS : FuseAPI
 
     void setMessage(std::string m) { message_ = m; }
     void setTarHeaderStyle(TarHeaderStyle ths) { tarheaderstyle_= ths; }
-    ForwardTarredFS(FileSystem *fs);
+    ForwardTarredFS(ptr<FileSystem> fs);
+
+    virtual ~ForwardTarredFS() = default;
 
 private:
     size_t findNumTarsFromSize(size_t amount, size_t total_size);
@@ -117,9 +119,10 @@ private:
     std::string message_;
     TarHeaderStyle tarheaderstyle_;
 
-    FileSystem *file_system_;
+    FileSystem* file_system_;
+
 };
 
-std::unique_ptr<ForwardTarredFS> newForwardTarredFS(FileSystem *fs);
+std::unique_ptr<ForwardTarredFS> newForwardTarredFS(ptr<FileSystem> fs);
 
 #endif

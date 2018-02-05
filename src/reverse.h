@@ -112,7 +112,7 @@ struct ReverseTarredFS
     PointInTime *findPointInTime(std::string s);
     PointInTime *setPointInTime(std::string g);
 
-    ReverseTarredFS(FileSystem *fs);
+    ReverseTarredFS(ptr<FileSystem> fs);
 
     Path *rootDir() { return root_dir_; }
     Path *mountDir() { return mount_dir_; }
@@ -134,6 +134,6 @@ struct ReverseTarredFS
     FileSystem *file_system_;
 };
 
-std::unique_ptr<ReverseTarredFS> newReverseTarredFS(FileSystem *fs);
+std::unique_ptr<ReverseTarredFS> newReverseTarredFS(ptr<FileSystem> fs);
 
 #endif

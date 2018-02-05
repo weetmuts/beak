@@ -11,33 +11,34 @@ beak is the tool for the impatient who wants to initiate a backup
 manually and want to see it finished, quickly. In other words, after
 finishing some important work, you type `beak push work: gd_work_crypt:`
 and wait for it to finish.  You can now be sure that your work directory
-is safely backed up to the _remote_ cloud storage gd_work_crypt: before
-you stuff your laptop in your bag.
+(the _origin_) is safely backed up to the _backup_ location gd_work_crypt: in
+the cloud, before you stuff your laptop in your bag.
 
 The push created a _point in time_, which is defined to be the modify
-timestamp of the most recently changed file/directory within the backup.
-(I.e. it is not the time when the push was initiated.)
+timestamp of the most recently changed file/directory within the
+_origin_ directory that was backed up. (I.e. it is not the time when
+the push was initiated.)
 
-`work: is a beak configuration to backup one of your directories, for example: /home/you/Work`
+`work: a beak _rule_ that you have created to backup the _origin_ directory /home/you/Work`.
 
-(the to be backed up directory is also known as a _source directory_)
+`gd_work_crypt: is an rclone _backup_ location , for example an encrypted directory in your google drive.`
+`backup@192.168.0.1:/backups is an rsync _backup_ location.`
 
-`gd_work_crypt: is an rclone destination, for example an encrypted directory in your google drive.`
-
-(the destination can also be a local directory, both the local and the remote are known as a _backup directory_)
+(the _backup_ location where your backups are stored, can also be a
+local directory, both locals and remotes are known as _backup_ locations.)
 
 The easiest way to access your _points in time_, is to do a history
 mount. Create the directory OldStuff, then do:
 
 `beak history work: OldStuff`
 
-(The history command mounts all known local and remote _backup directories_ and merges
+(The history command mounts all known local and remote _backup_ locations and merges
 their history into single timeline.)
 
-Now you can simply browse OldStuff and copy whatever file
-your are missing from the historical backups. You will see the _points
-in times_ as subdirectories, marked with the _remote_ or _local_ storage it was pushed
-to. You can have the same backup in multiple _backup directories_.
+Now you can simply browse OldStuff and copy whatever file your are
+missing from the historical backups. You will see the _points in
+times_ as subdirectories, marked with the _backup_ location
+it was pushed to. You can have the same backup in multiple _backup_ locations.
 
 ```
 >ls OldStuff
@@ -47,7 +48,7 @@ to. You can have the same backup in multiple _backup directories_.
 @3 2017-07-01 08:23 2 months ago to s3_work_crypt:
 ```
 
-You can check the status of your configured _source directories_ with:
+You can check the status of your configured _origin_ directories with:
 
 `beak status`
 
@@ -55,17 +56,13 @@ After a while you probably want to remove backups to save space.
 
 `beak prune gd_work_crypt:`
 
-The default _keep rule_ is:
+The default _keep_ configuration is:
 ```
-All points in time for the last 7 days.
-One point in time per day for the last 14 days.
-One point in time per week for the last 8 weeks.
-One point in time per month for the last 12 months.
+All points in time for the last 2 days.
+One point in time per day for the last 2 weeks.
+One point in time per week for the last 2 months.
+One point in time per month for the last 2 years.
 ```
-
-By default the point in time chosen for an interval, is the last point
-in time for that interval.  I.e. the last recorded point in time for
-that day, week or month.
 
 ## BeakFS, the chunky file system
 
@@ -96,7 +93,7 @@ becomes
 
 The order and selection of the chunky directories is deterministic (and depth first),
 which means that as long as you do not modify the contents of the
-_source directory_, then the created virtual chunky file system will
+_origin_ directory, then the created virtual chunky file system will
 be the same.
 
 The index provides for quick access to the contents of the chunks.  As
@@ -113,7 +110,7 @@ wish.
 `beak mount /home/you/Work TestBeakFS`
 
 Explore the directory `TestBeakFS` to see how beak has chunkified your
-_source directory_. Now do:
+_origin_ directory. Now do:
 
 `rclone copy TestBeakFS /home/you/Backup`
 
@@ -122,16 +119,16 @@ and you have a proper backup! To unmount the chunky filesystem:
 `beak umount TestBeakFS`
 
 Now remount and rclone again. Rclone will exit early because there is nothing to do.
-Logical, since you have not changed your _source directory_.
+Logical, since you have not changed your _origin_ directory.
 
 To access the backed up data do:
 
 `beak mount /home/you/Backup@0 OldStuff`
 
 Now explore OldStuff and do `diff -rq /home/you/Work OldStuff`. There should be no differences.
-The @0 means to mount the most recent _point in time_ in the _backup directory_.
+The @0 means to mount the most recent _point in time_ in the _backup_ location.
 
-You can skip the rclone step if you are storing in a local _backup directory_. Then simply do:
+You can skip the rclone step if the _backup_ location is a local directory. Then simply do:
 
 `beak store /home/you/Work /home/you/Backup`
 
@@ -170,12 +167,12 @@ The hash is the hash of the all the archives pointed to by this index file.
 (Those y01[...]tar files stores directories and hard links and are only used
 when extracting the backup using the shell script.)
 
-Assuming that your _source directory_ `/home/you/Work/` above contained `rclonesrc/` and `gamesrc/`
+Assuming that your _origin_ directory `/home/you/Work/` above contained `rclonesrc/` and `gamesrc/`
 and you made the backup to `/home/you/Backup`. Now modify a file in `gamesrc/` and do another backup:
 
 `beak store /home/you/Work /home/you/Backup`
 
-You now have two _points in time_ stored in the _backup directory_. Since you made no changes
+You now have two _points in time_ stored in the _backup_ location. Since you made no changes
 to `rclonesrc` the new index file will point to the existing rclonesrc/chunks.
 
 ![Beak FS](./doc/beak_fs.png)
@@ -193,7 +190,7 @@ even be created inside an existing backup using:
 
 `git pack s3_work_crypt:`
 
-You can get information on a _backup directory_ using:
+You can get information on a _backup_ location using:
 
 `beak info s3_work_crypt:`
 
@@ -218,7 +215,7 @@ to rewrite old archive files or update meta-data. As a consequence
 beak cannot destroy the previous backup if the current backup is
 interrupted halfway.
 
-If a _backup directory_ (local or remote) is later packed, the new
+If a _backup_ location (local or remote) is later packed, the new
 diff chunks are first uploaded and verified to have reached their
 destination, before the non-diff chunks are removed. The pack can be
 done by a different computer than the computer that pushed.
@@ -233,12 +230,13 @@ re-configuring rclone and beak. You can store your home directory in beak.
 beak is more like a Swiss army knife for backing up, mirroring,
 off-site storage etc. As you have seen, you can do everything by hand
 using: `beak mount` `beak store` and `rclone`.  But to speed up common tasks you
-can configure _source directories_ like `work:` with `beak config`.
+can configure rules with `beak config`. A _rule_ (like work:) provides a short cut to the
+actual _origin_ directory (like /home/you/Work). The push and pull commands require a _rule_.
 
-A configured _source directory_ can be of a type:
+A configured _rule_ can be of a type:
 
 ```
-LocalAndRemoteBackups = A push first stores locally and the rclones to the remote. Diff chunks are possible.
+LocalAndRemoteBackups = A push stores locally and the rclones to the remote. Diff chunks are possible.
 RemoteBackupsOnly     = A push rclones directly to the remote from a virtual BeakFS.
 MountOnly             = Only mount off-site storage
 ```
@@ -250,7 +248,7 @@ You can have separate configurations your Work, your Media, your
 Archive, your Home directory etc.  If you use S3 you can have separate
 passwords for the remote storage locations to create safety barriers.
 
-You can have different _keep rules_ for all _backup directories_. Your local backup
+You can have different _keep_ configurations for all _backup_ locations. Your local backup
 can be kept at a minimum and if you are using btrfs it can use snapshots.
 
 You can move your work between computers using beak. A typical use case for me is:
@@ -296,7 +294,7 @@ using a btrfs filesystem then the btrfs snapshots are stored here as well.
 Beak will use a snapshot and recreate the old _beakfs_ from that snapshot
 instead of storing the _beakfs_ files. Thus saving disk space.
 
-`.beak/cache` stores downloaded chunks when you mount remote _backup directories_
+`.beak/cache` stores downloaded chunks when you mount remote _backup_ locations
 or mount them all using the history command. You can clean the cache
 at any time when you are not mounting or otherwise executing a beak command.
 
