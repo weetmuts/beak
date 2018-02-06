@@ -1,5 +1,5 @@
 #!/bin/bash
-#  
+#
 #    Copyright (C) 2016 Fredrik Öhrström
 #
 #    This program is free software: you can redistribute it and/or modify
@@ -31,7 +31,7 @@ function finish {
 trap finish EXIT
 
 function Help() {
-    echo Usage: tarrredfs-integrity-test {-d} {-onlypart2} {-f [find-expression]} [root] [mount] {time} 
+    echo Usage: tarrredfs-integrity-test {-d} {-onlypart2} {-f [find-expression]} [root] [mount] {time}
     echo
     echo Check that the contents listed in the tar files inside mount
     echo corresponds exactly to the contents listed in root.
@@ -66,6 +66,8 @@ do
             shift ;;
         -onlypart2) onlypart2='true'
             shift ;;
+        *) echo Unknown option $1
+           exit ;;
     esac
 done
 
@@ -80,11 +82,11 @@ fi
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 if [ "$DIR" = "/usr/local/bin" ]; then
-    PERL_PREFIX=/usr/local/lib/tarredfs/
-    UNTAR=/usr/local/bin/tarredfs-untar
+    PERL_PREFIX=/usr/local/lib/beak/
+    UNTAR=/usr/local/bin/beak-restore
 else
     PERL_PREFIX="$DIR"/
-    UNTAR="$DIR/untar.sh"
+    UNTAR="$DIR/restore.sh"
 fi
 
 
@@ -95,11 +97,11 @@ then
         > $dir/test_root_raw.txt
 
     cat $dir/test_root_raw.txt | perl ${PERL_PREFIX}format_find.pl $root > $dir/test_root.txt
-    
+
     # Find all files listed in the tar files below mount.
     ${UNTAR} tv $mount > $dir/test_tar_raw.txt
     cat $dir/test_tar_raw.txt | perl ${PERL_PREFIX}format_tar.pl > $dir/test_tar.txt
-    
+
     sort $dir/test_root.txt > $dir/test_root_sorted.txt
     sort $dir/test_tar.txt > $dir/test_tar_sorted.txt
 
@@ -139,7 +141,7 @@ then
 
     while (( $time_diff < $time ))
     do
-        curr_time=$(date +%s) 
+        curr_time=$(date +%s)
         time_diff=$(($curr_time - $start_time))
         file=$(shuf $dir/files.txt | head -n 1)
         file=${file#./}
@@ -153,9 +155,8 @@ then
             echo Original:  "$root/$file"
             echo Extracted: "dir/Check/$file"
             exit
-        fi    
+        fi
         rm -f "$dir/Check/$file"
-        curr_time=$(date +%s) 
+        curr_time=$(date +%s)
     done
 fi
-

@@ -1,5 +1,5 @@
 while (<STDIN>) {
-    if ($_ =~ m/Tarredfs: tar/) {
+    if ($_ =~ m/Beak: tar/) {
     } else {
         if ($_ =~ m/V---------/) {
         } else {

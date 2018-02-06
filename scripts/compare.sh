@@ -1,5 +1,5 @@
 #!/bin/bash
-#  
+#
 #    Copyright (C) 2016 Fredrik Öhrström
 #
 #    This program is free software: you can redistribute it and/or modify
@@ -24,10 +24,10 @@ else
 fi
 
 if [ "$1" == "" ] || [ "$2" == "" ]; then
-    echo Usage: tarrredfs-compare [root] [extracted]
+    echo Usage: beak-compare [root] [extracted]
     echo
-    echo Used to check that the contents extracted from a tarredfs mount
-    echo directory are identical to the root.
+    echo Used to check that the contents extracted from a beak backup
+    echo directory are identical to the origin.
     exit
 fi
 
@@ -43,5 +43,3 @@ trap finish EXIT
 (cd "$2" && find . $NODIRS -printf '%p\t%TY-%Tm-%Td_%TT\t%M\t%u %g\t%s\t%l\n' | sort > $dir/dest.txt)
 
 diff $dir/org.txt $dir/dest.txt
-
-

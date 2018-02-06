@@ -118,12 +118,12 @@ and you have a proper backup! To unmount the chunky filesystem:
 
 `beak umount TestBeakFS`
 
-Now remount and rclone again. Rclone will exit early because there is nothing to do.
+Now mount and rclone again. Rclone will exit early because there is nothing to do.
 Logical, since you have not changed your _origin_ directory.
 
 To access the backed up data do:
 
-`beak mount /home/you/Backup@0 OldStuff`
+`beak remount /home/you/Backup@0 OldStuff`
 
 Now explore OldStuff and do `diff -rq /home/you/Work OldStuff`. There should be no differences.
 The @0 means to mount the most recent _point in time_ in the _backup_ location.
@@ -134,7 +134,7 @@ You can skip the rclone step if the _backup_ location is a local directory. Then
 
 which will store any chunk files that are missing into Backup. The extraction process is symmetrical:
 
-`beak store /home/you/Backup@0 /home/you/Work`
+`beak restore /home/you/Backup@0 /home/you/Work`
 
 (This will not delete superfluous files. Add --delete-superfluous to remove them automatically.)
 
@@ -304,11 +304,15 @@ if `beak history work:` is invoked without a target directory.
 ## Command summary
 
 ```
+beak store     beak restore
+
+beak mount     beak remount
+
 beak push      beak pull      beak history
 
 beak fetch     beak merge     beak diff
 
-beak mount     beak store     beak checkout      beak shell
+beak shell
 
 beak config
 

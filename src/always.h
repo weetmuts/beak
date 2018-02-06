@@ -24,7 +24,7 @@
 #include <assert.h>
 #include <memory>
 
-#define BEAK_VERSION 0.2
+#define BEAK_VERSION 0.7
 
 #define OK 0
 #define ERR 1

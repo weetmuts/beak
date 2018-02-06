@@ -16,7 +16,7 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-dir=$(mktemp -d /tmp/beak_untarXXXXXXXX)
+dir=$(mktemp -d /tmp/beak_restoreXXXXXXXX)
 
 function finish {
     if [ "$debug" == "" ]
@@ -30,13 +30,13 @@ trap finish EXIT
 
 function Help() {
     echo
-    echo Usage: tarredfs-untar {-d} {-c} [x\|t]{a}{v} [DirWithTars] {PathToExtract}
+    echo Usage: beak-restore {-d} {-c} [x\|t]{a}{v} [DirWithTars] {PathToExtract}
     echo
     echo Example:
-    echo tarredfs-untar x /Mirror/Storage
-    echo tarredfs-untar xv /Mirror/Storage/Articles
-    echo tarredfs-untar xa /Mirror/Storage/Articles mag1.pdf
-    echo tarredfs-untar tav /Mirror/Storage/Work
+    echo beak-restore x /Mirror/Storage
+    echo beak-restore xv /Mirror/Storage/Articles
+    echo beak-restore xa /Mirror/Storage/Articles mag1.pdf
+    echo beak-restore tav /Mirror/Storage/Work
     echo
     echo Add -d to debug.
     exit
@@ -130,7 +130,7 @@ root="$(realpath $2)"
 numgzs=$(ls "$root"/z01*.gz | sort -r | wc | tr -s ' ' | cut -f 2 -d ' ')
 
 if [ "$numgzs" = "0" ]; then
-    echo No tarredfs found in "$root"
+    echo No beakfs found in "$root"
     exit
 fi
 
@@ -143,7 +143,7 @@ if [ "$numgzs" = "1" ]; then
 else
     ls "$root"/z01*.gz | sort -r > "$dir/generations"
     if [ "$gen" = "" ]; then
-        echo More than one tarredfs generation found!
+        echo More than one beakfs generation found!
         echo Select a generation using -g
         n=0
         while IFS='' read i; do
@@ -209,7 +209,7 @@ while IFS='' read tar_file; do
             eval $CMD > $dir/tmplist
             popDir
             if [ "$?" == "0" ]; then
-                echo Tarredfs: tar ${cmd}f \"$file\" \"$ex\"
+                echo Beak: tar ${cmd}f \"$file\" \"$ex\"
             fi
             if [ "$extract" == "true" ]; then
                 # GNU Tar simply prints the filename when extracting verbosely.

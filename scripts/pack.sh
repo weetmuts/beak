@@ -1,5 +1,5 @@
 #!/bin/bash
-#  
+#
 #    Copyright (C) 2016 Fredrik Öhrström
 #
 #    This program is free software: you can redistribute it and/or modify
@@ -36,11 +36,11 @@ trap finish EXIT
 
 function Help() {
     echo
-    echo Usage: tarredfs-pack [xz\|gzip\|bzip2] [DirWithTars] [DirWithPackedTars]
+    echo Usage: beak-pack [xz\|gzip\|bzip2] [DirWithTars] [DirWithPackedTars]
     echo
     echo Example:
-    echo tarredfs-pack xz /Mirror/Storage /Mirror/CompressedStorage
-    echo tarredfs-pack gzip /Mirror/Storage/Articles /home/CompressedBackup
+    echo beak-pack xz /Mirror/Storage /Mirror/CompressedStorage
+    echo beak-pack gzip /Mirror/Storage/Articles /home/CompressedBackup
     exit
 }
 
@@ -84,7 +84,7 @@ while read from; do
              chmod --reference="$filename" "$to$ext")
         fi
     else
-        if [ ! -f "$to" ]; then        
+        if [ ! -f "$to" ]; then
             cp -a "$from" "$to"
         fi
     fi

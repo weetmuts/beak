@@ -119,11 +119,11 @@ function performStore {
     fi
 }
 
-function performUnStore {
+function performReStore {
     extra="$1"
     if [ -z "$test" ]; then
         # Normal test execution, execute the store
-        eval "${BEAK} store $extra "${store}${subdir}" $check > $log"
+        eval "${BEAK} restore $extra "${store}${subdir}" $check > $log"
     else
         if [ -z "$gdb" ]; then
             ${BEAK} store --log=all $extra $store $check 2>&1 | tee $log
@@ -168,7 +168,7 @@ function startMountTest {
             # Running a chosen test, we want to see the debug output from beak.
             # Spawn the daemon in foreground, delay start of the test by 2 seconds.
             (sleep 2; eval ${run}) &
-            eval "${BEAK} mount -d $extra $root $mount 2>&1 | tee $log &"
+            eval "${BEAK} mount -f $extra $root $mount 2>&1 | tee $log &"
         else
             # Running a chosen test in gdb. The gdb session must be in the foreground.
             # Delay start of the test by 3 seconds.
@@ -182,15 +182,15 @@ function startMountTestArchive {
     run="$1"
     extra="$2"
     if [ -z "$test" ]; then
-        ${BEAK} mount $extra $packed $check > $log
+        ${BEAK} remount $extra $packed $check > $log
         ${run}
     else
         if [ -z "$gdb" ]; then
             (sleep 2; eval ${run}) &
-            ${BEAK} mount -d $extra $packed $check 2>&1 | tee $log &
+            ${BEAK} remount -f $extra $packed $check 2>&1 | tee $log &
         else
             (sleep 3; eval ${run}) &
-            gdb -ex=r --args ${BEAK} mount -d $extra $packed $check
+            gdb -ex=r --args ${BEAK} remount -f $extra $packed $check
         fi
     fi
 }
@@ -205,10 +205,10 @@ function startMountTestExpectFail {
     else
         if [ -z "$gdb" ]; then
             (sleep 2; eval ${run}) &
-            "$env" ${BEAK} mount -d $extra $root $mount 2>&1 | tee $log &
+            "$env" ${BEAK} mount -f $extra $root $mount 2>&1 | tee $log &
         else
             (sleep 3; eval ${run}) &
-            gdb -ex=r --args "$env" ${BEAK} mount -d $extra $root $mount
+            gdb -ex=r --args "$env" ${BEAK} mount -f $extra $root $mount
         fi
     fi
 }
@@ -236,18 +236,18 @@ function startTwoFS {
     if [ -z "$test" ]; then
         ${BEAK} mount $extra $root $mount > $log
         sleep 2
-        ${BEAK} mount $extrareverse $mount $mountreverse > $log
+        ${BEAK} remount $extrareverse $mount $mountreverse > $log
         ${run}
     else
         if [ -z "$gdb" ]; then
             (sleep 4; eval ${run}) &
             ${BEAK} mount $extra $root $mount 2>&1 | tee $log &
-            ${BEAK} mount -d $extrareverse $mount $mountreverse 2>&1 | tee $logreverse &
+            ${BEAK} remount -f $extrareverse $mount $mountreverse 2>&1 | tee $logreverse &
         else
             (sleep 5; eval ${run}) &
             ${BEAK} mount $extra $root $mount > $log
             sleep 2
-            gdb -ex=r --args ${BEAK} mount -d $extrareverse $mount $mountreverse
+            gdb -ex=r --args ${BEAK} remount -f $extrareverse $mount $mountreverse
         fi
     fi
 }
@@ -266,7 +266,7 @@ function stopTwoFS {
 }
 
 function untar {
-    (cd "$check"; $THIS_DIR/scripts/untar.sh x "$1")
+    (cd "$check"; $THIS_DIR/scripts/restore.sh x "$1")
 }
 
 function pack {
@@ -274,7 +274,7 @@ function pack {
 }
 
 function untarpacked {
-    (cd "$check"; $THIS_DIR/scripts/untar.sh xa "$packed" "$1")
+    (cd "$check"; $THIS_DIR/scripts/restore.sh xa "$packed" "$1")
 }
 
 function checkdiff {
@@ -306,7 +306,7 @@ function standardStoreUntarTest {
 
 function standardStoreUnstoreTest {
     if_test_fail_msg="Store unstor test failed: "
-    performUnStore
+    performReStore
     checkdiff
     checklsld
 }
@@ -335,7 +335,7 @@ function fifoStoreUntarTest {
 
 function fifoStoreUnStoreTest {
     if_test_fail_msg="Store unstore fifo test failed: "
-    performUnStore
+    performReStore
     checklsld
 }
 
@@ -529,7 +529,7 @@ function storeUntarFilterTest {
 }
 
 function storeUnStoreFilterTest {
-    performUnStore
+    performReStore
     filterCheck
 }
 
@@ -569,7 +569,7 @@ if [ $do_test ]; then
     cleanCheck
     if_test_fail_msg="Store unstor test failed: "
     subdir="/Gamma"
-    performUnStore
+    performReStore
     checkdiff /Gamma
     checklsld /Gamma
     cleanCheck

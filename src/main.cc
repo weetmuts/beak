@@ -35,7 +35,6 @@ int main(int argc, char *argv[])
 
     beak->captureStartTime();
     Command cmd = beak->parseCommandLine(argc, argv, &settings);
-    beak->verifyCommandLine(cmd, &settings);
 
     switch (cmd) {
 
@@ -73,20 +72,8 @@ int main(int argc, char *argv[])
         break;
 
     case mount_cmd:
-    {
-
-        bool has_history = beak->lookForPointsInTime(&settings);
-        if (!has_history || settings.forceforward) {
-            // src contains your files, to be backed up
-            // dst will contain a virtual file system with the backup files.
-            rc = beak->mountForwardDaemon(&settings);
-        } else {
-            // src has a history of backup files, thus
-            // dst will contain a virtual file system with your files.
-            rc = beak->mountReverseDaemon(&settings);
-        }
-    }
-    break;
+        rc = beak->mountForwardDaemon(&settings);
+        break;
 
     case prune_cmd:
         rc = beak->prune(&settings);
@@ -99,6 +86,14 @@ int main(int argc, char *argv[])
     case pull_cmd:
         break;
 
+    case remount_cmd:
+        rc = beak->remountReverseDaemon(&settings);
+        break;
+
+    case restore_cmd:
+        rc = beak->restoreReverse(&settings);
+        break;
+
     case shell_cmd:
         rc = beak->shell(&settings);
         break;
@@ -108,28 +103,10 @@ int main(int argc, char *argv[])
         break;
 
     case store_cmd:
-    {
-        /*if (!settings.hasBothSrcAndDst()) {
-            fprintf(stdout, "You must supply a src and a dst.\n");
-            exit(1);
-            }*/
-        bool has_history = beak->lookForPointsInTime(&settings);
-        if (!has_history || settings.forceforward) {
-            // src contains your files, to be backed up
-            // the backup files will be stored in dst
-            rc = beak->storeForward(&settings);
-        } else {
-            // src has a history of backup files, thus
-            // store the extracted files into dst.
-            rc = beak->storeReverse(&settings);
-        }
+        rc = beak->storeForward(&settings);
         break;
-    }
+
     case umount_cmd:
-        /*if (!settings.hasSrc()) {
-            fprintf(stdout, "You must supply a directory to unmount.\n");
-            exit(1);
-            }*/
         rc = beak->umountDaemon(&settings);
         break;
 

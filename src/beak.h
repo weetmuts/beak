@@ -45,10 +45,8 @@ struct Beak
     virtual void captureStartTime() = 0;
     virtual std::string argsToVector(int argc, char **argv, std::vector<std::string> *args) = 0;
     virtual Command parseCommandLine(int argc, char **argv, Options *settings) = 0;
-    virtual void verifyCommandLine(Command cmd, Options *settings) = 0;
     virtual int printInfo(Options *settings) = 0;
-    virtual bool lookForPointsInTime(Options *settings) = 0;
-    virtual std::vector<PointInTime> &history() = 0;
+    virtual std::vector<PointInTime> history() = 0;
     virtual bool setPointInTime(std::string g) = 0;
 
     virtual int configure(Options *settings) = 0;
@@ -60,14 +58,14 @@ struct Beak
     virtual int mountForwardDaemon(Options *settings) = 0;
     virtual int mountForward(Options *settings) = 0;
     virtual int umountForward(Options *settings) = 0;
-    virtual int mountReverseDaemon(Options *settings) = 0;
-    virtual int mountReverse(Options *settings) = 0;
+    virtual int remountReverseDaemon(Options *settings) = 0;
+    virtual int remountReverse(Options *settings) = 0;
     virtual int umountReverse(Options *settings) = 0;
 
     virtual int shell(Options *settings) = 0;
     virtual int status(Options *settings) = 0;
     virtual int storeForward(Options *settings) = 0;
-    virtual int storeReverse(Options *settings) = 0;
+    virtual int restoreReverse(Options *settings) = 0;
 
     virtual void printHelp(Command cmd) = 0;
     virtual void printVersion() = 0;
@@ -91,14 +89,16 @@ std::unique_ptr<Beak> newBeak(ptr<FileSystem> src_fs, ptr<FileSystem> dst_fs);
     X(genautocomplete,"Output bash completion script for beak.")        \
     X(genmounttrigger,"Output systemd rule to trigger backup when USB drive is mounted.") \
     X(info,"List points in time and other info about archive.")         \
-    X(mount,"Mount your file system as a backup, or vice versa.")       \
+    X(mount,"Mount your file system as a backup.")                      \
     X(history,"Mount all known storages for your backup.")              \
     X(prune,"Discard old backups according to the keep rule.")          \
     X(pull,"Merge a backup from a remote.")                             \
     X(push,"Backup a directory to a remote.")                           \
+    X(remount,"Mount your backup as a file system.")                    \
+    X(restore,"Restore from your backup into your file system.")        \
     X(shell,"Start a minimal shell to explore a backup.")               \
     X(status,"Show the status of your backups both locally and remotely.") \
-    X(store,"Store your file system into a backup, or vice versa.")     \
+    X(store,"Store your file system into a backup.")                    \
     X(umount,"Unmount a virtual file system.")                          \
     X(version,"Show version.")                                          \
     X(nosuch,"No such command.")                                        \
@@ -115,8 +115,6 @@ LIST_OF_COMMANDS
       "                           1 is the root, 2 is the first subdir. The default is 2.")    \
     X(f,foreground,bool,false,"When mounting do not spawn a daemon.")   \
     X(fd,fusedebug,bool,false,"Enable fuse debug mode, this also triggers foreground.") \
-    X(ff,forceforward,bool,false,"Force forward mount of backup directory,\n" \
-      "                           if you want to backup your backup files!")  \
     X(i,include,std::vector<std::string>,true,"Only matching paths are inluded. E.g. -i '*.c'") \
     X(,license,bool,false,"Show copyright holders,licenses and notices for the program.") \
     X(l,log,std::string,true,"Log debug messages for these parts. E.g. --log=reverse,hashing") \
@@ -139,8 +137,6 @@ LIST_OF_COMMANDS
     X(x,exclude,std::vector<std::string>,true,"Paths matching glob are excluded. E.g. -exclude='beta/**'") \
     X(nso,nosuch,bool,false,"No such option")
 
-
-
 enum Option {
 #define X(shortname,name,type,requirevalue,info) name##_option,
 LIST_OF_OPTIONS
@@ -158,13 +154,10 @@ enum ArgumentType
 struct Argument
 {
     ArgumentType type {};
-
     Path *path {};
     Rule *rule {};
     Storage backup;
     std::string point_in_time;
-
-    bool parse(ptr<System> sys, ptr<Configuration> conf, std::string arg);
 };
 
 struct Options
