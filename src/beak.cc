@@ -66,7 +66,7 @@ struct OptionEntry;
 
 struct BeakImplementation : Beak {
 
-    BeakImplementation(ptr<FileSystem> src_fs, ptr<FileSystem> dst_fs);
+    BeakImplementation(ptr<FileSystem> from_fs, ptr<FileSystem> to_fs);
     void printCommands();
     void printOptions();
 
@@ -110,9 +110,7 @@ struct BeakImplementation : Beak {
     int mountForwardInternal(Options *settings, bool daemon);
     int remountReverseInternal(Options *settings, bool daemon);
 
-    ForwardTarredFS forward_fs;
     fuse_operations forward_tarredfs_ops;
-//    ReverseTarredFS reverse_fs;
     fuse_operations reverse_tarredfs_ops;
 
     map<string,CommandEntry*> commands_;
@@ -133,12 +131,12 @@ struct BeakImplementation : Beak {
     pid_t loop_pid_;
 
     unique_ptr<System> sys_;
-    ptr<FileSystem> src_file_system_;
-    ptr<FileSystem> dst_file_system_;
+    ptr<FileSystem> from_fs_;
+    ptr<FileSystem> to_fs_;
 };
 
-unique_ptr<Beak> newBeak(ptr<FileSystem> src_fs, ptr<FileSystem> dst_fs) {
-    return unique_ptr<Beak>(new BeakImplementation(src_fs, dst_fs));
+unique_ptr<Beak> newBeak(ptr<FileSystem> from_fs, ptr<FileSystem> to_fs) {
+    return unique_ptr<Beak>(new BeakImplementation(from_fs, to_fs));
 }
 
 struct CommandEntry {
@@ -167,11 +165,9 @@ LIST_OF_OPTIONS
 #undef X
 };
 
-BeakImplementation::BeakImplementation(ptr<FileSystem> src_fs, ptr<FileSystem> dst_fs) :
-    forward_fs(src_fs),
-//    reverse_fs(src_fs),
-    src_file_system_(src_fs),
-    dst_file_system_(dst_fs)
+BeakImplementation::BeakImplementation(ptr<FileSystem> from_fs, ptr<FileSystem> to_fs) :
+    from_fs_(from_fs),
+    to_fs_(to_fs)
 {
     for (auto &e : command_entries_) {
         if (e.cmd != nosuch_cmd) {
@@ -190,7 +186,7 @@ BeakImplementation::BeakImplementation(ptr<FileSystem> src_fs, ptr<FileSystem> d
 
     sys_ = newSystem();
 
-    configuration_ = newConfiguration(sys_, src_fs);
+    configuration_ = newConfiguration(sys_, from_fs_);
     configuration_->load();
 }
 
@@ -601,14 +597,18 @@ int BeakImplementation::configure(Options *settings)
 
 int BeakImplementation::push(Options *settings)
 {
-    /*
-    assert(settings->from.type == ArgRule && settings->from.rule);
-    assert(settings->to.type == ArgStorage && settings->to.storage);
+    if (settings->from.type != ArgPath && settings->from.type != ArgRule) {
+        failure(COMMANDLINE,"You have to specify an origin, rule or directory.\n");
+    }
 
-    Path *mount = src_file_system_->mkTempDir("beak_push_");
+    if (settings->to.type != ArgStorage) {
+        failure(COMMANDLINE,"You have to specify a backup location.\n");
+    }
+
+    Path *mount = from_fs_->mkTempDir("beak_push_");
 
     Options forward_settings = settings->copy();
-    forward_settings.to.setStorageDirectory(mount);
+    forward_settings.to.path = mount;
     forward_settings.fuse_argc = 1;
     char *arg;
     char **argv = &arg;
@@ -616,25 +616,27 @@ int BeakImplementation::push(Options *settings)
     strcpy(*argv, "beak");
     forward_settings.fuse_argv = argv;
 
-    fprintf(stderr, "Listing remote files...\n");
+    /*
     vector<TarFileName> storage_files;
     listStorageFiles(settings->to.storage, &storage_files);
     for (auto& tfn : storage_files) {
         fprintf(stderr, "Storage file size %ju\n", tfn.size);
     }
     fprintf(stderr, "Done listing storage files...\n");
+    */
 
     // Spawn virtual filesystem.
-    int rc = mountForward(&forward_settings);
+    RC rc = mountForward(&forward_settings);
+    if (!rc) return ERR;
 
     vector<string> args;
     args.push_back("copy");
     args.push_back("-v");
     args.push_back(mount->c_str());
-    if (settings->to.asStorageDirectory()) {
-        args.push_back(settings->dst->str());
+    if (settings->to.path) {
+        args.push_back(settings->to.path->str());
     } else {
-        args.push_back(settings->remote);
+        args.push_back(settings->to.backup.target_path->str());
     }
     vector<char> output;
     rc = sys_->invoke("rclone", args, &output, CaptureBoth,
@@ -647,7 +649,6 @@ int BeakImplementation::push(Options *settings)
     // Unmount virtual filesystem.
     rc = umountForward(&forward_settings);
     rmdir(mount->c_str());
-    */
 
     return OK;
 }
@@ -719,14 +720,15 @@ int BeakImplementation::mountForwardInternal(Options *settings, bool daemon)
     forward_tarredfs_ops.read = forwardRead;
     forward_tarredfs_ops.readdir = forwardReaddir;
 
-    ok = forward_fs.scanFileSystem(settings);
+    auto ffs  = newForwardTarredFS(from_fs_);
+    ok = ffs->scanFileSystem(settings);
 
     if (ok) {
         return ERR;
     }
 
     if (daemon) {
-        return fuse_main(settings->fuse_argc, settings->fuse_argv, &forward_tarredfs_ops, &forward_fs);
+        return fuse_main(settings->fuse_argc, settings->fuse_argv, &forward_tarredfs_ops, ffs.get());
     }
 
     struct fuse_args args;
@@ -738,7 +740,7 @@ int BeakImplementation::mountForwardInternal(Options *settings, bool daemon)
                      &args,
                      &forward_tarredfs_ops,
                      sizeof(forward_tarredfs_ops),
-                     &forward_fs);
+                     ffs.get());
 
     loop_pid_ = fork();
 
@@ -802,7 +804,7 @@ int BeakImplementation::remountReverseInternal(Options *settings, bool daemon)
     reverse_tarredfs_ops.readdir = reverseReaddir;
     reverse_tarredfs_ops.readlink = reverseReadlink;
 
-    auto rfs  = newReverseTarredFS(src_file_system_);
+    auto rfs  = newReverseTarredFS(from_fs_);
 
     rfs->lookForPointsInTime(PointInTimeFormat::absolute_point, settings->from.path);
 
@@ -899,7 +901,7 @@ RC BeakImplementation::fetchPointsInTime(string remote, Path *cache)
     string r = remote;
     r.pop_back();
     p = p->appendName(Atom::lookup(r+".ls"));
-    dst_file_system_->createFile(p, &out);
+    to_fs_->createFile(p, &out);
     UI::clearLine();
     fflush(stdout);
 
@@ -1049,12 +1051,12 @@ struct StoreStatistics
 void calculateForwardWork(Path *path, FileStat *stat,
                           ForwardTarredFS *rfs, Beak *beak,
                           Options *settings, StoreStatistics *st,
-                          FileSystem *src_fs, FileSystem *dst_fs)
+                          FileSystem *from_fs, FileSystem *to_fs)
 {
     auto file_to_extract = path->prepend(settings->to.path);
 
     if (stat->isRegularFile()) {
-        stat->checkStat(dst_fs, file_to_extract);
+        stat->checkStat(to_fs, file_to_extract);
         if (stat->disk_update == Store) {
             st->num_files_to_store++; st->size_files_to_store+=stat->st_size;
         }
@@ -1066,7 +1068,7 @@ void calculateForwardWork(Path *path, FileStat *stat,
 void handleFile(Path *path, FileStat *stat,
                 ForwardTarredFS *rfs, Beak *beak,
                 Options *settings, StoreStatistics *st,
-                FileSystem *src_fs, FileSystem *dst_fs)
+                FileSystem *from_fs, FileSystem *to_fs)
 {
     if (!stat->isRegularFile()) return;
 
@@ -1074,17 +1076,17 @@ void handleFile(Path *path, FileStat *stat,
     TarFile *tar = rfs->findTarFromPath(path);
     assert(tar);
     Path *file_name = tar->path()->prepend(settings->to.path);
-    dst_fs->mkDirp(file_name->parent());
+    to_fs->mkDirp(file_name->parent());
     FileStat old_stat;
-    if (OK == dst_fs->stat(file_name, &old_stat) &&
+    if (OK == to_fs->stat(file_name, &old_stat) &&
         stat->samePermissions(&old_stat) &&
         stat->sameSize(&old_stat) &&
         stat->sameMTime(&old_stat)) {
 
         debug(STORE, "Skipping %s\n", file_name->c_str());
     } else {
-        tar->createFile(file_name, stat, src_fs, dst_fs);
-        dst_fs->utime(file_name, stat);
+        tar->createFile(file_name, stat, from_fs, to_fs);
+        to_fs->utime(file_name, stat);
         st->num_files_stored++;
         st->size_files_stored += stat->st_size;
 
@@ -1107,7 +1109,7 @@ int BeakImplementation::storeForward(Options *settings)
         failure(COMMANDLINE,"You have to specify where to store the backup.\n");
     }
 
-    auto ffs  = newForwardTarredFS(src_file_system_);
+    auto ffs  = newForwardTarredFS(from_fs_);
     auto view = ffs->asFileSystem();
 
     uint64_t start = clockGetTime();
@@ -1117,13 +1119,13 @@ int BeakImplementation::storeForward(Options *settings)
 
     view->recurse([&ffs,this,settings,&st]
                   (Path *path, FileStat *stat) {calculateForwardWork(path,stat,ffs.get(), this,settings,&st,
-                                                                     src_file_system_.get(), dst_file_system_.get()); });
+                                                                     from_fs_.get(), to_fs_.get()); });
 
     debug(STORE, "Work to be done: num_files=%ju num_dirs=%ju\n", st.num_files, st.num_dirs);
 
     view->recurse([&ffs,this,settings,&st]
                   (Path *path, FileStat *stat) {handleFile(path,stat,ffs.get(),this,settings,&st,
-                                                           src_file_system_.get(), dst_file_system_.get()); });
+                                                           from_fs_.get(), to_fs_.get()); });
     uint64_t stop = clockGetTime();
     uint64_t store_time = stop - start;
 
@@ -1145,13 +1147,13 @@ int BeakImplementation::storeForward(Options *settings)
     return rc;
 }
 
-bool extractHardLink(FileSystem *src, Path *target,
-                     FileSystem *dst, Path *dst_root, Path *file_to_extract, FileStat *stat,
+bool extractHardLink(FileSystem *from_fs, Path *target,
+                     FileSystem *to_fs, Path *dst_root, Path *file_to_extract, FileStat *stat,
                      StoreStatistics *statistics)
 {
     target = target->prepend(dst_root);
     FileStat target_stat;
-    if (OK != dst->stat(target, &target_stat)) {
+    if (OK != to_fs->stat(target, &target_stat)) {
         error(STORE, "Cannot extract hard link %s because target %s does not exist!\n",
               file_to_extract->c_str(), target->c_str());
     }
@@ -1164,7 +1166,7 @@ bool extractHardLink(FileSystem *src, Path *target,
               "Expected %s to have mtime xxx\n", target->c_str());
     }
     FileStat old_stat;
-    if (OK == dst->stat(file_to_extract, &old_stat)) {
+    if (OK == to_fs->stat(file_to_extract, &old_stat)) {
         if (stat->samePermissions(&old_stat) &&
             target_stat.sameSize(&old_stat) && // The hard link definition does not have size.
             stat->sameMTime(&old_stat)) {
@@ -1175,9 +1177,9 @@ bool extractHardLink(FileSystem *src, Path *target,
 
     debug(STORE, "Storing hard link %s to %s\n", file_to_extract->c_str(), target->c_str());
 
-    dst->mkDirp(file_to_extract->parent());
-    dst->createHardLink(file_to_extract, stat, target);
-    dst->utime(file_to_extract, stat);
+    to_fs->mkDirp(file_to_extract->parent());
+    to_fs->createHardLink(file_to_extract, stat, target);
+    to_fs->utime(file_to_extract, stat);
     statistics->num_hard_links_stored++;
     verbose(STORE, "Stored hard link %s\n", file_to_extract->c_str());
     statistics->displayProgress();
@@ -1185,8 +1187,8 @@ bool extractHardLink(FileSystem *src, Path *target,
 }
 
 bool extractFile(Entry *entry,
-                 FileSystem *src, Path *tar_file, off_t tar_file_offset,
-                 FileSystem *dst, Path *file_to_extract, FileStat *stat,
+                 FileSystem *from_fs, Path *tar_file, off_t tar_file_offset,
+                 FileSystem *to_fs, Path *file_to_extract, FileStat *stat,
                  StoreStatistics *statistics)
 {
     if (stat->disk_update == NoUpdate) {
@@ -1194,7 +1196,7 @@ bool extractFile(Entry *entry,
         return false;
     }
     if (stat->disk_update == UpdatePermissions) {
-        dst->chmod(file_to_extract, stat);
+        to_fs->chmod(file_to_extract, stat);
         verbose(STORE, "Updating permissions for file \"%s\" to %o\n", file_to_extract->c_str(), stat->st_mode);
         return false;
     }
@@ -1203,18 +1205,18 @@ bool extractFile(Entry *entry,
           file_to_extract->c_str(), stat->st_size, permissionString(stat).c_str(),
           tar_file->c_str(), tar_file_offset);
 
-    dst->mkDirp(file_to_extract->parent());
-    dst->createFile(file_to_extract, stat,
-        [src,tar_file_offset,file_to_extract,tar_file] (off_t offset, char *buffer, size_t len)
+    to_fs->mkDirp(file_to_extract->parent());
+    to_fs->createFile(file_to_extract, stat,
+        [from_fs,tar_file_offset,file_to_extract,tar_file] (off_t offset, char *buffer, size_t len)
         {
             debug(STORE,"Extracting %ju bytes to file %s\n", len, file_to_extract->c_str());
-            ssize_t n = src->pread(tar_file, buffer, len, tar_file_offset + offset);
+            ssize_t n = from_fs->pread(tar_file, buffer, len, tar_file_offset + offset);
             debug(STORE, "Extracted %ju bytes from %ju to %ju.\n", n,
                   tar_file_offset+offset, offset);
             return n;
         });
 
-    dst->utime(file_to_extract, stat);
+    to_fs->utime(file_to_extract, stat);
     statistics->num_files_stored++;
     statistics->size_files_stored+=stat->st_size;
     verbose(STORE, "Stored %s (%ju %s %06o)\n",
@@ -1223,18 +1225,18 @@ bool extractFile(Entry *entry,
     return true;
 }
 
-bool extractSymbolicLink(FileSystem *src, string target,
-                        FileSystem *dst, Path *file_to_extract, FileStat *stat,
+bool extractSymbolicLink(FileSystem *from_fs, string target,
+                        FileSystem *to_fs, Path *file_to_extract, FileStat *stat,
                         StoreStatistics *statistics)
 {
     string old_target;
     FileStat old_stat;
-    bool found =  OK == dst->stat(file_to_extract, &old_stat);
+    bool found =  OK == to_fs->stat(file_to_extract, &old_stat);
     if (found) {
         if (stat->samePermissions(&old_stat) &&
             stat->sameSize(&old_stat) &&
             stat->sameMTime(&old_stat)) {
-            if (dst->readLink(file_to_extract, &old_target)) {
+            if (to_fs->readLink(file_to_extract, &old_target)) {
                 if (target == old_target) {
                     debug(STORE, "Skipping existing link %s\n", file_to_extract->c_str());
                     return false;
@@ -1245,23 +1247,23 @@ bool extractSymbolicLink(FileSystem *src, string target,
 
     debug(STORE, "Storing symlink %s to %s\n", file_to_extract->c_str(), target.c_str());
 
-    dst->mkDirp(file_to_extract->parent());
+    to_fs->mkDirp(file_to_extract->parent());
     if (found) {
-        dst->deleteFile(file_to_extract);
+        to_fs->deleteFile(file_to_extract);
     }
-    dst->createSymbolicLink(file_to_extract, stat, target);
-    dst->utime(file_to_extract, stat);
+    to_fs->createSymbolicLink(file_to_extract, stat, target);
+    to_fs->utime(file_to_extract, stat);
     statistics->num_symbolic_links_stored++;
     verbose(STORE, "Stored symlink %s\n", file_to_extract->c_str());
     statistics->displayProgress();
     return true;
 }
 
-bool extractNode(FileSystem *src, FileSystem *dst, Path *file_to_extract, FileStat *stat,
+bool extractNode(FileSystem *from_fs, FileSystem *to_fs, Path *file_to_extract, FileStat *stat,
                  StoreStatistics *statistics)
 {
     FileStat old_stat;
-    if (OK == dst->stat(file_to_extract, &old_stat)) {
+    if (OK == to_fs->stat(file_to_extract, &old_stat)) {
         if (stat->samePermissions(&old_stat) &&
             stat->sameMTime(&old_stat)) {
             // Compare of size is ignored since the nodes have no size...
@@ -1272,20 +1274,20 @@ bool extractNode(FileSystem *src, FileSystem *dst, Path *file_to_extract, FileSt
 
     if (stat->isFIFO()) {
         debug(STORE, "Storing FIFO %s\n", file_to_extract->c_str());
-        dst->mkDirp(file_to_extract->parent());
-        dst->createFIFO(file_to_extract, stat);
-        dst->utime(file_to_extract, stat);
+        to_fs->mkDirp(file_to_extract->parent());
+        to_fs->createFIFO(file_to_extract, stat);
+        to_fs->utime(file_to_extract, stat);
         verbose(STORE, "Stored fifo %s\n", file_to_extract->c_str());
         statistics->displayProgress();
     }
     return true;
 }
 
-bool chmodDirectory(FileSystem *dst, Path *file_to_extract, FileStat *stat,
+bool chmodDirectory(FileSystem *to_fs, Path *file_to_extract, FileStat *stat,
                     StoreStatistics *statistics)
 {
     FileStat old_stat;
-    if (OK == dst->stat(file_to_extract, &old_stat)) {
+    if (OK == to_fs->stat(file_to_extract, &old_stat)) {
         if (stat->samePermissions(&old_stat) &&
             stat->sameMTime(&old_stat)) {
             // Compare of directory size is ignored since the size differ between
@@ -1298,9 +1300,9 @@ bool chmodDirectory(FileSystem *dst, Path *file_to_extract, FileStat *stat,
     debug(STORE, "Chmodding directory %s %s\n", file_to_extract->c_str(),
           permissionString(stat).c_str());
 
-    dst->mkDirp(file_to_extract);
-    dst->chmod(file_to_extract, stat);
-    dst->utime(file_to_extract, stat);
+    to_fs->mkDirp(file_to_extract);
+    to_fs->chmod(file_to_extract, stat);
+    to_fs->utime(file_to_extract, stat);
     statistics->num_dirs_updated++;
     verbose(STORE, "Updated dir %s\n", file_to_extract->c_str());
     statistics->displayProgress();
@@ -1310,14 +1312,14 @@ bool chmodDirectory(FileSystem *dst, Path *file_to_extract, FileStat *stat,
 void calculateReverseWork(Path *path, FileStat *stat,
                           ReverseTarredFS *rfs, Beak *beak, PointInTime *point,
                           Options *settings, StoreStatistics *st,
-                          FileSystem *src_fs, FileSystem *dst_fs)
+                          FileSystem *from_fs, FileSystem *to_fs)
 {
     auto entry = rfs->findEntry(point, path);
     auto file_to_extract = path->prepend(settings->to.path);
 
     if (entry->is_hard_link) st->num_hard_links++;
     else if (stat->isRegularFile()) {
-        stat->checkStat(dst_fs, file_to_extract);
+        stat->checkStat(to_fs, file_to_extract);
         if (stat->disk_update == Store) {
             st->num_files_to_store++; st->size_files_to_store+=stat->st_size;
         }
@@ -1331,15 +1333,15 @@ void calculateReverseWork(Path *path, FileStat *stat,
 void handleHardLinks(Path *path, FileStat *stat,
                      ReverseTarredFS *rfs, Beak *beak,PointInTime *point,
                      Options *settings, StoreStatistics *st,
-                     FileSystem *src_fs, FileSystem *dst_fs)
+                     FileSystem *from_fs, FileSystem *to_fs)
 {
     auto entry = rfs->findEntry(point, path);
     auto file_to_extract = path->prepend(settings->to.path);
 
     if (entry->is_hard_link) {
         // Special case since hard links are not encoded in stat structure.
-        extractHardLink(src_fs, entry->hard_link,
-                        dst_fs, settings->to.path,
+        extractHardLink(from_fs, entry->hard_link,
+                        to_fs, settings->to.path,
                         file_to_extract, stat, st);
     }
 }
@@ -1347,7 +1349,7 @@ void handleHardLinks(Path *path, FileStat *stat,
 void handleRegularFiles(Path *path, FileStat *stat,
                         ReverseTarredFS *rfs, Beak *beak,PointInTime *point,
                         Options *settings, StoreStatistics *st,
-                        FileSystem *src_fs, FileSystem *dst_fs)
+                        FileSystem *from_fs, FileSystem *to_fs)
 {
     auto entry = rfs->findEntry(point, path);
     auto tar_file = entry->tar->prepend(settings->from.path);
@@ -1355,8 +1357,8 @@ void handleRegularFiles(Path *path, FileStat *stat,
     auto file_to_extract = path->prepend(settings->to.path);
 
     if (!entry->is_hard_link && stat->isRegularFile()) {
-        extractFile(entry, src_fs, tar_file, tar_file_offset,
-                    dst_fs, file_to_extract, stat, st);
+        extractFile(entry, from_fs, tar_file, tar_file_offset,
+                    to_fs, file_to_extract, stat, st);
         st->num_files_handled++;
         st->size_files_handled += stat->st_size;
     }
@@ -1365,39 +1367,39 @@ void handleRegularFiles(Path *path, FileStat *stat,
 void handleNodes(Path *path, FileStat *stat,
                  ReverseTarredFS *rfs, Beak *beak,PointInTime *point,
                  Options *settings, StoreStatistics *st,
-                 FileSystem *src_fs, FileSystem *dst_fs)
+                 FileSystem *from_fs, FileSystem *to_fs)
 {
     auto entry = rfs->findEntry(point, path);
     auto file_to_extract = path->prepend(settings->to.path);
 
     if (!entry->is_hard_link && stat->isFIFO()) {
-        extractNode(src_fs, dst_fs, file_to_extract, stat, st);
+        extractNode(from_fs, to_fs, file_to_extract, stat, st);
     }
 }
 
 void handleSymbolicLinks(Path *path, FileStat *stat,
                          ReverseTarredFS *rfs, Beak *beak,PointInTime *point,
                          Options *settings, StoreStatistics *st,
-                         FileSystem *src_fs, FileSystem *dst_fs)
+                         FileSystem *from_fs, FileSystem *to_fs)
 {
     auto entry = rfs->findEntry(point, path);
     auto file_to_extract = path->prepend(settings->to.path);
 
     if (!entry->is_hard_link && stat->isSymbolicLink()) {
-        extractSymbolicLink(src_fs, entry->symlink,
-                            dst_fs, file_to_extract, stat, st);
+        extractSymbolicLink(from_fs, entry->symlink,
+                            to_fs, file_to_extract, stat, st);
     }
 }
 
 void handleDirs(Path *path, FileStat *stat,
                 ReverseTarredFS *rfs, Beak *beak,PointInTime *point,
                 Options *settings, StoreStatistics *st,
-                FileSystem *src_fs, FileSystem *dst_fs)
+                FileSystem *from_fs, FileSystem *to_fs)
 {
     auto file_to_extract = path->prepend(settings->to.path);
 
     if (stat->isDirectory()) {
-        chmodDirectory(dst_fs, file_to_extract, stat, st);
+        chmodDirectory(to_fs, file_to_extract, stat, st);
     }
 }
 
@@ -1414,7 +1416,7 @@ int BeakImplementation::restoreReverse(Options *settings)
     }
 
     umask(0);
-    auto rfs  = newReverseTarredFS(src_file_system_);
+    auto rfs  = newReverseTarredFS(from_fs_);
     auto view = rfs->asFileSystem();
 
     rfs->lookForPointsInTime(PointInTimeFormat::absolute_point, settings->from.path);
@@ -1435,25 +1437,25 @@ int BeakImplementation::restoreReverse(Options *settings)
 
     view->recurse([&rfs,this,point,settings,&st]
                   (Path *path, FileStat *stat) {calculateReverseWork(path,stat,rfs.get(),this,point,settings,&st,
-                                                                     src_file_system_.get(), dst_file_system_.get()); });
+                                                                     from_fs_.get(), to_fs_.get()); });
     debug(STORE, "Work to be done: num_files=%ju num_hardlinks=%ju num_symlinks=%ju num_nodes=%ju num_dirs=%ju\n",
           st.num_files, st.num_hard_links, st.num_symbolic_links, st.num_nodes, st.num_dirs);
 
     view->recurse([&rfs,this,point,settings,&st]
                   (Path *path, FileStat *stat) {handleRegularFiles(path,stat,rfs.get(),this,point,settings,&st,
-                                                                   src_file_system_.get(), dst_file_system_.get()); });
+                                                                   from_fs_.get(), to_fs_.get()); });
     view->recurse([&rfs,this,point,settings,&st]
                   (Path *path, FileStat *stat) {handleNodes(path,stat,rfs.get(),this,point,settings,&st,
-                                                            src_file_system_.get(), dst_file_system_.get()); });
+                                                            from_fs_.get(), to_fs_.get()); });
     view->recurse([&rfs,this,point,settings,&st]
                   (Path *path, FileStat *stat) {handleSymbolicLinks(path,stat,rfs.get(),this,point,settings,&st,
-                                                                    src_file_system_.get(), dst_file_system_.get()); });
+                                                                    from_fs_.get(), to_fs_.get()); });
     view->recurse([&rfs,this,point,settings,&st]
                   (Path *path, FileStat *stat) {handleHardLinks(path,stat,rfs.get(),this,point,settings,&st,
-                                                                src_file_system_.get(), dst_file_system_.get()); });
+                                                                from_fs_.get(), to_fs_.get()); });
     view->recurse([&rfs,this,point,settings,&st]
                   (Path *path, FileStat *stat) {handleDirs(path,stat,rfs.get(),this,point,settings,&st,
-                                                           src_file_system_.get(), dst_file_system_.get()); });
+                                                           from_fs_.get(), to_fs_.get()); });
 
     uint64_t stop = clockGetTime();
     uint64_t store_time = stop - start;
@@ -1497,20 +1499,6 @@ void BeakImplementation::printHelp(Command cmd)
         fprintf(stdout,"\n");
         fprintf(stdout,"Beak is licensed to you under the GPLv3. For details do: "
                 "beak help --license\n");
-        break;
-    case mount_cmd:
-        fprintf(stdout,
-        "Examines the contents in src to determine what kind of virtual filesystem\n"
-        "to mount as dst. If src contains your files that you want to backup,\n"
-        "then dst will contain beak backup tar files, suitable for rcloning somewhere.\n"
-        "If src contains beak backup tar files, then dst will contain your original\n"
-        "backed up files.\n"
-        "\n"
-        "Usage:\n"
-            "  beak mount [options] [src] [dst]\n"
-            "\n"
-        "If you really want to backup the beak backup tar files, then you can override\n"
-            "the automatic detection with the --forceforward option.\n");
         break;
     default:
         fprintf(stdout, "Sorry, no help for that command yet.\n");
