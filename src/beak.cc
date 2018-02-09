@@ -599,10 +599,12 @@ int BeakImplementation::push(Options *settings)
 {
     if (settings->from.type != ArgPath && settings->from.type != ArgRule) {
         failure(COMMANDLINE,"You have to specify an origin, rule or directory.\n");
+        return ERR;
     }
 
     if (settings->to.type != ArgStorage) {
         failure(COMMANDLINE,"You have to specify a backup location.\n");
+        return ERR;
     }
 
     Path *mount = from_fs_->mkTempDir("beak_push_");
@@ -723,7 +725,7 @@ int BeakImplementation::mountForwardInternal(Options *settings, bool daemon)
     auto ffs  = newForwardTarredFS(from_fs_);
     ok = ffs->scanFileSystem(settings);
 
-    if (ok) {
+    if (!ok) {
         return ERR;
     }
 
@@ -749,7 +751,7 @@ int BeakImplementation::mountForwardInternal(Options *settings, bool daemon)
         fuse_loop_mt (fuse_);
         exit(0);
     }
-    return 0;
+    return OK;
 }
 
 

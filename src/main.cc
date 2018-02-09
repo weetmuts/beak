@@ -65,7 +65,7 @@ int main(int argc, char *argv[])
         }
         break;
 
-    case genmounttrigger_cmd:
+   case genmounttrigger_cmd:
         break;
 
     case history_cmd:
