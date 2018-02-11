@@ -54,7 +54,7 @@ typedef int (*ReadCB)(const char *,char *,size_t,off_t,struct fuse_file_info *);
 
 struct ForwardTarredFS : FuseAPI
 {
-    int scanFileSystem(Options *settings);
+    RCC scanFileSystem(Options *settings);
 
     pthread_mutex_t global;
 

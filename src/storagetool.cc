@@ -39,8 +39,8 @@ Storage StorageTool::checkRCloneStorage(ptr<System> sys, string name)
     vector<string> args;
     args.push_back("listremotes");
     args.push_back("-l");
-    RC rc = sys->invoke("rclone", args, &out);
-    if (rc == OK) {
+    RCC rcc = sys->invoke("rclone", args, &out);
+    if (rcc.isOk()) {
         auto i = out.begin();
         bool eof, err;
 

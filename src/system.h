@@ -32,11 +32,11 @@ enum Capture {
 
 struct System
 {
-    virtual RC invoke(std::string program,
-                      std::vector<std::string> args,
-                      std::vector<char> *output = NULL,
-                      Capture capture = CaptureStdout,
-                      std::function<void(char *buf, size_t len)> output_cb = NULL) = 0;
+    virtual RCC invoke(std::string program,
+                       std::vector<std::string> args,
+                       std::vector<char> *output = NULL,
+                       Capture capture = CaptureStdout,
+                       std::function<void(char *buf, size_t len)> output_cb = NULL) = 0;
     virtual ~System() = default;
 };
 

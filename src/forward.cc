@@ -925,10 +925,8 @@ int ForwardTarredFS::readlinkCB(const char *path_char_string, char *buf, size_t 
     return 0;
 }
 
-int ForwardTarredFS::scanFileSystem(Options *settings)
+RCC ForwardTarredFS::scanFileSystem(Options *settings)
 {
-    bool ok;
-
     if (settings->from.type == ArgPath && settings->from.path) {
         root_dir_path = settings->from.path;
     } else if (settings->from.type == ArgRule && settings->from.rule) {
@@ -940,8 +938,8 @@ int ForwardTarredFS::scanFileSystem(Options *settings)
 
     for (auto &e : settings->include) {
         Match m;
-        ok = m.use(e);
-        if (!ok) {
+        bool rc = m.use(e);
+        if (!rc) {
             error(COMMANDLINE, "Not a valid glob \"%s\"\n", e.c_str());
         }
         filters.push_back(pair<Filter,Match>(Filter(e.c_str(), INCLUDE), m));
@@ -949,8 +947,8 @@ int ForwardTarredFS::scanFileSystem(Options *settings)
     }
     for (auto &e : settings->exclude) {
         Match m;
-        ok = m.use(e);
-        if (!ok) {
+        bool rc = m.use(e);
+        if (!rc) {
             error(COMMANDLINE, "Not a valid glob \"%s\"\n", e.c_str());
         }
         filters.push_back(pair<Filter,Match>(Filter(e.c_str(), EXCLUDE), m));
@@ -979,8 +977,8 @@ int ForwardTarredFS::scanFileSystem(Options *settings)
 
     for (auto &e : settings->triggerglob) {
         Match m;
-        ok = m.use(e);
-        if (!ok) {
+        bool rc = m.use(e);
+        if (!rc) {
             error(COMMANDLINE, "Not a valid glob \"%s\"\n", e.c_str());
         }
         triggers.push_back(m);
@@ -1025,7 +1023,7 @@ int ForwardTarredFS::scanFileSystem(Options *settings)
             mount_dir.c_str(), num_tars, files.size(),
             scan_time / 1000, group_time / 1000);
 
-    return OK;
+    return RCC::OKK;
 }
 
 struct ForwardFileSystem : FileSystem

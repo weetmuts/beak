@@ -45,15 +45,14 @@ struct Beak
     virtual void captureStartTime() = 0;
     virtual std::string argsToVector(int argc, char **argv, std::vector<std::string> *args) = 0;
     virtual Command parseCommandLine(int argc, char **argv, Options *settings) = 0;
-    virtual int printInfo(Options *settings) = 0;
+    virtual RCC printInfo(Options *settings) = 0;
     virtual std::vector<PointInTime> history() = 0;
-    virtual bool setPointInTime(std::string g) = 0;
 
-    virtual int configure(Options *settings) = 0;
-    virtual int push(Options *settings) = 0;
-    virtual int prune(Options *settings) = 0;
+    virtual RCC configure(Options *settings) = 0;
+    virtual RCC push(Options *settings) = 0;
+    virtual RCC prune(Options *settings) = 0;
 
-    virtual int umountDaemon(Options *settings) = 0;
+    virtual RCC umountDaemon(Options *settings) = 0;
 
     virtual int mountForwardDaemon(Options *settings) = 0;
     virtual int mountForward(Options *settings) = 0;
@@ -64,7 +63,7 @@ struct Beak
 
     virtual int shell(Options *settings) = 0;
     virtual int status(Options *settings) = 0;
-    virtual int storeForward(Options *settings) = 0;
+    virtual RCC storeForward(Options *settings) = 0;
     virtual int restoreReverse(Options *settings) = 0;
 
     virtual void printHelp(Command cmd) = 0;

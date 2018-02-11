@@ -90,7 +90,7 @@ public:
 
     bool load();
     bool save();
-    int configure();
+    RCC configure();
 
     Rule *rule(string name);
     vector<Rule*> sortedRules();
@@ -763,7 +763,7 @@ Rule *ConfigurationImplementation::deleteStorage(Rule *r)
     return r;
 }
 
-int ConfigurationImplementation::configure()
+RCC ConfigurationImplementation::configure()
 {
     vector<ChoiceEntry> choices;
     choices.push_back( { "e", "", "Edit existing rule",         [=]() { editRule(); } } );
@@ -786,7 +786,7 @@ int ConfigurationImplementation::configure()
         if (ce->key == "q") break;
     }
 
-    return 0;
+    return RCC::OKK;
 }
 
 string keep_keys[] = { "all", "minutely", "hourly", "daily", "weekly", "monthly", "yearly", "mirror" };

@@ -77,18 +77,17 @@ struct BeakImplementation : Beak {
     void printHelp(Command cmd);
     void printVersion();
     void printLicense();
-    int printInfo(Options *settings);
+    RCC printInfo(Options *settings);
 
     vector<PointInTime> history();
-    bool setPointInTime(string g);
     RC findPointsInTime(string remote, vector<struct timespec> *v);
     RC fetchPointsInTime(string remote, Path *cache);
 
-    int configure(Options *settings);
-    int push(Options *settings);
-    int prune(Options *settings);
+    RCC configure(Options *settings);
+    RCC push(Options *settings);
+    RCC prune(Options *settings);
 
-    int umountDaemon(Options *settings);
+    RCC umountDaemon(Options *settings);
 
     int mountForwardDaemon(Options *settings);
     int mountForward(Options *settings);
@@ -100,7 +99,7 @@ struct BeakImplementation : Beak {
 
     int shell(Options *settings);
     int status(Options *settings);
-    int storeForward(Options *settings);
+    RCC storeForward(Options *settings);
     int restoreReverse(Options *settings);
 
     void genAutoComplete(string filename);
@@ -560,7 +559,7 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Options *set
     return cmd;
 }
 
-int BeakImplementation::printInfo(Options *settings)
+RCC BeakImplementation::printInfo(Options *settings)
 {
     /*if (reverse_fs.history().size() == 0) {
         fprintf(stdout, "Not a beak archive.\n");
@@ -576,7 +575,7 @@ int BeakImplementation::printInfo(Options *settings)
     }
     printf("\n");
     */
-    return 0;
+    return RCC::OKK;
 }
 
 vector<PointInTime> BeakImplementation::history()
@@ -585,26 +584,21 @@ vector<PointInTime> BeakImplementation::history()
     return tmp;
 }
 
-bool BeakImplementation::setPointInTime(string p)
-{
-    return false; //reverse_fs.setPointInTime(p);
-}
-
-int BeakImplementation::configure(Options *settings)
+RCC BeakImplementation::configure(Options *settings)
 {
     return configuration_->configure();
 }
 
-int BeakImplementation::push(Options *settings)
+RCC BeakImplementation::push(Options *settings)
 {
     if (settings->from.type != ArgPath && settings->from.type != ArgRule) {
         failure(COMMANDLINE,"You have to specify an origin, rule or directory.\n");
-        return ERR;
+        return RCC::ERRR;
     }
 
     if (settings->to.type != ArgStorage) {
         failure(COMMANDLINE,"You have to specify a backup location.\n");
-        return ERR;
+        return RCC::ERRR;
     }
 
     Path *mount = from_fs_->mkTempDir("beak_push_");
@@ -628,8 +622,10 @@ int BeakImplementation::push(Options *settings)
     */
 
     // Spawn virtual filesystem.
-    RC rc = mountForward(&forward_settings);
-    if (!rc) return ERR;
+    int rc = mountForward(&forward_settings);
+    RCC rcc = RCC::OKK;
+    if (rc != 0) rcc = RCC::ERRR;
+    if (rcc.isErr()) return rcc;
 
     vector<string> args;
     args.push_back("copy");
@@ -641,7 +637,7 @@ int BeakImplementation::push(Options *settings)
         args.push_back(settings->to.backup.target_path->str());
     }
     vector<char> output;
-    rc = sys_->invoke("rclone", args, &output, CaptureBoth,
+    rcc = sys_->invoke("rclone", args, &output, CaptureBoth,
                       [=](char *buf, size_t len) {
                           fprintf(stderr, "RCLONE COPY: >%*s<\n", (int)len, buf);
                       });
@@ -650,17 +646,15 @@ int BeakImplementation::push(Options *settings)
 
     // Unmount virtual filesystem.
     rc = umountForward(&forward_settings);
+    if (rc != 0) rcc = RCC::ERRR;
     rmdir(mount->c_str());
 
-    return OK;
+    return rcc;
 }
 
-int BeakImplementation::prune(Options *settings)
+RCC BeakImplementation::prune(Options *settings)
 {
-    RC rc = OK;
-
-
-    return rc;
+    return RCC::OKK;
 }
 
 static int forwardGetattr(const char *path, struct stat *stbuf)
@@ -688,7 +682,7 @@ static int open_callback(const char *path, struct fuse_file_info *fi)
     return 0;
 }
 
-int BeakImplementation::umountDaemon(Options *settings)
+RCC BeakImplementation::umountDaemon(Options *settings)
 {
     vector<string> args;
     args.push_back("-u");
@@ -715,17 +709,15 @@ int BeakImplementation::umountForward(Options *settings)
 
 int BeakImplementation::mountForwardInternal(Options *settings, bool daemon)
 {
-    bool ok;
-
     forward_tarredfs_ops.getattr = forwardGetattr;
     forward_tarredfs_ops.open = open_callback;
     forward_tarredfs_ops.read = forwardRead;
     forward_tarredfs_ops.readdir = forwardReaddir;
 
     auto ffs  = newForwardTarredFS(from_fs_);
-    ok = ffs->scanFileSystem(settings);
+    RCC rcc = ffs->scanFileSystem(settings);
 
-    if (!ok) {
+    if (rcc.isErr()) {
         return ERR;
     }
 
@@ -889,7 +881,8 @@ RC BeakImplementation::fetchPointsInTime(string remote, Path *cache)
     UI::clearLine();
     UI::output("Copying index files from %s", remote.c_str());
     fflush(stdout);
-    rc = sys_->invoke("rclone", args, &out);
+    RCC rcc = sys_->invoke("rclone", args, &out);
+    if (rcc.isErr()) rc = ERR;
 
     out.clear();
     args.clear();
@@ -898,7 +891,9 @@ RC BeakImplementation::fetchPointsInTime(string remote, Path *cache)
     UI::clearLine();
     UI::output("Listing files in %s", remote.c_str());
     fflush(stdout);
-    rc = sys_->invoke("rclone", args, &out);
+    rcc = sys_->invoke("rclone", args, &out);
+    if (rcc.isErr()) rc = ERR;
+
     Path *p = cache;
     string r = remote;
     r.pop_back();
@@ -913,16 +908,14 @@ RC BeakImplementation::fetchPointsInTime(string remote, Path *cache)
 // List the remote index files.
 RC BeakImplementation::findPointsInTime(string remote, vector<struct timespec> *v)
 {
-    RC rc = OK;
     vector<char> out;
     vector<string> args;
     args.push_back("ls");
     args.push_back("--include");
     args.push_back("/z01*");
     args.push_back(remote);
-    rc = sys_->invoke("rclone", args, &out);
-
-    if (rc != OK) return ERR;
+    RCC rcc = sys_->invoke("rclone", args, &out);
+    if (rcc.isErr()) return ERR;
 
     auto i = out.begin();
     bool eof, err;
@@ -1099,9 +1092,9 @@ void handleFile(Path *path, FileStat *stat,
     st->displayProgress();
 }
 
-int BeakImplementation::storeForward(Options *settings)
+RCC BeakImplementation::storeForward(Options *settings)
 {
-    int rc = 0;
+    RCC rcc = RCC::OKK;
 
     if (settings->from.type != ArgPath) {
         failure(COMMANDLINE,"You have to specify an origin directory that will be backed up.\n");
@@ -1115,7 +1108,7 @@ int BeakImplementation::storeForward(Options *settings)
     auto view = ffs->asFileSystem();
 
     uint64_t start = clockGetTime();
-    rc = ffs->scanFileSystem(settings);
+    rcc = ffs->scanFileSystem(settings);
 
     StoreStatistics st;
 
@@ -1146,7 +1139,7 @@ int BeakImplementation::storeForward(Options *settings)
         }
     }
 
-    return rc;
+    return rcc;
 }
 
 bool extractHardLink(FileSystem *from_fs, Path *target,

@@ -26,8 +26,26 @@
 
 #define BEAK_VERSION 0.7
 
+class ReturnCode
+{
+public:
+    bool isOk() { return val == 0; }
+    bool isErr() { return val != 0; }
+
+    static ReturnCode OKK;
+    static ReturnCode ERRR;
+    int toInteger() { return val; }
+
+private:
+    ReturnCode(int v) : val(v) { }
+    int val;
+};
+
+typedef ReturnCode RCC;
+
 #define OK 0
 #define ERR 1
+
 typedef int RC;
 
 #define XSTR(s) STR(s)

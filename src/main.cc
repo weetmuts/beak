@@ -26,6 +26,7 @@ using namespace std;
 
 int main(int argc, char *argv[])
 {
+    RCC rcc = RCC::OKK;
     int rc = 0;
     Options settings;
 
@@ -45,14 +46,14 @@ int main(int argc, char *argv[])
         break;
 
     case config_cmd:
-        rc = beak->configure(&settings);
+        rcc = beak->configure(&settings);
         break;
 
     case diff_cmd:
         break;
 
     case info_cmd:
-        rc = beak->printInfo(&settings);
+        rcc = beak->printInfo(&settings);
         break;
 
     case genautocomplete_cmd:
@@ -76,11 +77,11 @@ int main(int argc, char *argv[])
         break;
 
     case prune_cmd:
-        rc = beak->prune(&settings);
+        rcc = beak->prune(&settings);
         break;
 
     case push_cmd:
-        rc = beak->push(&settings);
+        rcc = beak->push(&settings);
         break;
 
     case pull_cmd:
@@ -103,11 +104,11 @@ int main(int argc, char *argv[])
         break;
 
     case store_cmd:
-        rc = beak->storeForward(&settings);
+        rcc = beak->storeForward(&settings);
         break;
 
     case umount_cmd:
-        rc = beak->umountDaemon(&settings);
+        rcc = beak->umountDaemon(&settings);
         break;
 
     case version_cmd:
@@ -126,5 +127,6 @@ int main(int argc, char *argv[])
         break;
     }
 
-    return rc;
+    printf("%d\n", rc);
+    return rcc.toInteger();
 }

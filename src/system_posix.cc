@@ -30,7 +30,7 @@ static ComponentId SYSTEM = registerLogComponent("system");
 
 struct SystemImplementation : System
 {
-    int invoke(string program,
+    RCC invoke(string program,
                vector<string> args,
                vector<char> *out,
                Capture capture,
@@ -49,7 +49,7 @@ string protect_(string arg)
     return arg;
 }
 
-int SystemImplementation::invoke(string program,
+RCC SystemImplementation::invoke(string program,
                                  vector<string> args,
                                  vector<char> *output,
                                  Capture capture,
@@ -74,7 +74,6 @@ int SystemImplementation::invoke(string program,
             error(SYSTEM, "Could not create pipe!\n");
         }
     }
-    int rc = 0;
     pid_t pid = fork();
     int status;
     if (pid == 0) {
@@ -124,9 +123,13 @@ int SystemImplementation::invoke(string program,
         waitpid(pid, &status, 0);
         if (WIFEXITED(status)) {
             // Child exited properly.
-            rc = WEXITSTATUS(status);
+            int rc = WEXITSTATUS(status);
             debug(SYSTEM,"Return code %d\n", rc);
+            if (rc != 0) {
+                warning(SYSTEM,"%s exited with non-zero return code: %d\n", program.c_str(), rc);
+                return RCC::ERRR;
+            }
         }
     }
-    return rc;
+    return RCC::OKK;
 }
