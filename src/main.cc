@@ -73,7 +73,7 @@ int main(int argc, char *argv[])
         break;
 
     case mount_cmd:
-        rc = beak->mountForwardDaemon(&settings);
+        rcc = beak->mountForwardDaemon(&settings);
         break;
 
     case prune_cmd:
@@ -92,7 +92,7 @@ int main(int argc, char *argv[])
         break;
 
     case restore_cmd:
-        rc = beak->restoreReverse(&settings);
+        rcc = beak->restoreReverse(&settings);
         break;
 
     case shell_cmd:

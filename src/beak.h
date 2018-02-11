@@ -54,8 +54,8 @@ struct Beak
 
     virtual RCC umountDaemon(Options *settings) = 0;
 
-    virtual int mountForwardDaemon(Options *settings) = 0;
-    virtual int mountForward(Options *settings) = 0;
+    virtual RCC mountForwardDaemon(Options *settings) = 0;
+    virtual RCC mountForward(Options *settings) = 0;
     virtual int umountForward(Options *settings) = 0;
     virtual int remountReverseDaemon(Options *settings) = 0;
     virtual int remountReverse(Options *settings) = 0;
@@ -64,7 +64,7 @@ struct Beak
     virtual int shell(Options *settings) = 0;
     virtual int status(Options *settings) = 0;
     virtual RCC storeForward(Options *settings) = 0;
-    virtual int restoreReverse(Options *settings) = 0;
+    virtual RCC restoreReverse(Options *settings) = 0;
 
     virtual void printHelp(Command cmd) = 0;
     virtual void printVersion() = 0;

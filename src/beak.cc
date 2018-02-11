@@ -89,8 +89,8 @@ struct BeakImplementation : Beak {
 
     RCC umountDaemon(Options *settings);
 
-    int mountForwardDaemon(Options *settings);
-    int mountForward(Options *settings);
+    RCC mountForwardDaemon(Options *settings);
+    RCC mountForward(Options *settings);
     int umountForward(Options *settings);
 
     int remountReverseDaemon(Options *settings);
@@ -100,13 +100,13 @@ struct BeakImplementation : Beak {
     int shell(Options *settings);
     int status(Options *settings);
     RCC storeForward(Options *settings);
-    int restoreReverse(Options *settings);
+    RCC restoreReverse(Options *settings);
 
     void genAutoComplete(string filename);
 
     private:
 
-    int mountForwardInternal(Options *settings, bool daemon);
+    RCC mountForwardInternal(Options *settings, bool daemon);
     int remountReverseInternal(Options *settings, bool daemon);
 
     fuse_operations forward_tarredfs_ops;
@@ -622,9 +622,7 @@ RCC BeakImplementation::push(Options *settings)
     */
 
     // Spawn virtual filesystem.
-    int rc = mountForward(&forward_settings);
-    RCC rcc = RCC::OKK;
-    if (rc != 0) rcc = RCC::ERRR;
+    RCC rcc = mountForward(&forward_settings);
     if (rcc.isErr()) return rcc;
 
     vector<string> args;
@@ -645,7 +643,7 @@ RCC BeakImplementation::push(Options *settings)
     // 2018/01/29 20:05:36 INFO  : code/src/s01_001517180913.689221661_11659264_b6f526ca4e988180fe6289213a338ab5a4926f7189dfb9dddff5a30ab50fc7f3_0.tar: Copied (new)
 
     // Unmount virtual filesystem.
-    rc = umountForward(&forward_settings);
+    int rc = umountForward(&forward_settings);
     if (rc != 0) rcc = RCC::ERRR;
     rmdir(mount->c_str());
 
@@ -690,12 +688,12 @@ RCC BeakImplementation::umountDaemon(Options *settings)
     return sys_->invoke("fusermount", args);
 }
 
-int BeakImplementation::mountForwardDaemon(Options *settings)
+RCC BeakImplementation::mountForwardDaemon(Options *settings)
 {
     return mountForwardInternal(settings, true);
 }
 
-int BeakImplementation::mountForward(Options *settings)
+RCC BeakImplementation::mountForward(Options *settings)
 {
     return mountForwardInternal(settings, false);
 }
@@ -707,7 +705,7 @@ int BeakImplementation::umountForward(Options *settings)
     return 0;
 }
 
-int BeakImplementation::mountForwardInternal(Options *settings, bool daemon)
+RCC BeakImplementation::mountForwardInternal(Options *settings, bool daemon)
 {
     forward_tarredfs_ops.getattr = forwardGetattr;
     forward_tarredfs_ops.open = open_callback;
@@ -718,11 +716,13 @@ int BeakImplementation::mountForwardInternal(Options *settings, bool daemon)
     RCC rcc = ffs->scanFileSystem(settings);
 
     if (rcc.isErr()) {
-        return ERR;
+        return rcc;
     }
 
     if (daemon) {
-        return fuse_main(settings->fuse_argc, settings->fuse_argv, &forward_tarredfs_ops, ffs.get());
+        int rc = fuse_main(settings->fuse_argc, settings->fuse_argv, &forward_tarredfs_ops, ffs.get());
+        if (rc) return RCC::ERRR;
+        return RCC::OKK;
     }
 
     struct fuse_args args;
@@ -743,7 +743,7 @@ int BeakImplementation::mountForwardInternal(Options *settings, bool daemon)
         fuse_loop_mt (fuse_);
         exit(0);
     }
-    return OK;
+    return rcc;
 }
 
 
@@ -1398,9 +1398,9 @@ void handleDirs(Path *path, FileStat *stat,
     }
 }
 
-int BeakImplementation::restoreReverse(Options *settings)
+RCC BeakImplementation::restoreReverse(Options *settings)
 {
-    RC rc = OK;
+    RCC rcc = RCC::OKK;
 
     if (settings->from.type != ArgPath) {
         failure(COMMANDLINE,"You have to specify a backup directory that will be extracted.\n");
@@ -1426,7 +1426,8 @@ int BeakImplementation::restoreReverse(Options *settings)
     assert(rfs->singlePointInTime());
 
     uint64_t start = clockGetTime();
-    rc = rfs->loadBeakFileSystem(settings);
+    int rc = rfs->loadBeakFileSystem(settings);
+    if (rc) rcc = RCC::ERRR;
 
     StoreStatistics st;
 
@@ -1475,7 +1476,7 @@ int BeakImplementation::restoreReverse(Options *settings)
         }
         info(STORE, "Time to store %jdms.\n", store_time / 1000);
     }
-    return rc;
+    return rcc;
 }
 
 void BeakImplementation::printHelp(Command cmd)
