@@ -93,8 +93,8 @@ struct BeakImplementation : Beak {
     RCC mountForward(Options *settings);
     int umountForward(Options *settings);
 
-    int remountReverseDaemon(Options *settings);
-    int remountReverse(Options *settings);
+    RCC remountReverseDaemon(Options *settings);
+    RCC remountReverse(Options *settings);
     int umountReverse(Options *settings);
 
     int shell(Options *settings);
@@ -107,7 +107,7 @@ struct BeakImplementation : Beak {
     private:
 
     RCC mountForwardInternal(Options *settings, bool daemon);
-    int remountReverseInternal(Options *settings, bool daemon);
+    RCC remountReverseInternal(Options *settings, bool daemon);
 
     fuse_operations forward_tarredfs_ops;
     fuse_operations reverse_tarredfs_ops;
@@ -773,12 +773,12 @@ static int reverseReadlink(const char *path, char *buf, size_t size)
     return fs->readlinkCB(path, buf, size);
 }
 
-int BeakImplementation::remountReverseDaemon(Options *settings)
+RCC BeakImplementation::remountReverseDaemon(Options *settings)
 {
     return remountReverseInternal(settings, true);
 }
 
-int BeakImplementation::remountReverse(Options *settings)
+RCC BeakImplementation::remountReverse(Options *settings)
 {
     return remountReverseInternal(settings, false);
 }
@@ -790,7 +790,7 @@ int BeakImplementation::umountReverse(Options *settings)
     return 0;
 }
 
-int BeakImplementation::remountReverseInternal(Options *settings, bool daemon)
+RCC BeakImplementation::remountReverseInternal(Options *settings, bool daemon)
 {
     reverse_tarredfs_ops.getattr = reverseGetattr;
     reverse_tarredfs_ops.open = open_callback;
@@ -804,18 +804,20 @@ int BeakImplementation::remountReverseInternal(Options *settings, bool daemon)
 
     if (settings->pointintime != "") {
         auto point = rfs->setPointInTime(settings->pointintime);
-        if (!point) return ERR;
+        if (!point) return RCC::ERRR;
     }
 
     RC rc = rfs->loadBeakFileSystem(settings);
-    if (rc != OK) return ERR;
+    if (rc != OK) return RCC::ERRR;
 
     if (daemon) {
-        return fuse_main(settings->fuse_argc, settings->fuse_argv, &reverse_tarredfs_ops,
-                         rfs.get()); // The reverse fs structure is passed as private data.
+        int rc = fuse_main(settings->fuse_argc, settings->fuse_argv, &reverse_tarredfs_ops,
+                           rfs.get()); // The reverse fs structure is passed as private data.
                                        // It is then extracted with
                                        // (ReverseTarredFS*)fuse_get_context()->private_data;
                                        // in the static fuse getters/setters.
+        if (rc) return RCC::ERRR;
+        return RCC::OKK;
     }
 
     struct fuse_args args;
@@ -836,7 +838,7 @@ int BeakImplementation::remountReverseInternal(Options *settings, bool daemon)
         fuse_loop_mt (fuse_);
         exit(0);
     }
-    return 0;
+    return RCC::OKK;
 }
 
 int BeakImplementation::shell(Options *settings)

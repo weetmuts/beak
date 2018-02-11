@@ -88,7 +88,7 @@ int main(int argc, char *argv[])
         break;
 
     case remount_cmd:
-        rc = beak->remountReverseDaemon(&settings);
+        rcc = beak->remountReverseDaemon(&settings);
         break;
 
     case restore_cmd:
