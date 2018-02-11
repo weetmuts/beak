@@ -80,7 +80,7 @@ struct BeakImplementation : Beak {
     RCC printInfo(Options *settings);
 
     vector<PointInTime> history();
-    RC findPointsInTime(string remote, vector<struct timespec> *v);
+    RCC findPointsInTime(string remote, vector<struct timespec> *v);
     RC fetchPointsInTime(string remote, Path *cache);
 
     RCC configure(Options *settings);
@@ -98,7 +98,7 @@ struct BeakImplementation : Beak {
     int umountReverse(Options *settings);
 
     int shell(Options *settings);
-    int status(Options *settings);
+    RCC status(Options *settings);
     RCC storeForward(Options *settings);
     RCC restoreReverse(Options *settings);
 
@@ -908,7 +908,7 @@ RC BeakImplementation::fetchPointsInTime(string remote, Path *cache)
 }
 
 // List the remote index files.
-RC BeakImplementation::findPointsInTime(string remote, vector<struct timespec> *v)
+RCC BeakImplementation::findPointsInTime(string remote, vector<struct timespec> *v)
 {
     vector<char> out;
     vector<string> args;
@@ -917,7 +917,7 @@ RC BeakImplementation::findPointsInTime(string remote, vector<struct timespec> *
     args.push_back("/z01*");
     args.push_back(remote);
     RCC rcc = sys_->invoke("rclone", args, &out);
-    if (rcc.isErr()) return ERR;
+    if (rcc.isErr()) return RCC::ERRR;
 
     auto i = out.begin();
     bool eof, err;
@@ -943,7 +943,7 @@ RC BeakImplementation::findPointsInTime(string remote, vector<struct timespec> *
 	v->push_back(ts);
     }
 
-    if (err) return ERR;
+    if (err) return RCC::ERRR;
 
     sort(v->begin(), v->end(),
 	      [](struct timespec &a, struct timespec &b)->bool {
@@ -952,18 +952,18 @@ RC BeakImplementation::findPointsInTime(string remote, vector<struct timespec> *
 		       b.tv_nsec < a.tv_nsec);
 	      });
 
-    return OK;
+    return RCC::OKK;
 }
 
-int BeakImplementation::status(Options *settings)
+RCC BeakImplementation::status(Options *settings)
 {
-    RC rc = OK;
+    RCC rcc = RCC::OKK;
 
     for (auto rule : configuration_->sortedRules()) {
 	UI::output("%-20s %s\n", rule->name.c_str(), rule->origin_path->c_str());
 	{
 	    vector<struct timespec> points;
-	    rc = findPointsInTime(rule->local->target_path->str(), &points);
+	    rcc = findPointsInTime(rule->local->target_path->str(), &points);
 	    if (points.size() > 0) {
 		string ago = timeAgo(&points.front());
 		UI::output("%-20s %s\n", ago.c_str(), "local");
@@ -973,11 +973,11 @@ int BeakImplementation::status(Options *settings)
 	}
 
 	for (auto storage : rule->sortedStorages()) {
-	    rc = fetchPointsInTime(storage->target_path->str(), rule->cache_path);
+	    int rc = fetchPointsInTime(storage->target_path->str(), rule->cache_path);
 	    if (rc != OK) continue;
 
 	    vector<struct timespec> points;
-	    rc = findPointsInTime(storage->target_path->str(), &points);
+	    rcc = findPointsInTime(storage->target_path->str(), &points);
 	    if (points.size() > 0) {
 		string ago = timeAgo(&points.front());
 		UI::output("%-20s %s\n", ago.c_str(), storage->target_path->c_str());
@@ -988,7 +988,7 @@ int BeakImplementation::status(Options *settings)
 	UI::output("\n");
     }
 
-    return rc;
+    return rcc;
 }
 
 struct StoreStatistics

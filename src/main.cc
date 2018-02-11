@@ -100,7 +100,7 @@ int main(int argc, char *argv[])
         break;
 
     case status_cmd:
-        rc = beak->status(&settings);
+        rcc = beak->status(&settings);
         break;
 
     case store_cmd:

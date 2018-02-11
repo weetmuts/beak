@@ -62,7 +62,7 @@ struct Beak
     virtual int umountReverse(Options *settings) = 0;
 
     virtual int shell(Options *settings) = 0;
-    virtual int status(Options *settings) = 0;
+    virtual RCC status(Options *settings) = 0;
     virtual RCC storeForward(Options *settings) = 0;
     virtual RCC restoreReverse(Options *settings) = 0;
 
