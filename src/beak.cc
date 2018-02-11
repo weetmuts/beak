@@ -81,7 +81,7 @@ struct BeakImplementation : Beak {
 
     vector<PointInTime> history();
     RCC findPointsInTime(string remote, vector<struct timespec> *v);
-    RC fetchPointsInTime(string remote, Path *cache);
+    RCC fetchPointsInTime(string remote, Path *cache);
 
     RCC configure(Options *settings);
     RCC push(Options *settings);
@@ -860,9 +860,8 @@ RCC BeakImplementation::shell(Options *settings)
 }
 
 // Copy the remote index files to the local storage.
-RC BeakImplementation::fetchPointsInTime(string remote, Path *cache)
+RCC BeakImplementation::fetchPointsInTime(string remote, Path *cache)
 {
-    RC rc = OK;
     vector<char> out;
     vector<string> args;
 
@@ -875,7 +874,6 @@ RC BeakImplementation::fetchPointsInTime(string remote, Path *cache)
     UI::output("Copying index files from %s", remote.c_str());
     fflush(stdout);
     RCC rcc = sys_->invoke("rclone", args, &out);
-    if (rcc.isErr()) rc = ERR;
 
     out.clear();
     args.clear();
@@ -885,7 +883,6 @@ RC BeakImplementation::fetchPointsInTime(string remote, Path *cache)
     UI::output("Listing files in %s", remote.c_str());
     fflush(stdout);
     rcc = sys_->invoke("rclone", args, &out);
-    if (rcc.isErr()) rc = ERR;
 
     Path *p = cache;
     string r = remote;
@@ -895,7 +892,7 @@ RC BeakImplementation::fetchPointsInTime(string remote, Path *cache)
     UI::clearLine();
     fflush(stdout);
 
-    return rc;
+    return rcc;
 }
 
 // List the remote index files.
@@ -964,8 +961,8 @@ RCC BeakImplementation::status(Options *settings)
 	}
 
 	for (auto storage : rule->sortedStorages()) {
-	    int rc = fetchPointsInTime(storage->target_path->str(), rule->cache_path);
-	    if (rc != OK) continue;
+	    rcc = fetchPointsInTime(storage->target_path->str(), rule->cache_path);
+	    if (rcc.isErr()) continue;
 
 	    vector<struct timespec> points;
 	    rcc = findPointsInTime(storage->target_path->str(), &points);
