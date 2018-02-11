@@ -91,13 +91,12 @@ struct BeakImplementation : Beak {
 
     RCC mountForwardDaemon(Options *settings);
     RCC mountForward(Options *settings);
-    int umountForward(Options *settings);
+    RCC umountForward(Options *settings);
 
     RCC remountReverseDaemon(Options *settings);
     RCC remountReverse(Options *settings);
-    int umountReverse(Options *settings);
 
-    int shell(Options *settings);
+    RCC shell(Options *settings);
     RCC status(Options *settings);
     RCC storeForward(Options *settings);
     RCC restoreReverse(Options *settings);
@@ -643,8 +642,7 @@ RCC BeakImplementation::push(Options *settings)
     // 2018/01/29 20:05:36 INFO  : code/src/s01_001517180913.689221661_11659264_b6f526ca4e988180fe6289213a338ab5a4926f7189dfb9dddff5a30ab50fc7f3_0.tar: Copied (new)
 
     // Unmount virtual filesystem.
-    int rc = umountForward(&forward_settings);
-    if (rc != 0) rcc = RCC::ERRR;
+    rcc = umountForward(&forward_settings);
     rmdir(mount->c_str());
 
     return rcc;
@@ -698,11 +696,11 @@ RCC BeakImplementation::mountForward(Options *settings)
     return mountForwardInternal(settings, false);
 }
 
-int BeakImplementation::umountForward(Options *settings)
+RCC BeakImplementation::umountForward(Options *settings)
 {
     fuse_exit(fuse_);
     fuse_unmount (settings->to.path->c_str(), chan_);
-    return 0;
+    return RCC::OKK;
 }
 
 RCC BeakImplementation::mountForwardInternal(Options *settings, bool daemon)
@@ -783,13 +781,6 @@ RCC BeakImplementation::remountReverse(Options *settings)
     return remountReverseInternal(settings, false);
 }
 
-int BeakImplementation::umountReverse(Options *settings)
-{
-    fuse_exit(fuse_);
-    fuse_unmount(settings->from.path->c_str(), chan_);
-    return 0;
-}
-
 RCC BeakImplementation::remountReverseInternal(Options *settings, bool daemon)
 {
     reverse_tarredfs_ops.getattr = reverseGetattr;
@@ -841,7 +832,7 @@ RCC BeakImplementation::remountReverseInternal(Options *settings, bool daemon)
     return RCC::OKK;
 }
 
-int BeakImplementation::shell(Options *settings)
+RCC BeakImplementation::shell(Options *settings)
 {
     /*
     int rc = 0;
@@ -865,7 +856,7 @@ int BeakImplementation::shell(Options *settings)
     }
     return rc;
     */
-    return OK;
+    return RCC::OKK;
 }
 
 // Copy the remote index files to the local storage.

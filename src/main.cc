@@ -96,7 +96,7 @@ int main(int argc, char *argv[])
         break;
 
     case shell_cmd:
-        rc = beak->shell(&settings);
+        rcc = beak->shell(&settings);
         break;
 
     case status_cmd:
