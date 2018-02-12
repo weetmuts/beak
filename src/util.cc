@@ -161,7 +161,7 @@ size_t roundoffHumanReadable(size_t s)
     return s;
 }
 
-int parseHumanReadable(string s, size_t *out)
+RCC parseHumanReadable(string s, size_t *out)
 {
     size_t mul = 1;
     string suffix;
@@ -177,7 +177,7 @@ int parseHumanReadable(string s, size_t *out)
 
     if (s.length() > 256)
     {
-        return ERR;
+        return RCC::ERRR;
     }
     if (suffix == "K" || suffix == "KiB")
     {
@@ -201,12 +201,12 @@ int parseHumanReadable(string s, size_t *out)
     {
         if (!isdigit(c))
         {
-            return ERR;
+            return RCC::ERRR;
         }
     }
 
     *out = mul * atol(s.c_str());
-    return OK;
+    return RCC::OKK;
 }
 
 bool parseTimeZoneOffset(std::string o, time_t *out)

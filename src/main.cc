@@ -27,7 +27,6 @@ using namespace std;
 int main(int argc, char *argv[])
 {
     RCC rcc = RCC::OKK;
-    int rc = 0;
     Options settings;
 
     auto fs_src = newDefaultFileSystem();
@@ -127,6 +126,5 @@ int main(int argc, char *argv[])
         break;
     }
 
-    printf("%d\n", rc);
     return rcc.toInteger();
 }

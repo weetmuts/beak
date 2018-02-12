@@ -473,8 +473,8 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Options *set
             case targetsize_option:
             {
                 size_t parsed_size;
-                int rc = parseHumanReadable(value.c_str(), &parsed_size);
-                if (rc)
+                RCC rcc = parseHumanReadable(value.c_str(), &parsed_size);
+                if (rcc.isErr())
                 {
                     error(COMMANDLINE,
                           "Cannot set target size because \"%s\" is not a proper number (e.g. 1,2K,3M,4G,5T)\n",
@@ -487,8 +487,8 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Options *set
             case triggersize_option:
             {
                 size_t parsed_size;
-                int rc = parseHumanReadable(value.c_str(), &parsed_size);
-                if (rc)
+                RCC rcc = parseHumanReadable(value.c_str(), &parsed_size);
+                if (rcc.isErr())
                 {
                     error(COMMANDLINE,
                           "Cannot set trigger size because \"%s\" is not a proper number (e.g. 1,2K,3M,4G,5T)\n",

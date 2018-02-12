@@ -217,8 +217,8 @@ bool ConfigurationImplementation::parseRow(string key, string value,
             break;
         case cache_size_key:
             {
-                RC rc = parseHumanReadable(value, &current_rule->cache_size);
-                if (rc != OK) error(CONFIGURATION, "Could not parse cache size \"%s\"\n", value.c_str());
+                RCC rcc = parseHumanReadable(value, &current_rule->cache_size);
+                if (rcc.isErr()) error(CONFIGURATION, "Could not parse cache size \"%s\"\n", value.c_str());
             }
             break;
         case local_key:
@@ -450,8 +450,8 @@ void ConfigurationImplementation::editCacheSize(Rule *r)
     for (;;) {
         UI::outputPrompt("cache size>");
         string s = UI::inputString();
-        RC rc = parseHumanReadable(s, &r->cache_size);
-        if (rc == OK) break;
+        RCC rcc = parseHumanReadable(s, &r->cache_size);
+        if (rcc.isOk()) break;
         UI::output("Invalid cache size.\n");
     }
 }
