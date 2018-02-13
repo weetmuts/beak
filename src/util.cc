@@ -595,8 +595,9 @@ string randomUpperCaseCharacterString(int len)
 
 #define CHUNK_SIZE 128*1024
 
-void compress_memory(char *in, size_t len, vector<char> *to)
+RCC compress_memory(char *in, size_t len, vector<char> *to)
 {
+    RCC rcc = RCC::OKK;
     char chunk[CHUNK_SIZE];
 
     z_stream strm;
@@ -613,14 +614,17 @@ void compress_memory(char *in, size_t len, vector<char> *to)
     int rc = deflateInit2_(&strm, Z_BEST_COMPRESSION, Z_DEFLATED, MAX_WBITS + 16, MAX_MEM_LEVEL,
                            Z_DEFAULT_STRATEGY, ZLIB_VERSION, (int)sizeof(z_stream));
     assert(rc == Z_OK);
+    if (rc != Z_OK) rcc = RCC::ERRR;
 
     rc = deflateSetHeader(&strm, &head);
     assert(rc == Z_OK);
+    if (rc != Z_OK) rcc = RCC::ERRR;
 
     while (strm.avail_in != 0)
     {
         int res = deflate(&strm, Z_NO_FLUSH);
         assert(res == Z_OK);
+        if (rc != Z_OK) rcc = RCC::ERRR;
         if (strm.avail_out == 0)
         {
             to->insert(to->end(), chunk, chunk+CHUNK_SIZE);
@@ -642,18 +646,21 @@ void compress_memory(char *in, size_t len, vector<char> *to)
     }
 
     assert(deflate_res == Z_STREAM_END);
+    if (deflate_res != Z_STREAM_END) rcc = RCC::ERRR;
+
     to->insert(to->end(), chunk, chunk+CHUNK_SIZE-strm.avail_out);
     deflateEnd(&strm);
+    return rcc;
 }
 
-int gzipit(string *from, vector<char> *to)
+RCC gzipit(string *from, vector<char> *to)
 {
-    compress_memory(&(*from)[0], from->length(), to);
-    return OK;
+    return compress_memory(&(*from)[0], from->length(), to);
 }
 
-void decompress_memory(char *in, size_t len, std::vector<char> *to)
+RCC decompress_memory(char *in, size_t len, std::vector<char> *to)
 {
+    RCC rcc = RCC::OKK;
     char chunk[CHUNK_SIZE];
 
     z_stream strm;
@@ -672,6 +679,7 @@ void decompress_memory(char *in, size_t len, std::vector<char> *to)
         strm.next_out = (unsigned char*)chunk;
         rc = inflate(&strm, Z_NO_FLUSH);
         assert(rc != Z_STREAM_ERROR);
+        if (rc == Z_STREAM_ERROR) rcc = RCC::ERRR;
 
         size_t have = CHUNK_SIZE-strm.avail_out;
         to->insert(to->end(), chunk, chunk+have);
@@ -679,12 +687,12 @@ void decompress_memory(char *in, size_t len, std::vector<char> *to)
 
     assert(rc == Z_STREAM_END);
     inflateEnd(&strm);
+    return rcc;
 }
 
-int gunzipit(vector<char> *from, vector<char> *to)
+RCC gunzipit(vector<char> *from, vector<char> *to)
 {
-    decompress_memory(&(*from)[0], from->size(), to);
-    return OK;
+    return decompress_memory(&(*from)[0], from->size(), to);
 }
 
 int stringToType(std::string s, char **names, int n)

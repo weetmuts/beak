@@ -75,8 +75,8 @@ uint64_t clockGetUnixTime();
 // Microseconds since the computer was started.
 uint64_t clockGetTime();
 void captureStartTime();
-int gzipit(std::string *from, std::vector<char> *to);
-int gunzipit(std::vector<char> *from, std::vector<char> *to);
+RCC gzipit(std::string *from, std::vector<char> *to);
+RCC gunzipit(std::vector<char> *from, std::vector<char> *to);
 std::string randomUpperCaseCharacterString(int len);
 
 int stringToType(std::string s, char*[], size_t n);
