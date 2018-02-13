@@ -695,16 +695,6 @@ RCC gunzipit(vector<char> *from, vector<char> *to)
     return decompress_memory(&(*from)[0], from->size(), to);
 }
 
-int stringToType(std::string s, char **names, int n)
-{
-    for (int i=0; i<n; ++i) {
-        if (s == names[i]) {
-            return i;
-        }
-    }
-    return -1;
-}
-
 time_t getTimeZoneOffset()
 {
     time_t rawtime = time(NULL);
