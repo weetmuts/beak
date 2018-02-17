@@ -304,11 +304,19 @@ function standardStoreUntarTest {
     checklsld
 }
 
-function standardStoreUnstoreTest {
+function standardStoreRestoreTest {
     if_test_fail_msg="Store unstor test failed: "
     performReStore
     checkdiff
     checklsld
+}
+
+function compareStoreAndMount {
+    diff -rq $store $mount
+    if [ $? -ne 0 ]; then
+        echo Store and Mount generated different beak filesystems! Check in $dir for more information.
+        exit
+    fi
 }
 
 function standardTest {
@@ -360,10 +368,11 @@ if [ $do_test ]; then
     performStore --tarheader=full
     standardStoreUntarTest
     cleanCheck
-    standardStoreUnstoreTest
+    standardStoreRestoreTest
     cleanCheck
     beakfs="$mount"
     startMountTest standardTest --tarheader=full
+    compareStoreAndMount
     stopMount
     echo OK
 fi
@@ -376,10 +385,11 @@ if [ $do_test ]; then
     performStore --tarheader=full
     standardStoreUntarTest
     cleanCheck
-    standardStoreUnstoreTest
+    standardStoreRestoreTest
     cleanCheck
     beakfs="$mount"
     startMountTest standardTest --tarheader=full
+    compareStoreAndMount
     stopMount
     echo OK
 fi
@@ -394,10 +404,11 @@ if [ $do_test ]; then
     performStore --tarheader=full
     standardStoreUntarTest
     cleanCheck
-    standardStoreUnstoreTest
+    standardStoreRestoreTest
     cleanCheck
     beakfs="$mount"
     startMountTest standardTest --tarheader=full
+    compareStoreAndMount
     stopMount
     echo OK
 fi
@@ -410,10 +421,11 @@ if [ $do_test ]; then
     performStore --tarheader=full
     standardStoreUntarTest
     cleanCheck
-    standardStoreUnstoreTest
+    standardStoreRestoreTest
     cleanCheck
     beakfs="$mount"
     startMountTest standardTest --tarheader=full
+    compareStoreAndMount
     stopMount
     echo OK
 fi
@@ -426,10 +438,11 @@ if [ $do_test ]; then
     performStore
     standardStoreUntarTest
     cleanCheck
-    standardStoreUnstoreTest
+    standardStoreRestoreTest
     cleanCheck
     beakfs="$mount"
     startMountTest standardTest
+    compareStoreAndMount
     stopMount
     echo OK
 fi
@@ -441,10 +454,11 @@ if [ $do_test ]; then
     performStore
     standardStoreUntarTest
     cleanCheck
-    standardStoreUnstoreTest
+    standardStoreRestoreTest
     cleanCheck
     beakfs="$mount"
     startMountTest standardTest
+    compareStoreAndMount
     stopMount
     echo OK
 fi
@@ -457,10 +471,11 @@ if [ $do_test ]; then
     performStore
     standardStoreUntarTest
     cleanCheck
-    standardStoreUnstoreTest
+    standardStoreRestoreTest
     cleanCheck
     beakfs="$mount"
     startMountTest standardTest
+    compareStoreAndMount
     stopMount
     echo OK
 fi
@@ -478,10 +493,11 @@ if [ $do_test ]; then
     performStore
     standardStoreUntarTest
     cleanCheck
-    standardStoreUnstoreTest
+    standardStoreRestoreTest
     cleanCheck
     beakfs="$mount"
     startMountTest standardTest
+    compareStoreAndMount
     stopMount
     echo OK
 fi
@@ -495,10 +511,11 @@ if [ $do_test ]; then
     performStore
     standardStoreUntarTest
     cleanCheck
-    standardStoreUnstoreTest
+    standardStoreRestoreTest
     cleanCheck
     beakfs="$mount"
     startMountTest standardTest
+    compareStoreAndMount
     stopMount
     echo OK
 fi
@@ -596,6 +613,7 @@ if [ $do_test ]; then
     devTest
     beakfs="$mount"
     startMountTest devTest "--tarheader=full -x '/shm/**'"
+    compareStoreAndMount
     stopMount
     echo OK
 fi
@@ -614,8 +632,15 @@ if [ $do_test ]; then
     echo HEJSAN > $root/libtar/.git/hooks
     echo HEJSAN > $root/libtar/.gitignore
     touch -d "2 hours ago" $root/libtar/.git/config $root/libtar/.git/hooks $root/libtar/.gitignore $root/libtar/.git
+
+    performStore
+    standardStoreUntarTest
+    cleanCheck
+    standardStoreRestoreTest
+    cleanCheck
     beakfs="$mount"
     startMountTest standardTest
+    compareStoreAndMount
     stopMount
     echo OK
 fi
@@ -708,8 +733,14 @@ if [ $do_test ]; then
     echo HEJSAN > "$root/alfa beta/gamma/delta"
     echo HEJSAN > "$root/alfa beta/gamma/del ta"
     echo HEJSAN > "$root/alfa beta/gam ma/del ta"
+    performStore
+    standardStoreUntarTest
+    cleanCheck
+    standardStoreRestoreTest
+    cleanCheck
     beakfs="$mount"
     startMountTest standardTest
+    compareStoreAndMount
     stopMount
     echo OK
 fi
@@ -721,7 +752,6 @@ function checkExtractFile {
         echo Could not extract single file! Check in $dir for more information.
         exit
     fi
-    stopMount
 }
 
 setup test_single_untar "Test single file untar"
@@ -735,6 +765,7 @@ if [ $do_test ]; then
     echo HEJSAN5 > "$root/alfa beta/delta"
     echo HEJSAN6 > "$root/delta"
     startMountTest checkExtractFile
+    stopMount
 fi
 
 function percentageTest {
@@ -753,14 +784,20 @@ function percentageTest {
         echo Percentage in filename was not handled properly! Check in $dir for more information.
         exit
     fi
-    stopMount
 }
 
 setup paths_with_percentages "Test paths with percentages in them"
 if [ $do_test ]; then
     mkdir -p "$root/alfa"
     echo HEJSAN > "$root/alfa/p%25e2%2594%259c%25c3%2591vensf%25e2%2594%259c%25e2%2595%25a2.jpg"
+    performStore --tarheader=full
+    standardStoreUntarTest
+    cleanCheck
+    standardStoreRestoreTest
+    cleanCheck
+    beakfs="$mount"    
     startMountTest percentageTest "--tarheader=full"
+    stopMount
 fi
 
 setup small_medium_large "Test small/medium/large tar files"
