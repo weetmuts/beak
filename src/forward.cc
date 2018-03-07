@@ -925,7 +925,7 @@ int ForwardTarredFS::readlinkCB(const char *path_char_string, char *buf, size_t 
     return 0;
 }
 
-RCC ForwardTarredFS::scanFileSystem(Options *settings)
+RC ForwardTarredFS::scanFileSystem(Options *settings)
 {
     if (settings->from.type == ArgPath && settings->from.path) {
         root_dir_path = settings->from.path;
@@ -1023,7 +1023,7 @@ RCC ForwardTarredFS::scanFileSystem(Options *settings)
             mount_dir.c_str(), num_tars, files.size(),
             scan_time / 1000, group_time / 1000);
 
-    return RCC::OKK;
+    return RC::OK;
 }
 
 struct ForwardFileSystem : FileSystem
@@ -1064,17 +1064,17 @@ struct ForwardFileSystem : FileSystem
         }
     }
 
-    RCC stat(Path *p, FileStat *fs)
+    RC stat(Path *p, FileStat *fs)
     {
-        return RCC::ERRR;
+        return RC::ERR;
     }
-    RCC chmod(Path *p, FileStat *fs)
+    RC chmod(Path *p, FileStat *fs)
     {
-        return RCC::ERRR;
+        return RC::ERR;
     }
-    RCC utime(Path *p, FileStat *fs)
+    RC utime(Path *p, FileStat *fs)
     {
-        return RCC::ERRR;
+        return RC::ERR;
     }
     Path *mkTempDir(std::string prefix)
     {
@@ -1084,13 +1084,13 @@ struct ForwardFileSystem : FileSystem
     {
         return NULL;
     }
-    RCC loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
+    RC loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
     {
-        return RCC::ERRR;
+        return RC::ERR;
     }
-    RCC createFile(Path *file, std::vector<char> *buf)
+    RC createFile(Path *file, std::vector<char> *buf)
     {
-        return RCC::ERRR;
+        return RC::ERR;
     }
     bool createFile(Path *path, FileStat *stat,
                      std::function<size_t(off_t offset, char *buffer, size_t len)> cb)

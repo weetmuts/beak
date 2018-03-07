@@ -49,7 +49,7 @@ ReverseTarredFS::ReverseTarredFS(ptr<FileSystem> fs)
 // The gz file to load, and the dir to populate with its contents.
 bool ReverseTarredFS::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
 {
-    RCC rc = RCC::OKK;
+    RC rc = RC::OK;
     if (point->loaded_gz_files_.count(gz) == 1)
     {
         return true;
@@ -137,7 +137,7 @@ Path *ReverseTarredFS::loadDirContents(PointInTime *point, Path *path)
     debug(REVERSE, "Looking for z01 gz file in dir >%s< (found %p)\n", path->c_str(), gz);
     if (gz != NULL) {
         gz = gz->prepend(rootDir());
-        RCC rc = file_system_->stat(gz, &stat);
+        RC rc = file_system_->stat(gz, &stat);
         debug(REVERSE, "%s --- rc=%d %d\n", gz->c_str(), rc.toInteger(), stat.isRegularFile());
         if (rc.isOk() && stat.isRegularFile()) {
             // Found a gz file!
@@ -585,7 +585,7 @@ PointInTime *ReverseTarredFS::setPointInTime(string g) {
     return single_point_in_time_;
 }
 
-RCC ReverseTarredFS::loadBeakFileSystem(Options *settings)
+RC ReverseTarredFS::loadBeakFileSystem(Options *settings)
 {
     setRootDir(settings->from.path);
     setMountDir(settings->to.path);
@@ -633,7 +633,7 @@ RCC ReverseTarredFS::loadBeakFileSystem(Options *settings)
         e->fs.st_mtim.tv_sec = youngest_secs;
         e->fs.st_mtim.tv_nsec = youngest_nanos;
     }
-    return RCC::OKK;
+    return RC::OK;
 }
 
 struct ReverseFileSystem : FileSystem
@@ -678,17 +678,17 @@ struct ReverseFileSystem : FileSystem
         recurseInto(d, cb);
     }
 
-    RCC stat(Path *p, FileStat *fs)
+    RC stat(Path *p, FileStat *fs)
     {
-        return RCC::ERRR;
+        return RC::ERR;
     }
-    RCC chmod(Path *p, FileStat *fs)
+    RC chmod(Path *p, FileStat *fs)
     {
-        return RCC::ERRR;
+        return RC::ERR;
     }
-    RCC utime(Path *p, FileStat *fs)
+    RC utime(Path *p, FileStat *fs)
     {
-        return RCC::ERRR;
+        return RC::ERR;
     }
     Path *mkTempDir(std::string prefix)
     {
@@ -698,13 +698,13 @@ struct ReverseFileSystem : FileSystem
     {
         return NULL;
     }
-    RCC loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
+    RC loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
     {
-        return RCC::OKK;
+        return RC::OK;
     }
-    RCC createFile(Path *file, std::vector<char> *buf)
+    RC createFile(Path *file, std::vector<char> *buf)
     {
-        return RCC::ERRR;
+        return RC::ERR;
     }
     bool createFile(Path *path, FileStat *stat,
                      std::function<size_t(off_t offset, char *buffer, size_t len)> cb)

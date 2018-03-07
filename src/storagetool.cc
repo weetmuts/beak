@@ -39,8 +39,8 @@ Storage StorageTool::checkRCloneStorage(ptr<System> sys, string name)
     vector<string> args;
     args.push_back("listremotes");
     args.push_back("-l");
-    RCC rcc = sys->invoke("rclone", args, &out);
-    if (rcc.isOk()) {
+    RC rc = sys->invoke("rclone", args, &out);
+    if (rc.isOk()) {
         auto i = out.begin();
         bool eof, err;
 
@@ -79,16 +79,16 @@ Storage StorageTool::checkRSyncStorage(ptr<System> sys, std::string name)
 }
 
 /*
-RCC BeakImplementation::listStorageFiles(Storage *storage, vector<TarFileName> *files)
+RC BeakImplementation::listStorageFiles(Storage *storage, vector<TarFileName> *files)
 {
-    RCC rc = RCC::OKK;
+    RC rc = RC::OK;
     vector<char> out;
     vector<string> args;
     args.push_back("ls");
     args.push_back(storage->c_str());
     rc = sys_->invoke("rclone", args, &out);
 
-    if (rc.isErr()) return RCC::ERRR;
+    if (rc.isErr()) return RC::ERR;
     auto i = out.begin();
     bool eof = false, err = false;
 
@@ -113,8 +113,8 @@ RCC BeakImplementation::listStorageFiles(Storage *storage, vector<TarFileName> *
             }
         }
     }
-    if (err) return RCC::ERRR;
+    if (err) return RC::ERR;
 
-    return RCC::OKK;
+    return RC::OK;
 }
 */

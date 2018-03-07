@@ -38,7 +38,7 @@ struct IndexTar {
 };
 
 struct Index {
-    static RCC loadIndex(std::vector<char> &contents,
+    static RC loadIndex(std::vector<char> &contents,
                          std::vector<char>::iterator &i,
                          IndexEntry *tmpentry, IndexTar *tmptar,
                          Path *dir_to_prepend,

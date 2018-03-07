@@ -86,14 +86,14 @@ struct FileSystemImplementationPosix : FileSystem
     bool readdir(Path *p, vector<Path*> *vec);
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
     void recurse(function<void(Path *path, FileStat *stat)> cb);
-    RCC stat(Path *p, FileStat *fs);
-    RCC chmod(Path *p, FileStat *stat);
-    RCC utime(Path *p, FileStat *stat);
+    RC stat(Path *p, FileStat *fs);
+    RC chmod(Path *p, FileStat *stat);
+    RC utime(Path *p, FileStat *stat);
     Path *mkTempDir(string prefix);
     Path *mkDirp(Path *p);
     Path *mkDir(Path *p, string name);
-    RCC loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
-    RCC createFile(Path *file, std::vector<char> *buf);
+    RC loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
+    RC createFile(Path *file, std::vector<char> *buf);
     bool createFile(Path *path, FileStat *stat,
                      std::function<size_t(off_t offset, char *buffer, size_t len)> cb);
     bool createSymbolicLink(Path *path, FileStat *stat, string target);
@@ -154,23 +154,23 @@ void FileSystemImplementationPosix::recurse(function<void(Path *path, FileStat *
 }
 
 
-RCC FileSystemImplementationPosix::stat(Path *p, FileStat *fs)
+RC FileSystemImplementationPosix::stat(Path *p, FileStat *fs)
 {
     struct stat sb;
     int rc = ::lstat(p->c_str(), &sb);
-    if (rc) return RCC::ERRR;
+    if (rc) return RC::ERR;
     fs->loadFrom(&sb);
-    return RCC::OKK;
+    return RC::OK;
 }
 
-RCC FileSystemImplementationPosix::chmod(Path *p, FileStat *fs)
+RC FileSystemImplementationPosix::chmod(Path *p, FileStat *fs)
 {
     int rc = ::chmod(p->c_str(), fs->st_mode);
-    if (rc) return RCC::ERRR;
-    return RCC::OKK;
+    if (rc) return RC::ERR;
+    return RC::OK;
 }
 
-RCC FileSystemImplementationPosix::utime(Path *p, FileStat *fs)
+RC FileSystemImplementationPosix::utime(Path *p, FileStat *fs)
 {
     struct timespec times[2];
     times[0].tv_sec = fs->st_atim.tv_sec;
@@ -181,8 +181,8 @@ RCC FileSystemImplementationPosix::utime(Path *p, FileStat *fs)
     // Why always AT_SYMLINK_NOFOLLOW? Because beak never intends
     // to follow symlinks when storing files! beak stores symlinks themselves!
     int rc = utimensat(0, p->c_str(), times, AT_SYMLINK_NOFOLLOW);
-    if (rc) return RCC::ERRR;
-    return RCC::OKK;
+    if (rc) return RC::ERR;
+    return RC::OK;
 }
 
 Path *FileSystemImplementationPosix::mkTempDir(string prefix)
@@ -226,13 +226,13 @@ int MinorDev(dev_t d)
     return MINOR(d);
 }
 
-RCC FileSystemImplementationPosix::loadVector(Path *file, size_t blocksize, vector<char> *buf)
+RC FileSystemImplementationPosix::loadVector(Path *file, size_t blocksize, vector<char> *buf)
 {
     char block[blocksize+1];
 
     int fd = open(file->c_str(), O_RDONLY);
     if (fd == -1) {
-        return RCC::ERRR;
+        return RC::ERR;
     }
     while (true) {
         ssize_t n = read(fd, block, sizeof(block));
@@ -242,7 +242,7 @@ RCC FileSystemImplementationPosix::loadVector(Path *file, size_t blocksize, vect
             }
             failure(FILESYSTEM,"Could not read from gzfile %s errno=%d\n", file->c_str(), errno);
             close(fd);
-            return RCC::ERRR;
+            return RC::ERR;
         }
         buf->insert(buf->end(), block, block+n);
         if (n < (ssize_t)sizeof(block)) {
@@ -250,15 +250,15 @@ RCC FileSystemImplementationPosix::loadVector(Path *file, size_t blocksize, vect
         }
     }
     close(fd);
-    return RCC::OKK;
+    return RC::OK;
 }
 
-RCC FileSystemImplementationPosix::createFile(Path *file, vector<char> *buf)
+RC FileSystemImplementationPosix::createFile(Path *file, vector<char> *buf)
 {
     int fd = open(file->c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
     if (fd == -1) {
 	failure(FILESYSTEM,"Could not open file %s errno=%d\n", file->c_str(), errno);
-        return RCC::ERRR;
+        return RC::ERR;
     }
     char *p = buf->data();
     ssize_t total = buf->size();
@@ -270,7 +270,7 @@ RCC FileSystemImplementationPosix::createFile(Path *file, vector<char> *buf)
             }
             failure(FILESYSTEM,"Could not write to file %s errno=%d\n", file->c_str(), errno);
             close(fd);
-            return RCC::ERRR;
+            return RC::ERR;
         }
 	p += n;
 	total -= n;
@@ -279,7 +279,7 @@ RCC FileSystemImplementationPosix::createFile(Path *file, vector<char> *buf)
         }
     }
     close(fd);
-    return RCC::OKK;
+    return RC::OK;
 }
 
 

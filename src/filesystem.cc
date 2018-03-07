@@ -31,13 +31,13 @@ struct FileSystemFuseAPIImplementation : FileSystem
     bool readdir(Path *p, vector<Path*> *vec);
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
     void recurse(function<void(Path *path, FileStat *stat)> cb);
-    RCC stat(Path *p, FileStat *fs);
-    RCC chmod(Path *p, FileStat *stat);
-    RCC utime(Path *p, FileStat *stat);
+    RC stat(Path *p, FileStat *fs);
+    RC chmod(Path *p, FileStat *stat);
+    RC utime(Path *p, FileStat *stat);
     Path *mkTempDir(string prefix);
     Path *mkDir(Path *path, string name);
-    RCC loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
-    RCC createFile(Path *file, std::vector<char> *buf);
+    RC loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
+    RC createFile(Path *file, std::vector<char> *buf);
     bool createFile(Path *path, FileStat *stat,
                     std::function<size_t(off_t offset, char *buffer, size_t len)> cb);
     bool createSymbolicLink(Path *path, FileStat *stat, string target);
@@ -83,19 +83,19 @@ void FileSystemFuseAPIImplementation::recurse(function<void(Path *path, FileStat
 {
 }
 
-RCC FileSystemFuseAPIImplementation::stat(Path *p, FileStat *fs)
+RC FileSystemFuseAPIImplementation::stat(Path *p, FileStat *fs)
 {
-    return RCC::ERRR;
+    return RC::ERR;
 }
 
-RCC FileSystemFuseAPIImplementation::chmod(Path *p, FileStat *fs)
+RC FileSystemFuseAPIImplementation::chmod(Path *p, FileStat *fs)
 {
-    return RCC::ERRR;
+    return RC::ERR;
 }
 
-RCC FileSystemFuseAPIImplementation::utime(Path *p, FileStat *fs)
+RC FileSystemFuseAPIImplementation::utime(Path *p, FileStat *fs)
 {
-    return RCC::ERRR;
+    return RC::ERR;
 }
 
 Path *FileSystemFuseAPIImplementation::mkTempDir(string prefix)
@@ -108,14 +108,14 @@ Path *FileSystemFuseAPIImplementation::mkDir(Path *p, string name)
     return NULL;
 }
 
-RCC FileSystemFuseAPIImplementation::loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
+RC FileSystemFuseAPIImplementation::loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
 {
-    return RCC::ERRR;
+    return RC::ERR;
 }
 
-RCC FileSystemFuseAPIImplementation::createFile(Path *file, std::vector<char> *buf)
+RC FileSystemFuseAPIImplementation::createFile(Path *file, std::vector<char> *buf)
 {
-    return RCC::ERRR;
+    return RC::ERR;
 }
 
 bool FileSystemFuseAPIImplementation::createFile(Path *path, FileStat *stat,
@@ -756,7 +756,7 @@ bool FileSystem::mkDirp(Path* path)
 void FileStat::checkStat(FileSystem *dst, Path *target)
 {
     FileStat old_stat;
-    RCC rc = dst->stat(target, &old_stat);
+    RC rc = dst->stat(target, &old_stat);
     if (rc.isErr()) { disk_update = Store; return; }
     if (sameSize(&old_stat) && sameMTime(&old_stat))
     {

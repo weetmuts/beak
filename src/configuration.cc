@@ -90,7 +90,7 @@ public:
 
     bool load();
     bool save();
-    RCC configure();
+    RC configure();
 
     Rule *rule(string name);
     vector<Rule*> sortedRules();
@@ -155,7 +155,7 @@ Path *inputDirectory(const char *prompt)
             continue;
         }
         FileStat fs;
-        RCC rc = defaultFileSystem()->stat(path, &fs);
+        RC rc = defaultFileSystem()->stat(path, &fs);
         if (rc.isErr()) {
             UI::output("Not a proper path!\n");
             continue;
@@ -218,8 +218,8 @@ bool ConfigurationImplementation::parseRow(string key, string value,
             break;
         case cache_size_key:
             {
-                RCC rcc = parseHumanReadable(value, &current_rule->cache_size);
-                if (rcc.isErr()) error(CONFIGURATION, "Could not parse cache size \"%s\"\n", value.c_str());
+                RC rc = parseHumanReadable(value, &current_rule->cache_size);
+                if (rc.isErr()) error(CONFIGURATION, "Could not parse cache size \"%s\"\n", value.c_str());
             }
             break;
         case local_key:
@@ -284,7 +284,7 @@ bool ConfigurationImplementation::load()
     rules_.clear();
     paths_.clear();
     vector<char> buf;
-    RCC rc = fs_->loadVector(configurationFile(), 32768, &buf);
+    RC rc = fs_->loadVector(configurationFile(), 32768, &buf);
     if (rc.isOk()) {
         vector<char>::iterator i = buf.begin();
         bool eof=false, err=false;
@@ -451,8 +451,8 @@ void ConfigurationImplementation::editCacheSize(Rule *r)
     for (;;) {
         UI::outputPrompt("cache size>");
         string s = UI::inputString();
-        RCC rcc = parseHumanReadable(s, &r->cache_size);
-        if (rcc.isOk()) break;
+        RC rc = parseHumanReadable(s, &r->cache_size);
+        if (rc.isOk()) break;
         UI::output("Invalid cache size.\n");
     }
 }
@@ -546,7 +546,7 @@ void ConfigurationImplementation::outputRule(Rule *r, std::vector<ChoiceEntry> *
 bool isDirectory(Path *path)
 {
     FileStat fs;
-    RCC rc = defaultFileSystem()->stat(path, &fs);
+    RC rc = defaultFileSystem()->stat(path, &fs);
     if (rc.isErr()) {
         return false;
     }
@@ -765,7 +765,7 @@ Rule *ConfigurationImplementation::deleteStorage(Rule *r)
     return r;
 }
 
-RCC ConfigurationImplementation::configure()
+RC ConfigurationImplementation::configure()
 {
     vector<ChoiceEntry> choices;
     choices.push_back( { "e", "", "Edit existing rule",         [=]() { editRule(); } } );
@@ -788,7 +788,7 @@ RCC ConfigurationImplementation::configure()
         if (ce->key == "q") break;
     }
 
-    return RCC::OKK;
+    return RC::OK;
 }
 
 string keep_keys[] = { "all", "minutely", "hourly", "daily", "weekly", "monthly", "yearly", "mirror" };

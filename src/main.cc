@@ -26,7 +26,7 @@ using namespace std;
 
 int main(int argc, char *argv[])
 {
-    RCC rcc = RCC::OKK;
+    RC rc = RC::OK;
     Options settings;
 
     auto fs_src = newDefaultFileSystem();
@@ -45,14 +45,14 @@ int main(int argc, char *argv[])
         break;
 
     case config_cmd:
-        rcc = beak->configure(&settings);
+        rc = beak->configure(&settings);
         break;
 
     case diff_cmd:
         break;
 
     case info_cmd:
-        rcc = beak->printInfo(&settings);
+        rc = beak->printInfo(&settings);
         break;
 
     case genautocomplete_cmd:
@@ -72,42 +72,42 @@ int main(int argc, char *argv[])
         break;
 
     case mount_cmd:
-        rcc = beak->mountForwardDaemon(&settings);
+        rc = beak->mountForwardDaemon(&settings);
         break;
 
     case prune_cmd:
-        rcc = beak->prune(&settings);
+        rc = beak->prune(&settings);
         break;
 
     case push_cmd:
-        rcc = beak->push(&settings);
+        rc = beak->push(&settings);
         break;
 
     case pull_cmd:
         break;
 
     case remount_cmd:
-        rcc = beak->remountReverseDaemon(&settings);
+        rc = beak->remountReverseDaemon(&settings);
         break;
 
     case restore_cmd:
-        rcc = beak->restoreReverse(&settings);
+        rc = beak->restoreReverse(&settings);
         break;
 
     case shell_cmd:
-        rcc = beak->shell(&settings);
+        rc = beak->shell(&settings);
         break;
 
     case status_cmd:
-        rcc = beak->status(&settings);
+        rc = beak->status(&settings);
         break;
 
     case store_cmd:
-        rcc = beak->storeForward(&settings);
+        rc = beak->storeForward(&settings);
         break;
 
     case umount_cmd:
-        rcc = beak->umountDaemon(&settings);
+        rc = beak->umountDaemon(&settings);
         break;
 
     case version_cmd:
@@ -126,5 +126,5 @@ int main(int argc, char *argv[])
         break;
     }
 
-    return rcc.toInteger();
+    return rc.toInteger();
 }

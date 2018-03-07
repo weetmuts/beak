@@ -17,5 +17,5 @@
 
 #include "always.h"
 
-ReturnCode ReturnCode::OKK = { 0 };
-ReturnCode ReturnCode::ERRR = { 1 };
+ReturnCode ReturnCode::OK = { 0 };
+ReturnCode ReturnCode::ERR = { 1 };

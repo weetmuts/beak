@@ -34,7 +34,7 @@ void strprintf(std::string &s, const char* fmt, ...);
 std::string humanReadable(size_t s);
 std::string humanReadableTwoDecimals(size_t s);
 size_t roundoffHumanReadable(size_t s);
-RCC parseHumanReadable(std::string s, size_t *out);
+RC parseHumanReadable(std::string s, size_t *out);
 bool parseTimeZoneOffset(std::string o, time_t *out);
 bool parseLengthOfTime(std::string s, time_t *out);
 std::string getLengthOfTime(time_t t);
@@ -75,8 +75,8 @@ uint64_t clockGetUnixTime();
 // Microseconds since the computer was started.
 uint64_t clockGetTime();
 void captureStartTime();
-RCC gzipit(std::string *from, std::vector<char> *to);
-RCC gunzipit(std::vector<char> *from, std::vector<char> *to);
+RC gzipit(std::string *from, std::vector<char> *to);
+RC gunzipit(std::vector<char> *from, std::vector<char> *to);
 std::string randomUpperCaseCharacterString(int len);
 
 #define lookupType(key_in,Type,TypeNames,key_out,ok) \

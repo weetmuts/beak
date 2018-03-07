@@ -30,7 +30,7 @@ static ComponentId SYSTEM = registerLogComponent("system");
 
 struct SystemImplementation : System
 {
-    RCC invoke(string program,
+    RC invoke(string program,
                vector<string> args,
                vector<char> *out,
                Capture capture,
@@ -49,7 +49,7 @@ string protect_(string arg)
     return arg;
 }
 
-RCC SystemImplementation::invoke(string program,
+RC SystemImplementation::invoke(string program,
                                  vector<string> args,
                                  vector<char> *output,
                                  Capture capture,
@@ -127,9 +127,9 @@ RCC SystemImplementation::invoke(string program,
             debug(SYSTEM,"Return code %d\n", rc);
             if (rc != 0) {
                 warning(SYSTEM,"%s exited with non-zero return code: %d\n", program.c_str(), rc);
-                return RCC::ERRR;
+                return RC::ERR;
             }
         }
     }
-    return RCC::OKK;
+    return RC::OK;
 }

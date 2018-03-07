@@ -91,14 +91,14 @@ struct FileSystemImplementationWinapi : FileSystem
     bool readdir(Path *p, vector<Path*> *vec);
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
     void recurse(function<void(Path*,FileStat*)> cb);
-    RCC stat(Path *p, FileStat *fs);
-    RCC chmod(Path *p, FileStat *fs);
-    RCC utime(Path *p, FileStat *fs);
+    RC stat(Path *p, FileStat *fs);
+    RC chmod(Path *p, FileStat *fs);
+    RC utime(Path *p, FileStat *fs);
     Path *mkTempDir(string prefix);
     Path *mkDir(Path *p, string name);
 
-    RCC loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
-    RCC createFile(Path *file, std::vector<char> *buf);
+    RC loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
+    RC createFile(Path *file, std::vector<char> *buf);
     bool createFile(Path *file,
                     FileStat *stat,
                     std::function<size_t(off_t offset, char *buffer, size_t len)> cb);
@@ -162,19 +162,19 @@ void FileSystemImplementationWinapi::recurse(function<void(Path *,FileStat*)> cb
 {
 }
 
-RCC FileSystemImplementationWinapi::stat(Path *p, FileStat *fs)
+RC FileSystemImplementationWinapi::stat(Path *p, FileStat *fs)
 {
-    return RCC::ERRR;
+    return RC::ERR;
 }
 
-RCC FileSystemImplementationWinapi::chmod(Path *p, FileStat *fs)
+RC FileSystemImplementationWinapi::chmod(Path *p, FileStat *fs)
 {
-    return RCC::ERRR;
+    return RC::ERR;
 }
 
-RCC FileSystemImplementationWinapi::utime(Path *p, FileStat *fs)
+RC FileSystemImplementationWinapi::utime(Path *p, FileStat *fs)
 {
-    return RCC::ERRR;
+    return RC::ERR;
 }
 
 Path *FileSystemImplementationWinapi::mkTempDir(string prefix)
@@ -213,7 +213,7 @@ Path *FileSystemImplementationWinapi::mkDir(Path *p, string name)
     return n;
 }
 
-RCC FileSystemImplementationWinapi::loadVector(Path *file, size_t blocksize, vector<char> *buf)
+RC FileSystemImplementationWinapi::loadVector(Path *file, size_t blocksize, vector<char> *buf)
 {
     /*
     char block[blocksize+1];
@@ -239,10 +239,10 @@ RCC FileSystemImplementationWinapi::loadVector(Path *file, size_t blocksize, vec
     }
     close(fd);
     */
-    return RCC::ERRR;
+    return RC::ERR;
 }
 
-RCC FileSystemImplementationWinapi::createFile(Path *file, vector<char> *buf)
+RC FileSystemImplementationWinapi::createFile(Path *file, vector<char> *buf)
 {
     /*
     int fd = open(file->c_str(), O_WRONLY | O_CREAT, 0666);
@@ -269,7 +269,7 @@ RCC FileSystemImplementationWinapi::createFile(Path *file, vector<char> *buf)
         }
     }
     close(fd);*/
-    return RCC::ERRR;
+    return RC::ERR;
 }
 
 

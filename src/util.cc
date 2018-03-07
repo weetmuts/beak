@@ -161,7 +161,7 @@ size_t roundoffHumanReadable(size_t s)
     return s;
 }
 
-RCC parseHumanReadable(string s, size_t *out)
+RC parseHumanReadable(string s, size_t *out)
 {
     size_t mul = 1;
     string suffix;
@@ -177,7 +177,7 @@ RCC parseHumanReadable(string s, size_t *out)
 
     if (s.length() > 256)
     {
-        return RCC::ERRR;
+        return RC::ERR;
     }
     if (suffix == "K" || suffix == "KiB")
     {
@@ -201,12 +201,12 @@ RCC parseHumanReadable(string s, size_t *out)
     {
         if (!isdigit(c))
         {
-            return RCC::ERRR;
+            return RC::ERR;
         }
     }
 
     *out = mul * atol(s.c_str());
-    return RCC::OKK;
+    return RC::OK;
 }
 
 bool parseTimeZoneOffset(std::string o, time_t *out)
@@ -595,9 +595,9 @@ string randomUpperCaseCharacterString(int len)
 
 #define CHUNK_SIZE 128*1024
 
-RCC compress_memory(char *in, size_t len, vector<char> *to)
+RC compress_memory(char *in, size_t len, vector<char> *to)
 {
-    RCC rcc = RCC::OKK;
+    RC rc = RC::OK;
     char chunk[CHUNK_SIZE];
 
     z_stream strm;
@@ -611,20 +611,20 @@ RCC compress_memory(char *in, size_t len, vector<char> *to)
     gz_header head;
     memset(&head, 0, sizeof(head));
 
-    int rc = deflateInit2_(&strm, Z_BEST_COMPRESSION, Z_DEFLATED, MAX_WBITS + 16, MAX_MEM_LEVEL,
+    int rcd = deflateInit2_(&strm, Z_BEST_COMPRESSION, Z_DEFLATED, MAX_WBITS + 16, MAX_MEM_LEVEL,
                            Z_DEFAULT_STRATEGY, ZLIB_VERSION, (int)sizeof(z_stream));
-    assert(rc == Z_OK);
-    if (rc != Z_OK) rcc = RCC::ERRR;
+    assert(rcd == Z_OK);
+    if (rcd != Z_OK) rc = RC::ERR;
 
-    rc = deflateSetHeader(&strm, &head);
-    assert(rc == Z_OK);
-    if (rc != Z_OK) rcc = RCC::ERRR;
+    rcd = deflateSetHeader(&strm, &head);
+    assert(rcd == Z_OK);
+    if (rcd != Z_OK) rc = RC::ERR;
 
     while (strm.avail_in != 0)
     {
         int res = deflate(&strm, Z_NO_FLUSH);
         assert(res == Z_OK);
-        if (rc != Z_OK) rcc = RCC::ERRR;
+        if (rcd != Z_OK) rc = RC::ERR;
         if (strm.avail_out == 0)
         {
             to->insert(to->end(), chunk, chunk+CHUNK_SIZE);
@@ -646,21 +646,21 @@ RCC compress_memory(char *in, size_t len, vector<char> *to)
     }
 
     assert(deflate_res == Z_STREAM_END);
-    if (deflate_res != Z_STREAM_END) rcc = RCC::ERRR;
+    if (deflate_res != Z_STREAM_END) rc = RC::ERR;
 
     to->insert(to->end(), chunk, chunk+CHUNK_SIZE-strm.avail_out);
     deflateEnd(&strm);
-    return rcc;
+    return rc;
 }
 
-RCC gzipit(string *from, vector<char> *to)
+RC gzipit(string *from, vector<char> *to)
 {
     return compress_memory(&(*from)[0], from->length(), to);
 }
 
-RCC decompress_memory(char *in, size_t len, std::vector<char> *to)
+RC decompress_memory(char *in, size_t len, std::vector<char> *to)
 {
-    RCC rcc = RCC::OKK;
+    RC rc = RC::OK;
     char chunk[CHUNK_SIZE];
 
     z_stream strm;
@@ -671,26 +671,26 @@ RCC decompress_memory(char *in, size_t len, std::vector<char> *to)
     strm.next_out = (unsigned char*)chunk;
     strm.avail_out = CHUNK_SIZE;
 
-    int rc = inflateInit2(&strm, MAX_WBITS + 16);
-    assert(rc == Z_OK);
+    int rci = inflateInit2(&strm, MAX_WBITS + 16);
+    assert(rci == Z_OK);
 
     do {
         strm.avail_out = CHUNK_SIZE;
         strm.next_out = (unsigned char*)chunk;
-        rc = inflate(&strm, Z_NO_FLUSH);
-        assert(rc != Z_STREAM_ERROR);
-        if (rc == Z_STREAM_ERROR) rcc = RCC::ERRR;
+        rci = inflate(&strm, Z_NO_FLUSH);
+        assert(rci != Z_STREAM_ERROR);
+        if (rci == Z_STREAM_ERROR) rc = RC::ERR;
 
         size_t have = CHUNK_SIZE-strm.avail_out;
         to->insert(to->end(), chunk, chunk+have);
     } while (strm.avail_out == 0);
 
-    assert(rc == Z_STREAM_END);
+    assert(rci == Z_STREAM_END);
     inflateEnd(&strm);
-    return rcc;
+    return rc;
 }
 
-RCC gunzipit(vector<char> *from, vector<char> *to)
+RC gunzipit(vector<char> *from, vector<char> *to)
 {
     return decompress_memory(&(*from)[0], from->size(), to);
 }

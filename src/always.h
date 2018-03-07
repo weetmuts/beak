@@ -32,8 +32,8 @@ public:
     bool isOk() { return val == 0; }
     bool isErr() { return val != 0; }
 
-    static ReturnCode OKK;
-    static ReturnCode ERRR;
+    static ReturnCode OK;
+    static ReturnCode ERR;
     int toInteger() { return val; }
     const char *toString() { return val==0?"ok":"err"; }
 
@@ -42,7 +42,7 @@ private:
     int val {};
 };
 
-typedef ReturnCode RCC;
+typedef ReturnCode RC;
 
 #define XSTR(s) STR(s)
 #define STR(s) #s

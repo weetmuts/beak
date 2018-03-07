@@ -158,7 +158,7 @@ struct Configuration
 {
     virtual bool load() = 0;
     virtual bool save() = 0;
-    virtual RCC configure() = 0;
+    virtual RC configure() = 0;
 
     virtual Rule *rule(std::string name) = 0;
     virtual std::vector<Rule*> sortedRules() = 0;

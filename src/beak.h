@@ -45,25 +45,25 @@ struct Beak
     virtual void captureStartTime() = 0;
     virtual std::string argsToVector(int argc, char **argv, std::vector<std::string> *args) = 0;
     virtual Command parseCommandLine(int argc, char **argv, Options *settings) = 0;
-    virtual RCC printInfo(Options *settings) = 0;
+    virtual RC printInfo(Options *settings) = 0;
     virtual std::vector<PointInTime> history() = 0;
 
-    virtual RCC configure(Options *settings) = 0;
-    virtual RCC push(Options *settings) = 0;
-    virtual RCC prune(Options *settings) = 0;
+    virtual RC configure(Options *settings) = 0;
+    virtual RC push(Options *settings) = 0;
+    virtual RC prune(Options *settings) = 0;
 
-    virtual RCC umountDaemon(Options *settings) = 0;
+    virtual RC umountDaemon(Options *settings) = 0;
 
-    virtual RCC mountForwardDaemon(Options *settings) = 0;
-    virtual RCC mountForward(Options *settings) = 0;
-    virtual RCC umountForward(Options *settings) = 0;
-    virtual RCC remountReverseDaemon(Options *settings) = 0;
-    virtual RCC remountReverse(Options *settings) = 0;
+    virtual RC mountForwardDaemon(Options *settings) = 0;
+    virtual RC mountForward(Options *settings) = 0;
+    virtual RC umountForward(Options *settings) = 0;
+    virtual RC remountReverseDaemon(Options *settings) = 0;
+    virtual RC remountReverse(Options *settings) = 0;
 
-    virtual RCC shell(Options *settings) = 0;
-    virtual RCC status(Options *settings) = 0;
-    virtual RCC storeForward(Options *settings) = 0;
-    virtual RCC restoreReverse(Options *settings) = 0;
+    virtual RC shell(Options *settings) = 0;
+    virtual RC status(Options *settings) = 0;
+    virtual RC storeForward(Options *settings) = 0;
+    virtual RC restoreReverse(Options *settings) = 0;
 
     virtual void printHelp(Command cmd) = 0;
     virtual void printVersion() = 0;
