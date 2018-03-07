@@ -137,9 +137,9 @@ Path *ReverseTarredFS::loadDirContents(PointInTime *point, Path *path)
     debug(REVERSE, "Looking for z01 gz file in dir >%s< (found %p)\n", path->c_str(), gz);
     if (gz != NULL) {
         gz = gz->prepend(rootDir());
-        RC rc = file_system_->stat(gz, &stat);
-        debug(REVERSE, "%s --- rc=%d %d\n", gz->c_str(), rc, stat.isRegularFile());
-        if (rc == OK && stat.isRegularFile()) {
+        RCC rc = file_system_->stat(gz, &stat);
+        debug(REVERSE, "%s --- rc=%d %d\n", gz->c_str(), rc.toInteger(), stat.isRegularFile());
+        if (rc.isOk() && stat.isRegularFile()) {
             // Found a gz file!
             loadGz(point, gz, path);
         }
@@ -678,17 +678,17 @@ struct ReverseFileSystem : FileSystem
         recurseInto(d, cb);
     }
 
-    RC stat(Path *p, FileStat *fs)
+    RCC stat(Path *p, FileStat *fs)
     {
-        return ERR;
+        return RCC::ERRR;
     }
-    RC chmod(Path *p, FileStat *fs)
+    RCC chmod(Path *p, FileStat *fs)
     {
-        return ERR;
+        return RCC::ERRR;
     }
-    RC utime(Path *p, FileStat *fs)
+    RCC utime(Path *p, FileStat *fs)
     {
-        return ERR;
+        return RCC::ERRR;
     }
     Path *mkTempDir(std::string prefix)
     {

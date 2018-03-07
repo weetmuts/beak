@@ -35,10 +35,11 @@ public:
     static ReturnCode OKK;
     static ReturnCode ERRR;
     int toInteger() { return val; }
+    const char *toString() { return val==0?"ok":"err"; }
 
 private:
     ReturnCode(int v) : val(v) { }
-    int val;
+    int val {};
 };
 
 typedef ReturnCode RCC;

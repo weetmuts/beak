@@ -1063,7 +1063,8 @@ void handleFile(Path *path, FileStat *stat,
     Path *file_name = tar->path()->prepend(settings->to.path);
     to_fs->mkDirp(file_name->parent());
     FileStat old_stat;
-    if (OK == to_fs->stat(file_name, &old_stat) &&
+    RCC rc = to_fs->stat(file_name, &old_stat);
+    if (rc.isOk() &&
         stat->samePermissions(&old_stat) &&
         stat->sameSize(&old_stat) &&
         stat->sameMTime(&old_stat)) {
@@ -1138,7 +1139,8 @@ bool extractHardLink(FileSystem *from_fs, Path *target,
 {
     target = target->prepend(dst_root);
     FileStat target_stat;
-    if (OK != to_fs->stat(target, &target_stat)) {
+    RCC rc = to_fs->stat(target, &target_stat);
+    if (rc.isErr()) {
         error(STORE, "Cannot extract hard link %s because target %s does not exist!\n",
               file_to_extract->c_str(), target->c_str());
     }
@@ -1151,7 +1153,8 @@ bool extractHardLink(FileSystem *from_fs, Path *target,
               "Expected %s to have mtime xxx\n", target->c_str());
     }
     FileStat old_stat;
-    if (OK == to_fs->stat(file_to_extract, &old_stat)) {
+    rc = to_fs->stat(file_to_extract, &old_stat);
+    if (rc.isOk()) {
         if (stat->samePermissions(&old_stat) &&
             target_stat.sameSize(&old_stat) && // The hard link definition does not have size.
             stat->sameMTime(&old_stat)) {
@@ -1216,7 +1219,8 @@ bool extractSymbolicLink(FileSystem *from_fs, string target,
 {
     string old_target;
     FileStat old_stat;
-    bool found =  OK == to_fs->stat(file_to_extract, &old_stat);
+    RCC rc = to_fs->stat(file_to_extract, &old_stat);
+    bool found = rc.isOk();
     if (found) {
         if (stat->samePermissions(&old_stat) &&
             stat->sameSize(&old_stat) &&
@@ -1248,7 +1252,8 @@ bool extractNode(FileSystem *from_fs, FileSystem *to_fs, Path *file_to_extract, 
                  StoreStatistics *statistics)
 {
     FileStat old_stat;
-    if (OK == to_fs->stat(file_to_extract, &old_stat)) {
+    RCC rc = to_fs->stat(file_to_extract, &old_stat);
+    if (rc.isOk()) {
         if (stat->samePermissions(&old_stat) &&
             stat->sameMTime(&old_stat)) {
             // Compare of size is ignored since the nodes have no size...
@@ -1272,7 +1277,8 @@ bool chmodDirectory(FileSystem *to_fs, Path *file_to_extract, FileStat *stat,
                     StoreStatistics *statistics)
 {
     FileStat old_stat;
-    if (OK == to_fs->stat(file_to_extract, &old_stat)) {
+    RCC rc = to_fs->stat(file_to_extract, &old_stat);
+    if (rc.isOk()) {
         if (stat->samePermissions(&old_stat) &&
             stat->sameMTime(&old_stat)) {
             // Compare of directory size is ignored since the size differ between

@@ -31,9 +31,9 @@ struct FileSystemFuseAPIImplementation : FileSystem
     bool readdir(Path *p, vector<Path*> *vec);
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
     void recurse(function<void(Path *path, FileStat *stat)> cb);
-    RC stat(Path *p, FileStat *fs);
-    RC chmod(Path *p, FileStat *stat);
-    RC utime(Path *p, FileStat *stat);
+    RCC stat(Path *p, FileStat *fs);
+    RCC chmod(Path *p, FileStat *stat);
+    RCC utime(Path *p, FileStat *stat);
     Path *mkTempDir(string prefix);
     Path *mkDir(Path *path, string name);
     int loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
@@ -83,19 +83,19 @@ void FileSystemFuseAPIImplementation::recurse(function<void(Path *path, FileStat
 {
 }
 
-RC FileSystemFuseAPIImplementation::stat(Path *p, FileStat *fs)
+RCC FileSystemFuseAPIImplementation::stat(Path *p, FileStat *fs)
 {
-    return ERR;
+    return RCC::ERRR;
 }
 
-RC FileSystemFuseAPIImplementation::chmod(Path *p, FileStat *fs)
+RCC FileSystemFuseAPIImplementation::chmod(Path *p, FileStat *fs)
 {
-    return ERR;
+    return RCC::ERRR;
 }
 
-RC FileSystemFuseAPIImplementation::utime(Path *p, FileStat *fs)
+RCC FileSystemFuseAPIImplementation::utime(Path *p, FileStat *fs)
 {
-    return ERR;
+    return RCC::ERRR;
 }
 
 Path *FileSystemFuseAPIImplementation::mkTempDir(string prefix)
@@ -756,8 +756,8 @@ bool FileSystem::mkDirp(Path* path)
 void FileStat::checkStat(FileSystem *dst, Path *target)
 {
     FileStat old_stat;
-    RC rc = dst->stat(target, &old_stat);
-    if (rc != OK) { disk_update = Store; return; }
+    RCC rc = dst->stat(target, &old_stat);
+    if (rc.isErr()) { disk_update = Store; return; }
     if (sameSize(&old_stat) && sameMTime(&old_stat))
     {
         if (!samePermissions(&old_stat))

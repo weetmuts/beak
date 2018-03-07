@@ -246,9 +246,9 @@ struct FileSystem
     virtual bool readdir(Path *p, std::vector<Path*> *vec) = 0;
     virtual ssize_t pread(Path *p, char *buf, size_t size, off_t offset) = 0;
     virtual void recurse(std::function<void(Path *path, FileStat *stat)> cb) = 0;
-    virtual RC stat(Path *p, FileStat *fs) = 0;
-    virtual RC chmod(Path *p, FileStat *stat) = 0;
-    virtual RC utime(Path *p, FileStat *stat) = 0;
+    virtual RCC stat(Path *p, FileStat *fs) = 0;
+    virtual RCC chmod(Path *p, FileStat *stat) = 0;
+    virtual RCC utime(Path *p, FileStat *stat) = 0;
     virtual Path *mkTempDir(std::string prefix) = 0;
             bool mkDirp(Path *p);
     virtual Path *mkDir(Path *p, std::string name) = 0;

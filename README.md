@@ -19,10 +19,11 @@ timestamp of the most recently changed file/directory within the
 _origin_ directory that was backed up. (I.e. it is not the time when
 the push was initiated.)
 
-`work: a beak _rule_ that you have created to backup the _origin_ directory /home/you/Work`.
+`work:` a beak _rule_ that you have created to backup the _origin_ directory /home/you/Work.
 
-`gd_work_crypt: is an rclone _backup_ location , for example an encrypted directory in your google drive.`
-`backup@192.168.0.1:/backups is an rsync _backup_ location.`
+`gd_work_crypt:` is an rclone _backup_ location , for example an encrypted directory in your google drive.
+
+`backup@192.168.0.1:/backups` is an rsync _backup_ location.
 
 (the _backup_ location where your backups are stored, can also be a
 local directory, both locals and remotes are known as _backup_ locations.)

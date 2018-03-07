@@ -86,9 +86,9 @@ struct FileSystemImplementationPosix : FileSystem
     bool readdir(Path *p, vector<Path*> *vec);
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
     void recurse(function<void(Path *path, FileStat *stat)> cb);
-    RC stat(Path *p, FileStat *fs);
-    RC chmod(Path *p, FileStat *stat);
-    RC utime(Path *p, FileStat *stat);
+    RCC stat(Path *p, FileStat *fs);
+    RCC chmod(Path *p, FileStat *stat);
+    RCC utime(Path *p, FileStat *stat);
     Path *mkTempDir(string prefix);
     Path *mkDirp(Path *p);
     Path *mkDir(Path *p, string name);
@@ -142,7 +142,7 @@ bool FileSystemImplementationPosix::readdir(Path *p, vector<Path*> *vec)
 ssize_t FileSystemImplementationPosix::pread(Path *p, char *buf, size_t size, off_t offset)
 {
     int fd = open(p->c_str(), O_RDONLY | O_NOATIME);
-    if (fd == -1) return ERR;
+    if (fd == -1) return -1;
     int rc = ::pread(fd, buf, size, offset);
     close(fd);
     return rc;
@@ -154,23 +154,23 @@ void FileSystemImplementationPosix::recurse(function<void(Path *path, FileStat *
 }
 
 
-RC FileSystemImplementationPosix::stat(Path *p, FileStat *fs)
+RCC FileSystemImplementationPosix::stat(Path *p, FileStat *fs)
 {
     struct stat sb;
     int rc = ::lstat(p->c_str(), &sb);
-    if (rc) return ERR;
+    if (rc) return RCC::ERRR;
     fs->loadFrom(&sb);
-    return OK;
+    return RCC::OKK;
 }
 
-RC FileSystemImplementationPosix::chmod(Path *p, FileStat *fs)
+RCC FileSystemImplementationPosix::chmod(Path *p, FileStat *fs)
 {
     int rc = ::chmod(p->c_str(), fs->st_mode);
-    if (rc) return ERR;
-    return OK;
+    if (rc) return RCC::ERRR;
+    return RCC::OKK;
 }
 
-RC FileSystemImplementationPosix::utime(Path *p, FileStat *fs)
+RCC FileSystemImplementationPosix::utime(Path *p, FileStat *fs)
 {
     struct timespec times[2];
     times[0].tv_sec = fs->st_atim.tv_sec;
@@ -181,8 +181,8 @@ RC FileSystemImplementationPosix::utime(Path *p, FileStat *fs)
     // Why always AT_SYMLINK_NOFOLLOW? Because beak never intends
     // to follow symlinks when storing files! beak stores symlinks themselves!
     int rc = utimensat(0, p->c_str(), times, AT_SYMLINK_NOFOLLOW);
-    if (rc) return ERR;
-    return OK;
+    if (rc) return RCC::ERRR;
+    return RCC::OKK;
 }
 
 Path *FileSystemImplementationPosix::mkTempDir(string prefix)
@@ -206,8 +206,8 @@ Path *FileSystemImplementationPosix::mkDirp(Path *p)
 Path *FileSystemImplementationPosix::mkDir(Path *p, string name)
 {
     Path *n = p->append(name);
-    RC rc = mkdir(n->c_str(), 0775);
-    if (rc != OK) error(FILESYSTEM, "Could not create directory: \"%s\"\n", n->c_str());
+    int rc = mkdir(n->c_str(), 0775);
+    if (rc != 0) error(FILESYSTEM, "Could not create directory: \"%s\"\n", n->c_str());
     return n;
 }
 

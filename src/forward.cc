@@ -1064,17 +1064,17 @@ struct ForwardFileSystem : FileSystem
         }
     }
 
-    RC stat(Path *p, FileStat *fs)
+    RCC stat(Path *p, FileStat *fs)
     {
-        return ERR;
+        return RCC::ERRR;
     }
-    RC chmod(Path *p, FileStat *fs)
+    RCC chmod(Path *p, FileStat *fs)
     {
-        return ERR;
+        return RCC::ERRR;
     }
-    RC utime(Path *p, FileStat *fs)
+    RCC utime(Path *p, FileStat *fs)
     {
-        return ERR;
+        return RCC::ERRR;
     }
     Path *mkTempDir(std::string prefix)
     {

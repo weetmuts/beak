@@ -155,7 +155,8 @@ Path *inputDirectory(const char *prompt)
             continue;
         }
         FileStat fs;
-        if (OK != defaultFileSystem()->stat(path, &fs)) {
+        RCC rc = defaultFileSystem()->stat(path, &fs);
+        if (rc.isErr()) {
             UI::output("Not a proper path!\n");
             continue;
         }
@@ -545,7 +546,8 @@ void ConfigurationImplementation::outputRule(Rule *r, std::vector<ChoiceEntry> *
 bool isDirectory(Path *path)
 {
     FileStat fs;
-    if (OK != defaultFileSystem()->stat(path, &fs)) {
+    RCC rc = defaultFileSystem()->stat(path, &fs);
+    if (rc.isErr()) {
         return false;
     }
     if (!fs.isDirectory()) {
