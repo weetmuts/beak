@@ -9,7 +9,12 @@ Beak is work in progress. The text below describes the goal!
 
 beak is the tool for the impatient who wants to initiate a backup
 manually and want to see it finished, quickly. In other words, after
-finishing some important work, you type `beak push work: gd_work_crypt:`
+finishing some important work, you type:
+
+```
+beak push work: gd_work_crypt:
+```
+
 and wait for it to finish.  You can now be sure that your work directory
 (the _origin_) is safely backed up to the _backup_ location gd_work_crypt: in
 the cloud, before you stuff your laptop in your bag.
@@ -55,10 +60,29 @@ mkdir RestoreHere
 beak restore gd_work_crypt: RestoreHere
 ```
 
-or from an arbitrary file system backup (here we pick the fourth most recent_point in time_ @0 is the most recent, @1 the second most recent etc):
+or from an arbitrary file system backup (here we pick the fourth most recent _point in time_ @0 is the most recent, @1 the second most recent etc):
 
 ```
 beak restore /media/you/USBDrive@3 RestoreHere
+```
+
+You can also pull a backup for merge into your _origin_
+directory. This is different from a restore since it will perform
+choice between your _origin_ files and the _backup_ files and pick the
+most recent file version. When it detects that a source file has been
+concurrently changed it will trigger an external merge program (like meld)
+to finalize the changes. For binary files, it stores the concurrently
+changed versions in the directory with the suffix .CCC (concurrent change conflict).
+
+```
+beak pull gd_work_crypt: work:
+beak pull /media/you/USBDevice /home/you/Work
+```
+
+or simply:
+
+```
+beak pull work:
 ```
 
 ## Accessing files in backups
@@ -82,7 +106,7 @@ When you mount without specifying the _point in time_ @x, then the _points in ti
 If you supply a _point in time_ (eg @2), then it will mount that particular backup.
 
 ```
-beak remount /media/you/USBDrive@2 RestoreHere
+beak remount /media/you/USBDrive@2 OldStuff
 ```
 
 You unmount like this:
@@ -181,8 +205,8 @@ be the same.
 The index provides for quick access to the contents of the chunks.  As
 a precaution, the chunks also happen to be valid GNU tar files.  If
 the index file is lost, then it is still possible to extract the data
-using tar.  In fact, there is a shell script that can do the proper
-extraction for you.
+using tar.  Tthere is a shell script that can do the proper
+extraction for you, you do not need the beak binary.
 
 Why discuss the storage format? Because the storage format _is_ the
 backup system.  There are no other meta-data files needed. This means
@@ -307,13 +331,19 @@ done by a different computer than the computer that pushed.
 As you might have guessed, beak is not the best tool to restore your whole
 hard disk image from scratch after a hard disk failure. If you are re-installing
 on an empty disk you can use `beak checkout s3_work_crypt: work:` after
-re-configuring rclone and beak. You can store your home directory in beak.
+re-configuring rclone and beak.
+
+You can safely create a beak _rule_ to backup your home directory (home: = /home/you) and at
+the same time have a _rule_ for a subdirectory (work: = /home/you/Work). The backup for home:
+will not include the /home/you/Work subdirectory!
 
 beak is more like a Swiss army knife for backing up, mirroring,
 off-site storage etc. As you have seen, you can do everything by hand
-using: `beak mount` `beak store` and `rclone`.  But to speed up common tasks you
-can configure rules with `beak config`. A _rule_ (like work:) provides a short cut to the
-actual _origin_ directory (like /home/you/Work). The push and pull commands require a _rule_.
+using: `beak mount` `beak remount` `beak store` `beak restore` and `rclone` or  `rsync`.
+
+But to speed up common tasks you can configure rules with `beak config`.
+A _rule_ (like work:) provides a short cut to the actual _origin_ directory (like /home/you/Work).
+The push and pull commands require a _rule_.
 
 A configured _rule_ can be of a type:
 
