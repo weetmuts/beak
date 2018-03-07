@@ -369,6 +369,6 @@ You can have multiple configurations enabled at the same time.
 
 `./configure`
 
-`./configure --host=x86_64-w64-mingw32 --with-zlib=3rdparty/zlib-1.2.11 --with-openssl=3rdparty/openssl-1.0.2`
+`./configure --host=x86_64-w64-mingw32 --with-zlib=3rdparty/zlib-1.2.11-winapi --with-openssl=3rdparty/openssl-1.0.2-winapi`
 
 `./configure --host=arm-linux-gnueabihf --with-fuse=3rdparty/libfuse-arm/usr --with-openssl=3rdparty/openssl-1.0.2-arm --with-zlib=3rdparty/zlib-1.2.11-arm`

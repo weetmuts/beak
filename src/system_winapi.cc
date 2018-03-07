@@ -26,7 +26,7 @@ using namespace std;
 
 struct SystemImplementationWinapi : System
 {
-    int invoke(string program,
+    RCC invoke(string program,
                vector<string> args,
                vector<char> *output,
                Capture capture,
@@ -44,11 +44,11 @@ string protect_(string arg)
     return arg;
 }
 
-int SystemImplementationWinapi::invoke(string program,
+RCC SystemImplementationWinapi::invoke(string program,
                                        vector<string> args,
                                        vector<char> *out,
                                        Capture capture,
                                        function<void(char *buffer, size_t len)> cb)
 {
-    return OK;
+    return RCC::OKK;
 }

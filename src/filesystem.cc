@@ -37,7 +37,7 @@ struct FileSystemFuseAPIImplementation : FileSystem
     Path *mkTempDir(string prefix);
     Path *mkDir(Path *path, string name);
     RCC loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
-    int createFile(Path *file, std::vector<char> *buf);
+    RCC createFile(Path *file, std::vector<char> *buf);
     bool createFile(Path *path, FileStat *stat,
                     std::function<size_t(off_t offset, char *buffer, size_t len)> cb);
     bool createSymbolicLink(Path *path, FileStat *stat, string target);
@@ -113,9 +113,9 @@ RCC FileSystemFuseAPIImplementation::loadVector(Path *file, size_t blocksize, st
     return RCC::ERRR;
 }
 
-int FileSystemFuseAPIImplementation::createFile(Path *file, std::vector<char> *buf)
+RCC FileSystemFuseAPIImplementation::createFile(Path *file, std::vector<char> *buf)
 {
-    return 0;
+    return RCC::ERRR;
 }
 
 bool FileSystemFuseAPIImplementation::createFile(Path *path, FileStat *stat,

@@ -93,7 +93,7 @@ struct FileSystemImplementationPosix : FileSystem
     Path *mkDirp(Path *p);
     Path *mkDir(Path *p, string name);
     RCC loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
-    int createFile(Path *file, std::vector<char> *buf);
+    RCC createFile(Path *file, std::vector<char> *buf);
     bool createFile(Path *path, FileStat *stat,
                      std::function<size_t(off_t offset, char *buffer, size_t len)> cb);
     bool createSymbolicLink(Path *path, FileStat *stat, string target);
@@ -253,12 +253,12 @@ RCC FileSystemImplementationPosix::loadVector(Path *file, size_t blocksize, vect
     return RCC::OKK;
 }
 
-int FileSystemImplementationPosix::createFile(Path *file, vector<char> *buf)
+RCC FileSystemImplementationPosix::createFile(Path *file, vector<char> *buf)
 {
     int fd = open(file->c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
     if (fd == -1) {
 	failure(FILESYSTEM,"Could not open file %s errno=%d\n", file->c_str(), errno);
-        return -1;
+        return RCC::ERRR;
     }
     char *p = buf->data();
     ssize_t total = buf->size();
@@ -270,7 +270,7 @@ int FileSystemImplementationPosix::createFile(Path *file, vector<char> *buf)
             }
             failure(FILESYSTEM,"Could not write to file %s errno=%d\n", file->c_str(), errno);
             close(fd);
-            return -1;
+            return RCC::ERRR;
         }
 	p += n;
 	total -= n;
@@ -279,7 +279,7 @@ int FileSystemImplementationPosix::createFile(Path *file, vector<char> *buf)
         }
     }
     close(fd);
-    return 0;
+    return RCC::OKK;
 }
 
 

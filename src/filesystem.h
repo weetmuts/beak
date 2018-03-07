@@ -254,7 +254,7 @@ struct FileSystem
     virtual Path *mkDir(Path *p, std::string name) = 0;
     virtual RCC loadVector(Path *file, size_t blocksize, std::vector<char> *buf) = 0;
 
-    virtual int createFile(Path *file, std::vector<char> *buf) = 0;
+    virtual RCC createFile(Path *file, std::vector<char> *buf) = 0;
 
     // file: The filename to be created or overwritten.
     // stat: The size and permissions of the to be created file.

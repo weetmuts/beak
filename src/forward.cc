@@ -1088,9 +1088,9 @@ struct ForwardFileSystem : FileSystem
     {
         return RCC::ERRR;
     }
-    int createFile(Path *file, std::vector<char> *buf)
+    RCC createFile(Path *file, std::vector<char> *buf)
     {
-        return 0;
+        return RCC::ERRR;
     }
     bool createFile(Path *path, FileStat *stat,
                      std::function<size_t(off_t offset, char *buffer, size_t len)> cb)
