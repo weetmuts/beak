@@ -86,7 +86,7 @@ struct PointInTime {
 
 struct ReverseTarredFS
 {
-    RC loadBeakFileSystem(Options *settings);
+    RCC loadBeakFileSystem(Options *settings);
 
     pthread_mutex_t global;
 

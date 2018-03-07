@@ -44,11 +44,6 @@ private:
 
 typedef ReturnCode RCC;
 
-#define OK 0
-#define ERR 1
-
-typedef int RC;
-
 #define XSTR(s) STR(s)
 #define STR(s) #s
 

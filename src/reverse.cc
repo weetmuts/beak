@@ -585,7 +585,7 @@ PointInTime *ReverseTarredFS::setPointInTime(string g) {
     return single_point_in_time_;
 }
 
-RC ReverseTarredFS::loadBeakFileSystem(Options *settings)
+RCC ReverseTarredFS::loadBeakFileSystem(Options *settings)
 {
     setRootDir(settings->from.path);
     setMountDir(settings->to.path);
@@ -633,7 +633,7 @@ RC ReverseTarredFS::loadBeakFileSystem(Options *settings)
         e->fs.st_mtim.tv_sec = youngest_secs;
         e->fs.st_mtim.tv_nsec = youngest_nanos;
     }
-    return OK;
+    return RCC::OKK;
 }
 
 struct ReverseFileSystem : FileSystem

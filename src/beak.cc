@@ -798,8 +798,8 @@ RCC BeakImplementation::remountReverseInternal(Options *settings, bool daemon)
         if (!point) return RCC::ERRR;
     }
 
-    RC rc = rfs->loadBeakFileSystem(settings);
-    if (rc != OK) return RCC::ERRR;
+    RCC rc = rfs->loadBeakFileSystem(settings);
+    if (rc.isErr()) return RCC::ERRR;
 
     if (daemon) {
         int rc = fuse_main(settings->fuse_argc, settings->fuse_argv, &reverse_tarredfs_ops,
@@ -1422,8 +1422,8 @@ RCC BeakImplementation::restoreReverse(Options *settings)
     assert(rfs->singlePointInTime());
 
     uint64_t start = clockGetTime();
-    int rc = rfs->loadBeakFileSystem(settings);
-    if (rc) rcc = RCC::ERRR;
+    RCC rc = rfs->loadBeakFileSystem(settings);
+    if (rc.isErr()) rcc = RCC::ERRR;
 
     StoreStatistics st;
 
