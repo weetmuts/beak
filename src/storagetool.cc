@@ -65,20 +65,30 @@ Storage StorageTool::checkRCloneStorage(ptr<System> sys, string name)
 
 Storage StorageTool::checkRSyncStorage(ptr<System> sys, std::string name)
 {
+    // An rsync location is detected by the @ sign and the server :.
+    size_t at = name.find('@');
+    size_t colon = name.find(':');
+    if (at != string::npos &&
+        colon != string::npos &&
+        at < colon)
+    {
+        return Storage { RSyncStorage, Path::lookup(name), "" };
+    }
+
     return Storage();
 }
 
 /*
-RC BeakImplementation::listStorageFiles(Storage *storage, vector<TarFileName> *files)
+RCC BeakImplementation::listStorageFiles(Storage *storage, vector<TarFileName> *files)
 {
-    RC rc = OK;
+    RCC rc = RCC::OKK;
     vector<char> out;
     vector<string> args;
     args.push_back("ls");
     args.push_back(storage->c_str());
     rc = sys_->invoke("rclone", args, &out);
 
-    if (rc != OK) return ERR;
+    if (rc.isErr()) return RCC::ERRR;
     auto i = out.begin();
     bool eof = false, err = false;
 
@@ -103,8 +113,8 @@ RC BeakImplementation::listStorageFiles(Storage *storage, vector<TarFileName> *f
             }
         }
     }
-    if (err) return ERR;
+    if (err) return RCC::ERRR;
 
-    return OK;
+    return RCC::OKK;
 }
 */

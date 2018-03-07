@@ -151,7 +151,7 @@ bool FileSystemImplementationWinapi::readdir(Path *p, vector<Path*> *vec)
 ssize_t FileSystemImplementationWinapi::pread(Path *p, char *buf, size_t count, off_t offset)
 {
     FILE * f = fopen(p->c_str(), "rb");
-    if (!f) return ERR;
+    if (!f) return -1;
     fseek(f, offset, SEEK_SET);
     ssize_t n = fread(buf, 1, count, f);
     fclose(f);
