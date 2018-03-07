@@ -92,7 +92,7 @@ struct FileSystemImplementationPosix : FileSystem
     Path *mkTempDir(string prefix);
     Path *mkDirp(Path *p);
     Path *mkDir(Path *p, string name);
-    int loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
+    RCC loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
     int createFile(Path *file, std::vector<char> *buf);
     bool createFile(Path *path, FileStat *stat,
                      std::function<size_t(off_t offset, char *buffer, size_t len)> cb);
@@ -226,13 +226,13 @@ int MinorDev(dev_t d)
     return MINOR(d);
 }
 
-int FileSystemImplementationPosix::loadVector(Path *file, size_t blocksize, vector<char> *buf)
+RCC FileSystemImplementationPosix::loadVector(Path *file, size_t blocksize, vector<char> *buf)
 {
     char block[blocksize+1];
 
     int fd = open(file->c_str(), O_RDONLY);
     if (fd == -1) {
-        return -1;
+        return RCC::ERRR;
     }
     while (true) {
         ssize_t n = read(fd, block, sizeof(block));
@@ -242,7 +242,7 @@ int FileSystemImplementationPosix::loadVector(Path *file, size_t blocksize, vect
             }
             failure(FILESYSTEM,"Could not read from gzfile %s errno=%d\n", file->c_str(), errno);
             close(fd);
-            return -1;
+            return RCC::ERRR;
         }
         buf->insert(buf->end(), block, block+n);
         if (n < (ssize_t)sizeof(block)) {
@@ -250,7 +250,7 @@ int FileSystemImplementationPosix::loadVector(Path *file, size_t blocksize, vect
         }
     }
     close(fd);
-    return 0;
+    return RCC::OKK;
 }
 
 int FileSystemImplementationPosix::createFile(Path *file, vector<char> *buf)

@@ -29,7 +29,7 @@ using namespace std;
 
 ComponentId INDEX = registerLogComponent("index");
 
-int Index::loadIndex(vector<char> &v,
+RCC Index::loadIndex(vector<char> &v,
                      vector<char>::iterator &i,
                      IndexEntry *ie, IndexTar *it,
                      Path *dir_to_prepend,
@@ -55,14 +55,14 @@ int Index::loadIndex(vector<char> &v,
         failure(INDEX,
                 "Type was not \"#beak " XSTR(BEAK_VERSION) "\" as expected! It was \"%s\"\n",
                 type.c_str());
-        return ERR;
+        return RCC::ERRR;
     }
 
     int num_files = 0;
     int n = sscanf(files.c_str(), "#files %d", &num_files);
     if (n != 1) {
         failure(INDEX, "File format error gz file. [%d]\n", __LINE__);
-        return ERR;
+        return RCC::ERRR;
     }
 
     debug(INDEX, "Loading gz for '%s' with >%s< and %d files.\n", dir_to_prepend->c_str(), msg.c_str(), num_files);
@@ -87,7 +87,7 @@ int Index::loadIndex(vector<char> &v,
 
     if (num_files != 0) {
         failure(INDEX, "Error in gz file format!");
-        return ERR;
+        return RCC::ERRR;
     }
 
     string tar_header = eatTo(v, i, separator, 30 * 1024 * 1024, &eof, &err);
@@ -101,7 +101,7 @@ int Index::loadIndex(vector<char> &v,
     n = sscanf(tars.c_str(), "#tars %d", &num_tars);
     if (n != 1) {
         failure(INDEX, "File format error gz file. [%d]\n", __LINE__);
-        return ERR;
+        return RCC::ERRR;
     }
 
     eof = false;
@@ -128,9 +128,9 @@ int Index::loadIndex(vector<char> &v,
 
     if (num_tars != 0) {
         failure(INDEX, "File format error gz file. [%d]\n", __LINE__);
-        return ERR;
+        return RCC::ERRR;
     }
-    return OK;
+    return RCC::OKK;
 
 
 };

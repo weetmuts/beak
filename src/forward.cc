@@ -1084,9 +1084,9 @@ struct ForwardFileSystem : FileSystem
     {
         return NULL;
     }
-    int loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
+    RCC loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
     {
-        return 0;
+        return RCC::ERRR;
     }
     int createFile(Path *file, std::vector<char> *buf)
     {

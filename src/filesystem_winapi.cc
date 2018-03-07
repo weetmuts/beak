@@ -162,19 +162,19 @@ void FileSystemImplementationWinapi::recurse(function<void(Path *,FileStat*)> cb
 {
 }
 
-RC FileSystemImplementationWinapi::stat(Path *p, FileStat *fs)
+RCC FileSystemImplementationWinapi::stat(Path *p, FileStat *fs)
 {
-    return ERR;
+    return RCC::ERRR;
 }
 
-RC FileSystemImplementationWinapi::chmod(Path *p, FileStat *fs)
+RCC FileSystemImplementationWinapi::chmod(Path *p, FileStat *fs)
 {
-    return ERR;
+    return RCC::ERRR;
 }
 
-RC FileSystemImplementationWinapi::utime(Path *p, FileStat *fs)
+RCC FileSystemImplementationWinapi::utime(Path *p, FileStat *fs)
 {
-    return ERR;
+    return RCC::ERRR;
 }
 
 Path *FileSystemImplementationWinapi::mkTempDir(string prefix)

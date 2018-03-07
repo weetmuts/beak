@@ -252,7 +252,7 @@ struct FileSystem
     virtual Path *mkTempDir(std::string prefix) = 0;
             bool mkDirp(Path *p);
     virtual Path *mkDir(Path *p, std::string name) = 0;
-    virtual int loadVector(Path *file, size_t blocksize, std::vector<char> *buf) = 0;
+    virtual RCC loadVector(Path *file, size_t blocksize, std::vector<char> *buf) = 0;
 
     virtual int createFile(Path *file, std::vector<char> *buf) = 0;
 

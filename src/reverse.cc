@@ -49,7 +49,7 @@ ReverseTarredFS::ReverseTarredFS(ptr<FileSystem> fs)
 // The gz file to load, and the dir to populate with its contents.
 bool ReverseTarredFS::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
 {
-    int rc;
+    RCC rc = RCC::OKK;
     if (point->loaded_gz_files_.count(gz) == 1)
     {
         return true;
@@ -58,7 +58,7 @@ bool ReverseTarredFS::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
 
     vector<char> buf;
     rc = file_system_->loadVector(gz, T_BLOCKSIZE, &buf);
-    if (rc) return false;
+    if (rc.isErr()) return false;
 
     vector<char> contents;
     gunzipit(&buf, &contents);
@@ -104,7 +104,7 @@ bool ReverseTarredFS::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
                          }
                      });
 
-    if (rc) {
+    if (rc.isErr()) {
         failure(REVERSE, "Could not parse the index file %s\n", gz->c_str());
         return false;
     }
@@ -698,9 +698,9 @@ struct ReverseFileSystem : FileSystem
     {
         return NULL;
     }
-    int loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
+    RCC loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
     {
-        return 0;
+        return RCC::OKK;
     }
     int createFile(Path *file, std::vector<char> *buf)
     {

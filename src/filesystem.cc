@@ -36,7 +36,7 @@ struct FileSystemFuseAPIImplementation : FileSystem
     RCC utime(Path *p, FileStat *stat);
     Path *mkTempDir(string prefix);
     Path *mkDir(Path *path, string name);
-    int loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
+    RCC loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
     int createFile(Path *file, std::vector<char> *buf);
     bool createFile(Path *path, FileStat *stat,
                     std::function<size_t(off_t offset, char *buffer, size_t len)> cb);
@@ -108,9 +108,9 @@ Path *FileSystemFuseAPIImplementation::mkDir(Path *p, string name)
     return NULL;
 }
 
-int FileSystemFuseAPIImplementation::loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
+RCC FileSystemFuseAPIImplementation::loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
 {
-    return 0;
+    return RCC::ERRR;
 }
 
 int FileSystemFuseAPIImplementation::createFile(Path *file, std::vector<char> *buf)

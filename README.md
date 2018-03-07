@@ -21,12 +21,26 @@ the push was initiated.)
 
 `work:` a beak _rule_ that you have created to backup the _origin_ directory /home/you/Work.
 
+You configure the beak _rules_ using the command `beak config`.
+
 `gd_work_crypt:` is an rclone _backup_ location , for example an encrypted directory in your google drive.
 
-`backup@192.168.0.1:/backups` is an rsync _backup_ location.
+Another example is: `beak push work: backup@192.168.0.1:/backups`
 
-(the _backup_ location where your backups are stored, can also be a
-local directory, both locals and remotes are known as _backup_ locations.)
+`backup@192.168.0.1:/backups` is an rsync _backup_ location. beak looks for the @ sign to detect that it should use rsync, otherwise it is considered to be an rclone location.
+
+Or you can push directly to the file system: `beak push work: /media/you/USBDrive`
+
+`/media/you/USBDrive` is just a local directory, that also happens to be a usb storage dongle.
+
+Actually you do not need to use a beak _rule_ at all. `beak store /home/you/Work /home/backups`
+
+But a beak _rule_ helps with remembering where the backups are stored, how to push to them and how to prune them.
+The _rule_ can also store local backups, in addition to remote backups. Thus normally you would just type:
+
+`beak push work:`
+
+beak will then figure out which _backup_ location to use for this push. (It might be round robing through several locations, or all of them always, or push to a special USB storage dongle if it is available.)
 
 The easiest way to access your _points in time_, is to do a history
 mount. Create the directory OldStuff, then do:

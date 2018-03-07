@@ -57,8 +57,8 @@ bool DiffEntry::same(DiffEntry *e) {
 int DiffTarredFS::loadZ01File(Target ft, Path *file)
 {
     vector<char> buf;
-    int rc = file_system_->loadVector(file, 4096, &buf);
-    if (rc) return -1;
+    RCC rc = file_system_->loadVector(file, 4096, &buf);
+    if (rc.isErr()) return -1;
 
     vector<char> contents;
     gunzipit(&buf, &contents);

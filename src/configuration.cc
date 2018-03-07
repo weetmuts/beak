@@ -284,8 +284,8 @@ bool ConfigurationImplementation::load()
     rules_.clear();
     paths_.clear();
     vector<char> buf;
-    RC rc = fs_->loadVector(configurationFile(), 32768, &buf);
-    if (rc == OK) {
+    RCC rc = fs_->loadVector(configurationFile(), 32768, &buf);
+    if (rc.isOk()) {
         vector<char>::iterator i = buf.begin();
         bool eof=false, err=false;
         Rule *current_rule = NULL;
