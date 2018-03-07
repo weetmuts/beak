@@ -1,5 +1,5 @@
 Beak is a backup-mirror-share-rotation-pruning tool that is designed
-to co-exist with the storage (cloud and otherwise) of your
+to co-exist with the cloud/remote storage (rclone, rsync) of your
 choice. Beak enables push/pull to share the remotely stored backups
 between multiple client computers.
 
@@ -25,24 +25,76 @@ You configure the beak _rules_ using the command `beak config`.
 
 `gd_work_crypt:` is an rclone _backup_ location , for example an encrypted directory in your google drive.
 
+You configure such rclone locations using the command `rclone config` ([see RClone doc](https://rclone.org/docs/)).
+
 Another example is: `beak push work: backup@192.168.0.1:/backups`
 
-`backup@192.168.0.1:/backups` is an rsync _backup_ location. beak looks for the @ sign to detect that it should use rsync, otherwise it is considered to be an rclone location.
+`backup@192.168.0.1:/backups` is an rsync _backup_ location. beak looks for the @ sign and the : colon, to detect that it should use rsync.
 
-Or you can push directly to the file system: `beak push work: /media/you/USBDrive`
+Or you can push directly to any directory in the file system: `beak push work: /media/you/USBDrive`
 
 `/media/you/USBDrive` is just a local directory, that also happens to be a usb storage dongle.
 
 Actually you do not need to use a beak _rule_ at all. `beak store /home/you/Work /home/backups`
 
 But a beak _rule_ helps with remembering where the backups are stored, how to push to them and how to prune them.
-The _rule_ can also store local backups, in addition to remote backups. Thus normally you would just type:
+The standard use case is therefore:
 
 `beak push work:`
 
-beak will then figure out which _backup_ location to use for this push. (It might be round robing through several locations, or all of them always, or push to a special USB storage dongle if it is available.)
+beak will then figure out which _backup_ location to use for this
+push. (It might be round robin through several _backup_ locations, or always push
+to all of them, or push to a special USB storage dongle if it is available.)
 
-The easiest way to access your _points in time_, is to do a history
+## Restoring a backup
+
+You can restore the the most recent _point in time_ from a _backup_ location to a directory:
+
+```
+mkdir RestoreHere
+beak restore gd_work_crypt: RestoreHere
+```
+
+or from an arbitrary file system backup (here we pick the fourth most recent_point in time_ @0 is the most recent, @1 the second most recent etc):
+
+```
+beak restore /media/you/USBDrive@3 RestoreHere
+```
+
+## Accessing files in backups
+
+You can mount a specific _backup_ location:
+
+```
+mkdir OldStuff
+beak remount gd_work_crypt: OldStuff
+```
+
+When you mount without specifying the _point in time_ @x, then the _points in time_ will show as subdirectories.
+
+```
+>ls OldStuff
+@0 2017-09-07 14:27 2 minutes ago
+@1 2017-09-05 10:01 2 days ago
+@2 2017-07-01 08:23 2 months ago
+```
+
+If you supply a _point in time_ (eg @2), then it will mount that particular backup.
+
+```
+beak remount /media/you/USBDrive@2 RestoreHere
+```
+
+You unmount like this:
+
+```
+beak umount OldStuff
+```
+
+## Accessing all backups at once.
+
+If you have configured a _rule_ that backups in many different remote storage locations,
+then the easiest way to access your _points in time_, is to do a history
 mount. Create the directory OldStuff, then do:
 
 `beak history work: OldStuff`
@@ -63,9 +115,16 @@ it was pushed to. You can have the same backup in multiple _backup_ locations.
 @3 2017-07-01 08:23 2 months ago to s3_work_crypt:
 ```
 
+(If you type `beak history work:`, then it will use the configuration of your _rule_ to find
+the default directory for the history mount. Typically /home/you/Work/.beak/history)
+
+## Status of your _origin_ directory
+
 You can check the status of your configured _origin_ directories with:
 
 `beak status`
+
+## Removing old backups
 
 After a while you probably want to remove backups to save space.
 
@@ -78,6 +137,14 @@ One point in time per day for the last 2 weeks.
 One point in time per week for the last 2 months.
 One point in time per month for the last 2 years.
 ```
+
+As usual, you usually want to do:
+
+```
+beak prune work:
+```
+
+and let the configured _rule_ select how to prune in the different locations.
 
 ## BeakFS, the chunky file system
 

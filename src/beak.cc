@@ -221,8 +221,13 @@ Argument BeakImplementation::parseArgument(string arg)
 {
     Argument argument;
     auto at = arg.find_last_of('@');
-    if (at != string::npos)
+    auto colon = arg.find(':');
+    if (at != string::npos && (colon == string::npos || at > colon))
     {
+        // An @ sign after the colon is a reference to a point in time.
+        // Example @0 in: s3_work_crypt:@0
+        //            in: user@backupserver:/backups@0
+        //            in: /media/you/USBDevice@0
         auto point = arg.substr(at);
         arg = arg.substr(0,at);
         debug(COMMANDLINE, "Found point in time (%s) after storage %s\n", point, arg.c_str());
@@ -230,7 +235,6 @@ Argument BeakImplementation::parseArgument(string arg)
     }
 
     // Anything with a colon could be a beak rule, an rclone config, or an rsync target.
-    auto colon = arg.find(':');
     if (colon != string::npos)
     {
         // Is this a beak rule?
@@ -258,8 +262,14 @@ Argument BeakImplementation::parseArgument(string arg)
         }
 
         // Is this an rsync storage?
-        string potential_rsync_storage_name = arg.substr(0,colon+1);
-        //  TODO
+        string potential_rsync_storage = arg;
+        argument.backup = StorageTool::checkRSyncStorage(sys_, potential_rsync_storage);
+        if (argument.backup.type != NoSuchStorage) {
+            debug(COMMANDLINE, "Arg parsed as rsync storage %s\n", argument.backup.target_path->c_str());
+            argument.path = argument.backup.target_path;
+            argument.type = ArgStorage;
+            return argument;
+        }
     }
 
     // All else failed, try if this is a standard directory.
