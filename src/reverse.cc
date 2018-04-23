@@ -98,8 +98,9 @@ bool ReverseTarredFS::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
                      },
                      [this,point,parsed_tars_already](IndexTar *it){
                          if (!parsed_tars_already) {
-                             if (it->path->name()->c_str()[0] == REG_FILE_CHAR) {
-                                 point->gz_files_[it->path->parent()] = it->path;
+                             Path *p = it->path->prepend(Path::lookupRoot());
+                             if (p->name()->c_str()[0] == REG_FILE_CHAR) {
+                                 point->gz_files_[p->parent()] = p;
                              }
                          }
                      });
@@ -689,6 +690,10 @@ struct ReverseFileSystem : FileSystem
     RC utime(Path *p, FileStat *fs)
     {
         return RC::ERR;
+    }
+    Path *mkTempFile(std::string prefix, std::string content)
+    {
+        return NULL;
     }
     Path *mkTempDir(std::string prefix)
     {

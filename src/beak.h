@@ -48,6 +48,7 @@ struct Beak
     virtual RC printInfo(Options *settings) = 0;
     virtual std::vector<PointInTime> history() = 0;
 
+    virtual RC check(Options *settings) = 0;
     virtual RC configure(Options *settings) = 0;
     virtual RC push(Options *settings) = 0;
     virtual RC prune(Options *settings) = 0;
@@ -154,7 +155,7 @@ struct Argument
     ArgumentType type {};
     Path *path {};
     Rule *rule {};
-    Storage backup;
+    Storage storage;
     std::string point_in_time;
 };
 

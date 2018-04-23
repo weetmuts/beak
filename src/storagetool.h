@@ -23,19 +23,24 @@
 #include "configuration.h"
 #include "tarfile.h"
 
-#include <string>
-#include <vector>
+#include<memory>
+#include<string>
+#include<vector>
 
 struct StorageTool
 {
-    static Storage checkFileSystemStorage(ptr<System> sys, std::string name);
-    static Storage checkRCloneStorage(ptr<System> sys, std::string name);
-    static Storage checkRSyncStorage(ptr<System> sys, std::string name);
+    virtual Storage checkFileSystemStorage(std::string name) = 0;
+    virtual Storage checkRCloneStorage(std::string name) = 0;
+    virtual Storage checkRSyncStorage(std::string name) = 0;
 
-    /*
-    virtual RC listBeakFiles(std::vector<TarFileName> *files) = 0;
-    virtual RC sendBeakFilesToStorageFrom(Argument from) = 0;
-    virtual RC fetchBeakFilesFromStorageTo(Argument to) = 0;*/
+    virtual RC listBeakFiles(Storage *storage,
+                             std::vector<TarFileName> *files,
+                             std::vector<TarFileName> *bad_files,
+                             std::vector<std::string> *other_files) = 0;
+    virtual RC sendBeakFilesToStorage(Path *dir, Storage *storage, std::vector<TarFileName*> *files) = 0;
+    virtual RC fetchBeakFilesFromStorage(Storage *storage, std::vector<TarFileName*> *files, Path *dir) = 0;
 };
+
+std::unique_ptr<StorageTool> newStorageTool(ptr<System> sys, ptr<FileSystem> fs);
 
 #endif

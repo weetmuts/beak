@@ -94,6 +94,7 @@ public:
 
     Rule *rule(string name);
     vector<Rule*> sortedRules();
+    Rule *findRuleFromTargetPath(Path *target_path);
 
     void editRule();
     void createNewRule();
@@ -248,10 +249,17 @@ bool ConfigurationImplementation::parseRow(string key, string value,
     if (ok) {
         switch (skw) {
         case remote_key:
+        {
             if (value == "") error(CONFIGURATION, "Remote storage cannot be empty.\n");
-            *current_storage = &current_rule->storages[Path::lookup(value)];
-            (*current_storage)->target_path = Path::lookup(value);
+            Path *target_path = Path::lookup(value);
+            Rule *rule = findRuleFromTargetPath(target_path);
+            if (rule) {
+                error(CONFIGURATION, "The storage location \"%s\" is used in two rules!\n", value.c_str());
+            }
+            *current_storage = &current_rule->storages[target_path];
+            (*current_storage)->target_path = target_path;
             break;
+        }
         case remote_type_key:
             if (!current_storage) {
                 error(CONFIGURATION, "Remote must be specified before type.\n");
@@ -493,6 +501,21 @@ Rule *ConfigurationImplementation::rule(string name)
 {
     if (rules_.count(name) == 0) return NULL;
     return &rules_[name];
+}
+
+Rule *ConfigurationImplementation::findRuleFromTargetPath(Path *target_path)
+{
+    for (auto rule : sortedRules())
+    {
+	for (auto storage : rule->sortedStorages())
+        {
+            if (storage->target_path == target_path)
+            {
+                return rule;
+            }
+	}
+    }
+    return NULL;
 }
 
 void Rule::status() {
@@ -918,7 +941,13 @@ bool ConfigurationImplementation::editRemoteTarget(Storage *s)
         if (storage == "") return false;
         auto r = okStorage(storage);
         if (!r.first) continue;
-        s->target_path = Path::lookup(storage);
+        Path *target_path = Path::lookup(storage);
+        Rule *rule = findRuleFromTargetPath(target_path);
+        if (rule) {
+            UI::output("The storage location \"%s\" is already used in the rule %d!\n", storage.c_str(), rule->name.c_str());
+            continue;
+        }
+        s->target_path = target_path;
         s->type = r.second;
         break;
     }

@@ -46,6 +46,7 @@ enum TarContents
 #define SINGLE_LARGE_FILE_TAR_CHAR 'l'
 
 struct TarFileName {
+    Path *path;
     TarContents type;
     int version;
     time_t secs;

@@ -480,11 +480,13 @@ void cookEntry(string *listing, TarEntry *entry) {
     listing->append(separator_string);
 }
 
-bool eatEntry(vector<char> &v, vector<char>::iterator &i, Path *dir_to_prepend,
+bool eatEntry(int beak_version, vector<char> &v, vector<char>::iterator &i, Path *dir_to_prepend,
               FileStat *fs, size_t *offset, string *tar, Path **path,
               string *link, bool *is_sym_link, bool *is_hard_link,
               bool *eof, bool *err)
 {
+    assert(beak_version == BEAK_VERSION_INT);
+
     string permission = eatTo(v, i, separator, 32, eof, err);
     if (*err || *eof) return false;
 
@@ -559,7 +561,12 @@ bool eatEntry(vector<char> &v, vector<char>::iterator &i, Path *dir_to_prepend,
         fs->st_ctim.tv_nsec = atol(na.c_str());
     }
     */
-    string filename = dir_to_prepend->str() + "/" + eatTo(v, i, separator, 1024, eof, err);
+    string filename;
+    if (dir_to_prepend) {
+        filename = dir_to_prepend->str() + "/" + eatTo(v, i, separator, 1024, eof, err);
+    } else {
+        filename = eatTo(v, i, separator, 1024, eof, err);
+    }
     if (*err || *eof) return false;
     if (filename.length() > 1 && filename.back() == '/')
     {
@@ -584,7 +591,11 @@ bool eatEntry(vector<char> &v, vector<char>::iterator &i, Path *dir_to_prepend,
         *is_sym_link = false;
         *is_hard_link = true;
     }
-    *tar = dir_to_prepend->str() + "/" + eatTo(v, i, separator, 1024, eof, err);
+    if (dir_to_prepend) {
+        *tar = dir_to_prepend->str() + "/" + eatTo(v, i, separator, 1024, eof, err);
+    } else {
+        *tar = eatTo(v, i, separator, 1024, eof, err);
+    }
     if (*err || *eof) return false;
     string off = eatTo(v, i, separator, 32, eof, err);
     *offset = atol(off.c_str());

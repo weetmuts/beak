@@ -39,6 +39,7 @@ int main(int argc, char *argv[])
     switch (cmd) {
 
     case check_cmd:
+        rc = beak->check(&settings);
         break;
 
     case checkout_cmd:

@@ -110,10 +110,12 @@ RC SystemImplementation::invoke(string program,
                 if (n > 0) {
                     output->insert(output->end(), buf, buf+n);
                     if (cb) { cb(buf, n); }
+                    debug(SYSTEM, "Input: \"%*s\"\n", n, buf);
                     //fprintf(stderr, "BANANAS >%*s<\n", n, buf);
                 } else {
                     // No more data to read.
-                    fprintf(stderr, "NOMORE GURKA\n");
+                    debug(SYSTEM, "Input: done\n");
+                    //fprintf(stderr, "NOMORE GURKA\n");
                     break;
                 }
             }

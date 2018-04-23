@@ -260,10 +260,13 @@ bool TarFile::parseFileName(string &name, TarFileName *c)
 
     if (name.size() == 0) return false;
 
-    k = typeFromChar(name[0], &c->type);
+    size_t p0 = name.rfind('/');
+    if (p0 == string::npos) { p0=0; } else { p0++; }
+
+    k = typeFromChar(name[p0], &c->type);
     if (!k) return false;
 
-    size_t p1 = name.find('_'); if (p1 == string::npos) return false;
+    size_t p1 = name.find('_', p0); if (p1 == string::npos) return false;
     size_t p2 = name.find('.', p1+1); if (p2 == string::npos) return false;
     size_t p3 = name.find('_', p2+1); if (p3 == string::npos) return false;
     size_t p4 = name.find('_', p3+1); if (p4 == string::npos) return false;
@@ -271,7 +274,7 @@ bool TarFile::parseFileName(string &name, TarFileName *c)
     size_t p6 = name.find('.', p5+1); if (p6 == string::npos) return false;
 
     string version;
-    k = digitsOnly(&name[1], p1-1, &version);
+    k = digitsOnly(&name[p0+1], p1-p0-1, &version);
     if (!k) return false;
     c->version = atoi(version.c_str());
 
@@ -286,7 +289,7 @@ bool TarFile::parseFileName(string &name, TarFileName *c)
     c->nsecs = atol(nsecs.c_str());
 
     string size;
-    k = digitsOnly(&name[p3+1], p4-p3-1, &nsecs);
+    k = digitsOnly(&name[p3+1], p4-p3-1, &size);
     if (!k) return false;
     c->size = atol(size.c_str());
 
@@ -297,6 +300,8 @@ bool TarFile::parseFileName(string &name, TarFileName *c)
     if (!k) return false;
 
     c->suffix = name.substr(p6+1);
+
+    c->path = Path::lookup(name);
     return true;
 }
 

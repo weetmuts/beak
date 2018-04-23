@@ -1076,6 +1076,10 @@ struct ForwardFileSystem : FileSystem
     {
         return RC::ERR;
     }
+    Path *mkTempFile(std::string prefix, std::string content)
+    {
+        return NULL;
+    }
     Path *mkTempDir(std::string prefix)
     {
         return NULL;

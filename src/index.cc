@@ -16,6 +16,7 @@
 */
 
 #include <string>
+#include <set>
 
 #include "diff.h"
 #include "index.h"
@@ -50,7 +51,17 @@ RC Index::loadIndex(vector<char> &v,
     string gid = eatTo(data, j, '\n', 10 * 1024 * 1024, &eof, &err); // Accept up to a ~million uniq gids
     string files = eatTo(data, j, '\n', 64, &eof, &err);
 
-    if (type != "#beak " XSTR(BEAK_VERSION))
+    if (type.length() < 9 || type.substr(0, 6) != "#beak ") {
+        failure(INDEX, "Not a proper \"#beak x.x\" header in index file. It was \"%s\"\n", type.c_str());
+        return RC::ERR;
+    }
+    string vers = type.substr(6);
+    string ver;
+    for (size_t i=0; i<vers.length(); ++i) {
+        if (vers[i]>='0' && vers[i]<='9') ver.push_back(vers[i]);
+    }
+    int beak_version = atoi(ver.c_str());
+    if (!supportedVersion(beak_version))
     {
         failure(INDEX,
                 "Type was not \"#beak " XSTR(BEAK_VERSION) "\" as expected! It was \"%s\"\n",
@@ -65,19 +76,21 @@ RC Index::loadIndex(vector<char> &v,
         return RC::ERR;
     }
 
-    debug(INDEX, "Loading gz for '%s' with >%s< and %d files.\n", dir_to_prepend->c_str(), msg.c_str(), num_files);
+    const char *dtp = "";
+    if (dir_to_prepend) dtp = dir_to_prepend->c_str();
+    debug(INDEX, "Loading gz for '%s' with >%s< and %d files.\n", dtp, msg.c_str(), num_files);
 
     eof = false;
     while (i != v.end() && !eof && num_files > 0)
     {
         ii = i;
-        bool got_entry = eatEntry(v, i, dir_to_prepend, &ie->fs, &ie->offset,
+        bool got_entry = eatEntry(beak_version, v, i, dir_to_prepend, &ie->fs, &ie->offset,
                                   &ie->tar, &ie->path, &ie->link,
                                   &ie->is_sym_link, &ie->is_hard_link,
                                   &eof, &err);
         if (err) {
             failure(INDEX, "Could not parse tarredfs-contents file in >%s<\n>%s<\n",
-                    dir_to_prepend->c_str(), ii);
+                    dtp, ii);
             break;
         }
         if (!got_entry) break;
@@ -113,7 +126,7 @@ RC Index::loadIndex(vector<char> &v,
         }
         // Remove the newline at the end.
         name.pop_back();
-        name.insert(0, "/");
+        //name.insert(0, "/");
         Path *p = Path::lookup(name);
         if (p->parent()) {
             debug(INDEX,"  found tar %s in dir %s\n", p->name()->c_str(), p->parent()->c_str());
@@ -131,6 +144,32 @@ RC Index::loadIndex(vector<char> &v,
         return RC::ERR;
     }
     return RC::OK;
-
-
 };
+
+RC Index::listFilesReferencedInIndex(ptr<FileSystem> fs, Path *gz, std::set<Path*> *files)
+{
+    RC rc = RC::OK;
+
+    vector<char> buf;
+    rc = fs->loadVector(gz, T_BLOCKSIZE, &buf);
+    if (rc.isErr()) return rc;
+
+    vector<char> contents;
+    gunzipit(&buf, &contents);
+    auto i = contents.begin();
+
+    struct IndexEntry index_entry;
+    struct IndexTar index_tar;
+
+    rc = Index::loadIndex(contents, i, &index_entry, &index_tar, NULL,
+                          [](IndexEntry *ie){ /* Do nothing per file. */ },
+                          [files](IndexTar *it){ files->insert(it->path); }
+                          );
+
+    if (rc.isErr()) {
+        failure(INDEX, "Could not parse the index file %s\n", gz->c_str());
+        return rc;
+    }
+
+    return rc;
+}

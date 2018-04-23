@@ -22,6 +22,7 @@
 #include "filesystem.h"
 #include "forward.h"
 #include "reverse.h"
+#include "index.h"
 #include "storagetool.h"
 #include "system.h"
 #include "tarfile.h"
@@ -60,6 +61,7 @@ using namespace std;
 
 static ComponentId COMMANDLINE = registerLogComponent("commandline");
 static ComponentId STORE = registerLogComponent("store");
+static ComponentId CHECK = registerLogComponent("check");
 
 struct CommandEntry;
 struct OptionEntry;
@@ -83,6 +85,7 @@ struct BeakImplementation : Beak {
     RC findPointsInTime(string remote, vector<struct timespec> *v);
     RC fetchPointsInTime(string remote, Path *cache);
 
+    RC check(Options *settings);
     RC configure(Options *settings);
     RC push(Options *settings);
     RC prune(Options *settings);
@@ -129,6 +132,8 @@ struct BeakImplementation : Beak {
     pid_t loop_pid_;
 
     unique_ptr<System> sys_;
+    unique_ptr<FileSystem> sys_fs_;
+    unique_ptr<StorageTool> storage_tool_;
     ptr<FileSystem> from_fs_;
     ptr<FileSystem> to_fs_;
 };
@@ -183,6 +188,8 @@ BeakImplementation::BeakImplementation(ptr<FileSystem> from_fs, ptr<FileSystem> 
     }
 
     sys_ = newSystem();
+    sys_fs_ = newDefaultFileSystem();
+    storage_tool_ = newStorageTool(sys_, sys_fs_);
 
     configuration_ = newConfiguration(sys_, from_fs_);
     configuration_->load();
@@ -253,20 +260,20 @@ Argument BeakImplementation::parseArgument(string arg)
         }
         // Is this an rclone storage?
         string potential_rclone_storage_name = arg.substr(0,colon+1);
-        argument.backup = StorageTool::checkRCloneStorage(sys_, potential_rclone_storage_name);
-        if (argument.backup.type != NoSuchStorage) {
-            debug(COMMANDLINE, "Arg parsed as rclone storage %s\n", argument.backup.target_path->c_str());
-            argument.path = argument.backup.target_path;
+        argument.storage = storage_tool_->checkRCloneStorage(potential_rclone_storage_name);
+        if (argument.storage.type != NoSuchStorage) {
+            debug(COMMANDLINE, "Arg parsed as rclone storage %s\n", argument.storage.target_path->c_str());
+            argument.path = argument.storage.target_path;
             argument.type = ArgStorage;
             return argument;
         }
 
         // Is this an rsync storage?
         string potential_rsync_storage = arg;
-        argument.backup = StorageTool::checkRSyncStorage(sys_, potential_rsync_storage);
-        if (argument.backup.type != NoSuchStorage) {
-            debug(COMMANDLINE, "Arg parsed as rsync storage %s\n", argument.backup.target_path->c_str());
-            argument.path = argument.backup.target_path;
+        argument.storage = storage_tool_->checkRSyncStorage(potential_rsync_storage);
+        if (argument.storage.type != NoSuchStorage) {
+            debug(COMMANDLINE, "Arg parsed as rsync storage %s\n", argument.storage.target_path->c_str());
+            argument.path = argument.storage.target_path;
             argument.type = ArgStorage;
             return argument;
         }
@@ -593,6 +600,105 @@ vector<PointInTime> BeakImplementation::history()
     return tmp;
 }
 
+RC BeakImplementation::check(Options *settings)
+{
+    RC rc = RC::OK;
+
+    Rule *rule = configuration_->findRuleFromTargetPath(settings->from.storage.target_path);
+    if (rule == NULL) {
+        failure(COMMANDLINE,"You have to specify an storage location.\n");
+        return RC::ERR;
+    }
+    Storage *storage = rule->storage(settings->from.storage.target_path->str());
+    assert(storage);
+
+    vector<TarFileName> existing_files, bad_files;
+    vector<string> other_files;
+    rc = storage_tool_->listBeakFiles(&settings->from.storage, &existing_files, &bad_files, &other_files);
+
+    if (bad_files.size() > 0) {
+        UI::output("Found %ju files with the wrong sizes!\n", bad_files.size());
+        for (auto& f : bad_files) {
+            verbose(CHECK, "Wrong size: %s\n", f.path->c_str());
+        }
+    }
+    if (other_files.size() > 0) {
+        UI::output("Found %ju non-beak files!\n", other_files.size());
+        for (auto& f : other_files) {
+            verbose(CHECK, "Non-beak: %s\n", f.c_str());
+        }
+    }
+
+    size_t total_size = 0;
+    set<Path*> set_of_existing_files;
+    vector<TarFileName*> indexes;
+    for (auto& f : existing_files) {
+        total_size += f.size;
+        if (f.type == REG_FILE && f.path->depth() == 1) {
+            // This is one of the index files in the root directory.
+            indexes.push_back(&f);
+        } else {
+            // The root index files are not listed inside themselves. Which is a side
+            // effect of the index file being named with the hash of the index contents.
+            // It cannot have the hash of itself. Well, perhaps it could with a fixpoint
+            // calculation/solving, but that is probably not feasable, nor interesting. :-)
+            set_of_existing_files.insert(f.path);
+        }
+    }
+
+    string total = humanReadable(total_size);
+    UI::output("Backup location uses %s in %ju beak files.\n", total.c_str(), existing_files.size());
+
+    verbose(CHECK, "Using cache location %s\n", rule->cache_path->c_str());
+    rc = storage_tool_->fetchBeakFilesFromStorage(storage, &indexes, rule->cache_path);
+
+    if (rc.isErr()) return rc;
+
+    set<Path*> set_of_beak_files;
+    for (auto& f : indexes) {
+        Path *gz = f->path->prepend(rule->cache_path);
+        rc = Index::listFilesReferencedInIndex(sys_fs_, gz, &set_of_beak_files);
+        if (rc.isErr()) {
+            failure(CHECK, "Cannot read index file %s\n", gz->c_str());
+            return rc;
+        }
+        set_of_existing_files.erase(f->path);
+    }
+
+     UI::output("Found %d points in time.\n", indexes.size());
+
+    vector<Path*> missing_files;
+    for (auto p : set_of_existing_files) {
+        if (set_of_beak_files.count(p) > 0)
+        {
+            set_of_beak_files.erase(p);
+        }
+        else
+        {
+            missing_files.push_back(p);
+        }
+    }
+
+    if (set_of_beak_files.size() > 0) {
+        UI::output("Found %d superflous files!\n", set_of_beak_files.size());
+        for (auto& f : set_of_beak_files) {
+            verbose(CHECK, "Superflouous: %s\n", f->c_str());
+        }
+    }
+
+    if (missing_files.size() > 0) {
+        UI::output("Warning! %d missing files!\n", missing_files.size());
+        for (auto& f : missing_files) {
+            verbose(CHECK, "Missing: %s\n", f->c_str());
+        }
+    } else {
+        UI::output("OK\n");
+    }
+
+
+    return rc;
+}
+
 RC BeakImplementation::configure(Options *settings)
 {
     return configuration_->configure();
@@ -643,7 +749,7 @@ RC BeakImplementation::push(Options *settings)
     if (settings->to.path) {
         args.push_back(settings->to.path->str());
     } else {
-        args.push_back(settings->to.backup.target_path->str());
+        args.push_back(settings->to.storage.target_path->str());
     }
     vector<char> output;
     rc = sys_->invoke("rclone", args, &output, CaptureBoth,

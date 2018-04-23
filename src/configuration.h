@@ -162,6 +162,7 @@ struct Configuration
 
     virtual Rule *rule(std::string name) = 0;
     virtual std::vector<Rule*> sortedRules() = 0;
+    virtual Rule *findRuleFromTargetPath(Path *target_path) = 0;
 
     virtual ~Configuration() = default;
 };

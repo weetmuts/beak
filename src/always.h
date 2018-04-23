@@ -25,6 +25,9 @@
 #include <memory>
 
 #define BEAK_VERSION 0.7
+#define BEAK_VERSION_INT 7
+
+#define supportedVersion(x) (x==BEAK_VERSION_INT)
 
 class ReturnCode
 {

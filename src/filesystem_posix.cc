@@ -89,6 +89,7 @@ struct FileSystemImplementationPosix : FileSystem
     RC stat(Path *p, FileStat *fs);
     RC chmod(Path *p, FileStat *stat);
     RC utime(Path *p, FileStat *stat);
+    Path *mkTempFile(string prefix, string content);
     Path *mkTempDir(string prefix);
     Path *mkDirp(Path *p);
     Path *mkDir(Path *p, string name);
@@ -183,6 +184,23 @@ RC FileSystemImplementationPosix::utime(Path *p, FileStat *fs)
     int rc = utimensat(0, p->c_str(), times, AT_SYMLINK_NOFOLLOW);
     if (rc) return RC::ERR;
     return RC::OK;
+}
+
+Path *FileSystemImplementationPosix::mkTempFile(string prefix, string content)
+{
+    string p = "/tmp/"+prefix+"XXXXXX";
+    char name[p.length()+1];
+    strcpy(name, p.c_str());
+    int fd = mkstemp(name);
+    if (fd == -1) {
+        error(FILESYSTEM, "Could not create temp file!\n");
+    }
+    size_t n = write(fd, &content[0], content.size());
+    if (n != content.size()) {
+        error(FILESYSTEM, "Could not write temp file!\n");
+    }
+    close(fd);
+    return Path::lookup(name);
 }
 
 Path *FileSystemImplementationPosix::mkTempDir(string prefix)

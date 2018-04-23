@@ -34,6 +34,7 @@ struct FileSystemFuseAPIImplementation : FileSystem
     RC stat(Path *p, FileStat *fs);
     RC chmod(Path *p, FileStat *stat);
     RC utime(Path *p, FileStat *stat);
+    Path *mkTempFile(string prefix, string content);
     Path *mkTempDir(string prefix);
     Path *mkDir(Path *path, string name);
     RC loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
@@ -96,6 +97,11 @@ RC FileSystemFuseAPIImplementation::chmod(Path *p, FileStat *fs)
 RC FileSystemFuseAPIImplementation::utime(Path *p, FileStat *fs)
 {
     return RC::ERR;
+}
+
+Path *FileSystemFuseAPIImplementation::mkTempFile(string prefix, string content)
+{
+    return NULL;
 }
 
 Path *FileSystemFuseAPIImplementation::mkTempDir(string prefix)

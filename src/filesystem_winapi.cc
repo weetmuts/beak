@@ -94,6 +94,7 @@ struct FileSystemImplementationWinapi : FileSystem
     RC stat(Path *p, FileStat *fs);
     RC chmod(Path *p, FileStat *fs);
     RC utime(Path *p, FileStat *fs);
+    Path *mkTempFile(string prefix, string content);
     Path *mkTempDir(string prefix);
     Path *mkDir(Path *p, string name);
 
@@ -175,6 +176,11 @@ RC FileSystemImplementationWinapi::chmod(Path *p, FileStat *fs)
 RC FileSystemImplementationWinapi::utime(Path *p, FileStat *fs)
 {
     return RC::ERR;
+}
+
+Path *FileSystemImplementationWinapi::mkTempFile(string prefix, string content)
+{
+    return NULL;
 }
 
 Path *FileSystemImplementationWinapi::mkTempDir(string prefix)
