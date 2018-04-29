@@ -81,9 +81,9 @@ struct Keep
 
 #define LIST_OF_STORAGE_TYPES \
     X(NoSuchStorage, "Not a storage")                                   \
-    X(FileSystemStorage, "Push to a directory")                         \
-    X(RCloneStorage,     "Push using rclone")                           \
-    X(RSyncStorage,      "Push using rsync")                            \
+    X(FileSystemStorage, "Store to a directory")                         \
+    X(RCloneStorage,     "Store using rclone")                           \
+    X(RSyncStorage,      "Store using rsync")                            \
 
 enum StorageType : short {
 #define X(name,info) name,
@@ -95,17 +95,17 @@ struct Storage
 {
     // Store or retrieve to/from local file system, rclone target, or rsync target.
     StorageType type {};
-    // Target is either a filesystem path, or an rclone target (eg s3_work_crypt: or s3:/prod/bar)
+    // Storage location is either a filesystem path, or an rclone target (eg s3_work_crypt: or s3:/prod/bar)
     // or an rsync target (eg backup@192.168.0.1:/backups/)
-    Path *target_path {};
+    Path *storage_location {};
     // The keep rule for the storage, default setting is keep everything.
     Keep keep;
 
     Storage() = default;
-    Storage(StorageType ty, Path *ta, std::string ke) : type(ty), target_path(ta), keep(ke) { }
+    Storage(StorageType ty, Path *sl, std::string ke) : type(ty), storage_location(sl), keep(ke) { }
     void output(std::vector<ChoiceEntry> *buf = NULL);
 
-    void editTarget();
+    void editStorageLocation();
     void editKeep();
 };
 
@@ -146,7 +146,7 @@ struct Rule {
     void output(std::vector<ChoiceEntry> *buf = NULL);
     void status();
     std::vector<Storage*> sortedStorages();
-    Storage *storage(std::string name);
+    Storage *storage(Path *storage_location);
 
     void generateDefaultSettingsBasedOnPath();
 };
@@ -162,7 +162,8 @@ struct Configuration
 
     virtual Rule *rule(std::string name) = 0;
     virtual std::vector<Rule*> sortedRules() = 0;
-    virtual Rule *findRuleFromTargetPath(Path *target_path) = 0;
+    virtual Rule *findRuleFromStorageLocation(Path *storage_location) = 0;
+    virtual Storage *findStorageFrom(Path *storage_location) = 0;
 
     virtual ~Configuration() = default;
 };

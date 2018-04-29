@@ -17,8 +17,11 @@
 
 #include "always.h"
 #include "beak.h"
+#include "configuration.h"
 #include "filesystem.h"
 #include "log.h"
+#include "storagetool.h"
+#include "system.h"
 
 #include<stdio.h>
 
@@ -27,22 +30,36 @@ using namespace std;
 int main(int argc, char *argv[])
 {
     RC rc = RC::OK;
-    Options settings;
-
+    // First create the interface to external commands like rclone and rsync.
+    auto sys = newSystem();
+    // Next create the interface to the file system that stores the beak configuration files
+    // and the temporary/cache files.
+    auto sys_fs = newDefaultFileSystem();
+    // Then create the interface to hide the differences between different storages types:
+    // ie rclone, rsync and local file system.
+    auto storage_tool = newStorageTool(sys, sys_fs);
+    // Create the source filesystem where the files to be backed up are found.
     auto fs_src = newDefaultFileSystem();
+    // Next create the dest filesystem where the files will be restored.
     auto fs_dst = newDefaultFileSystem();
-    auto beak = newBeak(fs_src, fs_dst);
+    // Fetch the beak configuration from ~/.config/beak/beak.conf
+    auto configuration = newConfiguration(sys, sys_fs);
+    configuration->load();
+
+    // Now create the beak backup software.
+    auto beak = newBeak(configuration, sys, sys_fs, storage_tool, fs_src, fs_dst);
 
     beak->captureStartTime();
+
+    // Configure the settings by parsing the command line and extract the command.
+    Options settings;
     Command cmd = beak->parseCommandLine(argc, argv, &settings);
 
+    // We now know the command the user intends to invoke.
     switch (cmd) {
 
     case check_cmd:
         rc = beak->check(&settings);
-        break;
-
-    case checkout_cmd:
         break;
 
     case config_cmd:
@@ -57,12 +74,12 @@ int main(int argc, char *argv[])
         break;
 
     case genautocomplete_cmd:
-        if (settings.from.path == NULL) {
+        if (settings.from.dir == NULL) {
             beak->genAutoComplete("/etc/bash_completion.d/beak");
             printf("Wrote /etc/bash_completion.d/beak\n");
         } else {
-            beak->genAutoComplete(settings.from.path->str());
-            printf("Wrote %s\n", settings.from.path->c_str());
+            beak->genAutoComplete(settings.from.dir->str());
+            printf("Wrote %s\n", settings.from.dir->c_str());
         }
         break;
 

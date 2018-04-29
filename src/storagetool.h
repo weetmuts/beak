@@ -29,10 +29,6 @@
 
 struct StorageTool
 {
-    virtual Storage checkFileSystemStorage(std::string name) = 0;
-    virtual Storage checkRCloneStorage(std::string name) = 0;
-    virtual Storage checkRSyncStorage(std::string name) = 0;
-
     virtual RC listBeakFiles(Storage *storage,
                              std::vector<TarFileName> *files,
                              std::vector<TarFileName> *bad_files,

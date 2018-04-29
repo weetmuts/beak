@@ -27,9 +27,6 @@ using namespace std;
 struct StorageToolImplementation : public StorageTool
 {
     StorageToolImplementation(ptr<System> sys, ptr<FileSystem> fs);
-    Storage checkFileSystemStorage(std::string name);
-    Storage checkRCloneStorage(std::string name);
-    Storage checkRSyncStorage(std::string name);
 
     RC listBeakFiles(Storage *storage,
                      std::vector<TarFileName> *files,
@@ -50,63 +47,6 @@ unique_ptr<StorageTool> newStorageTool(ptr<System> sys, ptr<FileSystem> fs)
 StorageToolImplementation::StorageToolImplementation(ptr<System>sys, ptr<FileSystem> fs)
     : sys_(sys), sys_fs_(fs)
 {
-}
-
-Storage StorageToolImplementation::checkFileSystemStorage(std::string name)
-{
-    Path *rp = Path::lookup(name)->realpath();
-    if (!rp)
-    {
-        return Storage();
-    }
-
-    return Storage { FileSystemStorage, rp, "" };
-}
-
-Storage StorageToolImplementation::checkRCloneStorage(string name)
-{
-    map<string,string> configs;
-    vector<char> out;
-    vector<string> args;
-    args.push_back("listremotes");
-    args.push_back("-l");
-    RC rc = sys_->invoke("rclone", args, &out);
-    if (rc.isOk()) {
-        auto i = out.begin();
-        bool eof, err;
-
-        for (;;) {
-            eatWhitespace(out, i, &eof);
-            if (eof) break;
-            string target = eatTo(out, i, ':', 4096, &eof, &err);
-            if (eof || err) break;
-            string type = eatTo(out, i, '\n', 64, &eof, &err);
-            if (err) break;
-            trimWhitespace(&type);
-            configs[target+":"] = type;
-        }
-
-        if (configs.count(name) > 0) {
-            return Storage { RCloneStorage, Path::lookup(name), "" };
-        }
-    }
-
-    return Storage();
-}
-
-Storage StorageToolImplementation::checkRSyncStorage(std::string name)
-{
-    // An rsync location is detected by the @ sign and the server :.
-    size_t at = name.find('@');
-    size_t colon = name.find(':');
-    if (at != string::npos &&
-        colon != string::npos &&
-        at < colon)
-    {
-        return Storage { RSyncStorage, Path::lookup(name), "" };
-    }
-
-    return Storage();
 }
 
 RC StorageToolImplementation::sendBeakFilesToStorage(Path *dir, Storage *storage, vector<TarFileName*> *files)
@@ -133,7 +73,7 @@ RC StorageToolImplementation::sendBeakFilesToStorage(Path *dir, Storage *storage
         args.push_back(tmp->c_str());
     }
     args.push_back(dir->c_str());
-    args.push_back(storage->target_path->c_str());
+    args.push_back(storage->storage_location->c_str());
     rc = sys_->invoke("rclone", args, &out);
 
     return rc;
@@ -157,7 +97,7 @@ RC StorageToolImplementation::fetchBeakFilesFromStorage(Storage *storage, vector
     args.push_back("copy");
     args.push_back("--include-from");
     args.push_back(tmp->c_str());
-    args.push_back(storage->target_path->c_str());
+    args.push_back(storage->storage_location->c_str());
     args.push_back(dir->c_str());
     rc = sys_->invoke("rclone", args, &out);
 
@@ -175,7 +115,7 @@ RC StorageToolImplementation::listBeakFiles(Storage *storage,
     vector<char> out;
     vector<string> args;
     args.push_back("ls");
-    args.push_back(storage->target_path->c_str());
+    args.push_back(storage->storage_location->c_str());
     rc = sys_->invoke("rclone", args, &out);
 
     if (rc.isErr()) return RC::ERR;

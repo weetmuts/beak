@@ -68,7 +68,10 @@ struct OptionEntry;
 
 struct BeakImplementation : Beak {
 
-    BeakImplementation(ptr<FileSystem> from_fs, ptr<FileSystem> to_fs);
+    BeakImplementation(ptr<Configuration> configuration,
+                       ptr<System> sys, ptr<FileSystem> sys_fs, ptr<StorageTool> storage_tool,
+                       ptr<FileSystem> from_fs, ptr<FileSystem> to_fs);
+
     void printCommands();
     void printOptions();
 
@@ -122,34 +125,37 @@ struct BeakImplementation : Beak {
 
     vector<PointInTime> history_;
 
-    Command parseCommand(string s);
+    CommandEntry *parseCommand(string s);
     OptionEntry *parseOption(string s, bool *has_value, string *value);
-    Argument parseArgument(std::string arg);
-    unique_ptr<Configuration> configuration_;
+    Argument parseArgument(std::string arg, ArgumentType expected_type);
 
     struct fuse_chan *chan_;
     struct fuse *fuse_;
     pid_t loop_pid_;
 
-    unique_ptr<System> sys_;
-    unique_ptr<FileSystem> sys_fs_;
-    unique_ptr<StorageTool> storage_tool_;
+    ptr<Configuration> configuration_;
+    ptr<System> sys_;
+    ptr<FileSystem> sys_fs_;
+    ptr<StorageTool> storage_tool_;
     ptr<FileSystem> from_fs_;
     ptr<FileSystem> to_fs_;
 };
 
-unique_ptr<Beak> newBeak(ptr<FileSystem> from_fs, ptr<FileSystem> to_fs) {
-    return unique_ptr<Beak>(new BeakImplementation(from_fs, to_fs));
+unique_ptr<Beak> newBeak(ptr<Configuration> configuration,
+                         ptr<System> sys, ptr<FileSystem> sys_fs, ptr<StorageTool> storage_tool,
+                         ptr<FileSystem> from_fs, ptr<FileSystem> to_fs) {
+    return unique_ptr<Beak>(new BeakImplementation(configuration, sys, sys_fs, storage_tool, from_fs, to_fs));
 }
 
 struct CommandEntry {
     const char *name;
     Command cmd;
     const char *info;
+    ArgumentType expected_from, expected_to;
 };
 
 CommandEntry command_entries_[] = {
-#define X(name,info) { #name, name##_cmd, info } ,
+#define X(name,info,expfrom,expto) { #name, name##_cmd, info, expfrom, expto } ,
 LIST_OF_COMMANDS
 #undef X
 };
@@ -168,7 +174,14 @@ LIST_OF_OPTIONS
 #undef X
 };
 
-BeakImplementation::BeakImplementation(ptr<FileSystem> from_fs, ptr<FileSystem> to_fs) :
+BeakImplementation::BeakImplementation(ptr<Configuration> configuration,
+                                       ptr<System> sys, ptr<FileSystem> sys_fs,
+                                       ptr<StorageTool> storage_tool,
+                                       ptr<FileSystem> from_fs, ptr<FileSystem> to_fs) :
+    configuration_(configuration),
+    sys_(sys),
+    sys_fs_(sys_fs),
+    storage_tool_(storage_tool),
     from_fs_(from_fs),
     to_fs_(to_fs)
 {
@@ -186,20 +199,12 @@ BeakImplementation::BeakImplementation(ptr<FileSystem> from_fs, ptr<FileSystem> 
             nosuch_option_ = &e;
         }
     }
-
-    sys_ = newSystem();
-    sys_fs_ = newDefaultFileSystem();
-    storage_tool_ = newStorageTool(sys_, sys_fs_);
-
-    configuration_ = newConfiguration(sys_, from_fs_);
-    configuration_->load();
 }
 
-Command BeakImplementation::parseCommand(string s)
+CommandEntry *BeakImplementation::parseCommand(string s)
 {
-    CommandEntry *ce = commands_[s];
-    if (!ce) return nosuch_cmd;
-    return ce->cmd;
+    if (commands_.count(s) == 0) return NULL;
+    return commands_[s];
 }
 
 OptionEntry *BeakImplementation::parseOption(string s, bool *has_value, string *value)
@@ -224,9 +229,12 @@ OptionEntry *BeakImplementation::parseOption(string s, bool *has_value, string *
     return ce;
 }
 
-Argument BeakImplementation::parseArgument(string arg)
+Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_type)
 {
     Argument argument;
+
+    assert(expected_type != ArgUnspecified && expected_type != ArgNone);
+
     auto at = arg.find_last_of('@');
     auto colon = arg.find(':');
     if (at != string::npos && (colon == string::npos || at > colon))
@@ -237,58 +245,88 @@ Argument BeakImplementation::parseArgument(string arg)
         //            in: /media/you/USBDevice@0
         auto point = arg.substr(at);
         arg = arg.substr(0,at);
-        debug(COMMANDLINE, "Found point in time (%s) after storage %s\n", point, arg.c_str());
+        if (expected_type != ArgStorage) {
+            error(COMMANDLINE, "A point in time must only be suffixed to a storage.\n");
+        }
         argument.point_in_time = point;
+        debug(COMMANDLINE, "Found point in time (%s) after storage %s\n", point, arg.c_str());
     }
 
-    // Anything with a colon could be a beak rule, an rclone config, or an rsync target.
-    if (colon != string::npos)
-    {
-        // Is this a beak rule?
-        if (arg.back() == ':')
+    if (expected_type == ArgDir) {
+        Path *dir = Path::lookup(arg);
+        Path *rp = dir->realpath();
+        if (!rp)
         {
-            string potential_rule_name = arg;
-            potential_rule_name.pop_back();
-            argument.rule = configuration_->rule(potential_rule_name);
-            if (argument.rule) {
-                debug(COMMANDLINE, "Arg parsed as rule %s pointing to origin %s\n",
-                      arg.c_str(), argument.rule->origin_path->c_str());
-                argument.path = argument.rule->origin_path;
-                argument.type = ArgRule;
-                return argument;
-            }
+            error(COMMANDLINE, "Expected directory. Got \"%s\" instead.\n", arg.c_str());
         }
-        // Is this an rclone storage?
-        string potential_rclone_storage_name = arg.substr(0,colon+1);
-        argument.storage = storage_tool_->checkRCloneStorage(potential_rclone_storage_name);
-        if (argument.storage.type != NoSuchStorage) {
-            debug(COMMANDLINE, "Arg parsed as rclone storage %s\n", argument.storage.target_path->c_str());
-            argument.path = argument.storage.target_path;
-            argument.type = ArgStorage;
-            return argument;
-        }
-
-        // Is this an rsync storage?
-        string potential_rsync_storage = arg;
-        argument.storage = storage_tool_->checkRSyncStorage(potential_rsync_storage);
-        if (argument.storage.type != NoSuchStorage) {
-            debug(COMMANDLINE, "Arg parsed as rsync storage %s\n", argument.storage.target_path->c_str());
-            argument.path = argument.storage.target_path;
-            argument.type = ArgStorage;
-            return argument;
-        }
-    }
-
-    // All else failed, try if this is a standard directory.
-    Path *rp = Path::lookup(arg)->realpath();
-    if (!rp)
-    {
-        error(COMMANDLINE, "Argument is neither a directory nor a storage: %s\n", arg.c_str());
+        argument.dir = dir;
+        argument.type = ArgDir;
+        debug(COMMANDLINE, "Found directory arg \"%s\", as expected.\n", dir->c_str());
         return argument;
     }
 
-    argument.type = ArgPath;
-    argument.path = rp;
+    if (expected_type == ArgORS || expected_type == ArgStorage) {
+        Path *storage_location = Path::lookup(arg);
+        Storage *storage = configuration_->findStorageFrom(storage_location);
+
+        if (storage) {
+            argument.type = ArgStorage;
+            argument.storage = storage;
+
+            switch (storage->type) {
+            case FileSystemStorage: debug(COMMANDLINE, "Storage \"%s\" parsed as directory.\n", arg.c_str()); break;
+            case RCloneStorage: debug(COMMANDLINE, "Storage \"%s\" parsed as rclone.\n", arg.c_str()); break;
+            case RSyncStorage: debug(COMMANDLINE, "Storage \"%s\" parsed as rsync.\n", arg.c_str()); break;
+            case NoSuchStorage: break;
+            }
+            debug(COMMANDLINE, "Found storage arg \"%s\", as expected.\n", storage_location->c_str());
+            return argument;
+        }
+
+        if (expected_type == ArgStorage) {
+            error(COMMANDLINE, "Expected storage, but \"%s\" is not a storage location.\n", arg.c_str());
+        }
+
+        // ArgORS will pass through here.
+    }
+
+    if (expected_type == ArgORS || expected_type == ArgRule || expected_type == ArgOrigin) {
+        Rule *rule = configuration_->rule(arg);
+
+        if (rule) {
+            argument.rule = rule;
+            argument.origin = argument.rule->origin_path;
+            argument.type = ArgRule;
+            debug(COMMANDLINE, "Found rule arg %s pointing to origin %s\n",
+                  arg.c_str(), argument.rule->origin_path->c_str());
+            return argument;
+        }
+
+        if (expected_type == ArgRule) {
+            // We expected a rule, but there was none....
+            error(COMMANDLINE, "Expected origin directory or rule. Got \"%s\" instead.\n", arg.c_str());
+        }
+
+        // If there is no rule, then we expect an origin directory.
+        Path *origin = Path::lookup(arg);
+        Path *rp = origin->realpath();
+        if (rp) {
+            argument.origin = origin;
+            argument.type = ArgOrigin;
+            debug(COMMANDLINE, "Found origin arg \"%s\".\n", origin->c_str());
+            return argument;
+        }
+
+        if (expected_type == ArgOrigin)
+        {
+            error(COMMANDLINE, "Expected rule or origin directory. Got \"%s\" instead.\n", arg.c_str());
+        }
+
+        // ArgORS will pass through here.
+    }
+
+    error(COMMANDLINE, "Expected rule, origin directory or storage location. Got \"%s\" instead.\n", arg.c_str());
+
     return argument;
 }
 
@@ -377,7 +415,9 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Options *set
 
     if (args.size() < 1) return nosuch_cmd;
 
-    Command cmd = parseCommand(args[0]);
+    CommandEntry *cmde = parseCommand(args[0]);
+    Command cmd = nosuch_cmd;
+    if (cmde != NULL) cmd = cmde->cmd;
 
     if (cmd == nosuch_cmd) {
         if (args[0] == "") {
@@ -412,6 +452,7 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Options *set
 
         if (*i == "--") {
             options_completed = true;
+            continue;
         }
 
         if (!options_completed)
@@ -544,18 +585,22 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Options *set
         {
             if (settings->from.type == ArgUnspecified)
             {
-                settings->from = parseArgument(*i);
+                settings->from = parseArgument(*i, cmde->expected_from);
                 if (settings->from.point_in_time != "") {
                     settings->pointintime = settings->from.point_in_time;
                 }
             }
             else if (settings->to.type == ArgUnspecified)
             {
-                settings->to = parseArgument(*i);
-                if (settings->to.type == ArgPath && (cmd == mount_cmd || cmd == remount_cmd))
+                settings->to = parseArgument(*i, cmde->expected_to);
+                if (settings->to.type == ArgOrigin)
                 {
-                    settings->fuse_args.push_back(settings->to.path->c_str());
-               }
+                    settings->fuse_args.push_back(settings->to.origin->c_str());
+                }
+                if (settings->to.type == ArgDir)
+                {
+                    settings->fuse_args.push_back(settings->to.dir->c_str());
+                }
             }
             else {
                 error(COMMANDLINE, "Superfluous argument %s\n", (*i).c_str());
@@ -604,17 +649,17 @@ RC BeakImplementation::check(Options *settings)
 {
     RC rc = RC::OK;
 
-    Rule *rule = configuration_->findRuleFromTargetPath(settings->from.storage.target_path);
+    Rule *rule = configuration_->findRuleFromStorageLocation(settings->from.storage->storage_location);
     if (rule == NULL) {
         failure(COMMANDLINE,"You have to specify an storage location.\n");
         return RC::ERR;
     }
-    Storage *storage = rule->storage(settings->from.storage.target_path->str());
+    Storage *storage = rule->storage(settings->from.storage->storage_location);
     assert(storage);
 
     vector<TarFileName> existing_files, bad_files;
     vector<string> other_files;
-    rc = storage_tool_->listBeakFiles(&settings->from.storage, &existing_files, &bad_files, &other_files);
+    rc = storage_tool_->listBeakFiles(settings->from.storage, &existing_files, &bad_files, &other_files);
 
     if (bad_files.size() > 0) {
         UI::output("Found %ju files with the wrong sizes!\n", bad_files.size());
@@ -708,49 +753,27 @@ RC BeakImplementation::push(Options *settings)
 {
     RC rc = RC::OK;
 
-    if (settings->from.type != ArgPath && settings->from.type != ArgRule) {
-        failure(COMMANDLINE,"You have to specify an origin, rule or directory.\n");
-        return RC::ERR;
-    }
+    assert(settings->from.type == ArgOrigin || settings->from.type == ArgRule);
 
-    if (settings->to.type != ArgStorage) {
-        failure(COMMANDLINE,"You have to specify a backup location.\n");
-        return RC::ERR;
-    }
-
-    Path *mount = from_fs_->mkTempDir("beak_push_");
+    Path *mount = sys_fs_->mkTempDir("beak_push_");
 
     Options forward_settings = settings->copy();
-    forward_settings.to.path = mount;
+    forward_settings.to.dir = mount;
     forward_settings.fuse_argc = 1;
     char *arg;
     char **argv = &arg;
     argv[0] = new char[16];
     strcpy(*argv, "beak");
     forward_settings.fuse_argv = argv;
-
-    /*
-    vector<TarFileName> storage_files;
-    listStorageFiles(settings->to.storage, &storage_files);
-    for (auto& tfn : storage_files) {
-        fprintf(stderr, "Storage file size %ju\n", tfn.size);
-    }
-    fprintf(stderr, "Done listing storage files...\n");
-    */
-
-    // Spawn virtual filesystem.
     rc = mountForward(&forward_settings);
     if (rc.isErr()) return RC::ERR;
 
+    // Beak file system is now mounted, lets store it into a storage location.
     vector<string> args;
     args.push_back("copy");
     args.push_back("-v");
     args.push_back(mount->c_str());
-    if (settings->to.path) {
-        args.push_back(settings->to.path->str());
-    } else {
-        args.push_back(settings->to.storage.target_path->str());
-    }
+    args.push_back(settings->to.storage->storage_location->str());
     vector<char> output;
     rc = sys_->invoke("rclone", args, &output, CaptureBoth,
                       [=](char *buf, size_t len) {
@@ -800,7 +823,7 @@ RC BeakImplementation::umountDaemon(Options *settings)
 {
     vector<string> args;
     args.push_back("-u");
-    args.push_back(settings->from.path->str());
+    args.push_back(settings->from.dir->str());
     return sys_->invoke("fusermount", args);
 }
 
@@ -817,7 +840,7 @@ RC BeakImplementation::mountForward(Options *settings)
 RC BeakImplementation::umountForward(Options *settings)
 {
     fuse_exit(fuse_);
-    fuse_unmount (settings->to.path->c_str(), chan_);
+    fuse_unmount (settings->to.dir->c_str(), chan_);
     return RC::OK;
 }
 
@@ -845,7 +868,7 @@ RC BeakImplementation::mountForwardInternal(Options *settings, bool daemon)
     args.argc = settings->fuse_argc;
     args.argv = settings->fuse_argv;
     args.allocated = 0;
-    struct fuse_chan *chan = fuse_mount(settings->to.path->c_str(), &args);
+    struct fuse_chan *chan = fuse_mount(settings->to.dir->c_str(), &args);
     fuse_ = fuse_new(chan,
                      &args,
                      &forward_tarredfs_ops,
@@ -909,14 +932,17 @@ RC BeakImplementation::remountReverseInternal(Options *settings, bool daemon)
 
     auto rfs  = newReverseTarredFS(from_fs_);
 
-    rfs->lookForPointsInTime(PointInTimeFormat::absolute_point, settings->from.path);
+    RC rc = rfs->lookForPointsInTime(PointInTimeFormat::absolute_point, settings->from.storage->storage_location);
+    if (rc.isErr()) {
+        error(COMMANDLINE, "No points in time found!\n");
+    }
 
     if (settings->pointintime != "") {
         auto point = rfs->setPointInTime(settings->pointintime);
         if (!point) return RC::ERR;
     }
 
-    RC rc = rfs->loadBeakFileSystem(settings);
+    rc = rfs->loadBeakFileSystem(settings);
     if (rc.isErr()) return RC::ERR;
 
     if (daemon) {
@@ -933,7 +959,7 @@ RC BeakImplementation::remountReverseInternal(Options *settings, bool daemon)
     args.argc = settings->fuse_argc;
     args.argv = settings->fuse_argv;
     args.allocated = 0;
-    struct fuse_chan *chan = fuse_mount(settings->to.path->c_str(), &args);
+    struct fuse_chan *chan = fuse_mount(settings->to.dir->c_str(), &args);
     fuse_ = fuse_new(chan,
                      &args,
                      &reverse_tarredfs_ops,
@@ -1069,7 +1095,7 @@ RC BeakImplementation::status(Options *settings)
 	UI::output("%-20s %s\n", rule->name.c_str(), rule->origin_path->c_str());
 	{
 	    vector<struct timespec> points;
-	    rc = findPointsInTime(rule->local->target_path->str(), &points);
+	    rc = findPointsInTime(rule->local->storage_location->str(), &points);
 	    if (points.size() > 0) {
 		string ago = timeAgo(&points.front());
 		UI::output("%-20s %s\n", ago.c_str(), "local");
@@ -1079,16 +1105,16 @@ RC BeakImplementation::status(Options *settings)
 	}
 
 	for (auto storage : rule->sortedStorages()) {
-	    rc = fetchPointsInTime(storage->target_path->str(), rule->cache_path);
+	    rc = fetchPointsInTime(storage->storage_location->str(), rule->cache_path);
 	    if (rc.isErr()) continue;
 
 	    vector<struct timespec> points;
-	    rc = findPointsInTime(storage->target_path->str(), &points);
+	    rc = findPointsInTime(storage->storage_location->str(), &points);
 	    if (points.size() > 0) {
 		string ago = timeAgo(&points.front());
-		UI::output("%-20s %s\n", ago.c_str(), storage->target_path->c_str());
+		UI::output("%-20s %s\n", ago.c_str(), storage->storage_location->c_str());
 	    } else {
-		UI::output("%-20s %s\n", "No backup!", storage->target_path->c_str());
+		UI::output("%-20s %s\n", "No backup!", storage->storage_location->c_str());
 	    }
 	}
 	UI::output("\n");
@@ -1156,7 +1182,7 @@ void calculateForwardWork(Path *path, FileStat *stat,
                           Options *settings, StoreStatistics *st,
                           FileSystem *from_fs, FileSystem *to_fs)
 {
-    auto file_to_extract = path->prepend(settings->to.path);
+    auto file_to_extract = path->prepend(settings->to.storage->storage_location);
 
     if (stat->isRegularFile()) {
         stat->checkStat(to_fs, file_to_extract);
@@ -1178,7 +1204,7 @@ void handleFile(Path *path, FileStat *stat,
     debug(STORE, "PATH %s\n", path->c_str());
     TarFile *tar = rfs->findTarFromPath(path);
     assert(tar);
-    Path *file_name = tar->path()->prepend(settings->to.path);
+    Path *file_name = tar->path()->prepend(settings->to.storage->storage_location);
     to_fs->mkDirp(file_name->parent());
     FileStat old_stat;
     RC rc = to_fs->stat(file_name, &old_stat);
@@ -1205,13 +1231,8 @@ RC BeakImplementation::storeForward(Options *settings)
 {
     RC rc = RC::OK;
 
-    if (settings->from.type != ArgPath) {
-        failure(COMMANDLINE,"You have to specify an origin directory that will be backed up.\n");
-    }
-
-    if (settings->to.type != ArgPath) {
-        failure(COMMANDLINE,"You have to specify where to store the backup.\n");
-    }
+    assert(settings->from.type == ArgOrigin || settings->from.type == ArgRule);
+    assert(settings->to.type == ArgStorage);
 
     auto ffs  = newForwardTarredFS(from_fs_);
     auto view = ffs->asFileSystem();
@@ -1424,7 +1445,7 @@ void calculateReverseWork(Path *path, FileStat *stat,
                           FileSystem *from_fs, FileSystem *to_fs)
 {
     auto entry = rfs->findEntry(point, path);
-    auto file_to_extract = path->prepend(settings->to.path);
+    auto file_to_extract = path->prepend(settings->from.storage->storage_location);
 
     if (entry->is_hard_link) st->num_hard_links++;
     else if (stat->isRegularFile()) {
@@ -1445,12 +1466,12 @@ void handleHardLinks(Path *path, FileStat *stat,
                      FileSystem *from_fs, FileSystem *to_fs)
 {
     auto entry = rfs->findEntry(point, path);
-    auto file_to_extract = path->prepend(settings->to.path);
+    auto file_to_extract = path->prepend(settings->to.origin);
 
     if (entry->is_hard_link) {
         // Special case since hard links are not encoded in stat structure.
         extractHardLink(from_fs, entry->hard_link,
-                        to_fs, settings->to.path,
+                        to_fs, settings->to.origin,
                         file_to_extract, stat, st);
     }
 }
@@ -1461,9 +1482,9 @@ void handleRegularFiles(Path *path, FileStat *stat,
                         FileSystem *from_fs, FileSystem *to_fs)
 {
     auto entry = rfs->findEntry(point, path);
-    auto tar_file = entry->tar->prepend(settings->from.path);
+    auto tar_file = entry->tar->prepend(settings->from.storage->storage_location);
     auto tar_file_offset = entry->offset;
-    auto file_to_extract = path->prepend(settings->to.path);
+    auto file_to_extract = path->prepend(settings->to.origin);
 
     if (!entry->is_hard_link && stat->isRegularFile()) {
         extractFile(entry, from_fs, tar_file, tar_file_offset,
@@ -1479,7 +1500,7 @@ void handleNodes(Path *path, FileStat *stat,
                  FileSystem *from_fs, FileSystem *to_fs)
 {
     auto entry = rfs->findEntry(point, path);
-    auto file_to_extract = path->prepend(settings->to.path);
+    auto file_to_extract = path->prepend(settings->to.origin);
 
     if (!entry->is_hard_link && stat->isFIFO()) {
         extractNode(from_fs, to_fs, file_to_extract, stat, st);
@@ -1492,7 +1513,7 @@ void handleSymbolicLinks(Path *path, FileStat *stat,
                          FileSystem *from_fs, FileSystem *to_fs)
 {
     auto entry = rfs->findEntry(point, path);
-    auto file_to_extract = path->prepend(settings->to.path);
+    auto file_to_extract = path->prepend(settings->to.origin);
 
     if (!entry->is_hard_link && stat->isSymbolicLink()) {
         extractSymbolicLink(from_fs, entry->symlink,
@@ -1505,7 +1526,7 @@ void handleDirs(Path *path, FileStat *stat,
                 Options *settings, StoreStatistics *st,
                 FileSystem *from_fs, FileSystem *to_fs)
 {
-    auto file_to_extract = path->prepend(settings->to.path);
+    auto file_to_extract = path->prepend(settings->to.origin);
 
     if (stat->isDirectory()) {
         chmodDirectory(to_fs, file_to_extract, stat, st);
@@ -1516,11 +1537,11 @@ RC BeakImplementation::restoreReverse(Options *settings)
 {
     RC rc = RC::OK;
 
-    if (settings->from.type != ArgPath) {
+    if (settings->from.type != ArgStorage) {
         failure(COMMANDLINE,"You have to specify a backup directory that will be extracted.\n");
     }
 
-    if (settings->to.type != ArgPath) {
+    if (settings->to.type != ArgOrigin) {
         failure(COMMANDLINE,"You have to specify where to store the backup.\n");
     }
 
@@ -1528,7 +1549,7 @@ RC BeakImplementation::restoreReverse(Options *settings)
     auto rfs  = newReverseTarredFS(from_fs_);
     auto view = rfs->asFileSystem();
 
-    rfs->lookForPointsInTime(PointInTimeFormat::absolute_point, settings->from.path);
+    rfs->lookForPointsInTime(PointInTimeFormat::absolute_point, settings->from.storage->storage_location);
 
     auto point = rfs->setPointInTime("@0");
     if (settings->pointintime != "") {

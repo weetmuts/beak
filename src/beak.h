@@ -39,6 +39,7 @@ struct Options;
 struct PointInTime;
 struct Rule;
 struct Storage;
+struct StorageTool;
 
 struct Beak
 {
@@ -77,33 +78,47 @@ struct Beak
     virtual ~Beak() = default;
 };
 
-std::unique_ptr<Beak> newBeak(ptr<FileSystem> src_fs, ptr<FileSystem> dst_fs);
+std::unique_ptr<Beak> newBeak(ptr<Configuration> config, ptr<System> sys, ptr<FileSystem> sys_fs, ptr<StorageTool> storage_tool,
+                              ptr<FileSystem> src_fs, ptr<FileSystem> dst_fs);
 
-#define LIST_OF_COMMANDS                                                \
-    X(check,"Check the integrity of an archive.")                       \
-    X(config,"Configure backup rules.")                                 \
-    X(checkout,"Overwrite your source directory with a backup.")        \
-    X(diff,"Show changes since last backup.")                           \
-    X(help,"Show help. Also: beak push help")                           \
-    X(genautocomplete,"Output bash completion script for beak.")        \
-    X(genmounttrigger,"Output systemd rule to trigger backup when USB drive is mounted.") \
-    X(info,"List points in time and other info about archive.")         \
-    X(mount,"Mount your file system as a backup.")                      \
-    X(history,"Mount all known storages for your backup.")              \
-    X(prune,"Discard old backups according to the keep rule.")          \
-    X(pull,"Merge a backup from a remote.")                             \
-    X(push,"Backup a directory to a remote.")                           \
-    X(remount,"Mount your backup as a file system.")                    \
-    X(restore,"Restore from your backup into your file system.")        \
-    X(shell,"Start a minimal shell to explore a backup.")               \
-    X(status,"Show the status of your backups both locally and remotely.") \
-    X(store,"Store your file system into a backup.")                    \
-    X(umount,"Unmount a virtual file system.")                          \
-    X(version,"Show version.")                                          \
-    X(nosuch,"No such command.")                                        \
+enum ArgumentType
+{
+    ArgUnspecified,
+    ArgNone,
+    ArgOrigin,
+    ArgRule,
+    ArgStorage,
+    ArgDir,
+    ArgFile,
+    ArgORS
+};
+
+// ArgORS will match ArgOrigin, ArgRule or ArgStorage.
+
+#define LIST_OF_COMMANDS \
+    X(check,"Check the integrity of an archive.",ArgStorage,ArgNone) \
+    X(config,"Configure backup rules.",ArgNone,ArgNone) \
+    X(diff,"Show changes since last backup.",ArgORS,ArgORS) \
+    X(help,"Show help. Also: beak push help",ArgORS,ArgNone) \
+    X(genautocomplete,"Output bash completion script for beak.",ArgFile,ArgNone) \
+    X(genmounttrigger,"Output systemd rule to trigger backup when USB drive is mounted.",ArgFile,ArgNone) \
+    X(info,"List points in time and other info about archive.",ArgStorage,ArgNone) \
+    X(mount,"Mount your file system as a backup.",ArgOrigin,ArgDir) \
+    X(history,"Mount all known storages for your backup.",ArgRule,ArgNone) \
+    X(prune,"Discard old backups according to the keep rule.",ArgStorage,ArgNone) \
+    X(pull,"Merge the most recent backup for the given rule.",ArgRule,ArgNone) \
+    X(push,"Backup a rule to a storage location.",ArgRule,ArgNone) \
+    X(remount,"Mount your backup as a file system.",ArgStorage,ArgDir) \
+    X(restore,"Restore from your backup into your file system.",ArgStorage,ArgOrigin) \
+    X(shell,"Start a minimal shell to explore a backup.",ArgStorage,ArgNone) \
+    X(status,"Show the status of your backups both locally and remotely.",ArgNone,ArgNone) \
+    X(store,"Store your file system into a backup.",ArgOrigin,ArgStorage) \
+    X(umount,"Unmount a virtual file system.",ArgDir,ArgNone) \
+    X(version,"Show version.",ArgNone,ArgNone) \
+    X(nosuch,"No such command.",ArgNone,ArgNone) \
 
 enum Command : short {
-#define X(name,info) name##_cmd,
+#define X(name,info,argfrom,argto) name##_cmd,
 LIST_OF_COMMANDS
 #undef X
 };
@@ -142,26 +157,21 @@ LIST_OF_OPTIONS
 #undef X
 };
 
-enum ArgumentType
-{
-    ArgUnspecified,
-    ArgPath,
-    ArgRule,
-    ArgStorage
-};
-
 struct Argument
 {
     ArgumentType type {};
-    Path *path {};
     Rule *rule {};
-    Storage storage;
+    Path *origin {};
+    Storage *storage {};
+    Path *dir {};
+    Path *file {};
     std::string point_in_time;
 };
 
 struct Options
 {
     Argument from, to;
+    ArgumentType expected_from, expected_to;
 
 #define X(shortname,name,type,requirevalue,info) type name {}; bool name##_supplied {};
 LIST_OF_OPTIONS

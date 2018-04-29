@@ -505,14 +505,14 @@ int ReverseTarredFS::readCB(const char *path_char_string, char *buf,
 }
 
 
-bool ReverseTarredFS::lookForPointsInTime(PointInTimeFormat f, Path *path)
+RC ReverseTarredFS::lookForPointsInTime(PointInTimeFormat f, Path *path)
 {
     bool ok;
-    if (path == NULL) return false;
+    if (path == NULL) return RC::ERR;
 
     vector<Path*> contents;
     if (!file_system_->readdir(path, &contents)) {
-        return false;
+        return RC::ERR;
     }
     for (auto f : contents)
     {
@@ -532,6 +532,10 @@ bool ReverseTarredFS::lookForPointsInTime(PointInTimeFormat f, Path *path)
             p.filename = f->str();
             history_.push_back(p);
         }
+    }
+
+    if (history_.size() == 0) {
+        return RC::ERR;
     }
     sort(history_.begin(), history_.end(),
               [](PointInTime &a, PointInTime &b)->bool {
@@ -561,7 +565,10 @@ bool ReverseTarredFS::lookForPointsInTime(PointInTimeFormat f, Path *path)
         j.entries_[Path::lookupRoot()] = Entry(fs, 0, Path::lookupRoot());
     }
 
-    return i > 0;
+    if (i > 0) {
+        return RC::OK;
+    }
+    return RC::ERR;
 }
 
 PointInTime *ReverseTarredFS::findPointInTime(string s) {
@@ -588,8 +595,8 @@ PointInTime *ReverseTarredFS::setPointInTime(string g) {
 
 RC ReverseTarredFS::loadBeakFileSystem(Options *settings)
 {
-    setRootDir(settings->from.path);
-    setMountDir(settings->to.path);
+    setRootDir(settings->from.storage->storage_location);
+    setMountDir(settings->to.origin);
 
     for (auto &point : history()) {
         string name = point.filename;

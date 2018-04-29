@@ -107,7 +107,7 @@ struct ReverseTarredFS
     void loadCache(PointInTime *point, Path *path);
 
     PointInTime *singlePointInTime() { return single_point_in_time_; }
-    bool lookForPointsInTime(PointInTimeFormat f, Path *src);
+    RC lookForPointsInTime(PointInTimeFormat f, Path *src);
     std::vector<PointInTime> &history() { return history_; }
     PointInTime *findPointInTime(std::string s);
     PointInTime *setPointInTime(std::string g);

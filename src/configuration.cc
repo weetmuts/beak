@@ -94,7 +94,8 @@ public:
 
     Rule *rule(string name);
     vector<Rule*> sortedRules();
-    Rule *findRuleFromTargetPath(Path *target_path);
+    Rule *findRuleFromStorageLocation(Path *storage_location);
+    Storage *findStorageFrom(Path *storage_location);
 
     void editRule();
     void createNewRule();
@@ -123,6 +124,10 @@ public:
 private:
     bool parseRow(string key, string value,
                   Rule *current_rule, Storage **current_storage);
+
+    bool isFileSystemStorage(Path *storage_location);
+    bool isRCloneStorage(Path *storage_location);
+    bool isRSyncStorage(Path *storage_location);
 
     // Map rule name to rule.
     map<string,Rule> rules_;
@@ -227,7 +232,7 @@ bool ConfigurationImplementation::parseRow(string key, string value,
             {
                 Storage *local = &current_rule->storages[Path::lookupRoot()];
                 current_rule->local = local;
-                local->target_path = realPath(current_rule->origin_path, value);
+                local->storage_location = realPath(current_rule->origin_path, value);
                 local->type = FileSystemStorage;
             }
             break;
@@ -251,13 +256,13 @@ bool ConfigurationImplementation::parseRow(string key, string value,
         case remote_key:
         {
             if (value == "") error(CONFIGURATION, "Remote storage cannot be empty.\n");
-            Path *target_path = Path::lookup(value);
-            Rule *rule = findRuleFromTargetPath(target_path);
+            Path *storage_location = Path::lookup(value);
+            Rule *rule = findRuleFromStorageLocation(storage_location);
             if (rule) {
                 error(CONFIGURATION, "The storage location \"%s\" is used in two rules!\n", value.c_str());
             }
-            *current_storage = &current_rule->storages[target_path];
-            (*current_storage)->target_path = target_path;
+            *current_storage = &current_rule->storages[storage_location];
+            (*current_storage)->storage_location = storage_location;
             break;
         }
         case remote_type_key:
@@ -357,14 +362,14 @@ bool ConfigurationImplementation::save()
         conf += "cache = " + relativePathIfPossible(rule->origin_path, rule->cache_path)->str() + "\n";
         conf += "cache_size = " + humanReadable(rule->cache_size) + "\n";
         if (rule->type == LocalThenRemoteBackup) {
-            conf += "local = " + relativePathIfPossible(rule->origin_path, rule->local->target_path)->str() + "\n";
+            conf += "local = " + relativePathIfPossible(rule->origin_path, rule->local->storage_location)->str() + "\n";
             conf += "local_keep = " + rule->local->keep.str() + "\n";
         }
 
         for (auto storage : rule->sortedStorages())
         {
             if (storage != rule->local) {
-                conf += "remote = " + storage->target_path->str() + "\n";
+                conf += "remote = " + storage->storage_location->str() + "\n";
                 conf += "remote_type = " + string(storage_type_names_[storage->type]) + "\n";
                 conf += "remote_keep = " + storage->keep.str() + "\n";
             }
@@ -387,17 +392,16 @@ vector<Storage*> Rule::sortedStorages()
     }
     sort(v.begin(), v.end(),
               [](Storage *a, Storage *b)->bool {
-             return (a->target_path->str() < b->target_path->str());
+             return (a->storage_location->str() < b->storage_location->str());
 	      });
 
     return v;
 }
 
-Storage* Rule::storage(string target)
+Storage* Rule::storage(Path *storage_location)
 {
-    Path *t = Path::lookup(target);
-    if (storages.count(t) > 0) {
-        return &storages[t];
+    if (storages.count(storage_location) > 0) {
+        return &storages[storage_location];
     }
     return NULL;
 }
@@ -468,7 +472,7 @@ void ConfigurationImplementation::editCacheSize(Rule *r)
 void ConfigurationImplementation::editLocalPath(Rule *r)
 {
     assert(r->local);
-    r->local->target_path = inputDirectory("local path>");
+    r->local->storage_location = inputDirectory("local path>");
 }
 
 void ConfigurationImplementation::editLocalKeep(Rule *r)
@@ -499,17 +503,23 @@ vector<Rule*> ConfigurationImplementation::sortedRules()
 
 Rule *ConfigurationImplementation::rule(string name)
 {
+    auto colon = name.find(':');
+    if (colon != string::npos && name.back() == ':')
+    {
+        name.pop_back();
+    }
+
     if (rules_.count(name) == 0) return NULL;
     return &rules_[name];
 }
 
-Rule *ConfigurationImplementation::findRuleFromTargetPath(Path *target_path)
+Rule *ConfigurationImplementation::findRuleFromStorageLocation(Path *storage_location)
 {
     for (auto rule : sortedRules())
     {
 	for (auto storage : rule->sortedStorages())
         {
-            if (storage->target_path == target_path)
+            if (storage->storage_location == storage_location)
             {
                 return rule;
             }
@@ -550,7 +560,7 @@ void ConfigurationImplementation::outputRule(Rule *r, std::vector<ChoiceEntry> *
     else buf->push_back(ChoiceEntry( msg, [=](){ editCacheSize(r); }));
 
     if (r->type == LocalThenRemoteBackup) {
-        strprintf(msg, "Local:        %s", relativePathIfPossible(r->origin_path, r->local->target_path)->c_str());
+        strprintf(msg, "Local:        %s", relativePathIfPossible(r->origin_path, r->local->storage_location)->c_str());
         if (!buf) UI::outputln(msg);
         else buf->push_back(ChoiceEntry( msg, [=](){ editLocalPath(r); }));
 
@@ -667,7 +677,7 @@ void ConfigurationImplementation::editRule()
             bool b = editRemoteTarget(&storage);
             if (b) {
                 editRemoteKeep(&storage);
-                r->storages[storage.target_path] = storage;
+                r->storages[storage.storage_location] = storage;
             }
         }
         else if (ce->key == "e") {
@@ -731,7 +741,7 @@ void ConfigurationImplementation::createNewRule()
         bool b = editRemoteTarget(&storage);
         if (!b) break;
         editRemoteKeep(&storage);
-        rule.storages[storage.target_path] = storage;
+        rule.storages[storage.storage_location] = storage;
     }
 
     UI::output("Proposed new rule:\n\n");
@@ -772,7 +782,7 @@ Rule *ConfigurationImplementation::deleteStorage(Rule *r)
 {
     vector<ChoiceEntry> choices;
     for (auto s : r->sortedStorages()) {
-        choices.push_back( { s->target_path->str() } );
+        choices.push_back( { s->storage_location->str() } );
     }
     auto ce = UI::inputChoice("Which storage to delete:", "storage>", choices);
     string s = ce->keyword;
@@ -917,7 +927,7 @@ void ConfigurationImplementation::outputStorage(Storage *s, std::vector<ChoiceEn
 {
     string msg;
 
-    strprintf(msg, "      Remote: %s", s->target_path->c_str());
+    strprintf(msg, "      Remote: %s", s->storage_location->c_str());
     if (!buf) UI::outputln(msg);
     else buf->push_back(ChoiceEntry(msg, [=](){ editRemoteTarget(s); }));
 
@@ -941,13 +951,13 @@ bool ConfigurationImplementation::editRemoteTarget(Storage *s)
         if (storage == "") return false;
         auto r = okStorage(storage);
         if (!r.first) continue;
-        Path *target_path = Path::lookup(storage);
-        Rule *rule = findRuleFromTargetPath(target_path);
+        Path *storage_location = Path::lookup(storage);
+        Rule *rule = findRuleFromStorageLocation(storage_location);
         if (rule) {
             UI::output("The storage location \"%s\" is already used in the rule %d!\n", storage.c_str(), rule->name.c_str());
             continue;
         }
-        s->target_path = target_path;
+        s->storage_location = storage_location;
         s->type = r.second;
         break;
     }
@@ -963,4 +973,100 @@ void ConfigurationImplementation::editRemoteKeep(Storage *s)
         if (ok) break;
         UI::output("Invalid keep rule.\n");
     }
+}
+
+bool ConfigurationImplementation::isFileSystemStorage(Path *storage_location)
+{
+    Path *rp = storage_location->realpath();
+    if (!rp)
+    {
+        return false;
+    }
+
+    return true;
+}
+
+bool ConfigurationImplementation::isRCloneStorage(Path *storage_location)
+{
+    string arg = storage_location->str();
+    auto colon = arg.find(':');
+    if (colon == string::npos) return false;
+
+    string name = arg.substr(0,colon+1);
+
+    map<string,string> configs;
+    vector<char> out;
+    vector<string> args;
+    args.push_back("listremotes");
+    args.push_back("-l");
+    RC rc = sys_->invoke("rclone", args, &out);
+    if (rc.isOk()) {
+        auto i = out.begin();
+        bool eof, err;
+
+        for (;;) {
+            eatWhitespace(out, i, &eof);
+            if (eof) break;
+            string target = eatTo(out, i, ':', 4096, &eof, &err);
+            if (eof || err) break;
+            string type = eatTo(out, i, '\n', 64, &eof, &err);
+            if (err) break;
+            trimWhitespace(&type);
+            configs[target+":"] = type;
+        }
+
+        if (configs.count(name) > 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool ConfigurationImplementation::isRSyncStorage(Path *storage_location)
+{
+    // An rsync location is detected by the @ sign and the server :.
+    string name = storage_location->str();
+    size_t at = name.find('@');
+    size_t colon = name.find(':');
+    if (at != string::npos &&
+        colon != string::npos &&
+        at < colon)
+    {
+        return true;
+    }
+
+    return false;
+}
+
+Storage a_storage;
+
+Storage *ConfigurationImplementation::findStorageFrom(Path *storage_location)
+{
+    // This is a storage that is configured inside a rule.
+    Rule *rule = findRuleFromStorageLocation(storage_location);
+
+    if (rule) {
+        return rule->storage(storage_location);
+    }
+
+    // Ok, not a known storage location.
+
+    if (isFileSystemStorage(storage_location)) {
+        a_storage.type = FileSystemStorage;
+        a_storage.storage_location = storage_location;
+        return &a_storage;
+    }
+    else if (isRCloneStorage(storage_location)) {
+        a_storage.type = RCloneStorage;
+        a_storage.storage_location = storage_location;
+        return &a_storage;
+    }
+    else if (isRSyncStorage(storage_location)) {
+        a_storage.type = RSyncStorage;
+        a_storage.storage_location = storage_location;
+        return &a_storage;
+    }
+
+    return NULL;
 }

@@ -927,8 +927,8 @@ int ForwardTarredFS::readlinkCB(const char *path_char_string, char *buf, size_t 
 
 RC ForwardTarredFS::scanFileSystem(Options *settings)
 {
-    if (settings->from.type == ArgPath && settings->from.path) {
-        root_dir_path = settings->from.path;
+    if (settings->from.type == ArgOrigin && settings->from.origin) {
+        root_dir_path = settings->from.origin;
     } else if (settings->from.type == ArgRule && settings->from.rule) {
         root_dir_path = settings->from.rule->origin_path;
     } else {
