@@ -80,7 +80,7 @@ LIST_OF_STORAGE_TYPES
 };
 
 // Logging must be enabled with env var BEAK_LOG_configuration since
-// this code runs before command line parsing.
+// this code runs before command line parsing!
 static ComponentId CONFIGURATION = registerLogComponent("configuration");
 
 class ConfigurationImplementation : public Configuration
@@ -197,6 +197,7 @@ bool ConfigurationImplementation::parseRow(string key, string value,
 {
     RuleKeyWord rkw;
     bool ok;
+    debug(CONFIGURATION,"Loading %s:%s for rule %s\n", key.c_str(), value.c_str(), current_rule->name.c_str());
     lookupType(key,RuleKeyWord,rule_keywords_,rkw,ok);
     if (ok) {
         switch (rkw) {
@@ -305,7 +306,7 @@ bool ConfigurationImplementation::load()
             eatWhitespace(buf,i,&eof);
             if (eof) break;
             string block = eatTo(buf,i,'\n', 1024*1024, &eof, &err);
-            if (eof || err) break;
+            if (err) break; // eof is ok here, the last line might not be terminated with a \n
             trimWhitespace(&block);
             // Ignore empty lines
             if (block.length() == 0) continue;
@@ -321,6 +322,7 @@ bool ConfigurationImplementation::load()
                 rules_[name] = Rule();
                 current_rule = &rules_[name];
                 current_rule->name = name;
+                debug(CONFIGURATION,"Loading configuration for rule [%s]\n", name.c_str());
             } else {
                 vector<char> line(block.begin(), block.end());
                 // Like in bash, a backslash at the end of the line means
@@ -331,7 +333,7 @@ bool ConfigurationImplementation::load()
                     if (eof || err) break;
                     line.insert(line.end(), block.begin(), block.end());
                 }
-                if (err) break;
+                if (err) break; // eof is ok here, the last line might not be terminated with a \n
 
                 auto i = line.begin();
                 string key = eatTo(line, i, '=', 1024*1024, &eof, &err);
@@ -822,7 +824,7 @@ RC ConfigurationImplementation::configure()
     return RC::OK;
 }
 
-string keep_keys[] = { "all", "minutely", "hourly", "daily", "weekly", "monthly", "yearly", "mirror" };
+string keep_keys[] = { "all", "daily", "weekly", "monthly" };
 
 size_t calcTime(string s)
 {
@@ -839,7 +841,6 @@ bool Keep::parse(string s)
 {
     // Example:    "tz:+0100 all:2d daily:2w weekly:2m monthly:2y"
     // Example:    "tz:+0100 all:2d daily:1w monthly:12m"
-    // Example:    "tz:+0100 mirror"
     vector<char> data(s.begin(), s.end());
     auto i = data.begin();
     string tz, offset;
@@ -886,16 +887,6 @@ bool Keep::parse(string s)
             level=4;
             monthly = len;
         }
-        else if (key == "yearly") {
-            if (level > 4) return false;
-            level=5;
-            yearly = len;
-        }
-        else if (key == "mirror") {
-            if (level > 5) return false;
-            level=6;
-            mirror = true;
-        }
 
         if (eof) break;
     }
@@ -916,7 +907,6 @@ string Keep::str()
     if (daily) s += "daily:"+getLengthOfTime(daily)+" ";
     if (weekly) s += "weekly:"+getLengthOfTime(weekly)+" ";
     if (monthly) s += "monthly:"+getLengthOfTime(monthly)+" ";
-    if (yearly) s += "yearly:"+getLengthOfTime(yearly);
     if (s.back() == ' ') s.pop_back();
     return s;
 }

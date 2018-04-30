@@ -259,7 +259,7 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
         {
             error(COMMANDLINE, "Expected directory. Got \"%s\" instead.\n", arg.c_str());
         }
-        argument.dir = dir;
+        argument.dir = rp;
         argument.type = ArgDir;
         debug(COMMANDLINE, "Found directory arg \"%s\", as expected.\n", dir->c_str());
         return argument;
@@ -846,6 +846,7 @@ RC BeakImplementation::umountForward(Options *settings)
 
 RC BeakImplementation::mountForwardInternal(Options *settings, bool daemon)
 {
+    memset(&forward_tarredfs_ops, 0, sizeof(forward_tarredfs_ops));
     forward_tarredfs_ops.getattr = forwardGetattr;
     forward_tarredfs_ops.open = open_callback;
     forward_tarredfs_ops.read = forwardRead;
@@ -924,6 +925,7 @@ RC BeakImplementation::remountReverse(Options *settings)
 
 RC BeakImplementation::remountReverseInternal(Options *settings, bool daemon)
 {
+    memset(&reverse_tarredfs_ops, 0, sizeof(reverse_tarredfs_ops));
     reverse_tarredfs_ops.getattr = reverseGetattr;
     reverse_tarredfs_ops.open = open_callback;
     reverse_tarredfs_ops.read = reverseRead;
