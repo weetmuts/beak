@@ -93,7 +93,7 @@ pair<TarEntry*, size_t> TarFile::findTarEntry(size_t offset)
     {
         return pair<TarEntry*, size_t>(NULL, 0);
     }
-    debug(TARFILE, "tarfile", "Looking for offset %zu\n", offset);
+    debug(TARFILE, "Looking for offset %zu\n", offset);
     size_t o = 0;
 
     vector<size_t>::iterator i = lower_bound(offsets.begin(), offsets.end(),

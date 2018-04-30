@@ -143,10 +143,18 @@ bool FileSystemImplementationPosix::readdir(Path *p, vector<Path*> *vec)
 ssize_t FileSystemImplementationPosix::pread(Path *p, char *buf, size_t size, off_t offset)
 {
     int fd = open(p->c_str(), O_RDONLY | O_NOATIME);
-    if (fd == -1) return -1;
-    int rc = ::pread(fd, buf, size, offset);
+    if (fd == -1) {
+        // This might be a file not owned by you, if so, open fails if O_NOATIME is enabled.
+        fd = open(p->c_str(), O_RDONLY);
+        if (fd == -1) {
+            // Give up permanently.
+            return -1;
+        }
+        warning(FILESYSTEM,"You are not the owner of \"%s\" so backing up causes its access time to be updated.\n", p->c_str());
+    }
+    ssize_t n = ::pread(fd, buf, size, offset);
     close(fd);
-    return rc;
+    return n;
 }
 
 void FileSystemImplementationPosix::recurse(function<void(Path *path, FileStat *stat)> cb)

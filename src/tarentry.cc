@@ -172,11 +172,13 @@ void TarEntry::createLargeTar(uint32_t hash) {
     tars_.push_back(large_tars_[hash]);
 }
 
-size_t TarEntry::copy(char *buf, size_t size, size_t from, FileSystem *fs) {
+size_t TarEntry::copy(char *buf, size_t size, size_t from, FileSystem *fs)
+{
     size_t copied = 0;
     debug(TARENTRY, "Copying from %s\n", name_->c_str());
 
-    if (size > 0 && from < header_size_) {
+    if (size > 0 && from < header_size_)
+    {
         debug(TARENTRY, "Copying max %zu from %zu, now inside header (header size=%ju)\n", size, from,
               header_size_);
 
@@ -249,6 +251,10 @@ size_t TarEntry::copy(char *buf, size_t size, size_t from, FileSystem *fs) {
                   size, copied, blocked_size_, from, header_size_);
             debug(TARENTRY, "    contents out from %s %zu size=%zu\n", path_->c_str(), from-header_size_, size);
             ssize_t l = fs->pread(abspath_, buf, size, from-header_size_);
+            if (l==-1) {
+                failure(TARENTRY, "Could not open file \"%s\"\n", abspath_->c_str());
+            }
+            assert(l>0);
             size -= l;
             buf += l;
             copied += l;
