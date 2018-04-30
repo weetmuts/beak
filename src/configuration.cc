@@ -126,7 +126,7 @@ private:
                   Rule *current_rule, Storage **current_storage);
 
     bool isFileSystemStorage(Path *storage_location);
-    bool isRCloneStorage(Path *storage_location);
+    bool isRCloneStorage(Path *storage_location, string *type = NULL);
     bool isRSyncStorage(Path *storage_location);
 
     // Map rule name to rule.
@@ -134,9 +134,6 @@ private:
 
     // Map path to rule.
     map<Path*,Rule*> paths_;
-
-    // Map rclone storage name: (including its colon suffix) to its type.
-    map<string,string> rclone_storages_;
 
     ptr<System> sys_;
     ptr<FileSystem> fs_;
@@ -626,11 +623,12 @@ pair<bool,StorageType> ConfigurationImplementation::okStorage(string storage)
     }
     size_t cp = storage.find(":");
     if (cp != string::npos) {
-        string rclone = storage.substr(0, cp+1);
-        if (rclone_storages_.count(rclone) > 0) {
+        Path *rclone = Path::lookup(storage.substr(0, cp+1));
+        string type;
+        bool ok = isRCloneStorage(rclone, &type);
+        if (ok) {
             // This is an rclone rule.
             UI::output("Storage identified as an rclone storage.\n");
-            string type = rclone_storages_[rclone];
             if (type != "crypt") {
                 UI::output("The rclone rule \"%s\" is not encrypted!\n", storage.c_str());
                 auto kc = UI::keepOrChange();
@@ -932,7 +930,7 @@ void ConfigurationImplementation::outputStorage(Storage *s, std::vector<ChoiceEn
     else buf->push_back(ChoiceEntry(msg, [=](){ editRemoteTarget(s); }));
 
     strprintf(msg, "        Type: %s", storage_type_names_[s->type]);
-    if (!buf) UI::output(msg);
+    if (!buf) UI::outputln(msg);
     else {
         buf->push_back(ChoiceEntry(msg));
         buf->back().available = false;
@@ -954,7 +952,8 @@ bool ConfigurationImplementation::editRemoteTarget(Storage *s)
         Path *storage_location = Path::lookup(storage);
         Rule *rule = findRuleFromStorageLocation(storage_location);
         if (rule) {
-            UI::output("The storage location \"%s\" is already used in the rule %d!\n", storage.c_str(), rule->name.c_str());
+            UI::output("The storage location \"%s\" is already used in the rule %s!\n", storage.c_str(), rule->name.c_str());
+            UI::output("Try again.\n");
             continue;
         }
         s->storage_location = storage_location;
@@ -967,8 +966,13 @@ bool ConfigurationImplementation::editRemoteTarget(Storage *s)
 void ConfigurationImplementation::editRemoteKeep(Storage *s)
 {
     for (;;) {
+        UI::output("Empty keep string means => tz:+0100 all:2d daily:2w weekly:2m monthly:2y\n");
         UI::outputPrompt("remote keep>");
         string k = UI::inputString();
+        if (k == "") {
+            UI::output("Using default keep: tz:+0100 all:2d daily:2w weekly:2m monthly:2y\n");
+            k = "tz:+0100 all:2d daily:2w weekly:2m monthly:2y";
+        }
         bool ok = s->keep.parse(k);
         if (ok) break;
         UI::output("Invalid keep rule.\n");
@@ -986,7 +990,7 @@ bool ConfigurationImplementation::isFileSystemStorage(Path *storage_location)
     return true;
 }
 
-bool ConfigurationImplementation::isRCloneStorage(Path *storage_location)
+bool ConfigurationImplementation::isRCloneStorage(Path *storage_location, string *type)
 {
     string arg = storage_location->str();
     auto colon = arg.find(':');
@@ -1016,6 +1020,9 @@ bool ConfigurationImplementation::isRCloneStorage(Path *storage_location)
         }
 
         if (configs.count(name) > 0) {
+            if (type) {
+                *type = configs[name];
+            }
             return true;
         }
     }
