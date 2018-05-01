@@ -267,6 +267,10 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
 
     if (expected_type == ArgORS || expected_type == ArgStorage) {
         Path *storage_location = Path::lookup(arg);
+        Path *rp = storage_location->realpath();
+        if (rp) {
+            storage_location = rp;
+        }
         Storage *storage = configuration_->findStorageFrom(storage_location);
 
         if (storage) {
@@ -1144,10 +1148,12 @@ struct StoreStatistics
     size_t num_total, num_total_handled;
 
     uint64_t prev, start;
+    bool info_displayed;
 
     StoreStatistics() {
         memset(this, 0, sizeof(StoreStatistics));
         start = prev = clockGetTime();
+        info_displayed = false;
     }
     //Tar emot objekt: 100% (814178/814178), 669.29 MiB | 6.71 MiB/s, klart.
     //Analyserar delta: 100% (690618/690618), klart.
@@ -1157,6 +1163,7 @@ struct StoreStatistics
         uint64_t now = clockGetTime();
         if ((now-prev) < 500000 && num_files_to_store < num_files) return;
         prev = now;
+        info_displayed = true;
         UI::clearLine();
         int percentage = (int)(100.0*(float)size_files_stored / (float)size_files_to_store);
         string mibs = humanReadableTwoDecimals(size_files_stored);
@@ -1172,7 +1179,7 @@ struct StoreStatistics
     }
 
     void finishProgress() {
-        if (num_files == 0 || num_files_to_store == 0) return;
+        if (info_displayed == false || num_files == 0 || num_files_to_store == 0) return;
         displayProgress();
         UI::output(", done.\n");
     }
@@ -1196,10 +1203,10 @@ void calculateForwardWork(Path *path, FileStat *stat,
     else if (stat->isDirectory()) st->num_dirs++;
 }
 
-void handleFile(Path *path, FileStat *stat,
-                ForwardTarredFS *rfs, Beak *beak,
-                Options *settings, StoreStatistics *st,
-                FileSystem *from_fs, FileSystem *to_fs)
+void handleTarFile(Path *path, FileStat *stat,
+                   ForwardTarredFS *rfs, Beak *beak,
+                   Options *settings, StoreStatistics *st,
+                   FileSystem *from_fs, FileSystem *to_fs)
 {
     if (!stat->isRegularFile()) return;
 
@@ -1217,6 +1224,9 @@ void handleFile(Path *path, FileStat *stat,
 
         debug(STORE, "Skipping %s\n", file_name->c_str());
     } else {
+        if (rc.isOk()) {
+            to_fs->deleteFile(file_name);
+        }
         tar->createFile(file_name, stat, from_fs, to_fs);
         to_fs->utime(file_name, stat);
         st->num_files_stored++;
@@ -1251,8 +1261,8 @@ RC BeakImplementation::storeForward(Options *settings)
     debug(STORE, "Work to be done: num_files=%ju num_dirs=%ju\n", st.num_files, st.num_dirs);
 
     view->recurse([&ffs,this,settings,&st]
-                  (Path *path, FileStat *stat) {handleFile(path,stat,ffs.get(),this,settings,&st,
-                                                           from_fs_.get(), to_fs_.get()); });
+                  (Path *path, FileStat *stat) {handleTarFile(path,stat,ffs.get(),this,settings,&st,
+                                                              from_fs_.get(), to_fs_.get()); });
     uint64_t stop = clockGetTime();
     uint64_t store_time = stop - start;
 

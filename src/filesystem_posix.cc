@@ -189,8 +189,12 @@ RC FileSystemImplementationPosix::utime(Path *p, FileStat *fs)
 
     // Why always AT_SYMLINK_NOFOLLOW? Because beak never intends
     // to follow symlinks when storing files! beak stores symlinks themselves!
+    assert(p->c_str()[0] == '/'); // Must be an absolute path, or utimensat wont work.
     int rc = utimensat(0, p->c_str(), times, AT_SYMLINK_NOFOLLOW);
-    if (rc) return RC::ERR;
+    if (rc) {
+        failure(FILESYSTEM,"Could not set modify time for \"%s\" (%s)\n", p->c_str(), strerror(errno));
+        return RC::ERR;
+    }
     return RC::OK;
 }
 
@@ -283,7 +287,7 @@ RC FileSystemImplementationPosix::createFile(Path *file, vector<char> *buf)
 {
     int fd = open(file->c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
     if (fd == -1) {
-	failure(FILESYSTEM,"Could not open file %s errno=%d\n", file->c_str(), errno);
+	failure(FILESYSTEM,"Could not create file %s from buffer (errno=%d)\n", file->c_str(), errno);
         return RC::ERR;
     }
     char *p = buf->data();
@@ -319,7 +323,7 @@ bool FileSystemImplementationPosix::createFile(Path *file,
 
     int fd = open(file->c_str(), O_WRONLY | O_CREAT, stat->st_mode);
     if (fd == -1) {
-	failure(FILESYSTEM,"Could not open file %s errno=%d\n", file->c_str(), errno);
+	failure(FILESYSTEM,"Could not create file %s with callback (errno=%d)\n", file->c_str(), errno);
         return false;
     }
 
