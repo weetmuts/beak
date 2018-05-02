@@ -30,7 +30,7 @@ using namespace std;
 int main(int argc, char *argv[])
 {
     RC rc = RC::OK;
-    // First create the interface to external commands like rclone and rsync.
+    // First create the OS interface to invoke external commands like rclone and rsync.
     auto sys = newSystem();
     // Next create the interface to the file system that stores the beak configuration files
     // and the temporary/cache files.
@@ -39,7 +39,7 @@ int main(int argc, char *argv[])
     // ie rclone, rsync and local file system.
     auto storage_tool = newStorageTool(sys, sys_fs);
     // Create the source filesystem where the files to be backed up are found.
-    auto fs_src = newDefaultFileSystem();
+    auto origin_fs = newDefaultFileSystem();
     // Next create the dest filesystem where the files will be restored.
     auto fs_dst = newDefaultFileSystem();
     // Fetch the beak configuration from ~/.config/beak/beak.conf
@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
     configuration->load();
 
     // Now create the beak backup software.
-    auto beak = newBeak(configuration, sys, sys_fs, storage_tool, fs_src, fs_dst);
+    auto beak = newBeak(configuration, sys, sys_fs, storage_tool, origin_fs, fs_dst);
 
     beak->captureStartTime();
 
