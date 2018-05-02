@@ -155,3 +155,42 @@ RC StorageToolImplementation::listBeakFiles(Storage *storage,
 
     return RC::OK;
 }
+
+
+
+StoreStatistics::StoreStatistics() {
+    memset(this, 0, sizeof(StoreStatistics));
+    start = prev = clockGetTime();
+    info_displayed = false;
+}
+
+//Tar emot objekt: 100% (814178/814178), 669.29 MiB | 6.71 MiB/s, klart.
+//Analyserar delta: 100% (690618/690618), klart.
+
+void StoreStatistics::displayProgress()
+{
+    if (num_files == 0 || num_files_to_store == 0) return;
+    uint64_t now = clockGetTime();
+    if ((now-prev) < 500000 && num_files_to_store < num_files) return;
+    prev = now;
+    info_displayed = true;
+    UI::clearLine();
+    int percentage = (int)(100.0*(float)size_files_stored / (float)size_files_to_store);
+    string mibs = humanReadableTwoDecimals(size_files_stored);
+    float secs = ((float)((now-start)/1000))/1000.0;
+    string speed = humanReadableTwoDecimals(((double)size_files_stored)/secs);
+    if (num_files > num_files_to_store) {
+        UI::output("Incremental store: %d%% (%ju/%ju), %s | %.2f s %s/s ",
+                   percentage, num_files_stored, num_files_to_store, mibs.c_str(), secs, speed.c_str());
+    } else {
+        UI::output("Full store: %d%% (%ju/%ju), %s | %.2f s %s/s ",
+                   percentage, num_files_stored, num_files_to_store, mibs.c_str(), secs, speed.c_str());
+    }
+}
+
+void StoreStatistics::finishProgress()
+{
+    if (info_displayed == false || num_files == 0 || num_files_to_store == 0) return;
+    displayProgress();
+    UI::output(", done.\n");
+}

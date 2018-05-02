@@ -82,7 +82,6 @@ struct BeakImplementation : Beak {
     void printHelp(Command cmd);
     void printVersion();
     void printLicense();
-    RC printInfo(Options *settings);
 
     vector<PointInTime> history();
     RC findPointsInTime(string remote, vector<struct timespec> *v);
@@ -102,7 +101,6 @@ struct BeakImplementation : Beak {
     RC remountReverseDaemon(Options *settings);
     RC remountReverse(Options *settings);
 
-    RC shell(Options *settings);
     RC status(Options *settings);
     RC storeForward(Options *settings);
     RC restoreReverse(Options *settings);
@@ -624,25 +622,6 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Options *set
     return cmd;
 }
 
-RC BeakImplementation::printInfo(Options *settings)
-{
-    /*if (reverse_fs.history().size() == 0) {
-        fprintf(stdout, "Not a beak archive.\n");
-        return 1;
-        } else
-    if (reverse_fs.history().size() == 1) {
-        fprintf(stdout, "Single point in time found:\n");
-    } else {
-        fprintf(stdout, "Multiple points in time:\n");
-    }
-    for (auto s : reverse_fs.history()) {
-        printf("@%d   %-15s %s\n", s.key, s.ago.c_str(), s.datetime.c_str());
-    }
-    printf("\n");
-    */
-    return RC::OK;
-}
-
 vector<PointInTime> BeakImplementation::history()
 {
     vector<PointInTime> tmp; // {}; //reverse_fs.history();
@@ -982,33 +961,6 @@ RC BeakImplementation::remountReverseInternal(Options *settings, bool daemon)
     return RC::OK;
 }
 
-RC BeakImplementation::shell(Options *settings)
-{
-    /*
-    int rc = 0;
-
-    vector<char> out;
-    vector<string> args;
-    args.push_back("ls");
-    args.push_back(settings->remote);
-    rc = sys_->invoke("rclone", args, &out);
-
-    auto i = out.begin();
-    bool eof, err;
-
-    for (;;) {
-        eatWhitespace(out, i, &eof);
-        if (eof) break;
-        string size = eatTo(out, i, ' ', 64, &eof, &err);
-        if (eof || err) break;
-        string name = eatTo(out, i, '\n', 4096, &eof, &err);
-        if (err) break;
-    }
-    return rc;
-    */
-    return RC::OK;
-}
-
 // Copy the remote index files to the local storage.
 RC BeakImplementation::fetchPointsInTime(string remote, Path *cache)
 {
@@ -1129,62 +1081,6 @@ RC BeakImplementation::status(Options *settings)
     return rc;
 }
 
-struct StoreStatistics
-{
-    size_t num_files, size_files, num_dirs;
-    size_t num_hard_links, num_symbolic_links, num_nodes;
-
-    size_t num_files_to_store, size_files_to_store;
-    size_t num_files_stored, size_files_stored;
-    size_t num_dirs_updated;
-
-    size_t num_files_handled, size_files_handled;
-    size_t num_dirs_handled;
-
-    size_t num_hard_links_stored;
-    size_t num_symbolic_links_stored;
-    size_t num_device_nodes_stored;
-
-    size_t num_total, num_total_handled;
-
-    uint64_t prev, start;
-    bool info_displayed;
-
-    StoreStatistics() {
-        memset(this, 0, sizeof(StoreStatistics));
-        start = prev = clockGetTime();
-        info_displayed = false;
-    }
-    //Tar emot objekt: 100% (814178/814178), 669.29 MiB | 6.71 MiB/s, klart.
-    //Analyserar delta: 100% (690618/690618), klart.
-
-    void displayProgress() {
-        if (num_files == 0 || num_files_to_store == 0) return;
-        uint64_t now = clockGetTime();
-        if ((now-prev) < 500000 && num_files_to_store < num_files) return;
-        prev = now;
-        info_displayed = true;
-        UI::clearLine();
-        int percentage = (int)(100.0*(float)size_files_stored / (float)size_files_to_store);
-        string mibs = humanReadableTwoDecimals(size_files_stored);
-        float secs = ((float)((now-start)/1000))/1000.0;
-        string speed = humanReadableTwoDecimals(((double)size_files_stored)/secs);
-        if (num_files > num_files_to_store) {
-            UI::output("Incremental store: %d%% (%ju/%ju), %s | %.2f s %s/s ",
-                       percentage, num_files_stored, num_files_to_store, mibs.c_str(), secs, speed.c_str());
-        } else {
-            UI::output("Full store: %d%% (%ju/%ju), %s | %.2f s %s/s ",
-                       percentage, num_files_stored, num_files_to_store, mibs.c_str(), secs, speed.c_str());
-        }
-    }
-
-    void finishProgress() {
-        if (info_displayed == false || num_files == 0 || num_files_to_store == 0) return;
-        displayProgress();
-        UI::output(", done.\n");
-    }
-
-};
 
 void calculateForwardWork(Path *path, FileStat *stat,
                           ForwardTarredFS *rfs, Beak *beak,

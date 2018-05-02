@@ -525,7 +525,7 @@ RC ReverseTarredFS::lookForPointsInTime(PointInTimeFormat f, Path *path)
             p.ts.tv_nsec = tfn.nsecs;
             char datetime[20];
             memset(datetime, 0, sizeof(datetime));
-            strftime(datetime, 20, "%Y-%m-%d %H:%M", localtime(&p.ts.tv_sec));
+            strftime(datetime, 20, "%Y-%m-%d_%H:%M", localtime(&p.ts.tv_sec));
 
             p.ago = timeAgo(&p.ts);
             p.datetime = datetime;

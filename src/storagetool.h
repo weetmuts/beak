@@ -27,6 +27,32 @@
 #include<string>
 #include<vector>
 
+struct StoreStatistics
+{
+    size_t num_files, size_files, num_dirs;
+    size_t num_hard_links, num_symbolic_links, num_nodes;
+
+    size_t num_files_to_store, size_files_to_store;
+    size_t num_files_stored, size_files_stored;
+    size_t num_dirs_updated;
+
+    size_t num_files_handled, size_files_handled;
+    size_t num_dirs_handled;
+
+    size_t num_hard_links_stored;
+    size_t num_symbolic_links_stored;
+    size_t num_device_nodes_stored;
+
+    size_t num_total, num_total_handled;
+
+    uint64_t prev, start;
+    bool info_displayed;
+
+    StoreStatistics();
+    void displayProgress();
+    void finishProgress();
+};
+
 struct StorageTool
 {
     virtual RC listBeakFiles(Storage *storage,
@@ -38,5 +64,6 @@ struct StorageTool
 };
 
 std::unique_ptr<StorageTool> newStorageTool(ptr<System> sys, ptr<FileSystem> fs);
+
 
 #endif

@@ -5,7 +5,7 @@ stored backups between multiple client computers.
 
 Beak is work in progress. The text below describes the goal!
 
-## Short short manaul....
+## Short short manual....
 
 Local filesystem backups.
 ```

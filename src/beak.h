@@ -46,7 +46,6 @@ struct Beak
     virtual void captureStartTime() = 0;
     virtual std::string argsToVector(int argc, char **argv, std::vector<std::string> *args) = 0;
     virtual Command parseCommandLine(int argc, char **argv, Options *settings) = 0;
-    virtual RC printInfo(Options *settings) = 0;
     virtual std::vector<PointInTime> history() = 0;
 
     virtual RC check(Options *settings) = 0;
@@ -62,7 +61,6 @@ struct Beak
     virtual RC remountReverseDaemon(Options *settings) = 0;
     virtual RC remountReverse(Options *settings) = 0;
 
-    virtual RC shell(Options *settings) = 0;
     virtual RC status(Options *settings) = 0;
     virtual RC storeForward(Options *settings) = 0;
     virtual RC restoreReverse(Options *settings) = 0;
@@ -102,7 +100,6 @@ enum ArgumentType
     X(help,"Show help. Also: beak push help",ArgORS,ArgNone) \
     X(genautocomplete,"Output bash completion script for beak.",ArgFile,ArgNone) \
     X(genmounttrigger,"Output systemd rule to trigger backup when USB drive is mounted.",ArgFile,ArgNone) \
-    X(info,"List points in time and other info about archive.",ArgStorage,ArgNone) \
     X(mount,"Mount your file system as a backup.",ArgOrigin,ArgDir) \
     X(history,"Mount all known storages for your backup.",ArgRule,ArgNone) \
     X(prune,"Discard old backups according to the keep rule.",ArgStorage,ArgNone) \
@@ -110,7 +107,6 @@ enum ArgumentType
     X(push,"Backup a rule to a storage location.",ArgRule,ArgNone) \
     X(remount,"Mount your backup as a file system.",ArgStorage,ArgDir) \
     X(restore,"Restore from your backup into your file system.",ArgStorage,ArgOrigin) \
-    X(shell,"Start a minimal shell to explore a backup.",ArgStorage,ArgNone) \
     X(status,"Show the status of your backups both locally and remotely.",ArgNone,ArgNone) \
     X(store,"Store your file system into a backup.",ArgOrigin,ArgStorage) \
     X(umount,"Unmount a virtual file system.",ArgDir,ArgNone) \

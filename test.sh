@@ -71,7 +71,7 @@ THIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 THIS_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 
 if [ "$1" == "list" ]; then
-    grep 'setup test' $THIS_SCRIPT | grep -v grep | cut -f 2- -d ' '
+    grep '^setup ' $THIS_SCRIPT | grep -v grep | cut -f 2- -d ' '
     exit
 fi
 

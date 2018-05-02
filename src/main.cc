@@ -69,10 +69,6 @@ int main(int argc, char *argv[])
     case diff_cmd:
         break;
 
-    case info_cmd:
-        rc = beak->printInfo(&settings);
-        break;
-
     case genautocomplete_cmd:
         if (settings.from.dir == NULL) {
             beak->genAutoComplete("/etc/bash_completion.d/beak");
@@ -110,10 +106,6 @@ int main(int argc, char *argv[])
 
     case restore_cmd:
         rc = beak->restoreReverse(&settings);
-        break;
-
-    case shell_cmd:
-        rc = beak->shell(&settings);
         break;
 
     case status_cmd:
