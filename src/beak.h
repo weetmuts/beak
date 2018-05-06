@@ -76,8 +76,10 @@ struct Beak
     virtual ~Beak() = default;
 };
 
-std::unique_ptr<Beak> newBeak(ptr<Configuration> config, ptr<System> sys, ptr<FileSystem> sys_fs, ptr<StorageTool> storage_tool,
-                              ptr<FileSystem> src_fs, ptr<FileSystem> dst_fs);
+std::unique_ptr<Beak> newBeak(ptr<Configuration> config,
+                              ptr<System> sys, ptr<FileSystem> sys_fs,
+                              ptr<StorageTool> storage_tool,
+                              ptr<FileSystem> origin_fs);
 
 enum ArgumentType
 {

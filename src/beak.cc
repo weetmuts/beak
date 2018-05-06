@@ -70,7 +70,7 @@ struct BeakImplementation : Beak {
 
     BeakImplementation(ptr<Configuration> configuration,
                        ptr<System> sys, ptr<FileSystem> sys_fs, ptr<StorageTool> storage_tool,
-                       ptr<FileSystem> from_fs, ptr<FileSystem> to_fs);
+                       ptr<FileSystem> origin_fs);
 
     void printCommands();
     void printOptions();
@@ -135,14 +135,15 @@ struct BeakImplementation : Beak {
     ptr<System> sys_;
     ptr<FileSystem> sys_fs_;
     ptr<StorageTool> storage_tool_;
-    ptr<FileSystem> from_fs_;
-    ptr<FileSystem> to_fs_;
+    ptr<FileSystem> origin_fs_;
 };
 
 unique_ptr<Beak> newBeak(ptr<Configuration> configuration,
-                         ptr<System> sys, ptr<FileSystem> sys_fs, ptr<StorageTool> storage_tool,
-                         ptr<FileSystem> from_fs, ptr<FileSystem> to_fs) {
-    return unique_ptr<Beak>(new BeakImplementation(configuration, sys, sys_fs, storage_tool, from_fs, to_fs));
+                         ptr<System> sys,
+                         ptr<FileSystem> sys_fs,
+                         ptr<StorageTool> storage_tool,
+                         ptr<FileSystem> origin_fs) {
+    return unique_ptr<Beak>(new BeakImplementation(configuration, sys, sys_fs, storage_tool, origin_fs));
 }
 
 struct CommandEntry {
@@ -175,13 +176,12 @@ LIST_OF_OPTIONS
 BeakImplementation::BeakImplementation(ptr<Configuration> configuration,
                                        ptr<System> sys, ptr<FileSystem> sys_fs,
                                        ptr<StorageTool> storage_tool,
-                                       ptr<FileSystem> from_fs, ptr<FileSystem> to_fs) :
+                                       ptr<FileSystem> origin_fs) :
     configuration_(configuration),
     sys_(sys),
     sys_fs_(sys_fs),
     storage_tool_(storage_tool),
-    from_fs_(from_fs),
-    to_fs_(to_fs)
+    origin_fs_(origin_fs)
 {
     for (auto &e : command_entries_) {
         if (e.cmd != nosuch_cmd) {
@@ -835,7 +835,7 @@ RC BeakImplementation::mountForwardInternal(Options *settings, bool daemon)
     forward_tarredfs_ops.read = forwardRead;
     forward_tarredfs_ops.readdir = forwardReaddir;
 
-    auto ffs  = newForwardTarredFS(from_fs_);
+    auto ffs  = newForwardTarredFS(origin_fs_);
     RC rc = ffs->scanFileSystem(settings);
 
     if (rc.isErr()) {
@@ -915,7 +915,7 @@ RC BeakImplementation::remountReverseInternal(Options *settings, bool daemon)
     reverse_tarredfs_ops.readdir = reverseReaddir;
     reverse_tarredfs_ops.readlink = reverseReadlink;
 
-    auto rfs  = newReverseTarredFS(from_fs_);
+    auto rfs  = newReverseTarredFS(origin_fs_);
 
     RC rc = rfs->lookForPointsInTime(PointInTimeFormat::absolute_point, settings->from.storage->storage_location);
     if (rc.isErr()) {
@@ -990,7 +990,7 @@ RC BeakImplementation::fetchPointsInTime(string remote, Path *cache)
     string r = remote;
     r.pop_back();
     p = p->appendName(Atom::lookup(r+".ls"));
-    to_fs_->createFile(p, &out);
+    sys_fs_->createFile(p, &out);
     UI::clearLine();
     fflush(stdout);
 
@@ -1082,32 +1082,15 @@ RC BeakImplementation::status(Options *settings)
 }
 
 
-void calculateForwardWork(Path *path, FileStat *stat,
-                          ForwardTarredFS *rfs, Beak *beak,
-                          Options *settings, StoreStatistics *st,
-                          FileSystem *from_fs, FileSystem *to_fs)
-{
-    auto file_to_extract = path->prepend(settings->to.storage->storage_location);
-
-    if (stat->isRegularFile()) {
-        stat->checkStat(to_fs, file_to_extract);
-        if (stat->disk_update == Store) {
-            st->num_files_to_store++; st->size_files_to_store+=stat->st_size;
-        }
-        st->num_files++; st->size_files+=stat->st_size;
-    }
-    else if (stat->isDirectory()) st->num_dirs++;
-}
-
 void handleTarFile(Path *path, FileStat *stat,
-                   ForwardTarredFS *rfs, Beak *beak,
+                   ForwardTarredFS *ffs, Beak *beak,
                    Options *settings, StoreStatistics *st,
-                   FileSystem *from_fs, FileSystem *to_fs)
+                   FileSystem *origin_fs, FileSystem *to_fs)
 {
     if (!stat->isRegularFile()) return;
 
     debug(STORE, "PATH %s\n", path->c_str());
-    TarFile *tar = rfs->findTarFromPath(path);
+    TarFile *tar = ffs->findTarFromPath(path);
     assert(tar);
     Path *file_name = tar->path()->prepend(settings->to.storage->storage_location);
     to_fs->mkDirp(file_name->parent());
@@ -1123,7 +1106,7 @@ void handleTarFile(Path *path, FileStat *stat,
         if (rc.isOk()) {
             to_fs->deleteFile(file_name);
         }
-        tar->createFile(file_name, stat, from_fs, to_fs);
+        tar->createFile(file_name, stat, origin_fs, to_fs);
         to_fs->utime(file_name, stat);
         st->num_files_stored++;
         st->size_files_stored += stat->st_size;
@@ -1142,7 +1125,7 @@ RC BeakImplementation::storeForward(Options *settings)
     assert(settings->from.type == ArgOrigin || settings->from.type == ArgRule);
     assert(settings->to.type == ArgStorage);
 
-    auto ffs  = newForwardTarredFS(from_fs_);
+    auto ffs  = newForwardTarredFS(origin_fs_);
     auto view = ffs->asFileSystem();
 
     uint64_t start = clockGetTime();
@@ -1151,14 +1134,13 @@ RC BeakImplementation::storeForward(Options *settings)
     StoreStatistics st;
 
     view->recurse([&ffs,this,settings,&st]
-                  (Path *path, FileStat *stat) {calculateForwardWork(path,stat,ffs.get(), this,settings,&st,
-                                                                     from_fs_.get(), to_fs_.get()); });
+                  (Path *path, FileStat *stat) {storage_tool_->addForwardWork(&st,path,stat,settings,origin_fs_.get()); });
 
     debug(STORE, "Work to be done: num_files=%ju num_dirs=%ju\n", st.num_files, st.num_dirs);
 
     view->recurse([&ffs,this,settings,&st]
                   (Path *path, FileStat *stat) {handleTarFile(path,stat,ffs.get(),this,settings,&st,
-                                                              from_fs_.get(), to_fs_.get()); });
+                                                              origin_fs_.get(), origin_fs_.get()); });
     uint64_t stop = clockGetTime();
     uint64_t store_time = stop - start;
 
@@ -1180,7 +1162,7 @@ RC BeakImplementation::storeForward(Options *settings)
     return rc;
 }
 
-bool extractHardLink(FileSystem *from_fs, Path *target,
+bool extractHardLink(FileSystem *origin_fs, Path *target,
                      FileSystem *to_fs, Path *dst_root, Path *file_to_extract, FileStat *stat,
                      StoreStatistics *statistics)
 {
@@ -1222,7 +1204,7 @@ bool extractHardLink(FileSystem *from_fs, Path *target,
 }
 
 bool extractFile(Entry *entry,
-                 FileSystem *from_fs, Path *tar_file, off_t tar_file_offset,
+                 FileSystem *origin_fs, Path *tar_file, off_t tar_file_offset,
                  FileSystem *to_fs, Path *file_to_extract, FileStat *stat,
                  StoreStatistics *statistics)
 {
@@ -1242,10 +1224,10 @@ bool extractFile(Entry *entry,
 
     to_fs->mkDirp(file_to_extract->parent());
     to_fs->createFile(file_to_extract, stat,
-        [from_fs,tar_file_offset,file_to_extract,tar_file] (off_t offset, char *buffer, size_t len)
+        [origin_fs,tar_file_offset,file_to_extract,tar_file] (off_t offset, char *buffer, size_t len)
         {
             debug(STORE,"Extracting %ju bytes to file %s\n", len, file_to_extract->c_str());
-            ssize_t n = from_fs->pread(tar_file, buffer, len, tar_file_offset + offset);
+            ssize_t n = origin_fs->pread(tar_file, buffer, len, tar_file_offset + offset);
             debug(STORE, "Extracted %ju bytes from %ju to %ju.\n", n,
                   tar_file_offset+offset, offset);
             return n;
@@ -1260,7 +1242,7 @@ bool extractFile(Entry *entry,
     return true;
 }
 
-bool extractSymbolicLink(FileSystem *from_fs, string target,
+bool extractSymbolicLink(FileSystem *origin_fs, string target,
                         FileSystem *to_fs, Path *file_to_extract, FileStat *stat,
                         StoreStatistics *statistics)
 {
@@ -1295,7 +1277,7 @@ bool extractSymbolicLink(FileSystem *from_fs, string target,
     return true;
 }
 
-bool extractNode(FileSystem *from_fs, FileSystem *to_fs, Path *file_to_extract, FileStat *stat,
+bool extractNode(FileSystem *origin_fs, FileSystem *to_fs, Path *file_to_extract, FileStat *stat,
                  StoreStatistics *statistics)
 {
     FileStat old_stat;
@@ -1347,38 +1329,17 @@ bool chmodDirectory(FileSystem *to_fs, Path *file_to_extract, FileStat *stat,
     return true;
 }
 
-void calculateReverseWork(Path *path, FileStat *stat,
-                          ReverseTarredFS *rfs, Beak *beak, PointInTime *point,
-                          Options *settings, StoreStatistics *st,
-                          FileSystem *from_fs, FileSystem *to_fs)
-{
-    auto entry = rfs->findEntry(point, path);
-    auto file_to_extract = path->prepend(settings->from.storage->storage_location);
-
-    if (entry->is_hard_link) st->num_hard_links++;
-    else if (stat->isRegularFile()) {
-        stat->checkStat(to_fs, file_to_extract);
-        if (stat->disk_update == Store) {
-            st->num_files_to_store++; st->size_files_to_store+=stat->st_size;
-        }
-        st->num_files++; st->size_files+=stat->st_size;
-    }
-    else if (stat->isSymbolicLink()) st->num_symbolic_links++;
-    else if (stat->isDirectory()) st->num_dirs++;
-    else if (stat->isFIFO()) st->num_nodes++;
-}
-
 void handleHardLinks(Path *path, FileStat *stat,
                      ReverseTarredFS *rfs, Beak *beak,PointInTime *point,
                      Options *settings, StoreStatistics *st,
-                     FileSystem *from_fs, FileSystem *to_fs)
+                     FileSystem *origin_fs, FileSystem *to_fs)
 {
     auto entry = rfs->findEntry(point, path);
     auto file_to_extract = path->prepend(settings->to.origin);
 
     if (entry->is_hard_link) {
         // Special case since hard links are not encoded in stat structure.
-        extractHardLink(from_fs, entry->hard_link,
+        extractHardLink(origin_fs, entry->hard_link,
                         to_fs, settings->to.origin,
                         file_to_extract, stat, st);
     }
@@ -1387,7 +1348,7 @@ void handleHardLinks(Path *path, FileStat *stat,
 void handleRegularFiles(Path *path, FileStat *stat,
                         ReverseTarredFS *rfs, Beak *beak,PointInTime *point,
                         Options *settings, StoreStatistics *st,
-                        FileSystem *from_fs, FileSystem *to_fs)
+                        FileSystem *origin_fs, FileSystem *to_fs)
 {
     auto entry = rfs->findEntry(point, path);
     auto tar_file = entry->tar->prepend(settings->from.storage->storage_location);
@@ -1395,7 +1356,7 @@ void handleRegularFiles(Path *path, FileStat *stat,
     auto file_to_extract = path->prepend(settings->to.origin);
 
     if (!entry->is_hard_link && stat->isRegularFile()) {
-        extractFile(entry, from_fs, tar_file, tar_file_offset,
+        extractFile(entry, origin_fs, tar_file, tar_file_offset,
                     to_fs, file_to_extract, stat, st);
         st->num_files_handled++;
         st->size_files_handled += stat->st_size;
@@ -1405,26 +1366,26 @@ void handleRegularFiles(Path *path, FileStat *stat,
 void handleNodes(Path *path, FileStat *stat,
                  ReverseTarredFS *rfs, Beak *beak,PointInTime *point,
                  Options *settings, StoreStatistics *st,
-                 FileSystem *from_fs, FileSystem *to_fs)
+                 FileSystem *origin_fs, FileSystem *to_fs)
 {
     auto entry = rfs->findEntry(point, path);
     auto file_to_extract = path->prepend(settings->to.origin);
 
     if (!entry->is_hard_link && stat->isFIFO()) {
-        extractNode(from_fs, to_fs, file_to_extract, stat, st);
+        extractNode(origin_fs, to_fs, file_to_extract, stat, st);
     }
 }
 
 void handleSymbolicLinks(Path *path, FileStat *stat,
                          ReverseTarredFS *rfs, Beak *beak,PointInTime *point,
                          Options *settings, StoreStatistics *st,
-                         FileSystem *from_fs, FileSystem *to_fs)
+                         FileSystem *origin_fs, FileSystem *to_fs)
 {
     auto entry = rfs->findEntry(point, path);
     auto file_to_extract = path->prepend(settings->to.origin);
 
     if (!entry->is_hard_link && stat->isSymbolicLink()) {
-        extractSymbolicLink(from_fs, entry->symlink,
+        extractSymbolicLink(origin_fs, entry->symlink,
                             to_fs, file_to_extract, stat, st);
     }
 }
@@ -1432,7 +1393,7 @@ void handleSymbolicLinks(Path *path, FileStat *stat,
 void handleDirs(Path *path, FileStat *stat,
                 ReverseTarredFS *rfs, Beak *beak,PointInTime *point,
                 Options *settings, StoreStatistics *st,
-                FileSystem *from_fs, FileSystem *to_fs)
+                FileSystem *origin_fs, FileSystem *to_fs)
 {
     auto file_to_extract = path->prepend(settings->to.origin);
 
@@ -1454,7 +1415,7 @@ RC BeakImplementation::restoreReverse(Options *settings)
     }
 
     umask(0);
-    auto rfs  = newReverseTarredFS(from_fs_);
+    auto rfs  = newReverseTarredFS(origin_fs_);
     auto view = rfs->asFileSystem();
 
     rfs->lookForPointsInTime(PointInTimeFormat::absolute_point, settings->from.storage->storage_location);
@@ -1475,26 +1436,26 @@ RC BeakImplementation::restoreReverse(Options *settings)
     StoreStatistics st;
 
     view->recurse([&rfs,this,point,settings,&st]
-                  (Path *path, FileStat *stat) {calculateReverseWork(path,stat,rfs.get(),this,point,settings,&st,
-                                                                     from_fs_.get(), to_fs_.get()); });
+                  (Path *path, FileStat *stat) {storage_tool_->addReverseWork(&st,path,stat,settings,origin_fs_.get(),
+                                                                              rfs.get(),point); });
     debug(STORE, "Work to be done: num_files=%ju num_hardlinks=%ju num_symlinks=%ju num_nodes=%ju num_dirs=%ju\n",
           st.num_files, st.num_hard_links, st.num_symbolic_links, st.num_nodes, st.num_dirs);
 
     view->recurse([&rfs,this,point,settings,&st]
                   (Path *path, FileStat *stat) {handleRegularFiles(path,stat,rfs.get(),this,point,settings,&st,
-                                                                   from_fs_.get(), to_fs_.get()); });
+                                                                   origin_fs_.get(), origin_fs_.get()); });
     view->recurse([&rfs,this,point,settings,&st]
                   (Path *path, FileStat *stat) {handleNodes(path,stat,rfs.get(),this,point,settings,&st,
-                                                            from_fs_.get(), to_fs_.get()); });
+                                                            origin_fs_.get(), origin_fs_.get()); });
     view->recurse([&rfs,this,point,settings,&st]
                   (Path *path, FileStat *stat) {handleSymbolicLinks(path,stat,rfs.get(),this,point,settings,&st,
-                                                                    from_fs_.get(), to_fs_.get()); });
+                                                                    origin_fs_.get(), origin_fs_.get()); });
     view->recurse([&rfs,this,point,settings,&st]
                   (Path *path, FileStat *stat) {handleHardLinks(path,stat,rfs.get(),this,point,settings,&st,
-                                                                from_fs_.get(), to_fs_.get()); });
+                                                                origin_fs_.get(), origin_fs_.get()); });
     view->recurse([&rfs,this,point,settings,&st]
                   (Path *path, FileStat *stat) {handleDirs(path,stat,rfs.get(),this,point,settings,&st,
-                                                           from_fs_.get(), to_fs_.get()); });
+                                                           origin_fs_.get(), origin_fs_.get()); });
 
     uint64_t stop = clockGetTime();
     uint64_t store_time = stop - start;

@@ -35,19 +35,20 @@ int main(int argc, char *argv[])
     // Next create the interface to the file system that stores the beak configuration files
     // and the temporary/cache files.
     auto sys_fs = newDefaultFileSystem();
+    // Next create the filesystem that can be used as a storage location
+    auto storage_fs = newDefaultFileSystem();
     // Then create the interface to hide the differences between different storages types:
     // ie rclone, rsync and local file system.
-    auto storage_tool = newStorageTool(sys, sys_fs);
-    // Create the source filesystem where the files to be backed up are found.
+    auto storage_tool = newStorageTool(sys, sys_fs, storage_fs);
+    // Create the source filesystem where the files to be backed up are found
+    // and where restored files are written.
     auto origin_fs = newDefaultFileSystem();
-    // Next create the dest filesystem where the files will be restored.
-    auto fs_dst = newDefaultFileSystem();
     // Fetch the beak configuration from ~/.config/beak/beak.conf
     auto configuration = newConfiguration(sys, sys_fs);
     configuration->load();
 
     // Now create the beak backup software.
-    auto beak = newBeak(configuration, sys, sys_fs, storage_tool, origin_fs, fs_dst);
+    auto beak = newBeak(configuration, sys, sys_fs, storage_tool, origin_fs);
 
     beak->captureStartTime();
 
