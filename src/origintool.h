@@ -15,8 +15,8 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef STORAGE_H
-#define STORAGE_H
+#ifndef ORIGINTOOL_H
+#define ORIGINTOOL_H
 
 #include "always.h"
 #include "beak.h"
@@ -29,23 +29,17 @@
 #include<string>
 #include<vector>
 
-struct StorageTool
+struct OriginTool
 {
-    virtual RC listBeakFiles(Storage *storage,
-                             std::vector<TarFileName> *files,
-                             std::vector<TarFileName> *bad_files,
-                             std::vector<std::string> *other_files) = 0;
-    virtual RC sendBeakFilesToStorage(Path *dir, Storage *storage, std::vector<TarFileName*> *files) = 0;
-    virtual RC fetchBeakFilesFromStorage(Storage *storage, std::vector<TarFileName*> *files, Path *dir) = 0;
-
-    virtual void addForwardWork(StoreStatistics *st, Path *path, FileStat *stat, Options *settings) = 0;
+    virtual void addReverseWork(StoreStatistics *st, Path *path, FileStat *stat, Options *settings,
+                                ReverseTarredFS *rfs, PointInTime *point) = 0;
 
     virtual ptr<FileSystem> fs() = 0;
 };
 
+std::unique_ptr<OriginTool> newOriginTool(ptr<System> sys,
+                                          ptr<FileSystem> sys_fs,
+                                          ptr<FileSystem> origin_fs);
 
-std::unique_ptr<StorageTool> newStorageTool(ptr<System> sys,
-                                            ptr<FileSystem> sys_fs,
-                                            ptr<FileSystem> storage_fs);
 
 #endif

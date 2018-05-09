@@ -40,6 +40,7 @@ struct PointInTime;
 struct Rule;
 struct Storage;
 struct StorageTool;
+struct OriginTool;
 
 struct Beak
 {
@@ -79,7 +80,7 @@ struct Beak
 std::unique_ptr<Beak> newBeak(ptr<Configuration> config,
                               ptr<System> sys, ptr<FileSystem> sys_fs,
                               ptr<StorageTool> storage_tool,
-                              ptr<FileSystem> origin_fs);
+                              ptr<OriginTool> origin_tool);
 
 enum ArgumentType
 {

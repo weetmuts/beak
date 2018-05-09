@@ -35,9 +35,9 @@ struct StorageToolImplementation : public StorageTool
     RC sendBeakFilesToStorage(Path *dir, Storage *storage, std::vector<TarFileName*> *files);
     RC fetchBeakFilesFromStorage(Storage *storage, std::vector<TarFileName*> *files, Path *dir);
 
-    void addForwardWork(StoreStatistics *st, Path *path, FileStat *stat, Options *settings, FileSystem *origin_fs);
-    void addReverseWork(StoreStatistics *st, Path *path, FileStat *stat, Options *settings, FileSystem *origin_fs,
-                        ReverseTarredFS *rfs, PointInTime *point);
+    void addForwardWork(StoreStatistics *st, Path *path, FileStat *stat, Options *settings);
+
+    ptr<FileSystem> fs() { return storage_fs_; }
 
     ptr<System> sys_;
     ptr<FileSystem> sys_fs_;
@@ -50,6 +50,7 @@ unique_ptr<StorageTool> newStorageTool(ptr<System> sys,
 {
     return unique_ptr<StorageTool>(new StorageToolImplementation(sys, sys_fs, storage_fs));
 }
+
 
 StorageToolImplementation::StorageToolImplementation(ptr<System>sys,
                                                      ptr<FileSystem> sys_fs,
@@ -165,54 +166,15 @@ RC StorageToolImplementation::listBeakFiles(Storage *storage,
     return RC::OK;
 }
 
-
-
-StoreStatistics::StoreStatistics() {
-    memset(this, 0, sizeof(StoreStatistics));
-    start = prev = clockGetTime();
-    info_displayed = false;
-}
-
-//Tar emot objekt: 100% (814178/814178), 669.29 MiB | 6.71 MiB/s, klart.
-//Analyserar delta: 100% (690618/690618), klart.
-
-void StoreStatistics::displayProgress()
-{
-    if (num_files == 0 || num_files_to_store == 0) return;
-    uint64_t now = clockGetTime();
-    if ((now-prev) < 500000 && num_files_to_store < num_files) return;
-    prev = now;
-    info_displayed = true;
-    UI::clearLine();
-    int percentage = (int)(100.0*(float)size_files_stored / (float)size_files_to_store);
-    string mibs = humanReadableTwoDecimals(size_files_stored);
-    float secs = ((float)((now-start)/1000))/1000.0;
-    string speed = humanReadableTwoDecimals(((double)size_files_stored)/secs);
-    if (num_files > num_files_to_store) {
-        UI::output("Incremental store: %d%% (%ju/%ju), %s | %.2f s %s/s ",
-                   percentage, num_files_stored, num_files_to_store, mibs.c_str(), secs, speed.c_str());
-    } else {
-        UI::output("Full store: %d%% (%ju/%ju), %s | %.2f s %s/s ",
-                   percentage, num_files_stored, num_files_to_store, mibs.c_str(), secs, speed.c_str());
-    }
-}
-
-void StoreStatistics::finishProgress()
-{
-    if (info_displayed == false || num_files == 0 || num_files_to_store == 0) return;
-    displayProgress();
-    UI::output(", done.\n");
-}
-
 void addForwardWork(StoreStatistics *st,
                     Path *path, FileStat *stat,
                     Options *settings,
-                    FileSystem *origin_fs, FileSystem *to_fs)
+                    ptr<FileSystem> to_fs)
 {
     Path *file_to_extract = path->prepend(settings->to.storage->storage_location);
 
     if (stat->isRegularFile()) {
-        stat->checkStat(to_fs, file_to_extract);
+        stat->checkStat(to_fs.get(), file_to_extract);
         if (stat->disk_update == Store) {
             st->num_files_to_store++;
             st->size_files_to_store += stat->st_size;
@@ -223,41 +185,11 @@ void addForwardWork(StoreStatistics *st,
     else if (stat->isDirectory()) st->num_dirs++;
 }
 
-void addReverseWork(StoreStatistics *st,
-                    Path *path, FileStat *stat,
-                    Options *settings,
-                    FileSystem *origin_fs,
-                    ReverseTarredFS *rfs, PointInTime *point,
-                    FileSystem *to_fs)
-{
-    Entry *entry = rfs->findEntry(point, path);
-    Path *file_to_extract = path->prepend(settings->from.storage->storage_location);
-
-    if (entry->is_hard_link) st->num_hard_links++;
-    else if (stat->isRegularFile()) {
-        stat->checkStat(to_fs, file_to_extract);
-        if (stat->disk_update == Store) {
-            st->num_files_to_store++;
-            st->size_files_to_store += stat->st_size;
-        }
-        st->num_files++;
-        st->size_files += stat->st_size;
-    }
-    else if (stat->isSymbolicLink()) st->num_symbolic_links++;
-    else if (stat->isDirectory()) st->num_dirs++;
-    else if (stat->isFIFO()) st->num_nodes++;
-}
 
 void StorageToolImplementation::addForwardWork(StoreStatistics *st,
-                                               Path *path, FileStat *stat, Options *settings,
-                                               FileSystem *origin_fs)
+                                               Path *path,
+                                               FileStat *stat,
+                                               Options *settings)
 {
-    ::addForwardWork(st, path, stat, settings, origin_fs, storage_fs_.get());
-}
-
-void StorageToolImplementation::addReverseWork(StoreStatistics *st,
-                                               Path *path, FileStat *stat, Options *settings, FileSystem *origin_fs,
-                                               ReverseTarredFS *rfs, PointInTime *point)
-{
-    ::addReverseWork(st, path, stat, settings, origin_fs, rfs, point, storage_fs_.get());
+    ::addForwardWork(st, path, stat, settings, storage_fs_);
 }

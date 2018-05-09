@@ -23,6 +23,8 @@
 #include "forward.h"
 #include "reverse.h"
 #include "index.h"
+#include "origintool.h"
+#include "statistics.h"
 #include "storagetool.h"
 #include "system.h"
 #include "tarfile.h"
@@ -69,8 +71,9 @@ struct OptionEntry;
 struct BeakImplementation : Beak {
 
     BeakImplementation(ptr<Configuration> configuration,
-                       ptr<System> sys, ptr<FileSystem> sys_fs, ptr<StorageTool> storage_tool,
-                       ptr<FileSystem> origin_fs);
+                       ptr<System> sys, ptr<FileSystem> sys_fs,
+                       ptr<StorageTool> storage_tool,
+                       ptr<OriginTool> origin_tool);
 
     void printCommands();
     void printOptions();
@@ -135,15 +138,15 @@ struct BeakImplementation : Beak {
     ptr<System> sys_;
     ptr<FileSystem> sys_fs_;
     ptr<StorageTool> storage_tool_;
-    ptr<FileSystem> origin_fs_;
+    ptr<OriginTool> origin_tool_;
 };
 
 unique_ptr<Beak> newBeak(ptr<Configuration> configuration,
                          ptr<System> sys,
                          ptr<FileSystem> sys_fs,
                          ptr<StorageTool> storage_tool,
-                         ptr<FileSystem> origin_fs) {
-    return unique_ptr<Beak>(new BeakImplementation(configuration, sys, sys_fs, storage_tool, origin_fs));
+                         ptr<OriginTool> origin_tool) {
+    return unique_ptr<Beak>(new BeakImplementation(configuration, sys, sys_fs, storage_tool, origin_tool));
 }
 
 struct CommandEntry {
@@ -176,12 +179,12 @@ LIST_OF_OPTIONS
 BeakImplementation::BeakImplementation(ptr<Configuration> configuration,
                                        ptr<System> sys, ptr<FileSystem> sys_fs,
                                        ptr<StorageTool> storage_tool,
-                                       ptr<FileSystem> origin_fs) :
+                                       ptr<OriginTool> origin_tool) :
     configuration_(configuration),
     sys_(sys),
     sys_fs_(sys_fs),
     storage_tool_(storage_tool),
-    origin_fs_(origin_fs)
+    origin_tool_(origin_tool)
 {
     for (auto &e : command_entries_) {
         if (e.cmd != nosuch_cmd) {
@@ -835,7 +838,7 @@ RC BeakImplementation::mountForwardInternal(Options *settings, bool daemon)
     forward_tarredfs_ops.read = forwardRead;
     forward_tarredfs_ops.readdir = forwardReaddir;
 
-    auto ffs  = newForwardTarredFS(origin_fs_);
+    auto ffs  = newForwardTarredFS(origin_tool_->fs());
     RC rc = ffs->scanFileSystem(settings);
 
     if (rc.isErr()) {
@@ -915,7 +918,7 @@ RC BeakImplementation::remountReverseInternal(Options *settings, bool daemon)
     reverse_tarredfs_ops.readdir = reverseReaddir;
     reverse_tarredfs_ops.readlink = reverseReadlink;
 
-    auto rfs  = newReverseTarredFS(origin_fs_);
+    auto rfs  = newReverseTarredFS(origin_tool_->fs());
 
     RC rc = rfs->lookForPointsInTime(PointInTimeFormat::absolute_point, settings->from.storage->storage_location);
     if (rc.isErr()) {
@@ -1085,7 +1088,7 @@ RC BeakImplementation::status(Options *settings)
 void handleTarFile(Path *path, FileStat *stat,
                    ForwardTarredFS *ffs, Beak *beak,
                    Options *settings, StoreStatistics *st,
-                   FileSystem *origin_fs, FileSystem *to_fs)
+                   FileSystem *origin_fs, FileSystem *storage_fs)
 {
     if (!stat->isRegularFile()) return;
 
@@ -1093,9 +1096,9 @@ void handleTarFile(Path *path, FileStat *stat,
     TarFile *tar = ffs->findTarFromPath(path);
     assert(tar);
     Path *file_name = tar->path()->prepend(settings->to.storage->storage_location);
-    to_fs->mkDirp(file_name->parent());
+    storage_fs->mkDirp(file_name->parent());
     FileStat old_stat;
-    RC rc = to_fs->stat(file_name, &old_stat);
+    RC rc = storage_fs->stat(file_name, &old_stat);
     if (rc.isOk() &&
         stat->samePermissions(&old_stat) &&
         stat->sameSize(&old_stat) &&
@@ -1104,10 +1107,10 @@ void handleTarFile(Path *path, FileStat *stat,
         debug(STORE, "Skipping %s\n", file_name->c_str());
     } else {
         if (rc.isOk()) {
-            to_fs->deleteFile(file_name);
+            storage_fs->deleteFile(file_name);
         }
-        tar->createFile(file_name, stat, origin_fs, to_fs);
-        to_fs->utime(file_name, stat);
+        tar->createFile(file_name, stat, origin_fs, storage_fs);
+        storage_fs->utime(file_name, stat);
         st->num_files_stored++;
         st->size_files_stored += stat->st_size;
 
@@ -1125,7 +1128,7 @@ RC BeakImplementation::storeForward(Options *settings)
     assert(settings->from.type == ArgOrigin || settings->from.type == ArgRule);
     assert(settings->to.type == ArgStorage);
 
-    auto ffs  = newForwardTarredFS(origin_fs_);
+    auto ffs  = newForwardTarredFS(origin_tool_->fs());
     auto view = ffs->asFileSystem();
 
     uint64_t start = clockGetTime();
@@ -1134,13 +1137,13 @@ RC BeakImplementation::storeForward(Options *settings)
     StoreStatistics st;
 
     view->recurse([&ffs,this,settings,&st]
-                  (Path *path, FileStat *stat) {storage_tool_->addForwardWork(&st,path,stat,settings,origin_fs_.get()); });
+                  (Path *path, FileStat *stat) {storage_tool_->addForwardWork(&st,path,stat,settings); });
 
     debug(STORE, "Work to be done: num_files=%ju num_dirs=%ju\n", st.num_files, st.num_dirs);
 
     view->recurse([&ffs,this,settings,&st]
                   (Path *path, FileStat *stat) {handleTarFile(path,stat,ffs.get(),this,settings,&st,
-                                                              origin_fs_.get(), origin_fs_.get()); });
+                                                              origin_tool_->fs().get(), storage_tool_->fs().get()); });
     uint64_t stop = clockGetTime();
     uint64_t store_time = stop - start;
 
@@ -1162,7 +1165,7 @@ RC BeakImplementation::storeForward(Options *settings)
     return rc;
 }
 
-bool extractHardLink(FileSystem *origin_fs, Path *target,
+bool extractHardLink(Path *target,
                      FileSystem *to_fs, Path *dst_root, Path *file_to_extract, FileStat *stat,
                      StoreStatistics *statistics)
 {
@@ -1339,7 +1342,7 @@ void handleHardLinks(Path *path, FileStat *stat,
 
     if (entry->is_hard_link) {
         // Special case since hard links are not encoded in stat structure.
-        extractHardLink(origin_fs, entry->hard_link,
+        extractHardLink(entry->hard_link,
                         to_fs, settings->to.origin,
                         file_to_extract, stat, st);
     }
@@ -1415,7 +1418,7 @@ RC BeakImplementation::restoreReverse(Options *settings)
     }
 
     umask(0);
-    auto rfs  = newReverseTarredFS(origin_fs_);
+    auto rfs  = newReverseTarredFS(origin_tool_->fs());
     auto view = rfs->asFileSystem();
 
     rfs->lookForPointsInTime(PointInTimeFormat::absolute_point, settings->from.storage->storage_location);
@@ -1436,26 +1439,31 @@ RC BeakImplementation::restoreReverse(Options *settings)
     StoreStatistics st;
 
     view->recurse([&rfs,this,point,settings,&st]
-                  (Path *path, FileStat *stat) {storage_tool_->addReverseWork(&st,path,stat,settings,origin_fs_.get(),
+                  (Path *path, FileStat *stat) {origin_tool_->addReverseWork(&st,path,stat,settings,
                                                                               rfs.get(),point); });
     debug(STORE, "Work to be done: num_files=%ju num_hardlinks=%ju num_symlinks=%ju num_nodes=%ju num_dirs=%ju\n",
           st.num_files, st.num_hard_links, st.num_symbolic_links, st.num_nodes, st.num_dirs);
 
     view->recurse([&rfs,this,point,settings,&st]
                   (Path *path, FileStat *stat) {handleRegularFiles(path,stat,rfs.get(),this,point,settings,&st,
-                                                                   origin_fs_.get(), origin_fs_.get()); });
+                                                                   origin_tool_->fs().get(),
+                                                                   storage_tool_->fs().get()); });
     view->recurse([&rfs,this,point,settings,&st]
                   (Path *path, FileStat *stat) {handleNodes(path,stat,rfs.get(),this,point,settings,&st,
-                                                            origin_fs_.get(), origin_fs_.get()); });
+                                                            origin_tool_->fs().get(),
+                                                            storage_tool_->fs().get()); });
     view->recurse([&rfs,this,point,settings,&st]
                   (Path *path, FileStat *stat) {handleSymbolicLinks(path,stat,rfs.get(),this,point,settings,&st,
-                                                                    origin_fs_.get(), origin_fs_.get()); });
+                                                                    origin_tool_->fs().get(),
+                                                                    storage_tool_->fs().get()); });
     view->recurse([&rfs,this,point,settings,&st]
                   (Path *path, FileStat *stat) {handleHardLinks(path,stat,rfs.get(),this,point,settings,&st,
-                                                                origin_fs_.get(), origin_fs_.get()); });
+                                                                origin_tool_->fs().get(),
+                                                                storage_tool_->fs().get()); });
     view->recurse([&rfs,this,point,settings,&st]
                   (Path *path, FileStat *stat) {handleDirs(path,stat,rfs.get(),this,point,settings,&st,
-                                                           origin_fs_.get(), origin_fs_.get()); });
+                                                           origin_tool_->fs().get(),
+                                                           storage_tool_->fs().get()); });
 
     uint64_t stop = clockGetTime();
     uint64_t store_time = stop - start;

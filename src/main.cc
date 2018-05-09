@@ -20,6 +20,7 @@
 #include "configuration.h"
 #include "filesystem.h"
 #include "log.h"
+#include "origintool.h"
 #include "storagetool.h"
 #include "system.h"
 
@@ -37,18 +38,20 @@ int main(int argc, char *argv[])
     auto sys_fs = newDefaultFileSystem();
     // Next create the filesystem that can be used as a storage location
     auto storage_fs = newDefaultFileSystem();
+    // Next create the filesystem where the origin files are found.
+    auto origin_fs = newDefaultFileSystem();
     // Then create the interface to hide the differences between different storages types:
     // ie rclone, rsync and local file system.
     auto storage_tool = newStorageTool(sys, sys_fs, storage_fs);
     // Create the source filesystem where the files to be backed up are found
     // and where restored files are written.
-    auto origin_fs = newDefaultFileSystem();
+    auto origin_tool = newOriginTool(sys, sys_fs, origin_fs);
     // Fetch the beak configuration from ~/.config/beak/beak.conf
     auto configuration = newConfiguration(sys, sys_fs);
     configuration->load();
 
     // Now create the beak backup software.
-    auto beak = newBeak(configuration, sys, sys_fs, storage_tool, origin_fs);
+    auto beak = newBeak(configuration, sys, sys_fs, storage_tool, origin_tool);
 
     beak->captureStartTime();
 
