@@ -586,7 +586,7 @@ PointInTime *ReverseTarredFS::setPointInTime(string g) {
     }
     g = g.substr(1);
     size_t gg = atoi(g.c_str());
-    if (gg < 0 || gg >= history_.size()) {
+    if (gg >= history_.size()) {
         return NULL;
     }
     single_point_in_time_ = &history_[gg];

@@ -15,8 +15,9 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "ui.h"
 #include "filesystem.h"
+#include "log.h"
+#include "ui.h"
 
 #include <assert.h>
 #include <stdarg.h>
@@ -46,7 +47,27 @@ void UI::outputln(string msg)
 
 void UI::clearLine()
 {
-    output("\x1B[2K\r");
+    if (logLevel() <= INFO) {
+        output("\x1B[2K\r");
+    }
+}
+
+void UI::redrawLineOutput(const char *fmt, ...)
+{
+    if (logLevel() <= INFO) {
+        fprintf(stdout, "\x1B[2K\r");
+    }
+
+    va_list args;
+    va_start(args, fmt);
+    vfprintf(stdout, fmt, args);
+    va_end(args);
+    fflush(stdout);
+
+    if (logLevel() > INFO) {
+        fprintf(stdout, "\n");
+    }
+
 }
 
 void UI::outputPrompt(const char *msg)

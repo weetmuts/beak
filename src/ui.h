@@ -63,6 +63,8 @@ struct UI
     static void outputln(std::string msg);
     // Clear line, so that output will overwrite it again!
     static void clearLine();
+    // Clear line the output.
+    static void redrawLineOutput(const char *fmt, ...);
     // Present a prompt message "name>" no newline/cr.
     static void outputPrompt(const char *msg);
     static void outputPrompt(std::string msg);

@@ -313,7 +313,6 @@ struct TarEntry
     std::map<std::vector<char>,TarFile*> large_hash_tars_;
     std::vector<TarEntry*> entries_; // The contents stored in the tar files.
 
-    TarEntry *tar_collection_dir = NULL; // This entry is stored in this tar collection dir.
     bool is_added_to_directory_ = false;
     bool virtual_file_ = false;
     std::vector<char> content;

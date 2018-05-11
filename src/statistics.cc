@@ -43,16 +43,15 @@ void StoreStatistics::displayProgress()
     if ((now-prev) < 500000 && num_files_to_store < num_files) return;
     prev = now;
     info_displayed = true;
-    UI::clearLine();
     int percentage = (int)(100.0*(float)size_files_stored / (float)size_files_to_store);
     string mibs = humanReadableTwoDecimals(size_files_stored);
     float secs = ((float)((now-start)/1000))/1000.0;
     string speed = humanReadableTwoDecimals(((double)size_files_stored)/secs);
     if (num_files > num_files_to_store) {
-        UI::output("Incremental store: %d%% (%ju/%ju), %s | %.2f s %s/s ",
+        UI::redrawLineOutput("Incremental store: %d%% (%ju/%ju), %s | %.2f s %s/s ",
                    percentage, num_files_stored, num_files_to_store, mibs.c_str(), secs, speed.c_str());
     } else {
-        UI::output("Full store: %d%% (%ju/%ju), %s | %.2f s %s/s ",
+        UI::redrawLineOutput("Full store: %d%% (%ju/%ju), %s | %.2f s %s/s ",
                    percentage, num_files_stored, num_files_to_store, mibs.c_str(), secs, speed.c_str());
     }
 }

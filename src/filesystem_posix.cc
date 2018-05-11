@@ -105,8 +105,6 @@ struct FileSystemImplementationPosix : FileSystem
 
 private:
 
-    Path *root;
-    Path *cache;
 };
 
 FileSystem *default_file_system_;
