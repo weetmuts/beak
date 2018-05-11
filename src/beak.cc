@@ -114,6 +114,7 @@ struct BeakImplementation : Beak {
 
     RC mountForwardInternal(Options *settings, bool daemon);
     RC remountReverseInternal(Options *settings, bool daemon);
+    bool hasPointsInTime(Path *path, FileSystem *fs);
 
     fuse_operations forward_tarredfs_ops;
     fuse_operations reverse_tarredfs_ops;
@@ -128,7 +129,7 @@ struct BeakImplementation : Beak {
 
     CommandEntry *parseCommand(string s);
     OptionEntry *parseOption(string s, bool *has_value, string *value);
-    Argument parseArgument(std::string arg, ArgumentType expected_type);
+    Argument parseArgument(std::string arg, ArgumentType expected_type, Options *settings);
 
     struct fuse_chan *chan_;
     struct fuse *fuse_;
@@ -230,7 +231,7 @@ OptionEntry *BeakImplementation::parseOption(string s, bool *has_value, string *
     return ce;
 }
 
-Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_type)
+Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_type, Options *settings)
 {
     Argument argument;
 
@@ -316,6 +317,9 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
         Path *origin = Path::lookup(arg);
         Path *rp = origin->realpath();
         if (rp) {
+            if (hasPointsInTime(rp, origin_tool_->fs().get()) && !settings->yesorigin) {
+                error(COMMANDLINE, "You passed a storage location as an origin. If this is what you want add --yes-origin\n");
+            }
             argument.origin = rp;
             argument.type = ArgOrigin;
             debug(COMMANDLINE, "Found origin arg \"%s\".\n", origin->c_str());
@@ -575,6 +579,9 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Options *set
             case exclude_option:
                 settings->exclude.push_back(value);
                 break;
+            case yesorigin_option:
+                settings->yesorigin = true;
+                break;
             case nosuch_option:
                 if ((*i)[0] == '-' && !options_completed) {
                     // It looks like an option, but we could not find it!
@@ -590,14 +597,14 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Options *set
         {
             if (settings->from.type == ArgUnspecified)
             {
-                settings->from = parseArgument(*i, cmde->expected_from);
+                settings->from = parseArgument(*i, cmde->expected_from, settings);
                 if (settings->from.point_in_time != "") {
                     settings->pointintime = settings->from.point_in_time;
                 }
             }
             else if (settings->to.type == ArgUnspecified)
             {
-                settings->to = parseArgument(*i, cmde->expected_to);
+                settings->to = parseArgument(*i, cmde->expected_to, settings);
                 if (settings->to.type == ArgOrigin)
                 {
                     settings->fuse_args.push_back(settings->to.origin->c_str());
@@ -1287,4 +1294,25 @@ void BeakImplementation::genAutoComplete(string filename)
     }
     fwrite(autocomplete, 1, strlen(autocomplete), f);
     fclose(f);
+}
+
+bool BeakImplementation::hasPointsInTime(Path *path, FileSystem *fs)
+{
+    if (path == NULL) return false;
+
+    vector<Path*> contents;
+    if (!fs->readdir(path, &contents)) {
+        return false;
+    }
+    for (auto f : contents)
+    {
+        TarFileName tfn;
+        bool ok = TarFile::parseFileName(f->str(), &tfn);
+
+        if (ok && tfn.type == REG_FILE) {
+            return true;
+        }
+    }
+
+    return false;
 }

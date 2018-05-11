@@ -12,7 +12,7 @@ Local filesystem backups.
 beak store /home/you/Work /home/backups
 beak info /home/backups
 beak remount /home/backups /home/you/OldWork
-cd /home/you/OldWork
+cd /home/you/OldWork/2018-05-14_15:32
 ...copy out stuff...
 cd ~
 beak umount /home/you/OldWork
@@ -23,7 +23,7 @@ Remote rclone cloud storage backups.
 beak store /home/you/Work s3_work_crypt:
 beak info s3_work_crypt:
 beak remount s3_work_crypt: /home/you/OldWork
-cd /home/you/OldWork
+cd /home/you/OldWork/2018-05-14_15:32
 ...copy out stuff...
 cd ~
 beak umount /home/you/OldWork
@@ -34,7 +34,7 @@ Configure a rule for /home/you/Work
 beak config
 beak push work:
 beak history work:
-cd /home/you/Work/.beak/history
+cd /home/you/Work/.beak/history/2018-05-14_15:32_s3_work_crypt
 ... copy out stuff...
 cd ~
 beak umount history
