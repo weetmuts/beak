@@ -317,9 +317,9 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
         Path *origin = Path::lookup(arg);
         Path *rp = origin->realpath();
         if (rp) {
-            //if (hasPointsInTime(rp, origin_tool_->fs().get()) && !settings->yesorigin) {
-                //error(COMMANDLINE, "You passed a storage location as an origin. If this is what you want add --yes-origin\n");
-            //}
+            if (hasPointsInTime(rp, origin_tool_->fs().get()) && !settings->yesorigin) {
+                error(COMMANDLINE, "You passed a storage location as an origin. If this is what you want add --yes-origin\n");
+            }
             argument.origin = rp;
             argument.type = ArgOrigin;
             debug(COMMANDLINE, "Found origin arg \"%s\".\n", origin->c_str());

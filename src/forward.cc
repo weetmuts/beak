@@ -42,6 +42,9 @@ static ComponentId FORWARD = registerLogComponent("forward");
 static ComponentId HARDLINKS = registerLogComponent("hardlinks");
 static ComponentId FUSE = registerLogComponent("fuse");
 ForwardTarredFS::ForwardTarredFS(ptr<FileSystem> fs) {
+    pthread_mutexattr_init(&global_attr);
+    pthread_mutexattr_settype(&global_attr, PTHREAD_MUTEX_RECURSIVE);
+    pthread_mutex_init(&global, &global_attr);
     file_system_ = fs.get();
 }
 

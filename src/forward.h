@@ -57,6 +57,7 @@ struct ForwardTarredFS : FuseAPI
     RC scanFileSystem(Options *settings);
 
     pthread_mutex_t global;
+    pthread_mutexattr_t global_attr;
 
     std::string root_dir;
     Path *root_dir_path;
