@@ -126,33 +126,13 @@ function performReStore {
         eval "${BEAK} restore $extra "${store}${subdir}" $check > $log"
     else
         if [ -z "$gdb" ]; then
-            ${BEAK} store --log=all $extra $store $check 2>&1 | tee $log
+            ${BEAK} restore --log=all $extra $store $check 2>&1 | tee $log
         else
-            gdb -ex=r --args ${BEAK} store -f $extra $store $check
+            gdb -ex=r --args ${BEAK} restore -f $extra $store $check
         fi
     fi
 }
 
-function reverseStoreTest {
-    run="$1"
-    extra="$2"
-    if [ -z "$test" ]; then
-        # Normal test execution, execute the store
-        eval "${BEAK} store $extra $store $storereverse > $log"
-        # Then run the test
-        ${run}
-    else
-        if [ -z "$gdb" ]; then
-            # Run a specific test, bring the beak process to the console foreground.
-            (sleep 2; eval ${run}) &
-            eval "${BEAK} store --log=all $extra $store $storereverse 2>&1 | tee $log &"
-        else
-            # Run a specific test in gdb. Necessary to bring the gdb beak process to the console.
-            (sleep 3; eval ${run}) &
-            eval "gdb -ex=r --args ${BEAK} store -f $extra $store $storereverse"
-        fi
-    fi
-}
 
 
 function startMountTest {
