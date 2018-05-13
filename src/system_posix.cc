@@ -19,6 +19,7 @@
 #include "system.h"
 
 #include <memory.h>
+#include <pthread.h>
 #include <sys/types.h>
 #include <wait.h>
 
@@ -28,6 +29,92 @@ using namespace std;
 
 static ComponentId SYSTEM = registerLogComponent("system");
 
+struct ThreadCallbackImplementation : ThreadCallback
+{
+    ThreadCallbackImplementation(int millis, function<bool()> thread_cb);
+    void stop();
+    void doWhileCallbackBlocked(std::function<void()> do_cb);
+    ~ThreadCallbackImplementation();
+
+private:
+
+    pthread_mutex_t execute_ {};
+    bool running_ {};
+    int millis_ {};
+    function<bool()> regular_cb_;
+    pthread_t thread_ {};
+
+    friend void *regularThread(void *data);
+};
+
+void ThreadCallbackImplementation::stop()
+{
+    running_ = false;
+    if (thread_) {
+        //pthread_kill(thread_, SIGUSR2);
+    }
+}
+
+void ThreadCallbackImplementation::doWhileCallbackBlocked(function<void()> do_cb)
+{
+    pthread_mutex_lock(&execute_);
+    do_cb();
+    pthread_mutex_unlock(&execute_);
+}
+
+void *regularThread(void *data)
+{
+    auto tcbi = (ThreadCallbackImplementation*)(data);
+
+    time_t prev = time(NULL);
+    time_t curr = prev;
+    while (tcbi->running_) {
+        curr = time(NULL);
+        time_t diff = curr-prev;
+        if (diff >= 1) {
+            tcbi->doWhileCallbackBlocked(tcbi->regular_cb_);
+            prev = curr;
+        } else {
+            int rc = usleep(1000000);
+            if (rc == -1) {
+                if (errno == EINTR) {
+                    debug(SYSTEM, "Regular thread callback awaken by signal.\n");
+                } else {
+                    error(SYSTEM, "Could not sleep.\n");
+                }
+            }
+        }
+    }
+    return NULL;
+}
+
+ThreadCallbackImplementation::ThreadCallbackImplementation(int millis, function<bool()> regular_cb)
+    : millis_(millis), regular_cb_(regular_cb)
+{
+    running_ = true;
+    int rc  = pthread_create(&thread_, NULL, regularThread, this);
+    if (rc) {
+        error(SYSTEM, "Could not create thread.\n");
+    }
+    millis_++;
+}
+
+
+ThreadCallbackImplementation::~ThreadCallbackImplementation()
+{
+    fprintf(stderr, "Destructing regular thread\n");
+    if (thread_) {
+        //pthread_kill(thread_, SIGUSR2);
+        pthread_join(thread_, NULL);
+        fprintf(stderr, "JOINED thread properly!\n");
+    }
+}
+
+unique_ptr<ThreadCallback> newRegularThreadCallback(int millis, std::function<bool()> thread_cb)
+{
+    return unique_ptr<ThreadCallback>(new ThreadCallbackImplementation(millis, thread_cb));
+}
+
 struct SystemImplementation : System
 {
     RC invoke(string program,
@@ -36,11 +123,14 @@ struct SystemImplementation : System
                Capture capture,
                function<void(char *buf, size_t len)> cb);
 
+    RC regularThreadCallback(int millis, function<bool()> thread_cb);
+
     ~SystemImplementation() = default;
 };
 
 unique_ptr<System> newSystem()
 {
+//    onExit([](){ printf("\nInterrupted, cleaning up.\n"); exit(0); });
     return unique_ptr<System>(new SystemImplementation());
 }
 
@@ -134,4 +224,39 @@ RC SystemImplementation::invoke(string program,
         }
     }
     return RC::OK;
+}
+
+function<void()> exit_handler;
+
+void exitHandler(int signum)
+{
+    if (exit_handler) exit_handler();
+}
+
+void doNothing(int signum) {
+}
+
+void onExit(function<void()> cb)
+{
+    /*
+    exit_handler = cb;
+    struct sigaction new_action, old_action;
+
+    new_action.sa_handler = exitHandler;
+    sigemptyset (&new_action.sa_mask);
+    new_action.sa_flags = 0;*/
+/*
+    sigaction (SIGINT, NULL, &old_action);
+    if (old_action.sa_handler != SIG_IGN) sigaction(SIGINT, &new_action, NULL);
+    sigaction (SIGHUP, NULL, &old_action);
+    if (old_action.sa_handler != SIG_IGN) sigaction (SIGHUP, &new_action, NULL);
+    sigaction (SIGTERM, NULL, &old_action);
+    if (old_action.sa_handler != SIG_IGN) sigaction (SIGTERM, &new_action, NULL);
+*/
+/*    new_action.sa_handler = doNothing;
+    sigemptyset (&new_action.sa_mask);
+    new_action.sa_flags = 0;*/
+
+    //sigaction (SIGUSR2, NULL, &old_action);
+    //if (old_action.sa_handler != SIG_IGN) sigaction(SIGUSR2, &new_action, NULL);
 }

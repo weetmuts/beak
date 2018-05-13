@@ -35,7 +35,7 @@ struct StorageToolImplementation : public StorageTool
     RC sendBeakFilesToStorage(Path *dir, Storage *storage, std::vector<TarFileName*> *files);
     RC fetchBeakFilesFromStorage(Storage *storage, std::vector<TarFileName*> *files, Path *dir);
 
-    void addForwardWork(StoreStatistics *st, Path *path, FileStat *stat, Options *settings);
+    void addForwardWork(ptr<StoreStatistics> st, Path *path, FileStat *stat, Options *settings);
 
     ptr<FileSystem> fs() { return storage_fs_; }
 
@@ -166,7 +166,7 @@ RC StorageToolImplementation::listBeakFiles(Storage *storage,
     return RC::OK;
 }
 
-void addForwardWork(StoreStatistics *st,
+void addForwardWork(ptr<StoreStatistics> st,
                     Path *path, FileStat *stat,
                     Options *settings,
                     ptr<FileSystem> to_fs)
@@ -176,17 +176,17 @@ void addForwardWork(StoreStatistics *st,
     if (stat->isRegularFile()) {
         stat->checkStat(to_fs.get(), file_to_extract);
         if (stat->disk_update == Store) {
-            st->num_files_to_store++;
-            st->size_files_to_store += stat->st_size;
+            st->stats.num_files_to_store++;
+            st->stats.size_files_to_store += stat->st_size;
         }
-        st->num_files++;
-        st->size_files+=stat->st_size;
+        st->stats.num_files++;
+        st->stats.size_files+=stat->st_size;
     }
-    else if (stat->isDirectory()) st->num_dirs++;
+    else if (stat->isDirectory()) st->stats.num_dirs++;
 }
 
 
-void StorageToolImplementation::addForwardWork(StoreStatistics *st,
+void StorageToolImplementation::addForwardWork(ptr<StoreStatistics> st,
                                                Path *path,
                                                FileStat *stat,
                                                Options *settings)

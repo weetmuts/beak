@@ -22,43 +22,92 @@
 #include "util.h"
 
 #include <memory.h>
+#include <string.h>
 
-//static ComponentId STORAGETOOL = registerLogComponent("storagetool");
+static ComponentId STATISTICS = registerLogComponent("statistics");
 
 using namespace std;
 
-StoreStatistics::StoreStatistics() {
-    memset(this, 0, sizeof(StoreStatistics));
-    start = prev = clockGetTime();
-    info_displayed = false;
+struct StoreStatisticsImplementation : StoreStatistics
+{
+private:
+
+    Stats copy;
+
+    uint64_t prev_time {};
+    uint64_t start_time {};
+
+    size_t prev_files_stored {};
+    float prev_bytes_per_sec {};
+
+    unique_ptr<ThreadCallback> regular_;
+
+    bool redrawLine();
+    void startDisplayOfProgress();
+    void updateProgress();
+    void finishProgress();
+};
+
+void StoreStatisticsImplementation::startDisplayOfProgress()
+{
+    start_time = prev_time = clockGetTime();
+
+    regular_ = newRegularThreadCallback(1000, [this](){ return redrawLine();});
 }
 
 //Tar emot objekt: 100% (814178/814178), 669.29 MiB | 6.71 MiB/s, klart.
 //Analyserar delta: 100% (690618/690618), klart.
 
-void StoreStatistics::displayProgress()
+void StoreStatisticsImplementation::updateProgress()
 {
-    if (num_files == 0 || num_files_to_store == 0) return;
-    uint64_t now = clockGetTime();
-    if ((now-prev) < 500000 && num_files_to_store < num_files) return;
-    prev = now;
-    info_displayed = true;
-    int percentage = (int)(100.0*(float)size_files_stored / (float)size_files_to_store);
-    string mibs = humanReadableTwoDecimals(size_files_stored);
-    float secs = ((float)((now-start)/1000))/1000.0;
-    string speed = humanReadableTwoDecimals(((double)size_files_stored)/secs);
-    if (num_files > num_files_to_store) {
-        UI::redrawLineOutput("Incremental store: %d%% (%ju/%ju), %s | %.2f s %s/s ",
-                   percentage, num_files_stored, num_files_to_store, mibs.c_str(), secs, speed.c_str());
-    } else {
-        UI::redrawLineOutput("Full store: %d%% (%ju/%ju), %s | %.2f s %s/s ",
-                   percentage, num_files_stored, num_files_to_store, mibs.c_str(), secs, speed.c_str());
-    }
+    // Take a snapshot of the stats structure.
+    // The snapshot is taken while the regular callback is blocked.
+    regular_->doWhileCallbackBlocked([this]() { copy = stats; });
 }
 
-void StoreStatistics::finishProgress()
+// Draw the progress line based on the snapshotted contents in the copy struct.
+bool StoreStatisticsImplementation::redrawLine()
 {
-    if (info_displayed == false || num_files == 0 || num_files_to_store == 0) return;
-    displayProgress();
+    if (copy.num_files == 0 || copy.num_files_to_store == 0) return true;
+    uint64_t now = clockGetTime();
+    float secs = ((float)((now-start_time)/1000))/1000.0;
+    float bps = ((float)copy.size_files_stored)/secs;
+
+    size_t written = copy.size_files_stored-prev_files_stored;
+    prev_files_stored = copy.size_files_stored;
+    float secs_diff = ((float)((now-prev_time)/1000))/1000.0;
+    float bytes_per_sec = (float)(written)/secs_diff;
+    prev_bytes_per_sec = bytes_per_sec;
+    prev_time = now;
+
+    int percentage = (int)(100.0*(float)copy.size_files_stored / (float)copy.size_files_to_store);
+
+    string mibs = humanReadableTwoDecimals(copy.size_files_stored);
+    float estimated_time_total = (float)(copy.size_files_to_store) / bps;
+    float estimated_time_left = (float)(copy.size_files_to_store-copy.size_files_stored) / bps;
+    string speed = humanReadableTwoDecimals(bps);
+    string msg = "Full";
+    if (copy.num_files > copy.num_files_to_store) {
+        msg = "Incr";
+    }
+    debug(STATISTICS, "stored(secs,bytes)\t%.2f\t%ju\n", secs, copy.size_files_stored);
+    UI::redrawLineOutput("%s store: %d%% (%ju/%ju), %s | %.1f/%.1fs %s/s time left %.0fs",
+                         msg.c_str(),
+                         percentage, copy.num_files_stored, copy.num_files_to_store, mibs.c_str(),
+                         secs, estimated_time_total, speed.c_str(), estimated_time_left);
+    return true;
+}
+
+void StoreStatisticsImplementation::finishProgress()
+{
+    if (stats.num_files == 0 || stats.num_files_to_store == 0) return;
+    regular_->stop();
+    updateProgress();
+    redrawLine();
     UI::output(", done.\n");
+}
+
+unique_ptr<StoreStatistics> newStoreStatistics()
+{
+    return unique_ptr<StoreStatisticsImplementation>(new StoreStatisticsImplementation());
 }

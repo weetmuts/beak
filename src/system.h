@@ -30,6 +30,15 @@ enum Capture {
     CaptureBoth
 };
 
+struct ThreadCallback
+{
+    virtual void stop() = 0;
+    virtual void doWhileCallbackBlocked(std::function<void()> do_cb) = 0;
+    virtual ~ThreadCallback() = default;
+};
+
+std::unique_ptr<ThreadCallback> newRegularThreadCallback(int millis, std::function<bool()> thread_cb);
+
 struct System
 {
     virtual RC invoke(std::string program,
@@ -37,9 +46,12 @@ struct System
                        std::vector<char> *output = NULL,
                        Capture capture = CaptureStdout,
                        std::function<void(char *buf, size_t len)> output_cb = NULL) = 0;
+
     virtual ~System() = default;
 };
 
 std::unique_ptr<System> newSystem();
+
+void onExit(std::function<void()> cb);
 
 #endif

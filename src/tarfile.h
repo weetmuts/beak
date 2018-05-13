@@ -148,7 +148,8 @@ struct TarFile
     // dst_fs: Store into this filesystem
     // off: Start storing from this offset in the tar file.
     bool createFile(Path *file, FileStat *stat,
-                    FileSystem *src_fs, FileSystem *dst_fs, size_t off=0);
+                    FileSystem *src_fs, FileSystem *dst_fs, size_t off,
+                    std::function<void(size_t)> update_progress);
 
 private:
 

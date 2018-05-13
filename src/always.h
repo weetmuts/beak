@@ -60,6 +60,11 @@ typedef ReturnCode RC;
 #define PRINTF_TIME_T "l"
 #endif
 
+#define call(A,B) ([A](){A->B();})
+#define calll(A,B,T) ([A](T t){A->B(t);})
+
+// The ptr template class is used to automatically acquire
+// a copy of a unique_ptr, without the need for calling .get
 template<class T>
 class ptr {
     T *t {};

@@ -31,11 +31,11 @@
 
 struct OriginTool
 {
-    virtual void addReverseWork(StoreStatistics *st, Path *path, FileStat *stat, Options *settings,
+    virtual void addReverseWork(ptr<StoreStatistics> st, Path *path, FileStat *stat, Options *settings,
                                 ReverseTarredFS *rfs, PointInTime *point) = 0;
 
     virtual void restoreFileSystem(FileSystem *view, ReverseTarredFS *rfs, PointInTime *point,
-                                   Options *settings, StoreStatistics *st, FileSystem *storage_fs) = 0;
+                                   Options *settings, ptr<StoreStatistics> st, FileSystem *storage_fs) = 0;
 
     virtual ptr<FileSystem> fs() = 0;
 };

@@ -38,7 +38,7 @@ struct StorageTool
     virtual RC sendBeakFilesToStorage(Path *dir, Storage *storage, std::vector<TarFileName*> *files) = 0;
     virtual RC fetchBeakFilesFromStorage(Storage *storage, std::vector<TarFileName*> *files, Path *dir) = 0;
 
-    virtual void addForwardWork(StoreStatistics *st, Path *path, FileStat *stat, Options *settings) = 0;
+    virtual void addForwardWork(ptr<StoreStatistics> st, Path *path, FileStat *stat, Options *settings) = 0;
 
     virtual ptr<FileSystem> fs() = 0;
 };

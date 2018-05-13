@@ -317,9 +317,9 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
         Path *origin = Path::lookup(arg);
         Path *rp = origin->realpath();
         if (rp) {
-            if (hasPointsInTime(rp, origin_tool_->fs().get()) && !settings->yesorigin) {
-                error(COMMANDLINE, "You passed a storage location as an origin. If this is what you want add --yes-origin\n");
-            }
+            //if (hasPointsInTime(rp, origin_tool_->fs().get()) && !settings->yesorigin) {
+                //error(COMMANDLINE, "You passed a storage location as an origin. If this is what you want add --yes-origin\n");
+            //}
             argument.origin = rp;
             argument.type = ArgOrigin;
             debug(COMMANDLINE, "Found origin arg \"%s\".\n", origin->c_str());
@@ -1094,7 +1094,7 @@ RC BeakImplementation::status(Options *settings)
 
 void handleTarFile(Path *path, FileStat *stat,
                    ForwardTarredFS *ffs, Beak *beak,
-                   Options *settings, StoreStatistics *st,
+                   Options *settings, ptr<StoreStatistics> st,
                    FileSystem *origin_fs, FileSystem *storage_fs)
 {
     if (!stat->isRegularFile()) return;
@@ -1116,16 +1116,16 @@ void handleTarFile(Path *path, FileStat *stat,
         if (rc.isOk()) {
             storage_fs->deleteFile(file_name);
         }
-        tar->createFile(file_name, stat, origin_fs, storage_fs);
-        storage_fs->utime(file_name, stat);
-        st->num_files_stored++;
-        st->size_files_stored += stat->st_size;
+        auto func = [&st](size_t n){st->stats.size_files_stored += n;};
+        tar->createFile(file_name, stat, origin_fs, storage_fs, 0, func);
 
+        storage_fs->utime(file_name, stat);
+        st->stats.num_files_stored++;
         verbose(STORE, "Stored %s\n", file_name->c_str());
     }
-    st->num_files_handled++;
-    st->size_files_handled += stat->st_size;
-    st->displayProgress();
+//    st->num_files_handled++;
+//    st->size_files_handled += stat->st_size;
+    st->updateProgress();
 }
 
 RC BeakImplementation::storeForward(Options *settings)
@@ -1141,30 +1141,32 @@ RC BeakImplementation::storeForward(Options *settings)
     uint64_t start = clockGetTime();
     rc = ffs->scanFileSystem(settings);
 
-    StoreStatistics st;
+    auto st = newStoreStatistics();
+
+    st->startDisplayOfProgress();
 
     view->recurse([&ffs,this,settings,&st]
-                  (Path *path, FileStat *stat) {storage_tool_->addForwardWork(&st,path,stat,settings); });
+                  (Path *path, FileStat *stat) {storage_tool_->addForwardWork(st,path,stat,settings); });
 
-    debug(STORE, "Work to be done: num_files=%ju num_dirs=%ju\n", st.num_files, st.num_dirs);
+    debug(STORE, "Work to be done: num_files=%ju num_dirs=%ju\n", st->stats.num_files, st->stats.num_dirs);
 
     view->recurse([&ffs,this,settings,&st]
-                  (Path *path, FileStat *stat) {handleTarFile(path,stat,ffs.get(),this,settings,&st,
+                  (Path *path, FileStat *stat) {handleTarFile(path,stat,ffs.get(),this,settings,st,
                                                               origin_tool_->fs().get(), storage_tool_->fs().get()); });
     uint64_t stop = clockGetTime();
     uint64_t store_time = stop - start;
 
-    st.finishProgress();
+    st->finishProgress();
 
-    if (st.num_files_stored == 0 && st.num_dirs_updated == 0) {
+    if (st->stats.num_files_stored == 0 && st->stats.num_dirs_updated == 0) {
         info(STORE, "No stores needed, everything was up to date.\n");
     } else {
-        if (st.num_files_stored > 0) {
-            string file_sizes = humanReadable(st.size_files_stored);
+        if (st->stats.num_files_stored > 0) {
+            string file_sizes = humanReadable(st->stats.size_files_stored);
 
             info(STORE, "Stored %ju beak files for a total size of %s.\n"
                  "Time to store %jdms.\n",
-                 st.num_files_stored, file_sizes.c_str(),
+                 st->stats.num_files_stored, file_sizes.c_str(),
                  store_time / 1000);
         }
     }
@@ -1204,36 +1206,38 @@ RC BeakImplementation::restoreReverse(Options *settings)
     rc = rfs->loadBeakFileSystem(settings);
     if (rc.isErr()) rc = RC::ERR;
 
-    StoreStatistics st;
+    auto st = newStoreStatistics();
+
+    st->startDisplayOfProgress();
 
     view->recurse([&rfs,this,point,settings,&st]
-                  (Path *path, FileStat *stat) {origin_tool_->addReverseWork(&st,path,stat,settings,
+                  (Path *path, FileStat *stat) {origin_tool_->addReverseWork(st,path,stat,settings,
                                                                               rfs.get(),point); });
     debug(STORE, "Work to be done: num_files=%ju num_hardlinks=%ju num_symlinks=%ju num_nodes=%ju num_dirs=%ju\n",
-          st.num_files, st.num_hard_links, st.num_symbolic_links, st.num_nodes, st.num_dirs);
+          st->stats.num_files, st->stats.num_hard_links, st->stats.num_symbolic_links, st->stats.num_nodes, st->stats.num_dirs);
 
-    origin_tool_->restoreFileSystem(view,rfs.get(),point,settings,&st,storage_tool_->fs().get());
+    origin_tool_->restoreFileSystem(view,rfs.get(),point,settings,st,storage_tool_->fs().get());
 
     uint64_t stop = clockGetTime();
     uint64_t store_time = stop - start;
 
-    st.finishProgress();
+    st->finishProgress();
 
-    if (st.num_files_stored == 0 && st.num_symbolic_links_stored == 0 && st.num_dirs_updated == 0) {
+    if (st->stats.num_files_stored == 0 && st->stats.num_symbolic_links_stored == 0 && st->stats.num_dirs_updated == 0) {
         info(STORE, "No stores needed, everything was up to date.\n");
     } else {
-        if (st.num_files_stored > 0) {
-            string file_sizes = humanReadable(st.size_files_stored);
-            info(STORE, "Stored %ju files for a total size of %s.\n", st.num_files_stored, file_sizes.c_str());
+        if (st->stats.num_files_stored > 0) {
+            string file_sizes = humanReadable(st->stats.size_files_stored);
+            info(STORE, "Stored %ju files for a total size of %s.\n", st->stats.num_files_stored, file_sizes.c_str());
         }
-        if (st.num_symbolic_links_stored > 0) {
-            info(STORE, "Stored %ju symlinks.\n", st.num_symbolic_links_stored);
+        if (st->stats.num_symbolic_links_stored > 0) {
+            info(STORE, "Stored %ju symlinks.\n", st->stats.num_symbolic_links_stored);
         }
-        if (st.num_hard_links_stored > 0) {
-            info(STORE, "Stored %ju hard links.\n", st.num_hard_links_stored);
+        if (st->stats.num_hard_links_stored > 0) {
+            info(STORE, "Stored %ju hard links.\n", st->stats.num_hard_links_stored);
         }
-        if (st.num_dirs_updated > 0) {
-            info(STORE, "Updated %ju dirs.\n", st.num_dirs_updated);
+        if (st->stats.num_dirs_updated > 0) {
+            info(STORE, "Updated %ju dirs.\n", st->stats.num_dirs_updated);
         }
         info(STORE, "Time to store %jdms.\n", store_time / 1000);
     }

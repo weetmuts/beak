@@ -20,30 +20,39 @@
 
 #include "always.h"
 
+struct Stats
+{
+    size_t num_files {};
+    size_t size_files {};
+
+    size_t num_dirs {};
+    size_t num_hard_links {};
+    size_t num_symbolic_links {};
+    size_t num_nodes {};
+
+    size_t num_files_to_store {};
+    size_t size_files_to_store {};
+
+    size_t num_files_stored {};
+    size_t size_files_stored {};
+    size_t num_hard_links_stored {};
+    size_t num_symbolic_links_stored {};
+    size_t num_device_nodes_stored {};
+
+    size_t num_dirs_updated {};
+
+    size_t num_total {};
+};
+
 struct StoreStatistics
 {
-    size_t num_files, size_files, num_dirs;
-    size_t num_hard_links, num_symbolic_links, num_nodes;
+    Stats stats;
 
-    size_t num_files_to_store, size_files_to_store;
-    size_t num_files_stored, size_files_stored;
-    size_t num_dirs_updated;
-
-    size_t num_files_handled, size_files_handled;
-    size_t num_dirs_handled;
-
-    size_t num_hard_links_stored;
-    size_t num_symbolic_links_stored;
-    size_t num_device_nodes_stored;
-
-    size_t num_total, num_total_handled;
-
-    uint64_t prev, start;
-    bool info_displayed;
-
-    StoreStatistics();
-    void displayProgress();
-    void finishProgress();
+    virtual void startDisplayOfProgress() = 0;
+    virtual void updateProgress() = 0;
+    virtual void finishProgress() = 0;
 };
+
+std::unique_ptr<StoreStatistics> newStoreStatistics();
 
 #endif

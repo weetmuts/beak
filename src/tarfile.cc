@@ -341,12 +341,14 @@ size_t TarFile::copy(char *buf, size_t bufsiz, off_t offset, FileSystem *fs)
 }
 
 bool TarFile::createFile(Path *file, FileStat *stat,
-                          FileSystem *src_fs, FileSystem *dst_fs, size_t off)
+                         FileSystem *src_fs, FileSystem *dst_fs, size_t off,
+                         function<void(size_t)> update_progress)
 {
-    dst_fs->createFile(file, stat, [this,file,src_fs,off] (off_t offset, char *buffer, size_t len) {
+    dst_fs->createFile(file, stat, [this,file,src_fs,off,update_progress] (off_t offset, char *buffer, size_t len) {
             debug(TARFILE,"Write %ju bytes to file %s\n", len, file->c_str());
             size_t n = copy(buffer, len, off+offset, src_fs);
             debug(TARFILE, "Wrote %ju bytes from %ju to %ju.\n", n, off+offset, offset);
+            update_progress(n);
             return n;
         });
     return true;

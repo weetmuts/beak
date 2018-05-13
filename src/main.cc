@@ -25,12 +25,14 @@
 #include "system.h"
 
 #include<stdio.h>
+#include <unistd.h>
 
 using namespace std;
 
 int main(int argc, char *argv[])
 {
     RC rc = RC::OK;
+
     // First create the OS interface to invoke external commands like rclone and rsync.
     auto sys = newSystem();
     // Next create the interface to the file system that stores the beak configuration files
@@ -50,6 +52,26 @@ int main(int argc, char *argv[])
     auto configuration = newConfiguration(sys, sys_fs);
     configuration->load();
 
+/*
+    {
+        auto st = newStoreStatistics();
+        st->stats.num_files=100000;
+        st->stats.num_files_to_store = 100000;
+        st->stats.size_files_to_store = 100000*1000;
+
+        st->startDisplayOfProgress();
+
+        for (int i=0; i<100000; ++i) {
+            int slowdown = i/1000;
+            usleep(100+slowdown);
+            st->stats.num_files_stored++;
+            st->stats.size_files_stored+=1000;
+            st->updateProgress();
+        }
+        st->finishProgress();
+    }
+
+    return 0;*/
     // Now create the beak backup software.
     auto beak = newBeak(configuration, sys, sys_fs, storage_tool, origin_tool);
 
