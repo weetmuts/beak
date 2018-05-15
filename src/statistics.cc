@@ -17,6 +17,7 @@
 
 #include "statistics.h"
 
+#include "fit.h"
 #include "log.h"
 #include "system.h"
 #include "util.h"
@@ -34,11 +35,9 @@ private:
 
     Stats copy;
 
-    uint64_t prev_time {};
     uint64_t start_time {};
 
-    size_t prev_files_stored {};
-    float prev_bytes_per_sec {};
+    vector<SecsBytes> secsbytes;
 
     unique_ptr<ThreadCallback> regular_;
 
@@ -50,7 +49,7 @@ private:
 
 void StoreStatisticsImplementation::startDisplayOfProgress()
 {
-    start_time = prev_time = clockGetTime();
+    start_time = clockGetTime();
 
     regular_ = newRegularThreadCallback(1000, [this](){ return redrawLine();});
 }
@@ -71,30 +70,38 @@ bool StoreStatisticsImplementation::redrawLine()
     if (copy.num_files == 0 || copy.num_files_to_store == 0) return true;
     uint64_t now = clockGetTime();
     float secs = ((float)((now-start_time)/1000))/1000.0;
-    float bps = ((float)copy.size_files_stored)/secs;
-
-    size_t written = copy.size_files_stored-prev_files_stored;
-    prev_files_stored = copy.size_files_stored;
-    float secs_diff = ((float)((now-prev_time)/1000))/1000.0;
-    float bytes_per_sec = (float)(written)/secs_diff;
-    prev_bytes_per_sec = bytes_per_sec;
-    prev_time = now;
+    double bytes = (double)copy.size_files_stored;
+    secsbytes.push_back({secs,bytes});
 
     int percentage = (int)(100.0*(float)copy.size_files_stored / (float)copy.size_files_to_store);
-
     string mibs = humanReadableTwoDecimals(copy.size_files_stored);
-    float estimated_time_total = (float)(copy.size_files_to_store) / bps;
-    float estimated_time_left = (float)(copy.size_files_to_store-copy.size_files_stored) / bps;
-    string speed = humanReadableTwoDecimals(bps);
+    //string speed = humanReadableTwoDecimals(bps);
+
     string msg = "Full";
     if (copy.num_files > copy.num_files_to_store) {
         msg = "Incr";
     }
-    debug(STATISTICS, "stored(secs,bytes)\t%.2f\t%ju\n", secs, copy.size_files_stored);
-    UI::redrawLineOutput("%s store: %d%% (%ju/%ju), %s | %.1f/%.1fs %s/s time left %.0fs",
+    double max_bytes = (double)copy.size_files_to_store;
+    double eta_1s_speed, eta_immediate, eta_average;
+    predict_all(secsbytes, secsbytes.size()-1, max_bytes, &eta_1s_speed, &eta_immediate, &eta_average);
+
+    debug(STATISTICS, "stored(secs,bytes)\t"
+          "%.1f\t"
+          "%ju\t"
+          "%.0f\t"
+          "%.0f\t"
+          "%.0f\n",
+          secs,
+          copy.size_files_stored,
+          eta_1s_speed,
+          eta_immediate,
+          eta_average);
+
+
+    UI::redrawLineOutput("%s store: %d%% (%ju/%ju), %s | %.1f (%.0fs,%.0fs,%.0fs)",
                          msg.c_str(),
                          percentage, copy.num_files_stored, copy.num_files_to_store, mibs.c_str(),
-                         secs, estimated_time_total, speed.c_str(), estimated_time_left);
+                         secs, eta_1s_speed, eta_immediate, eta_average);
     return true;
 }
 

@@ -65,18 +65,12 @@ struct Keep
     // Number of seconds to keep the last one per month
     time_t monthly {};
 
-    // Number of seconds to keep the last one per year
-    time_t yearly {};
-
-    // Never keep more than the latest backup. I.e. mirror.
-    bool mirror {};
-
     Keep() = default;
     Keep(std::string s) { parse(s); }
     bool parse(std::string s);
     std::string str();
     // By default it keeps everything forever.
-    bool keepAllForever() { return all==0 && daily==0 && weekly==0 && monthly==0 && yearly==0 and mirror==false; }
+    bool keepAllForever() { return all==0 && daily==0 && weekly==0 && monthly==0; }
 };
 
 #define LIST_OF_STORAGE_TYPES \

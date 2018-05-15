@@ -52,7 +52,16 @@ int main(int argc, char *argv[])
     auto configuration = newConfiguration(sys, sys_fs);
     configuration->load();
 
-/*
+    // Now create the beak backup software.
+    auto beak = newBeak(configuration, sys, sys_fs, storage_tool, origin_tool);
+
+    beak->captureStartTime();
+
+    // Configure the settings by parsing the command line and extract the command.
+    Options settings;
+    Command cmd = beak->parseCommandLine(argc, argv, &settings);
+
+    /*
     {
         auto st = newStoreStatistics();
         st->stats.num_files=100000;
@@ -63,7 +72,7 @@ int main(int argc, char *argv[])
 
         for (int i=0; i<100000; ++i) {
             int slowdown = i/1000;
-            usleep(100+slowdown);
+            usleep(10+5*slowdown);
             st->stats.num_files_stored++;
             st->stats.size_files_stored+=1000;
             st->updateProgress();
@@ -71,16 +80,8 @@ int main(int argc, char *argv[])
         st->finishProgress();
     }
 
-    return 0;*/
-    // Now create the beak backup software.
-    auto beak = newBeak(configuration, sys, sys_fs, storage_tool, origin_tool);
-
-    beak->captureStartTime();
-
-    // Configure the settings by parsing the command line and extract the command.
-    Options settings;
-    Command cmd = beak->parseCommandLine(argc, argv, &settings);
-
+    return 0;
+    */
     // We now know the command the user intends to invoke.
     switch (cmd) {
 

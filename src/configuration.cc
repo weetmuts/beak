@@ -845,9 +845,9 @@ bool Keep::parse(string s)
     auto i = data.begin();
     string tz, offset;
     bool eof, err, ok;
-    int level = 0; // 0=all 1=daily, 2=weekly, 3=monthly, 4=yearly
+    int level = 0; // 0=all 1=daily, 2=weekly, 3=monthly
 
-    tz_offset = all = daily = weekly = monthly = yearly = 0;
+    tz_offset = all = daily = weekly = monthly = 0;
 
     tz = eatToSkipWhitespace(data, i, ':', 16, &eof, &err);
     if (eof || err) goto err;

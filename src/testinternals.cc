@@ -16,6 +16,7 @@
  */
 
 #include "filesystem.h"
+#include "fit.h"
 #include "log.h"
 #include "match.h"
 #include "util.h"
@@ -29,6 +30,7 @@ static ComponentId TEST_RANDOM = registerLogComponent("test_random");
 static ComponentId TEST_FILESYSTEM = registerLogComponent("test_filesystem");
 static ComponentId TEST_GZIP = registerLogComponent("test_filesystem");
 static ComponentId TEST_KEEP = registerLogComponent("test_keep");
+static ComponentId TEST_FIT = registerLogComponent("test_fit");
 static ComponentId TEST_HUMANREADABLE = registerLogComponent("human_readable");
 
 void testMatch(string pattern, const char *path, bool should_match)
@@ -44,6 +46,8 @@ void testFileSystem();
 void testGzip();
 void testKeeps();
 void testHumanReadable();
+void testFit();
+void predictor(int argc, char **argv);
 
 int main(int argc, char *argv[])
 {
@@ -55,6 +59,10 @@ int main(int argc, char *argv[])
         setLogLevel(DEBUG);
         setLogComponents("all");
     }
+    if (argc > 1 && string("--predictor") == argv[1]) {
+        predictor(argc, argv);
+        return 0;
+    }
     try {
         fs = newDefaultFileSystem();
 
@@ -64,6 +72,7 @@ int main(int argc, char *argv[])
         testGzip();
         testKeeps();
         testHumanReadable();
+        testFit();
 
         if (!err_found_) {
             printf("OK\n");
@@ -181,19 +190,17 @@ void testGzip() {
     }
 }
 
-void testKeep(string k, time_t tz_offset, time_t all, time_t daily, time_t weekly,
-              time_t monthly, time_t yearly)
+void testKeep(string k, time_t tz_offset, time_t all, time_t daily, time_t weekly, time_t monthly)
 {
     Keep keep;
 
-    verbose(TEST_KEEP, "Testing Keep \"%s\"\n", k.c_str());
+    verbose(TEST_KEEP, "Testing Keep \"%s\" ", k.c_str());
     keep.parse(k);
     if (keep.tz_offset != tz_offset ||
         keep.all != all ||
         keep.daily != daily ||
         keep.weekly != weekly ||
-        keep.monthly != monthly ||
-        keep.yearly != yearly)
+        keep.monthly != monthly)
     {
         verbose(TEST_KEEP, "Keep parse \"%s\" failed!\n", k.c_str());
         verbose(TEST_KEEP, "Expected / Got \n"
@@ -201,28 +208,28 @@ void testKeep(string k, time_t tz_offset, time_t all, time_t daily, time_t weekl
                 "all=%" PRINTF_TIME_T "d / %" PRINTF_TIME_T "d \n"
                 "daily=%" PRINTF_TIME_T "d / %" PRINTF_TIME_T "d \n"
                 "weekly=%" PRINTF_TIME_T "d / %" PRINTF_TIME_T "d \n"
-                "monthly=%" PRINTF_TIME_T "d / %" PRINTF_TIME_T "d \n"
-                "yearly=%" PRINTF_TIME_T "d / %" PRINTF_TIME_T "d \n",
+                "monthly=%" PRINTF_TIME_T "d / %" PRINTF_TIME_T "d \n",
                 tz_offset, keep.tz_offset,
                 all, keep.all,
                 daily, keep.daily,
                 weekly, keep.weekly,
-                monthly, keep.monthly,
-                yearly, keep.yearly);
+                monthly, keep.monthly);
         err_found_ = true;
+    } else {
+        verbose(TEST_KEEP, " OK\n");
     }
 }
 
 void testKeeps()
 {
-    testKeep("tz:+0100 all:10d", 3600, 3600*24*10, 0, 0, 0, 0);
-    testKeep("tz:+0000  all: 7d     daily:2w", 0, 3600*24*7, 3600*24*14, 0, 0, 0);
+    testKeep("tz:+0100 all:10d", 3600, 3600*24*10, 0, 0, 0);
+    testKeep("tz:+0000  all: 7d     daily:2w", 0, 3600*24*7, 3600*24*14, 0, 0);
     testKeep(" tz : -1030 all:1d daily: 1w weekly:1m monthly:1y", -3600*10.5,
-             3600*24/*all*/, 3600*24*7/*daily*/, 3600*24*31/*weekly*/, 3600*24*366/*monthly*/, 0/*yearly*/);
+             3600*24/*all*/, 3600*24*7/*daily*/, 3600*24*31/*weekly*/, 3600*24*366/*monthly*/);
     testKeep("tz:+0500 weekly:1y", 3600*5,
-             0/*all*/, 0/*daily*/, 3600*24*366/*weekly*/, 0/*monthly*/, 0/*yearly*/);
-    testKeep("tz:+1001 yearly:10y", 3600*10+60,
-             0/*all*/, 0/*daily*/, 0/*weekly*/, 0/*monthly*/, 3600*24*366*10/*yearly*/);
+             0/*all*/, 0/*daily*/, 3600*24*366/*weekly*/, 0/*monthly*/);
+    testKeep("tz:+1001 monthly:10y", 3600*10+60,
+             0/*all*/, 0/*daily*/, 0/*weekly*/, 366*24*3600*10/*monthly*/);
 }
 
 void testHR(size_t v, string expected) {
@@ -246,4 +253,106 @@ void testHumanReadable()
     testHR(1024*1024*1024*512.77, "512.77 GiB");
     testHR(1024*1024*1024*1023.99, "1023.99 GiB");
 #endif
+}
+
+void testFit()
+{
+    vector<pair<double,double>> xy;
+    xy.push_back({ -3, 0.9 });
+    xy.push_back({ -2, 0.8 });
+    xy.push_back({ -1, 0.4 });
+    xy.push_back({ -0.2, 0.2 });
+    xy.push_back({ 1, 0.1 });
+    xy.push_back({ 3, 0 });
+
+    double a,b,c;
+
+    fitSecondOrderCurve(xy, &a, &b, &c);
+
+    if (int(a*1000)!=27 ||
+        int(b*1000)!=-162 ||
+        int(c*1000)!=229) {
+        verbose(TEST_FIT, "Error in fit, expected 0.0278 0.1628 0.2291 but got %f %f %f\n",
+                a, b, c);
+    }
+    else
+    {
+        verbose(TEST_FIT, "Test fit, second order OK\n");
+    }
+
+    vector<pair<double,double>> xy2;
+    xy2.push_back({ 0.1, 0.1});
+    xy2.push_back({ 0.35, 0.45 });
+    xy2.push_back({ 0.6, 0.8 });
+
+    double aa,bb;
+
+    fitFirstOrderCurve(xy2, &aa, &bb);
+
+    if (int(a*10)!=14 ||
+        int(b*100)!=4) {
+        verbose(TEST_FIT, "Error in fit, expected 1.4 -0.04 but got %f %f\n",
+                a, b);
+    }
+    else
+    {
+        verbose(TEST_FIT, "Test fit, 1st order OK\n");
+    }
+}
+
+
+void predictor(int argc, char **argv)
+{
+    if (argc < 3) {
+        error(TEST_FIT,"You must supply a log file with statistics.\n");
+    }
+    try {
+        fs = newDefaultFileSystem();
+
+        Path *log = Path::lookup(argv[2]);
+        vector<char> buf;
+        RC rc = fs->loadVector(log, 32768, &buf);
+        if (rc.isErr()) {
+            error(TEST_FIT,"Could not read file \"%s\"\n", log->c_str());
+        }
+
+        vector<SecsBytes> secsbytes;
+        bool eof = false, err = false;
+        auto i = buf.begin();
+        while (!eof) {
+            // statistics: stored(secs,bytes)\t2.00\t340639232
+            string line = eatTo(buf, i,  '\n', 1024, &eof, &err);
+            if (err) break;
+            string pre = line.substr(0,30);
+            if (pre == "statistics: stored(secs,bytes)") {
+                size_t tab1 = line.find('\t',32);
+                size_t tab2 = line.find('\t',tab1+1);
+                string secs_s = line.substr(31,tab1-31);
+                string bytes_s = line.substr(tab1+1,tab2);
+                double bytes = (double)atol(bytes_s.c_str());
+                double secs = (double)atol(secs_s.c_str());
+                secsbytes.push_back({secs,bytes});
+            }
+        }
+        size_t max_bytes = secsbytes[secsbytes.size()-1].bytes;
+        for (size_t i = 0; i<secsbytes.size(); ++i) {
+            double secs = secsbytes[i].secs;
+            double bytes = secsbytes[i].bytes;
+            double eta_1s_speed, eta_immediate, eta_average;
+            predict_all(secsbytes, i, max_bytes, &eta_1s_speed, &eta_immediate, &eta_average);
+            printf("statistics: stored(secs,bytes)\t"
+                   "%.1f\t"
+                   "%.0f\t"
+                   "%.0f\t"
+                   "%.0f\t"
+                   "%.0f\n",
+                   secs,
+                   bytes,
+                   eta_1s_speed,
+                   eta_immediate,
+                   eta_average);
+        }
+    } catch (string e) {
+        fprintf(stderr, "ERR: %s\n", e.c_str());
+    }
 }
