@@ -28,6 +28,8 @@ struct OriginToolImplementation : public OriginTool
 {
     OriginToolImplementation(ptr<System> sys, ptr<FileSystem> sys_fs, ptr<FileSystem> origin_fs);
 
+    RC restoreFileSystemIntoOrigin(FileSystem *fs);
+
     void addReverseWork(ptr<StoreStatistics> st, Path *path, FileStat *stat, Options *settings,
                         ReverseTarredFS *rfs, PointInTime *point);
 
@@ -94,6 +96,11 @@ OriginToolImplementation::OriginToolImplementation(ptr<System>sys,
                                                      ptr<FileSystem> origin_fs)
     : sys_(sys), sys_fs_(sys_fs), origin_fs_(origin_fs)
 {
+}
+
+RC OriginToolImplementation::restoreFileSystemIntoOrigin(FileSystem *fs)
+{
+    return RC::OK;
 }
 
 void OriginToolImplementation::addReverseWork(ptr<StoreStatistics> st,

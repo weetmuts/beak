@@ -21,6 +21,7 @@
 #include "always.h"
 #include "beak.h"
 #include "configuration.h"
+#include "forward.h"
 #include "reverse.h"
 #include "tarfile.h"
 #include "statistics.h"
@@ -31,14 +32,12 @@
 
 struct StorageTool
 {
-    virtual RC listBeakFiles(Storage *storage,
-                             std::vector<TarFileName> *files,
-                             std::vector<TarFileName> *bad_files,
-                             std::vector<std::string> *other_files) = 0;
-    virtual RC sendBeakFilesToStorage(Path *dir, Storage *storage, std::vector<TarFileName*> *files) = 0;
-    virtual RC fetchBeakFilesFromStorage(Storage *storage, std::vector<TarFileName*> *files, Path *dir) = 0;
-
-    virtual void addForwardWork(ptr<StoreStatistics> st, Path *path, FileStat *stat, Options *settings) = 0;
+    virtual RC storeFileSystemIntoStorage(FileSystem *beaked_fs,
+                                          FileSystem *origin_fs,
+                                          Storage *storage,
+                                          ptr<StoreStatistics> st,
+                                          ptr<ForwardTarredFS> ffs,
+                                          Options *settings) = 0;
 
     virtual ptr<FileSystem> fs() = 0;
 };

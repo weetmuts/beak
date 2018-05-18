@@ -31,6 +31,8 @@
 
 struct OriginTool
 {
+    virtual RC restoreFileSystemIntoOrigin(FileSystem *fs) = 0;
+
     virtual void addReverseWork(ptr<StoreStatistics> st, Path *path, FileStat *stat, Options *settings,
                                 ReverseTarredFS *rfs, PointInTime *point) = 0;
 

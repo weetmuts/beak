@@ -17,10 +17,11 @@
 
 #include "storagetool.h"
 
+#include "forward.h"
 #include "log.h"
 #include "system.h"
 
-//static ComponentId STORAGETOOL = registerLogComponent("storagetool");
+static ComponentId STORAGETOOL = registerLogComponent("storagetool");
 
 using namespace std;
 
@@ -28,14 +29,19 @@ struct StorageToolImplementation : public StorageTool
 {
     StorageToolImplementation(ptr<System> sys, ptr<FileSystem> sys_fs, ptr<FileSystem> storage_fs);
 
+    RC storeFileSystemIntoStorage(FileSystem *beaked_fs,
+                                  FileSystem *origin_fs,
+                                  Storage *storage,
+                                  ptr<StoreStatistics> st,
+                                  ptr<ForwardTarredFS> ffs,
+                                  Options *settings);
+
     RC listBeakFiles(Storage *storage,
                      std::vector<TarFileName> *files,
                      std::vector<TarFileName> *bad_files,
                      std::vector<std::string> *other_files);
     RC sendBeakFilesToStorage(Path *dir, Storage *storage, std::vector<TarFileName*> *files);
     RC fetchBeakFilesFromStorage(Storage *storage, std::vector<TarFileName*> *files, Path *dir);
-
-    void addForwardWork(ptr<StoreStatistics> st, Path *path, FileStat *stat, Options *settings);
 
     ptr<FileSystem> fs() { return storage_fs_; }
 
@@ -57,7 +63,94 @@ StorageToolImplementation::StorageToolImplementation(ptr<System>sys,
                                                      ptr<FileSystem> storage_fs)
     : sys_(sys), sys_fs_(sys_fs), storage_fs_(storage_fs)
 {
+
 }
+
+void add_forward_work(ptr<StoreStatistics> st,
+                      Path *path, FileStat *stat,
+                      Options *settings,
+                      ptr<FileSystem> to_fs)
+{
+    Path *file_to_extract = path->prepend(settings->to.storage->storage_location);
+
+    if (stat->isRegularFile()) {
+        stat->checkStat(to_fs.get(), file_to_extract);
+        if (stat->disk_update == Store) {
+            st->stats.num_files_to_store++;
+            st->stats.size_files_to_store += stat->st_size;
+        }
+        st->stats.num_files++;
+        st->stats.size_files+=stat->st_size;
+    }
+    else if (stat->isDirectory()) st->stats.num_dirs++;
+}
+
+void handle_tar_file(Path *path,
+                     FileStat *stat,
+                     ptr<ForwardTarredFS> ffs,
+                     Options *settings,
+                     ptr<StoreStatistics> st,
+                     FileSystem *origin_fs,
+                     FileSystem *storage_fs)
+{
+    if (!stat->isRegularFile()) return;
+
+    debug(STORAGETOOL, "PATH %s\n", path->c_str());
+    TarFile *tar = ffs->findTarFromPath(path);
+    assert(tar);
+    Path *file_name = tar->path()->prepend(settings->to.storage->storage_location);
+    storage_fs->mkDirp(file_name->parent());
+    FileStat old_stat;
+    RC rc = storage_fs->stat(file_name, &old_stat);
+    if (rc.isOk() &&
+        stat->samePermissions(&old_stat) &&
+        stat->sameSize(&old_stat) &&
+        stat->sameMTime(&old_stat)) {
+
+        debug(STORAGETOOL, "Skipping %s\n", file_name->c_str());
+    } else {
+        if (rc.isOk()) {
+            storage_fs->deleteFile(file_name);
+        }
+        auto func = [&st](size_t n){st->stats.size_files_stored += n;};
+        tar->createFile(file_name, stat, origin_fs, storage_fs, 0, func);
+
+        storage_fs->utime(file_name, stat);
+        st->stats.num_files_stored++;
+        verbose(STORAGETOOL, "Stored %s\n", file_name->c_str());
+    }
+//    st->num_files_handled++;
+//    st->size_files_handled += stat->st_size;
+    st->updateProgress();
+}
+
+RC StorageToolImplementation::storeFileSystemIntoStorage(FileSystem *beaked_fs,
+                                                         FileSystem *origin_fs,
+                                                         Storage *storage,
+                                                         ptr<StoreStatistics> st,
+                                                         ptr<ForwardTarredFS> ffs,
+                                                         Options *settings)
+{
+    st->startDisplayOfProgress();
+
+    beaked_fs->recurse([=]
+                       (Path *path, FileStat *stat) {add_forward_work(st,path,stat,settings, storage_fs_); });
+
+    debug(STORAGETOOL, "Work to be done: num_files=%ju num_dirs=%ju\n", st->stats.num_files, st->stats.num_dirs);
+
+    beaked_fs->recurse([=]
+                       (Path *path, FileStat *stat) {handle_tar_file(path,
+                                                                     stat,
+                                                                     ffs,
+                                                                     settings,
+                                                                     st,
+                                                                     origin_fs,
+                                                                     storage_fs_.get()); });
+    st->finishProgress();
+
+    return RC::OK;
+}
+
 
 RC StorageToolImplementation::sendBeakFilesToStorage(Path *dir, Storage *storage, vector<TarFileName*> *files)
 {
@@ -164,32 +257,4 @@ RC StorageToolImplementation::listBeakFiles(Storage *storage,
     if (err) return RC::ERR;
 
     return RC::OK;
-}
-
-void addForwardWork(ptr<StoreStatistics> st,
-                    Path *path, FileStat *stat,
-                    Options *settings,
-                    ptr<FileSystem> to_fs)
-{
-    Path *file_to_extract = path->prepend(settings->to.storage->storage_location);
-
-    if (stat->isRegularFile()) {
-        stat->checkStat(to_fs.get(), file_to_extract);
-        if (stat->disk_update == Store) {
-            st->stats.num_files_to_store++;
-            st->stats.size_files_to_store += stat->st_size;
-        }
-        st->stats.num_files++;
-        st->stats.size_files+=stat->st_size;
-    }
-    else if (stat->isDirectory()) st->stats.num_dirs++;
-}
-
-
-void StorageToolImplementation::addForwardWork(ptr<StoreStatistics> st,
-                                               Path *path,
-                                               FileStat *stat,
-                                               Options *settings)
-{
-    ::addForwardWork(st, path, stat, settings, storage_fs_);
 }

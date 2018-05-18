@@ -652,7 +652,7 @@ RC BeakImplementation::check(Options *settings)
 
     vector<TarFileName> existing_files, bad_files;
     vector<string> other_files;
-    rc = storage_tool_->listBeakFiles(settings->from.storage, &existing_files, &bad_files, &other_files);
+    //rc = storage_tool_->listBeakFiles(settings->from.storage, &existing_files, &bad_files, &other_files);
 
     if (bad_files.size() > 0) {
         UI::output("Found %ju files with the wrong sizes!\n", bad_files.size());
@@ -688,7 +688,7 @@ RC BeakImplementation::check(Options *settings)
     UI::output("Backup location uses %s in %ju beak files.\n", total.c_str(), existing_files.size());
 
     verbose(CHECK, "Using cache location %s\n", rule->cache_path->c_str());
-    rc = storage_tool_->fetchBeakFilesFromStorage(storage, &indexes, rule->cache_path);
+    //rc = storage_tool_->fetchBeakFilesFromStorage(storage, &indexes, rule->cache_path);
 
     if (rc.isErr()) return rc;
 
@@ -1091,43 +1091,6 @@ RC BeakImplementation::status(Options *settings)
     return rc;
 }
 
-
-void handleTarFile(Path *path, FileStat *stat,
-                   ForwardTarredFS *ffs, Beak *beak,
-                   Options *settings, ptr<StoreStatistics> st,
-                   FileSystem *origin_fs, FileSystem *storage_fs)
-{
-    if (!stat->isRegularFile()) return;
-
-    debug(STORE, "PATH %s\n", path->c_str());
-    TarFile *tar = ffs->findTarFromPath(path);
-    assert(tar);
-    Path *file_name = tar->path()->prepend(settings->to.storage->storage_location);
-    storage_fs->mkDirp(file_name->parent());
-    FileStat old_stat;
-    RC rc = storage_fs->stat(file_name, &old_stat);
-    if (rc.isOk() &&
-        stat->samePermissions(&old_stat) &&
-        stat->sameSize(&old_stat) &&
-        stat->sameMTime(&old_stat)) {
-
-        debug(STORE, "Skipping %s\n", file_name->c_str());
-    } else {
-        if (rc.isOk()) {
-            storage_fs->deleteFile(file_name);
-        }
-        auto func = [&st](size_t n){st->stats.size_files_stored += n;};
-        tar->createFile(file_name, stat, origin_fs, storage_fs, 0, func);
-
-        storage_fs->utime(file_name, stat);
-        st->stats.num_files_stored++;
-        verbose(STORE, "Stored %s\n", file_name->c_str());
-    }
-//    st->num_files_handled++;
-//    st->size_files_handled += stat->st_size;
-    st->updateProgress();
-}
-
 RC BeakImplementation::storeForward(Options *settings)
 {
     RC rc = RC::OK;
@@ -1136,27 +1099,21 @@ RC BeakImplementation::storeForward(Options *settings)
     assert(settings->to.type == ArgStorage);
 
     auto ffs  = newForwardTarredFS(origin_tool_->fs());
-    auto view = ffs->asFileSystem();
+    auto beaked_fs = ffs->asFileSystem();
 
     uint64_t start = clockGetTime();
     rc = ffs->scanFileSystem(settings);
 
     auto st = newStoreStatistics();
+    storage_tool_->storeFileSystemIntoStorage(beaked_fs,
+                                              origin_tool_->fs().get(),
+                                              settings->to.storage,
+                                              st,
+                                              ffs,
+                                              settings);
 
-    st->startDisplayOfProgress();
-
-    view->recurse([&ffs,this,settings,&st]
-                  (Path *path, FileStat *stat) {storage_tool_->addForwardWork(st,path,stat,settings); });
-
-    debug(STORE, "Work to be done: num_files=%ju num_dirs=%ju\n", st->stats.num_files, st->stats.num_dirs);
-
-    view->recurse([&ffs,this,settings,&st]
-                  (Path *path, FileStat *stat) {handleTarFile(path,stat,ffs.get(),this,settings,st,
-                                                              origin_tool_->fs().get(), storage_tool_->fs().get()); });
     uint64_t stop = clockGetTime();
     uint64_t store_time = stop - start;
-
-    st->finishProgress();
 
     if (st->stats.num_files_stored == 0 && st->stats.num_dirs_updated == 0) {
         info(STORE, "No stores needed, everything was up to date.\n");
