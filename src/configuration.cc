@@ -257,7 +257,7 @@ bool ConfigurationImplementation::parseRow(string key, string value,
             Path *storage_location = Path::lookup(value);
             Rule *rule = findRuleFromStorageLocation(storage_location);
             if (rule) {
-                error(CONFIGURATION, "The storage location \"%s\" is used in two rules!\n", value.c_str());
+                error(CONFIGURATION, "The remote storage location \"%s\" is used in two rules!\n", value.c_str());
             }
             *current_storage = &current_rule->storages[storage_location];
             (*current_storage)->storage_location = storage_location;

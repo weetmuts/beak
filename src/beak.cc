@@ -112,7 +112,6 @@ struct BeakImplementation : Beak {
 
     private:
 
-    RC mountForwardInternal(Options *settings, bool daemon);
     RC remountReverseInternal(Options *settings, bool daemon);
     bool hasPointsInTime(Path *path, FileSystem *fs);
 
@@ -131,6 +130,7 @@ struct BeakImplementation : Beak {
     OptionEntry *parseOption(string s, bool *has_value, string *value);
     Argument parseArgument(std::string arg, ArgumentType expected_type, Options *settings);
 
+    unique_ptr<FuseMount> fuse_mount_;
     struct fuse_chan *chan_;
     struct fuse *fuse_;
     pid_t loop_pid_;
@@ -746,8 +746,9 @@ RC BeakImplementation::push(Options *settings)
 {
     RC rc = RC::OK;
 
-    assert(settings->from.type == ArgOrigin || settings->from.type == ArgRule);
+    assert(settings->from.type == ArgRule);
 
+    Rule *rule = settings->from.rule;
     Path *mount = sys_fs_->mkTempDir("beak_push_");
 
     Options forward_settings = settings->copy();
@@ -761,12 +762,21 @@ RC BeakImplementation::push(Options *settings)
     rc = mountForward(&forward_settings);
     if (rc.isErr()) return RC::ERR;
 
+    vector<Storage*> storages = rule->sortedStorages();
+    Storage *storage = NULL;
+    for (auto s : storages) {
+        if (s != rule->local) storage = s;
+    }
+    if (storage == NULL) {
+        error(COMMANDLINE, "No remote storage configured for rule \"%s\"\n", rule->name.c_str());
+    }
+
     // Beak file system is now mounted, lets store it into a storage location.
     vector<string> args;
     args.push_back("copy");
     args.push_back("-v");
     args.push_back(mount->c_str());
-    args.push_back(settings->to.storage->storage_location->str());
+    args.push_back(storage->storage_location->str());
     vector<char> output;
     rc = sys_->invoke("rclone", args, &output, CaptureBoth,
                       [=](char *buf, size_t len) {
@@ -827,9 +837,8 @@ RC BeakImplementation::mountForwardDaemon(Options *settings)
     if (settings->to.type == ArgOrigin) {
         dir = settings->to.origin;
     }
-    if (settings->to.type == ArgDir) {
-        dir = settings->to.dir;
-    }
+    assert(settings->to.type == ArgDir);
+    dir = settings->to.dir;
 
     auto ffs  = newForwardTarredFS(fs);
     RC rc = ffs->scanFileSystem(settings);
@@ -843,58 +852,25 @@ RC BeakImplementation::mountForwardDaemon(Options *settings)
 
 RC BeakImplementation::mountForward(Options *settings)
 {
-    return mountForwardInternal(settings, false);
-}
+    ptr<FileSystem> fs = origin_tool_->fs();
 
-RC BeakImplementation::umountForward(Options *settings)
-{
-    fuse_exit(fuse_);
-    fuse_unmount (settings->to.dir->c_str(), chan_);
-    return RC::OK;
-}
-
-RC BeakImplementation::mountForwardInternal(Options *settings, bool daemon)
-{
-    memset(&forward_tarredfs_ops, 0, sizeof(forward_tarredfs_ops));
-    forward_tarredfs_ops.getattr = forwardGetattr;
-    forward_tarredfs_ops.open = open_callback;
-    forward_tarredfs_ops.read = forwardRead;
-    forward_tarredfs_ops.readdir = forwardReaddir;
-
-    auto ffs  = newForwardTarredFS(origin_tool_->fs());
+    auto ffs  = newForwardTarredFS(fs);
     RC rc = ffs->scanFileSystem(settings);
 
     if (rc.isErr()) {
         return RC::ERR;
     }
 
-    if (daemon) {
-        int rc = fuse_main(settings->fuse_argc, settings->fuse_argv, &forward_tarredfs_ops, ffs.get());
-        if (rc) return RC::ERR;
-        return RC::OK;
-    }
-
-    struct fuse_args args;
-    args.argc = settings->fuse_argc;
-    args.argv = settings->fuse_argv;
-    args.allocated = 0;
-    struct fuse_chan *chan = fuse_mount(settings->to.dir->c_str(), &args);
-    fuse_ = fuse_new(chan,
-                     &args,
-                     &forward_tarredfs_ops,
-                     sizeof(forward_tarredfs_ops),
-                     ffs.get());
-
-    loop_pid_ = fork();
-
-    if (loop_pid_ == 0) {
-        // This is the child process. Serve the virtual file system.
-        fuse_loop_mt (fuse_);
-        exit(0);
-    }
-    return rc;
+    fuse_mount_ = origin_tool_->fs()->mount(settings->to.dir, ffs.get(), settings->fusedebug);
+    return RC::OK;
 }
 
+RC BeakImplementation::umountForward(Options *settings)
+{
+    ptr<FileSystem> fs = origin_tool_->fs();
+    fs->umount(fuse_mount_);
+    return RC::OK;
+}
 
 static int reverseGetattr(const char *path, struct stat *stbuf)
 {

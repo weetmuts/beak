@@ -442,11 +442,13 @@ RC FileSystemImplementationPosix::mountDaemon(Path *dir, FuseAPI *fuseapi, bool 
 unique_ptr<FuseMount> FileSystemImplementationPosix::mount(Path *dir, FuseAPI *fuseapi, bool debug)
 {
     unique_ptr<FuseMount> fm;
-    mountInternal(dir, fuseapi, true, fm, false, debug);
+    mountInternal(dir, fuseapi, false, fm, false, debug);
     return fm;
 }
 
-RC FileSystemImplementationPosix::mountInternal(Path *dir, FuseAPI *fuseapi, bool daemon, unique_ptr<FuseMount> &fm, bool foreground, bool debug)
+RC FileSystemImplementationPosix::mountInternal(Path *dir, FuseAPI *fuseapi,
+                                                bool daemon, unique_ptr<FuseMount> &fm,
+                                                bool foreground, bool debug)
 {
     vector<string> fuse_args;
     fuse_args.push_back("beak");
