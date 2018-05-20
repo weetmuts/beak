@@ -744,6 +744,19 @@ struct ReverseFileSystem : FileSystem
         return false;
     }
 
+    RC mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground=false, bool debug=false)
+    {
+        return RC::ERR;
+    }
+    unique_ptr<FuseMount> mount(Path *dir, FuseAPI *fuseapi, bool debug=false)
+    {
+        return NULL;
+    }
+
+    RC umount(ptr<FuseMount> fuse_mount)
+    {
+        return RC::ERR;
+    }
 
     ReverseFileSystem(ReverseTarredFS *rev) : rev_(rev) { }
 };

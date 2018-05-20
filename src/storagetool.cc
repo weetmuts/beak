@@ -138,14 +138,42 @@ RC StorageToolImplementation::storeFileSystemIntoStorage(FileSystem *beaked_fs,
 
     debug(STORAGETOOL, "Work to be done: num_files=%ju num_dirs=%ju\n", st->stats.num_files, st->stats.num_dirs);
 
-    beaked_fs->recurse([=]
-                       (Path *path, FileStat *stat) {handle_tar_file(path,
-                                                                     stat,
-                                                                     ffs,
-                                                                     settings,
-                                                                     st,
-                                                                     origin_fs,
-                                                                     storage_fs_.get()); });
+    switch (storage->type) {
+    case FileSystemStorage:
+    {
+        beaked_fs->recurse([=]
+                           (Path *path, FileStat *stat) {handle_tar_file(path,
+                                                                         stat,
+                                                                         ffs,
+                                                                         settings,
+                                                                         st,
+                                                                         origin_fs,
+                                                                         storage_fs_.get()); });
+        break;
+    }
+    case RCloneStorage:
+    case RSyncStorage:
+    {
+        /*
+        Path *mount = sys_fs_->mkTempDir("beak_push_");
+
+        Options forward_settings = settings->copy();
+        forward_settings.to.dir = mount;
+        forward_settings.fuse_argc = 1;
+        char *arg;
+        char **argv = &arg;
+        argv[0] = new char[16];
+        strcpy(*argv, "beak");
+        forward_settings.fuse_argv = argv;
+        rc = mountForward(&forward_settings);
+        if (rc.isErr()) return RC::ERR;
+        */
+
+    }
+    case NoSuchStorage:
+        assert(0);
+    }
+
     st->finishProgress();
 
     return RC::OK;

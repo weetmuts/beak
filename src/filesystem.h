@@ -241,6 +241,10 @@ struct FuseAPI {
                            size_t s) = 0;
 };
 
+struct FuseMount
+{
+};
+
 struct FileSystem
 {
     virtual bool readdir(Path *p, std::vector<Path*> *vec) = 0;
@@ -270,6 +274,12 @@ struct FileSystem
     virtual bool readLink(Path *file, std::string *target) = 0;
 
     virtual bool deleteFile(Path *file) = 0;
+
+    // A daemon mount will exit the current program and continue to run in the background as a daemon,
+    virtual RC mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground=false, bool debug=false) = 0;
+    // A normal mount forks and the current program continues to run.
+    virtual std::unique_ptr<FuseMount> mount(Path *dir, FuseAPI *fuseapi, bool debug=false) = 0;
+    virtual RC umount(ptr<FuseMount> fuse_mount) = 0;
 
     virtual ~FileSystem() = default;
 };

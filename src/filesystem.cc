@@ -46,6 +46,9 @@ struct FileSystemFuseAPIImplementation : FileSystem
     bool createFIFO(Path *path, FileStat *stat);
     bool readLink(Path *file, string *target);
     bool deleteFile(Path *file);
+    RC mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground=false, bool debug=false);
+    unique_ptr<FuseMount> mount(Path *dir, FuseAPI *fuseapi, bool debug=false);
+    RC umount(ptr<FuseMount> fuse_mount);
 
     FileSystemFuseAPIImplementation(FuseAPI *api);
     private:
@@ -153,6 +156,22 @@ bool FileSystemFuseAPIImplementation::readLink(Path *path, string *target)
 bool FileSystemFuseAPIImplementation::deleteFile(Path *path)
 {
     return false;
+}
+
+
+RC  FileSystemFuseAPIImplementation::mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground, bool debug)
+{
+    return RC::ERR;
+}
+
+unique_ptr<FuseMount>  FileSystemFuseAPIImplementation::mount(Path *dir, FuseAPI *fuseapi, bool debug)
+{
+    return NULL;
+}
+
+RC  FileSystemFuseAPIImplementation::umount(ptr<FuseMount> fuse_mount)
+{
+    return RC::ERR;
 }
 
 size_t basepos(string &s)
