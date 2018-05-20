@@ -822,7 +822,23 @@ RC BeakImplementation::umountDaemon(Options *settings)
 
 RC BeakImplementation::mountForwardDaemon(Options *settings)
 {
-    return mountForwardInternal(settings, true);
+    Path *dir;
+    ptr<FileSystem> fs = origin_tool_->fs();
+    if (settings->to.type == ArgOrigin) {
+        dir = settings->to.origin;
+    }
+    if (settings->to.type == ArgDir) {
+        dir = settings->to.dir;
+    }
+
+    auto ffs  = newForwardTarredFS(fs);
+    RC rc = ffs->scanFileSystem(settings);
+
+    if (rc.isErr()) {
+        return RC::ERR;
+    }
+
+    return origin_tool_->fs()->mountDaemon(dir, ffs.get(), settings->foreground, settings->fusedebug);
 }
 
 RC BeakImplementation::mountForward(Options *settings)

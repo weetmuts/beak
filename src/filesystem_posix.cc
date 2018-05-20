@@ -449,6 +449,7 @@ unique_ptr<FuseMount> FileSystemImplementationPosix::mount(Path *dir, FuseAPI *f
 RC FileSystemImplementationPosix::mountInternal(Path *dir, FuseAPI *fuseapi, bool daemon, unique_ptr<FuseMount> &fm, bool foreground, bool debug)
 {
     vector<string> fuse_args;
+    fuse_args.push_back("beak");
     if (foreground) fuse_args.push_back("-f");
     if (debug) fuse_args.push_back("-d");
     if (daemon) fuse_args.push_back(dir->str());
