@@ -105,7 +105,7 @@ int ForwardTarredFS::addTarEntry(const char *p, const struct stat *sb)
         if (err == 0) {
             // Oups found .beak subdir! This directory and children
             // must be ignored!
-            info(FORWARD,"Skipping subbeak %s\n", path->c_str());
+            info(FORWARD,"Skipping subbeak %s\n", abspath->c_str());
             return FTW_SKIP_SUBTREE;
         }
     }

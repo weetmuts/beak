@@ -86,7 +86,7 @@ void add_forward_work(ptr<StoreStatistics> st,
         }
         st->stats.num_files++;
         st->stats.size_files+=stat->st_size;
-        printf("PREP %ju/%ju \"%s\"\n", st->stats.num_files_to_store, st->stats.num_files, file_to_extract->c_str());
+        //printf("PREP %ju/%ju \"%s\"\n", st->stats.num_files_to_store, st->stats.num_files, file_to_extract->c_str());
     }
     else if (stat->isDirectory()) st->stats.num_dirs++;
 }
@@ -343,8 +343,9 @@ RC StorageToolImplementation::listBeakFiles(Storage *storage,
                 Path *p = tfn.path->prepend(storage->storage_location);
                 FileStat fs;
                 fs.st_size = (off_t)siz;
+                fs.st_mtim.tv_sec = tfn.secs;
+                fs.st_mtim.tv_nsec = tfn.nsecs;
                 (*contents)[p] = fs;
-                printf("ls2: %ju \"%s\"\n", (size_t)fs.st_size, p->c_str());
             }
             else
             {

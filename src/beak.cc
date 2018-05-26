@@ -1101,11 +1101,16 @@ RC BeakImplementation::storeForward(Options *settings)
     } else {
         if (st->stats.num_files_stored > 0) {
             string file_sizes = humanReadable(st->stats.size_files_stored);
+            double secs = ((double)((store_time)/1000))/1000.0;
+            string seconds = humanReadableTwoDecimals(secs);
+            double bytes = (double)st->stats.size_files_stored;
+            double bps = bytes/secs;
+            string average_speed = humanReadableTwoDecimals(bps);
 
-            info(STORE, "Stored %ju beak files for a total size of %s.\n"
-                 "Time to store %jdms.\n",
+            info(STORE, "Stored %ju beak files for a total size of %s, "
+                 "time to store %ds and average speed %s/s.\n",
                  st->stats.num_files_stored, file_sizes.c_str(),
-                 store_time / 1000);
+                 (int)secs, average_speed.c_str());
         }
     }
 

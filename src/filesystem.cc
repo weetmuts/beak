@@ -826,7 +826,6 @@ struct ListOnlyFileSystem : FileSystem
 
     RC stat(Path *p, FileStat *fs)
     {
-        printf("stat: %ju \"%s\"\n", contents_.count(p), p->c_str());
         if (contents_.count(p) != 0) {
             *fs = contents_[p];
             return RC::OK;

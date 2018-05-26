@@ -69,13 +69,14 @@ bool StoreStatisticsImplementation::redrawLine()
 {
     if (copy.num_files == 0 || copy.num_files_to_store == 0) return true;
     uint64_t now = clockGetTime();
-    float secs = ((float)((now-start_time)/1000))/1000.0;
+    double secs = ((double)((now-start_time)/1000))/1000.0;
     double bytes = (double)copy.size_files_stored;
     secsbytes.push_back({secs,bytes});
+    double bps = bytes/secs;
 
-    int percentage = (int)(100.0*(float)copy.size_files_stored / (float)copy.size_files_to_store);
+    int percentage = (int)(100.0*(double)copy.size_files_stored / (double)copy.size_files_to_store);
     string mibs = humanReadableTwoDecimals(copy.size_files_stored);
-    //string speed = humanReadableTwoDecimals(bps);
+    string average_speed = humanReadableTwoDecimals(bps);
 
     string msg = "Full";
     if (copy.num_files > copy.num_files_to_store) {
@@ -98,10 +99,10 @@ bool StoreStatisticsImplementation::redrawLine()
           eta_average);
 
 
-    UI::redrawLineOutput("%s store: %d%% (%ju/%ju), %s | %.1f (%.0fs,%.0fs,%.0fs)",
+    UI::redrawLineOutput("%s store: %d%% (%ju/%ju), %s %s/s| %.1f (%.0fs,%.0fs,%.0fs)",
                          msg.c_str(),
                          percentage, copy.num_files_stored, copy.num_files_to_store, mibs.c_str(),
-                         secs, eta_1s_speed, eta_immediate, eta_average);
+                         average_speed.c_str(), secs, eta_1s_speed, eta_immediate, eta_average);
     return true;
 }
 
