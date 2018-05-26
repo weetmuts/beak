@@ -101,6 +101,7 @@ struct FileSystemImplementationPosix : FileSystem
     Path *mkTempDir(string prefix);
     Path *mkDirp(Path *p);
     Path *mkDir(Path *p, string name);
+    RC rmDir(Path *p);
     RC loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
     RC createFile(Path *file, std::vector<char> *buf);
     bool createFile(Path *path, FileStat *stat,
@@ -251,6 +252,14 @@ Path *FileSystemImplementationPosix::mkDir(Path *p, string name)
     int rc = mkdir(n->c_str(), 0775);
     if (rc != 0) error(FILESYSTEM, "Could not create directory: \"%s\"\n", n->c_str());
     return n;
+}
+
+RC FileSystemImplementationPosix::rmDir(Path *p)
+{
+    int rc = rmdir(p->c_str());
+
+    if (rc != 0) return RC::ERR;
+    return RC::OK;
 }
 
 dev_t MakeDev(int maj, int min)

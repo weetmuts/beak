@@ -38,13 +38,14 @@ int main(int argc, char *argv[])
     // Next create the interface to the file system that stores the beak configuration files
     // and the temporary/cache files.
     auto sys_fs = newDefaultFileSystem();
-    // Next create the filesystem that can be used as a storage location
-    auto storage_fs = newDefaultFileSystem();
+    // Next create the filesystem that can be used as a storage location,
+    // but it might not be used, if storing remotely.
+    auto local_storage_fs = newDefaultFileSystem();
     // Next create the filesystem where the origin files are found.
     auto origin_fs = newDefaultFileSystem();
     // Then create the interface to hide the differences between different storages types:
     // ie rclone, rsync and local file system.
-    auto storage_tool = newStorageTool(sys, sys_fs, storage_fs);
+    auto storage_tool = newStorageTool(sys, sys_fs, local_storage_fs);
     // Create the source filesystem where the files to be backed up are found
     // and where restored files are written.
     auto origin_tool = newOriginTool(sys, sys_fs, origin_fs);

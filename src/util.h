@@ -87,5 +87,6 @@ std::string randomUpperCaseCharacterString(int len);
     } \
 } \
 
+void printContents(std::map<Path*,FileStat> &contents);
 
 #endif

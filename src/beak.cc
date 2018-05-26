@@ -269,10 +269,6 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
 
     if (expected_type == ArgORS || expected_type == ArgStorage) {
         Path *storage_location = Path::lookup(arg);
-        Path *rp = storage_location->realpath();
-        if (rp) {
-            storage_location = rp;
-        }
         Storage *storage = configuration_->findStorageFrom(storage_location);
 
         if (storage) {
@@ -749,16 +745,9 @@ RC BeakImplementation::push(Options *settings)
     assert(settings->from.type == ArgRule);
 
     Rule *rule = settings->from.rule;
-    Path *mount = sys_fs_->mkTempDir("beak_push_");
-
     Options forward_settings = settings->copy();
+    Path *mount = sys_fs_->mkTempDir("beak_push_");
     forward_settings.to.dir = mount;
-    forward_settings.fuse_argc = 1;
-    char *arg;
-    char **argv = &arg;
-    argv[0] = new char[16];
-    strcpy(*argv, "beak");
-    forward_settings.fuse_argv = argv;
     rc = mountForward(&forward_settings);
     if (rc.isErr()) return RC::ERR;
 
@@ -1122,7 +1111,6 @@ RC BeakImplementation::storeForward(Options *settings)
 
     return rc;
 }
-
 
 RC BeakImplementation::restoreReverse(Options *settings)
 {

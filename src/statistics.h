@@ -19,6 +19,9 @@
 #define STATISTICS_H
 
 #include "always.h"
+#include "filesystem.h"
+
+#include <map>
 
 struct Stats
 {
@@ -42,6 +45,8 @@ struct Stats
     size_t num_dirs_updated {};
 
     size_t num_total {};
+
+    std::map<Path*,size_t> file_sizes;
 };
 
 struct StoreStatistics

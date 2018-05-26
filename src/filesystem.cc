@@ -37,6 +37,7 @@ struct FileSystemFuseAPIImplementation : FileSystem
     Path *mkTempFile(string prefix, string content);
     Path *mkTempDir(string prefix);
     Path *mkDir(Path *path, string name);
+    RC rmDir(Path *path);
     RC loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
     RC createFile(Path *file, std::vector<char> *buf);
     bool createFile(Path *path, FileStat *stat,
@@ -115,6 +116,11 @@ Path *FileSystemFuseAPIImplementation::mkTempDir(string prefix)
 Path *FileSystemFuseAPIImplementation::mkDir(Path *p, string name)
 {
     return NULL;
+}
+
+RC FileSystemFuseAPIImplementation::rmDir(Path *p)
+{
+    return RC::ERR;
 }
 
 RC FileSystemFuseAPIImplementation::loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
@@ -794,4 +800,112 @@ void FileStat::checkStat(FileSystem *dst, Path *target)
         return;
     }
     disk_update = Store;
+}
+
+struct ListOnlyFileSystem : FileSystem
+{
+    map<Path*,FileStat> contents_;
+
+    ListOnlyFileSystem(map<Path*,FileStat> &contents) : contents_(contents) {
+    }
+
+
+    bool readdir(Path *p, std::vector<Path*> *vec)
+    {
+        return false;
+    }
+
+    ssize_t pread(Path *p, char *buf, size_t size, off_t offset)
+    {
+        return 0;
+    }
+
+    void recurse(std::function<void(Path *path, FileStat *stat)> cb)
+    {
+    }
+
+    RC stat(Path *p, FileStat *fs)
+    {
+        printf("stat: %ju \"%s\"\n", contents_.count(p), p->c_str());
+        if (contents_.count(p) != 0) {
+            *fs = contents_[p];
+            return RC::OK;
+        }
+        return RC::ERR;
+    }
+    RC chmod(Path *p, FileStat *fs)
+    {
+        return RC::ERR;
+    }
+    RC utime(Path *p, FileStat *fs)
+    {
+        return RC::ERR;
+    }
+    Path *mkTempFile(std::string prefix, std::string content)
+    {
+        return NULL;
+    }
+    Path *mkTempDir(std::string prefix)
+    {
+        return NULL;
+    }
+    Path *mkDir(Path *p, std::string name)
+    {
+        return NULL;
+    }
+    RC rmDir(Path *p)
+    {
+        return RC::ERR;
+    }
+    RC loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
+    {
+        return RC::OK;
+    }
+    RC createFile(Path *file, std::vector<char> *buf)
+    {
+        return RC::ERR;
+    }
+    bool createFile(Path *path, FileStat *stat,
+                     std::function<size_t(off_t offset, char *buffer, size_t len)> cb)
+    {
+        return false;
+    }
+    bool createSymbolicLink(Path *file, FileStat *stat, string target)
+    {
+        return false;
+    }
+    bool createHardLink(Path *file, FileStat *stat, Path *target)
+    {
+        return false;
+    }
+    bool createFIFO(Path *file, FileStat *stat)
+    {
+        return false;
+    }
+    bool readLink(Path *file, string *target)
+    {
+        return false;
+    }
+    bool deleteFile(Path *file)
+    {
+        return false;
+    }
+    RC mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground=false, bool debug=false)
+    {
+        return RC::ERR;
+    }
+    unique_ptr<FuseMount> mount(Path *dir, FuseAPI *fuseapi, bool debug=false)
+    {
+        return NULL;
+    }
+
+    RC umount(ptr<FuseMount> fuse_mount)
+    {
+        return RC::ERR;
+    }
+};
+
+unique_ptr<FileSystem> newListOnlyFileSystem(map<Path*,FileStat> contents)
+{
+    return unique_ptr<FileSystem>(new ListOnlyFileSystem(contents));
 }

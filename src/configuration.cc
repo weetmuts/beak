@@ -911,6 +911,15 @@ string Keep::str()
     return s;
 }
 
+bool Keep::subsetOf(const Keep &keep) {
+    if (tz_offset != keep.tz_offset) return false;
+    if (all > keep.all) return false;
+    if (daily > keep.daily) return false;
+    if (weekly > keep.weekly) return false;
+    if (monthly > keep.monthly) return false;
+    return true;
+}
+
 void ConfigurationImplementation::outputStorage(Storage *s, std::vector<ChoiceEntry> *buf)
 {
     string msg;
@@ -1002,6 +1011,8 @@ bool ConfigurationImplementation::isRCloneStorage(Path *storage_location, string
             eatWhitespace(out, i, &eof);
             if (eof) break;
             string target = eatTo(out, i, ':', 4096, &eof, &err);
+            trimWhitespace(&target);
+            target += ':';
             if (eof || err) break;
             string type = eatTo(out, i, '\n', 64, &eof, &err);
             if (err) break;
@@ -1048,13 +1059,8 @@ Storage *ConfigurationImplementation::findStorageFrom(Path *storage_location)
     }
 
     // Ok, not a known storage location.
-
-    if (isFileSystemStorage(storage_location)) {
-        a_storage.type = FileSystemStorage;
-        a_storage.storage_location = storage_location;
-        return &a_storage;
-    }
-    else if (isRCloneStorage(storage_location)) {
+    // Let us check if it is rclone, rsync or a directory.
+    if (isRCloneStorage(storage_location)) {
         a_storage.type = RCloneStorage;
         a_storage.storage_location = storage_location;
         return &a_storage;
@@ -1063,6 +1069,17 @@ Storage *ConfigurationImplementation::findStorageFrom(Path *storage_location)
         a_storage.type = RSyncStorage;
         a_storage.storage_location = storage_location;
         return &a_storage;
+    }
+    else {
+        Path *rp = storage_location->realpath();
+        if (rp) {
+            storage_location = rp;
+        }
+        if (isFileSystemStorage(storage_location)) {
+            a_storage.type = FileSystemStorage;
+            a_storage.storage_location = storage_location;
+            return &a_storage;
+        }
     }
 
     return NULL;

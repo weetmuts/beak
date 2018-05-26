@@ -71,6 +71,9 @@ struct Keep
     std::string str();
     // By default it keeps everything forever.
     bool keepAllForever() { return all==0 && daily==0 && weekly==0 && monthly==0; }
+    // Return true if a storage pruned with this keep rule is a subset of
+    // the same storage pruned with the k rule.
+    bool subsetOf(const Keep &k);
 };
 
 #define LIST_OF_STORAGE_TYPES \

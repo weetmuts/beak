@@ -733,3 +733,10 @@ string getTimeZoneOffsetAsString(time_t t)
     s += to_string(minutesone);
     return s;
 }
+
+void printContents(std::map<Path*,FileStat> &contents)
+{
+    for (auto& p : contents) {
+        printf("%s\n", p.first->c_str());
+    }
+}

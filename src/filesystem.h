@@ -22,7 +22,7 @@
 
 #include <deque>
 #include <functional>
-#include <memory>
+#include <map>
 #include <memory.h>
 #include <string>
 #include <vector>
@@ -257,6 +257,8 @@ struct FileSystem
     virtual Path *mkTempDir(std::string prefix) = 0;
             bool mkDirp(Path *p);
     virtual Path *mkDir(Path *p, std::string name) = 0;
+    virtual RC rmDir(Path *p) = 0;
+
     virtual RC loadVector(Path *file, size_t blocksize, std::vector<char> *buf) = 0;
 
     virtual RC createFile(Path *file, std::vector<char> *buf) = 0;
@@ -284,7 +286,12 @@ struct FileSystem
     virtual ~FileSystem() = default;
 };
 
+// The default file system for this computer/OS.
 std::unique_ptr<FileSystem> newDefaultFileSystem();
+// A file system where you can list the files and their stats,
+// but not read the data nor write to it.
+std::unique_ptr<FileSystem> newListOnlyFileSystem(std::map<Path*,FileStat> contents);
+
 FileSystem *newFileSystem(FuseAPI *api);
 FileSystem *defaultFileSystem();
 

@@ -710,6 +710,10 @@ struct ReverseFileSystem : FileSystem
     {
         return NULL;
     }
+    RC rmDir(Path *p)
+    {
+        return RC::ERR;
+    }
     RC loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
     {
         return RC::OK;

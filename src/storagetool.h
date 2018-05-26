@@ -45,6 +45,6 @@ struct StorageTool
 
 std::unique_ptr<StorageTool> newStorageTool(ptr<System> sys,
                                             ptr<FileSystem> sys_fs,
-                                            ptr<FileSystem> storage_fs);
+                                            ptr<FileSystem> local_storage_fs);
 
 #endif
