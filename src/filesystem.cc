@@ -390,7 +390,7 @@ static Path *interned_root;
 Path *Path::lookup(string p)
 {
     assert(p.back() != '\n' && (p.back() != 0 || p.length() == 0));
-    #ifdef PLATFORM_WINAPI
+/* #ifdef PLATFORM_WINAPI
     char *c = &p[0];
     while (c < &p[p.length()]) {
         if (*c == '\\') {
@@ -399,6 +399,7 @@ Path *Path::lookup(string p)
         c++;
     }
     #endif
+*/
     if (p.back() == '/')
     {
         p = p.substr(0, p.length() - 1);

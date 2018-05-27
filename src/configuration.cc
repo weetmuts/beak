@@ -148,7 +148,7 @@ ConfigurationImplementation::ConfigurationImplementation(ptr<System> sys, ptr<Fi
 {
 }
 
-Path *inputDirectory(const char *prompt)
+Path *inputDirectory(ptr<FileSystem> fs, const char *prompt)
 {
     for (;;) {
         UI::outputPrompt(prompt);
@@ -157,13 +157,13 @@ Path *inputDirectory(const char *prompt)
             UI::output("Path not found!\n");
             continue;
         }
-        FileStat fs;
-        RC rc = defaultFileSystem()->stat(path, &fs);
+        FileStat st;
+        RC rc = fs->stat(path, &st);
         if (rc.isErr()) {
             UI::output("Not a proper path!\n");
             continue;
         }
-        if (!fs.isDirectory()) {
+        if (!st.isDirectory()) {
             UI::output("Path is not a directory!\n");
             continue;
         }
@@ -295,7 +295,8 @@ bool ConfigurationImplementation::load()
     rules_.clear();
     paths_.clear();
     vector<char> buf;
-    RC rc = fs_->loadVector(configurationFile(), 32768, &buf);
+    Path *config = configurationFile();
+    RC rc = fs_->loadVector(config, 32768, &buf);
     if (rc.isOk()) {
         vector<char>::iterator i = buf.begin();
         bool eof=false, err=false;
@@ -433,7 +434,7 @@ void ConfigurationImplementation::editName(Rule *r)
 
 void ConfigurationImplementation::editPath(Rule *r)
 {
-    r->origin_path = inputDirectory("path>");
+    r->origin_path = inputDirectory(fs_, "path>");
 }
 
 void ConfigurationImplementation::editType(Rule *r)
@@ -449,12 +450,12 @@ void ConfigurationImplementation::editType(Rule *r)
 
 void ConfigurationImplementation::editHistoryPath(Rule *r)
 {
-    r->history_path = inputDirectory("history path>");
+    r->history_path = inputDirectory(fs_, "history path>");
 }
 
 void ConfigurationImplementation::editCachePath(Rule *r)
 {
-    r->history_path = inputDirectory("history path>");
+    r->history_path = inputDirectory(fs_, "history path>");
 }
 
 void ConfigurationImplementation::editCacheSize(Rule *r)
@@ -471,7 +472,7 @@ void ConfigurationImplementation::editCacheSize(Rule *r)
 void ConfigurationImplementation::editLocalPath(Rule *r)
 {
     assert(r->local);
-    r->local->storage_location = inputDirectory("local path>");
+    r->local->storage_location = inputDirectory(fs_, "local path>");
 }
 
 void ConfigurationImplementation::editLocalKeep(Rule *r)
@@ -575,14 +576,14 @@ void ConfigurationImplementation::outputRule(Rule *r, std::vector<ChoiceEntry> *
     }
 }
 
-bool isDirectory(Path *path)
+bool isDirectory(ptr<FileSystem> fs, Path *path)
 {
-    FileStat fs;
-    RC rc = defaultFileSystem()->stat(path, &fs);
+    FileStat st;
+    RC rc = fs->stat(path, &st);
     if (rc.isErr()) {
         return false;
     }
-    if (!fs.isDirectory()) {
+    if (!st.isDirectory()) {
         return false;
     }
     return true;
@@ -640,7 +641,7 @@ pair<bool,StorageType> ConfigurationImplementation::okStorage(string storage)
         }
     }
     Path *p = Path::lookup(storage);
-    if (isDirectory(p)) {
+    if (isDirectory(fs_, p)) {
         // This is a plain directory
         UI::output("Storage identified as directory.\n");
         return { true, FileSystemStorage };

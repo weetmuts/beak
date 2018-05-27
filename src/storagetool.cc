@@ -20,6 +20,9 @@
 #include "forward.h"
 #include "log.h"
 #include "system.h"
+#include "storage_rclone.h"
+
+#include <algorithm>
 
 static ComponentId STORAGETOOL = registerLogComponent("storagetool");
 static ComponentId RCLONE = registerLogComponent("rclone");
@@ -36,6 +39,8 @@ struct StorageToolImplementation : public StorageTool
                                   ptr<StoreStatistics> st,
                                   ptr<ForwardTarredFS> ffs,
                                   Options *settings);
+
+    RC listPointsInTime(Storage *storage, vector<pair<Path*,struct timespec>> *v);
 
     RC listBeakFiles(Storage *storage,
                      std::vector<TarFileName> *files,
@@ -59,7 +64,6 @@ unique_ptr<StorageTool> newStorageTool(ptr<System> sys,
 {
     return unique_ptr<StorageTool>(new StorageToolImplementation(sys, sys_fs, local_storage_fs));
 }
-
 
 StorageToolImplementation::StorageToolImplementation(ptr<System>sys,
                                                      ptr<FileSystem> sys_fs,
@@ -242,7 +246,6 @@ RC StorageToolImplementation::storeFileSystemIntoStorage(FileSystem *beaked_fs,
     return RC::OK;
 }
 
-
 RC StorageToolImplementation::sendBeakFilesToStorage(Path *dir, Storage *storage, vector<TarFileName*> *files)
 {
     assert(storage->type == RCloneStorage);
@@ -356,6 +359,59 @@ RC StorageToolImplementation::listBeakFiles(Storage *storage,
         }
     }
     if (err) return RC::ERR;
+
+    return RC::OK;
+}
+
+RC StorageToolImplementation::listPointsInTime(Storage *storage, vector<pair<Path*,struct timespec>> *v)
+{
+    switch (storage->type) {
+    case FileSystemStorage:
+    {
+        break;
+    }
+    case RSyncStorage:
+    {
+        /*
+        vector<char> out;
+        vector<string> args;
+        args.push_back("--list-only");
+        args.push_back(storage->storage_location->str());
+        RC rc = sys_->invoke("rsync", args, &out);
+        if (rc.isErr()) return RC::ERR;
+        */
+        /*auto i = out.begin();
+        bool eof, err;
+
+        for (;;) {
+            // Example line:
+            // -rw-rw-r--         15,920 2018/05/26 08:43:32 z01_.....gz
+            }*/
+        break;
+    }
+    case RCloneStorage:
+    {
+        vector<TarFileName> files;
+        vector<TarFileName> bad_files;
+        vector<std::string> other_files;
+        map<Path*,FileStat> contents;
+        RC rc = rcloneListBeakFiles(storage, &files, &bad_files, &other_files, &contents, sys_);
+        if (rc.isErr()) return RC::ERR;
+
+        /*
+        sort(v->begin(), v->end(),
+             [](struct timespec &a, struct timespec &b)->bool {
+                 return (b.tv_sec < a.tv_sec) ||
+                     (b.tv_sec == a.tv_sec &&
+                      b.tv_nsec < a.tv_nsec);
+             });
+        */
+
+        break;
+    }
+    case NoSuchStorage:
+        assert(0);
+    }
 
     return RC::OK;
 }

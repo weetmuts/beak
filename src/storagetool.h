@@ -39,9 +39,10 @@ struct StorageTool
                                           ptr<ForwardTarredFS> ffs,
                                           Options *settings) = 0;
 
+    virtual RC listPointsInTime(Storage *storage, std::vector<std::pair<Path*,struct timespec>> *v) = 0;
+
     virtual ptr<FileSystem> fs() = 0;
 };
-
 
 std::unique_ptr<StorageTool> newStorageTool(ptr<System> sys,
                                             ptr<FileSystem> sys_fs,

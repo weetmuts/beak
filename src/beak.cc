@@ -335,7 +335,8 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
     return argument;
 }
 
-void BeakImplementation::printCommands() {
+void BeakImplementation::printCommands()
+{
     fprintf(stdout, "Available Commands:\n");
 
     size_t max = 0;
@@ -355,7 +356,8 @@ void BeakImplementation::printCommands() {
     }
 }
 
-void BeakImplementation::printOptions() {
+void BeakImplementation::printOptions()
+{
     fprintf(stdout, "Options:\n");
 
     size_t max = 0;
@@ -648,7 +650,9 @@ RC BeakImplementation::check(Options *settings)
 
     vector<TarFileName> existing_files, bad_files;
     vector<string> other_files;
-    //rc = storage_tool_->listBeakFiles(settings->from.storage, &existing_files, &bad_files, &other_files);
+    map<Path*,FileStat> contents;
+    //rc = storage_tool_->listBeakFiles(settings->from.storage,
+    //&existing_files, &bad_files, &other_files, &contents);
 
     if (bad_files.size() > 0) {
         UI::output("Found %ju files with the wrong sizes!\n", bad_files.size());
@@ -952,7 +956,6 @@ RC BeakImplementation::remountReverseInternal(Options *settings, bool daemon)
     return RC::OK;
 }
 
-// Copy the remote index files to the local storage.
 RC BeakImplementation::fetchPointsInTime(string remote, Path *cache)
 {
     vector<char> out;
@@ -988,54 +991,6 @@ RC BeakImplementation::fetchPointsInTime(string remote, Path *cache)
     return rc;
 }
 
-// List the remote index files.
-RC BeakImplementation::findPointsInTime(string remote, vector<struct timespec> *v)
-{
-    vector<char> out;
-    vector<string> args;
-    args.push_back("ls");
-    args.push_back("--include");
-    args.push_back("/z01*");
-    args.push_back(remote);
-    RC rc = sys_->invoke("rclone", args, &out);
-    if (rc.isErr()) return RC::ERR;
-
-    auto i = out.begin();
-    bool eof, err;
-
-    for (;;) {
-	// Example line:
-	// 12288 z01_001506595429.268937346_0_7eb62d8e0097d5eaa99f332536236e6ba9dbfeccf0df715ec96363f8ddd495b6_0.gz
-        eatWhitespace(out, i, &eof);
-        if (eof) break;
-        string size = eatTo(out, i, ' ', 64, &eof, &err);
-        if (eof || err) break;
-        eatTo(out, i, '_', 64, &eof, &err);
-        if (eof || err) break;
-        string secs = eatTo(out, i, '.', 64, &eof, &err);
-        if (eof || err) break;
-        string nanos = eatTo(out, i, '_', 64, &eof, &err);
-        if (eof || err) break;
-        eatTo(out, i, '\n', 4096, &eof, &err);
-        if (err) break;
-	struct timespec ts;
-	ts.tv_sec = atol(secs.c_str());
-	ts.tv_nsec = atoi(nanos.c_str());
-	v->push_back(ts);
-    }
-
-    if (err) return RC::ERR;
-
-    sort(v->begin(), v->end(),
-	      [](struct timespec &a, struct timespec &b)->bool {
-		  return (b.tv_sec < a.tv_sec) ||
-		      (b.tv_sec == a.tv_sec &&
-		       b.tv_nsec < a.tv_nsec);
-	      });
-
-    return RC::OK;
-}
-
 RC BeakImplementation::status(Options *settings)
 {
     RC rc = RC::OK;
@@ -1043,14 +998,15 @@ RC BeakImplementation::status(Options *settings)
     for (auto rule : configuration_->sortedRules()) {
 	UI::output("%-20s %s\n", rule->name.c_str(), rule->origin_path->c_str());
 	{
-	    vector<struct timespec> points;
-	    rc = findPointsInTime(rule->local->storage_location->str(), &points);
+	    vector<pair<Path*,struct timespec>> points;
+	    rc = storage_tool_->listPointsInTime(rule->local, &points);
+            /*
 	    if (points.size() > 0) {
 		string ago = timeAgo(&points.front());
 		UI::output("%-20s %s\n", ago.c_str(), "local");
 	    } else {
 		UI::output("%-20s %s\n", "No backup!", "local");
-	    }
+                }*/
 	}
 
 	for (auto storage : rule->sortedStorages()) {
@@ -1058,7 +1014,7 @@ RC BeakImplementation::status(Options *settings)
 	    if (rc.isErr()) continue;
 
 	    vector<struct timespec> points;
-	    rc = findPointsInTime(storage->storage_location->str(), &points);
+	    //rc = findPointsInTime(storage->storage_location->str(), &points);
 	    if (points.size() > 0) {
 		string ago = timeAgo(&points.front());
 		UI::output("%-20s %s\n", ago.c_str(), storage->storage_location->c_str());
@@ -1153,8 +1109,8 @@ RC BeakImplementation::restoreReverse(Options *settings)
     st->startDisplayOfProgress();
 
     view->recurse([&rfs,this,point,settings,&st]
-                  (Path *path, FileStat *stat) {origin_tool_->addReverseWork(st,path,stat,settings,
-                                                                              rfs.get(),point); });
+                  (Path *path, FileStat *stat) {origin_tool_->addRestoreWork(st,path,stat,settings,
+                                                                             rfs.get(),point); });
     debug(STORE, "Work to be done: num_files=%ju num_hardlinks=%ju num_symlinks=%ju num_nodes=%ju num_dirs=%ju\n",
           st->stats.num_files, st->stats.num_hard_links, st->stats.num_symbolic_links, st->stats.num_nodes, st->stats.num_dirs);
 

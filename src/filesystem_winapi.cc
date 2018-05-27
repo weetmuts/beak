@@ -97,6 +97,7 @@ struct FileSystemImplementationWinapi : FileSystem
     Path *mkTempFile(string prefix, string content);
     Path *mkTempDir(string prefix);
     Path *mkDir(Path *p, string name);
+    RC rmDir(Path *p);
 
     RC loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
     RC createFile(Path *file, std::vector<char> *buf);
@@ -109,25 +110,21 @@ struct FileSystemImplementationWinapi : FileSystem
     bool readLink(Path *file, string *target);
     bool deleteFile(Path *file);
 
+    RC mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground=false, bool debug=false);
+    unique_ptr<FuseMount> mount(Path *dir, FuseAPI *fuseapi, bool debug=false);
+
+    RC umount(ptr<FuseMount> fuse_mount);
+
 private:
 
     Path *root;
     Path *cache;
 };
 
-FileSystem *default_file_system_;
-
-FileSystem *defaultFileSystem()
-{
-    return default_file_system_;
-}
-
 unique_ptr<FileSystem> newDefaultFileSystem()
 {
-    default_file_system_ = new FileSystemImplementationWinapi();
-    return unique_ptr<FileSystem>(default_file_system_);
+    return unique_ptr<FileSystem>(new FileSystemImplementationWinapi());
 }
-
 
 bool FileSystemImplementationWinapi::readdir(Path *p, vector<Path*> *vec)
 {
@@ -219,63 +216,78 @@ Path *FileSystemImplementationWinapi::mkDir(Path *p, string name)
     return n;
 }
 
+RC FileSystemImplementationWinapi::rmDir(Path *p)
+{
+    return RC::ERR;
+}
+
 RC FileSystemImplementationWinapi::loadVector(Path *file, size_t blocksize, vector<char> *buf)
 {
-    /*
+    assert(file != NULL && buf != NULL && blocksize > 0);
     char block[blocksize+1];
 
-    int fd = open(file->c_str(), O_RDONLY);
-    if (fd == -1) {
-        return -1;
+    HANDLE fd = CreateFile(file->c_str(),
+                           GENERIC_READ,
+                           0,                      // do not share
+                           NULL,                   // default security
+                           OPEN_EXISTING,
+                           FILE_ATTRIBUTE_NORMAL,  // normal file
+                           NULL);
+
+    if (fd == INVALID_HANDLE_VALUE) {
+        return RC::ERR;
     }
+
     while (true) {
-        ssize_t n = read(fd, block, sizeof(block));
-        if (n == -1) {
-            if (errno == EINTR) {
-                continue;
-            }
-            failure(FILESYSTEM,"Could not read from gzfile %s errno=%d\n", file->c_str(), errno);
-            close(fd);
-            return -1;
+        DWORD n;
+        BOOL rc = ReadFile(fd, block, blocksize, &n, NULL);
+        if (!rc) {
+            DWORD err = GetLastError();
+            error(FILESYSTEM,"Could not read from file %s errno=%d\n", file->c_str(), err);
+            CloseHandle(fd);
+            return RC::ERR;
         }
         buf->insert(buf->end(), block, block+n);
         if (n < (ssize_t)sizeof(block)) {
             break;
         }
     }
-    close(fd);
-    */
-    return RC::ERR;
+    CloseHandle(fd);
+
+    return RC::OK;
 }
 
 RC FileSystemImplementationWinapi::createFile(Path *file, vector<char> *buf)
 {
-    /*
-    int fd = open(file->c_str(), O_WRONLY | O_CREAT, 0666);
-    if (fd == -1) {
-	failure(FILESYSTEM,"Could not open file %s errno=%d\n", file->c_str(), errno);
-        return -1;
+    assert(file != NULL && buf != NULL);
+
+    HANDLE fd = CreateFile(file->c_str(),
+                           GENERIC_WRITE,
+                           0,                      // do not share
+                           NULL,                   // default security
+                           CREATE_ALWAYS,
+                           FILE_ATTRIBUTE_NORMAL,  // normal file
+                           NULL);
+
+    if (fd == INVALID_HANDLE_VALUE) {
+        return RC::ERR;
     }
-    char *p = buf->data();
-    ssize_t total = buf->size();
-    while (true) {
-        ssize_t n = write(fd, buf->data(), buf->size());
-        if (n == -1) {
-            if (errno == EINTR) {
-                continue;
-            }
-            failure(FILESYSTEM,"Could not write to file %s errno=%d\n", file->c_str(), errno);
-            close(fd);
-            return -1;
-        }
-	p += n;
-	total -= n;
-        if (total <= 0) {
-            break;
-        }
+
+    DWORD n;
+    BOOL rc = WriteFile(fd, &(*buf)[0], buf->size(), &n, NULL);
+    if (!rc) {
+        DWORD err = GetLastError();
+        error(FILESYSTEM,"Could not write to file %s errno=%d\n", file->c_str(), err);
+        CloseHandle(fd);
+        return RC::ERR;
     }
-    close(fd);*/
-    return RC::ERR;
+    if (n != buf->size()) {
+        error(FILESYSTEM,"Expected %ju bytes to be written to file %s, wrote only %ju\n",
+              buf->size(), file->c_str(), n);
+    }
+    CloseHandle(fd);
+
+    return RC::OK;
 }
 
 
@@ -351,6 +363,32 @@ bool makeDirHelper(const char *s)
 
 Path *configurationFile()
 {
-    Path *home = Path::lookup(getenv("HOME"));
-    return home->append(".config/beak/beak.conf");
+    const char *homedrive = getenv("HOMEDRIVE");
+    const char *homepath = getenv("HOMEPATH");
+
+    if (homedrive == NULL) {
+        error(FILESYSTEM, "Could not find home drive!\n");
+    }
+    if (homepath == NULL) {
+        error(FILESYSTEM, "Could not find home directory!\n");
+    }
+
+    string homes = string(homedrive)+string(homepath);
+    Path *homep = Path::lookup(homes);
+    return homep->append(".config/beak/beak.conf");
+}
+
+RC FileSystemImplementationWinapi::mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground, bool debug)
+{
+    return RC::ERR;
+}
+
+unique_ptr<FuseMount> FileSystemImplementationWinapi::mount(Path *dir, FuseAPI *fuseapi, bool debug)
+{
+    return NULL;
+}
+
+RC FileSystemImplementationWinapi::umount(ptr<FuseMount> fuse_mount_info)
+{
+    return RC::ERR;
 }

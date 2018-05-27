@@ -24,13 +24,25 @@
 #include "storagetool.h"
 #include "system.h"
 
-#include<stdio.h>
+#include <stdio.h>
 #include <unistd.h>
 
 using namespace std;
 
+int go(int argc, char *argv[]);
+
 int main(int argc, char *argv[])
 {
+    try {
+        go(argc, argv);
+    }
+    catch (...) {
+        fprintf(stderr, "Internal error due to C++ exception.\n");
+        // We really want to print the stack trace here!
+    }
+}
+
+int go(int argc, char *argv[]) {
     RC rc = RC::OK;
 
     // First create the OS interface to invoke external commands like rclone and rsync.
@@ -43,11 +55,10 @@ int main(int argc, char *argv[])
     auto local_storage_fs = newDefaultFileSystem();
     // Next create the filesystem where the origin files are found.
     auto origin_fs = newDefaultFileSystem();
-    // Then create the interface to hide the differences between different storages types:
+     // Then create the interface to hide the differences between different storages types:
     // ie rclone, rsync and local file system.
     auto storage_tool = newStorageTool(sys, sys_fs, local_storage_fs);
-    // Create the source filesystem where the files to be backed up are found
-    // and where restored files are written.
+    // Then create the interface to restore and read files from the origin.
     auto origin_tool = newOriginTool(sys, sys_fs, origin_fs);
     // Fetch the beak configuration from ~/.config/beak/beak.conf
     auto configuration = newConfiguration(sys, sys_fs);
@@ -62,27 +73,6 @@ int main(int argc, char *argv[])
     Options settings;
     Command cmd = beak->parseCommandLine(argc, argv, &settings);
 
-    /*
-    {
-        auto st = newStoreStatistics();
-        st->stats.num_files=100000;
-        st->stats.num_files_to_store = 100000;
-        st->stats.size_files_to_store = 100000*1000;
-
-        st->startDisplayOfProgress();
-
-        for (int i=0; i<100000; ++i) {
-            int slowdown = i/1000;
-            usleep(10+5*slowdown);
-            st->stats.num_files_stored++;
-            st->stats.size_files_stored+=1000;
-            st->updateProgress();
-        }
-        st->finishProgress();
-    }
-
-    return 0;
-    */
     // We now know the command the user intends to invoke.
     switch (cmd) {
 

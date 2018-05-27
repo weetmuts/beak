@@ -32,6 +32,8 @@ struct SystemImplementationWinapi : System
                Capture capture,
                function<void(char *buffer, size_t len)> cb);
 
+private:
+    int *rooot {};
 };
 
 unique_ptr<System> newSystem()
@@ -50,5 +52,11 @@ RC SystemImplementationWinapi::invoke(string program,
                                        Capture capture,
                                        function<void(char *buffer, size_t len)> cb)
 {
+    fprintf(stderr, "INOKING!\n");
     return RC::OK;
+}
+
+unique_ptr<ThreadCallback> newRegularThreadCallback(int millis, std::function<bool()> thread_cb)
+{
+    return NULL;
 }

@@ -30,7 +30,7 @@ struct OriginToolImplementation : public OriginTool
 
     RC restoreFileSystemIntoOrigin(FileSystem *fs);
 
-    void addReverseWork(ptr<StoreStatistics> st, Path *path, FileStat *stat, Options *settings,
+    void addRestoreWork(ptr<StoreStatistics> st, Path *path, FileStat *stat, Options *settings,
                         ReverseTarredFS *rfs, PointInTime *point);
 
     void restoreFileSystem(FileSystem *view, ReverseTarredFS *rfs, PointInTime *point,
@@ -103,7 +103,7 @@ RC OriginToolImplementation::restoreFileSystemIntoOrigin(FileSystem *fs)
     return RC::OK;
 }
 
-void OriginToolImplementation::addReverseWork(ptr<StoreStatistics> st,
+void OriginToolImplementation::addRestoreWork(ptr<StoreStatistics> st,
                                               Path *path, FileStat *stat, Options *settings,
                                               ReverseTarredFS *rfs, PointInTime *point)
 {
