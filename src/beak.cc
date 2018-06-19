@@ -827,6 +827,7 @@ RC BeakImplementation::mountForwardDaemon(Options *settings)
 {
     Path *dir;
     ptr<FileSystem> fs = origin_tool_->fs();
+    fs->enableWatch();
     if (settings->to.type == ArgOrigin) {
         dir = settings->to.origin;
     }

@@ -128,7 +128,7 @@ private:
 
     RC mountInternal(Path *dir, FuseAPI *fuseapi, bool daemon, unique_ptr<FuseMount> &fm, bool foreground, bool debug);
 
-    int inotify_fd_;
+    int inotify_fd_ {};
 };
 
 FileSystem *default_file_system_;
