@@ -26,12 +26,15 @@
 #include <grp.h>
 #include <linux/kdev_t.h>
 #include <pwd.h>
+#include <sys/inotify.h>
+#include <sys/ioctl.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 using namespace std;
 
 static ComponentId FILESYSTEM = registerLogComponent("filesystem");
+static ComponentId WATCH = registerLogComponent("watch");
 
 bool FileStat::isRegularFile() { return S_ISREG(st_mode); }
 bool FileStat::isDirectory() { return S_ISDIR(st_mode); }
@@ -93,7 +96,7 @@ struct FileSystemImplementationPosix : FileSystem
 {
     bool readdir(Path *p, vector<Path*> *vec);
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
-    void recurse(function<void(Path *path, FileStat *stat)> cb);
+    void recurse(Path *p, function<void(Path *path, FileStat *stat)> cb);
     RC stat(Path *p, FileStat *fs);
     RC chmod(Path *p, FileStat *stat);
     RC utime(Path *p, FileStat *stat);
@@ -117,9 +120,15 @@ struct FileSystemImplementationPosix : FileSystem
 
     RC umount(ptr<FuseMount> fuse_mount);
 
+    RC enableWatch();
+    RC addWatch(Path *dir);
+    int endWatch();
+
 private:
 
     RC mountInternal(Path *dir, FuseAPI *fuseapi, bool daemon, unique_ptr<FuseMount> &fm, bool foreground, bool debug);
+
+    int inotify_fd_;
 };
 
 FileSystem *default_file_system_;
@@ -170,11 +179,26 @@ ssize_t FileSystemImplementationPosix::pread(Path *p, char *buf, size_t size, of
     return n;
 }
 
-void FileSystemImplementationPosix::recurse(function<void(Path *path, FileStat *stat)> cb)
+thread_local function<void(Path *path, FileStat *stat)> nftw_cb_;
+
+static int nftwCB(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf)
 {
-    //int rc = nftw(root_dir.c_str(), addEntry, 256, FTW_PHYS|FTW_ACTIONRETVAL);
+    FileStat st(sb);
+    nftw_cb_(Path::lookup(fpath), &st);
+    return 0;
 }
 
+void FileSystemImplementationPosix::recurse(Path *p, function<void(Path *path, FileStat *stat)> cb)
+{
+    /*
+    nftw_cn_ = cb;
+
+    int rc = nftw(p->c_str(), nftwCB, 256, FTW_PHYS|FTW_ACTIONRETVAL);
+
+    if (rc  == -1) {
+        error(FORWARD,"Error while recursing into \"%s\" %s", p->c_str(), strerror(errno));
+        }*/
+}
 
 RC FileSystemImplementationPosix::stat(Path *p, FileStat *fs)
 {
@@ -602,4 +626,101 @@ Path *configurationFile()
 {
     Path *home = Path::lookup(getenv("HOME"));
     return home->append(".config/beak/beak.conf");
+}
+
+RC FileSystemImplementationPosix::enableWatch()
+{
+    inotify_fd_ = inotify_init1(IN_NONBLOCK);
+
+    if (inotify_fd_ == -1) {
+        error(FILESYSTEM, "Could not enable inotify watch. errno=%d\n", errno);
+    }
+
+    return RC::OK;
+}
+
+RC FileSystemImplementationPosix::addWatch(Path *p)
+{
+    int wd = inotify_add_watch(inotify_fd_, p->c_str(),
+                               IN_ATTRIB |
+                               IN_CREATE |
+                               IN_DELETE |
+                               IN_DELETE_SELF |
+                               IN_MODIFY |
+                               IN_MOVE_SELF |
+                               IN_MOVED_FROM |
+                               IN_MOVED_TO);
+
+    debug(WATCH,"added \"%s\"\n", p->c_str());
+    if (wd == -1) {
+        error(FILESYSTEM, "Could not add watch to \"%s\". (errno=%d %s)\n", p->c_str(), errno, strerror(errno));
+    }
+    return RC::OK;
+}
+
+#define LEN_NAME    256
+#define EVENT_SIZE  sizeof(struct inotify_event)
+#define BUF_LEN     (EVENT_SIZE + LEN_NAME + 1)
+
+int FileSystemImplementationPosix::endWatch()
+{
+    ssize_t n = 0;
+    int rc = ioctl(inotify_fd_, FIONREAD, &n);
+    if (rc) {
+        error(WATCH, "Could not read from inotify fd.\n");
+    }
+    if (n == 0) return 0;
+
+    ssize_t i = 0;
+    char buffer[BUF_LEN];
+    n = read(inotify_fd_, buffer, BUF_LEN);
+
+    if (n == -1 && errno != EAGAIN) {
+        perror("read");
+        exit(EXIT_FAILURE);
+    }
+    int count = 0;
+
+    if (n<0) {
+        error(WATCH, "Could not read from inotify fd!\n");
+    }
+
+    while (i<n)
+    {
+        struct inotify_event *event = (struct inotify_event*)&buffer[i];
+        if (event->len)
+        {
+            count ++;
+            if (event->mask & IN_CREATE)
+            {
+                debug(WATCH, "created %s\n", event->name);
+            }
+            if (event->mask & IN_MODIFY)
+            {
+                debug(WATCH, "modified %s\n", event->name);
+            }
+            if (event->mask & IN_DELETE ||
+                event->mask & IN_DELETE_SELF) {
+                debug(WATCH, "deleted %s\n", event->name);
+            }
+            if (event->mask & IN_ATTRIB) {
+                debug(WATCH, "attributes changed %s\n", event->name);
+            }
+            if (event->mask & IN_MOVE_SELF) {
+                debug(WATCH, "move %s\n", event->name);
+            }
+            if (event->mask & IN_MOVED_FROM) {
+                debug(WATCH, "move from %s\n", event->name);
+            }
+            if (event->mask & IN_MOVED_TO) {
+                debug(WATCH, "move to %s\n", event->name);
+            }
+            i += EVENT_SIZE + event->len;
+        }
+    }
+
+    // This happens implicitly below, inotify_rm_watch(...);
+    close(inotify_fd_);
+
+    return count;
 }

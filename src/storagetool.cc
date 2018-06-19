@@ -159,7 +159,7 @@ RC StorageToolImplementation::storeFileSystemIntoStorage(FileSystem *beaked_fs,
         fs = newListOnlyFileSystem(contents);
         storage_fs = fs.get();
     }
-    beaked_fs->recurse([=]
+    beaked_fs->recurse(Path::lookupRoot(), [=]
                        (Path *path, FileStat *stat) {
                            add_forward_work(st,path,stat,settings, storage_fs);
                        });
@@ -169,7 +169,7 @@ RC StorageToolImplementation::storeFileSystemIntoStorage(FileSystem *beaked_fs,
     switch (storage->type) {
     case FileSystemStorage:
     {
-        beaked_fs->recurse([=]
+        beaked_fs->recurse(Path::lookupRoot(), [=]
                            (Path *path, FileStat *stat) {handle_tar_file(path,
                                                                          stat,
                                                                          ffs,

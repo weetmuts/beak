@@ -148,6 +148,7 @@ int ForwardTarredFS::addTarEntry(const char *p, const struct stat *sb)
     if (te->isDirectory()) {
         // Storing the path in the lookup
         directories[te->path()] = te;
+        file_system_->addWatch(abspath);
         debug(FORWARD, "Added directory >%s<\n", te->path()->c_str());
     }
     return FTW_CONTINUE;
@@ -1042,7 +1043,7 @@ struct ForwardFileSystem : FileSystem
         return 0;
     }
 
-    void recurse(std::function<void(Path *path, FileStat *stat)> cb)
+    void recurse(Path *root, std::function<void(Path *path, FileStat *stat)> cb)
     {
         for (auto& e : forw_->tar_storage_directories)
         {
@@ -1140,6 +1141,21 @@ struct ForwardFileSystem : FileSystem
     RC umount(ptr<FuseMount> fuse_mount)
     {
         return RC::ERR;
+    }
+
+    RC enableWatch()
+    {
+        return RC::ERR;
+    }
+
+    RC addWatch(Path *dir)
+    {
+        return RC::ERR;
+    }
+
+    int endWatch()
+    {
+        return 0;
     }
 
     ForwardFileSystem(ForwardTarredFS *forw) : forw_(forw) { }

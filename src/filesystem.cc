@@ -30,7 +30,7 @@ struct FileSystemFuseAPIImplementation : FileSystem
 {
     bool readdir(Path *p, vector<Path*> *vec);
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
-    void recurse(function<void(Path *path, FileStat *stat)> cb);
+    void recurse(Path *root, function<void(Path *path, FileStat *stat)> cb);
     RC stat(Path *p, FileStat *fs);
     RC chmod(Path *p, FileStat *stat);
     RC utime(Path *p, FileStat *stat);
@@ -50,6 +50,20 @@ struct FileSystemFuseAPIImplementation : FileSystem
     RC mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground=false, bool debug=false);
     unique_ptr<FuseMount> mount(Path *dir, FuseAPI *fuseapi, bool debug=false);
     RC umount(ptr<FuseMount> fuse_mount);
+    RC enableWatch()
+    {
+        return RC::ERR;
+    }
+
+    RC addWatch(Path *dir)
+    {
+        return RC::ERR;
+    }
+
+    int endWatch()
+    {
+        return 0;
+    }
 
     FileSystemFuseAPIImplementation(FuseAPI *api);
     private:
@@ -84,7 +98,7 @@ ssize_t FileSystemFuseAPIImplementation::pread(Path *p, char *buf, size_t size, 
     return 0; // rc;
 }
 
-void FileSystemFuseAPIImplementation::recurse(function<void(Path *path, FileStat *stat)> cb)
+void FileSystemFuseAPIImplementation::recurse(Path *root, function<void(Path *path, FileStat *stat)> cb)
 {
 }
 
@@ -821,7 +835,7 @@ struct ListOnlyFileSystem : FileSystem
         return 0;
     }
 
-    void recurse(std::function<void(Path *path, FileStat *stat)> cb)
+    void recurse(Path *root, std::function<void(Path *path, FileStat *stat)> cb)
     {
     }
 
@@ -903,6 +917,22 @@ struct ListOnlyFileSystem : FileSystem
     {
         return RC::ERR;
     }
+
+    RC enableWatch()
+    {
+        return RC::ERR;
+    }
+
+    RC addWatch(Path *dir)
+    {
+        return RC::ERR;
+    }
+
+    int endWatch()
+    {
+        return 0;
+    }
+
 };
 
 unique_ptr<FileSystem> newListOnlyFileSystem(map<Path*,FileStat> contents)

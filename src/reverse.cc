@@ -676,7 +676,7 @@ struct ReverseFileSystem : FileSystem
         }
     }
 
-    void recurse(std::function<void(Path *path, FileStat *stat)> cb)
+    void recurse(Path *root, std::function<void(Path *path, FileStat *stat)> cb)
     {
         point_ = rev_->singlePointInTime();
         assert(point_);
@@ -760,6 +760,21 @@ struct ReverseFileSystem : FileSystem
     RC umount(ptr<FuseMount> fuse_mount)
     {
         return RC::ERR;
+    }
+
+    RC enableWatch()
+    {
+        return RC::ERR;
+    }
+
+    RC addWatch(Path *dir)
+    {
+        return RC::ERR;
+    }
+
+    int endWatch()
+    {
+        return 0;
     }
 
     ReverseFileSystem(ReverseTarredFS *rev) : rev_(rev) { }

@@ -1035,11 +1035,15 @@ RC BeakImplementation::storeForward(Options *settings)
     assert(settings->from.type == ArgOrigin || settings->from.type == ArgRule);
     assert(settings->to.type == ArgStorage);
 
+    ptr<FileSystem> ofs = origin_tool_->fs();
+    ofs->enableWatch();
+
     auto ffs  = newForwardTarredFS(origin_tool_->fs());
-    auto beaked_fs = ffs->asFileSystem();
 
     uint64_t start = clockGetTime();
     rc = ffs->scanFileSystem(settings);
+
+    auto beaked_fs = ffs->asFileSystem();
 
     auto st = newStoreStatistics();
     storage_tool_->storeFileSystemIntoStorage(beaked_fs,
@@ -1052,6 +1056,7 @@ RC BeakImplementation::storeForward(Options *settings)
     uint64_t stop = clockGetTime();
     uint64_t store_time = stop - start;
 
+    int unpleasant_modifications = ofs->endWatch();
     if (st->stats.num_files_stored == 0 && st->stats.num_dirs_updated == 0) {
         info(STORE, "No stores needed, everything was up to date.\n");
     } else {
@@ -1068,6 +1073,9 @@ RC BeakImplementation::storeForward(Options *settings)
                  st->stats.num_files_stored, file_sizes.c_str(),
                  (int)secs, average_speed.c_str());
         }
+    }
+    if (unpleasant_modifications > 0) {
+        warning(STORE, "Warning! Origin directory modified while doing backup!\n");
     }
 
     return rc;
@@ -1108,7 +1116,8 @@ RC BeakImplementation::restoreReverse(Options *settings)
 
     st->startDisplayOfProgress();
 
-    view->recurse([&rfs,this,point,settings,&st]
+    view->recurse(Path::lookupRoot(),
+                  [&rfs,this,point,settings,&st]
                   (Path *path, FileStat *stat) {origin_tool_->addRestoreWork(st,path,stat,settings,
                                                                              rfs.get(),point); });
     debug(STORE, "Work to be done: num_files=%ju num_hardlinks=%ju num_symlinks=%ju num_nodes=%ju num_dirs=%ju\n",

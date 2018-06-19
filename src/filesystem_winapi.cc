@@ -90,7 +90,7 @@ struct FileSystemImplementationWinapi : FileSystem
 {
     bool readdir(Path *p, vector<Path*> *vec);
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
-    void recurse(function<void(Path*,FileStat*)> cb);
+    void recurse(Path *p, function<void(Path*,FileStat*)> cb);
     RC stat(Path *p, FileStat *fs);
     RC chmod(Path *p, FileStat *fs);
     RC utime(Path *p, FileStat *fs);
@@ -114,6 +114,10 @@ struct FileSystemImplementationWinapi : FileSystem
     unique_ptr<FuseMount> mount(Path *dir, FuseAPI *fuseapi, bool debug=false);
 
     RC umount(ptr<FuseMount> fuse_mount);
+
+    RC enableWatch();
+    RC addWatch(Path *dir);
+    int endWatch();
 
 private:
 
@@ -156,7 +160,7 @@ ssize_t FileSystemImplementationWinapi::pread(Path *p, char *buf, size_t count, 
     return n;
 }
 
-void FileSystemImplementationWinapi::recurse(function<void(Path *,FileStat*)> cb)
+void FileSystemImplementationWinapi::recurse(Path *p, function<void(Path *,FileStat*)> cb)
 {
 }
 
@@ -391,4 +395,19 @@ unique_ptr<FuseMount> FileSystemImplementationWinapi::mount(Path *dir, FuseAPI *
 RC FileSystemImplementationWinapi::umount(ptr<FuseMount> fuse_mount_info)
 {
     return RC::ERR;
+}
+
+RC  FileSystemImplementationWinapi::enableWatch()
+{
+    return RC::ERR;
+}
+
+RC  FileSystemImplementationWinapi::addWatch(Path *dir)
+{
+    return RC::ERR;
+}
+
+int  FileSystemImplementationWinapi::endWatch()
+{
+    return 0;
 }

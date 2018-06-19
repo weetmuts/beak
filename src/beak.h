@@ -91,7 +91,8 @@ enum ArgumentType
     ArgStorage,
     ArgDir,
     ArgFile,
-    ArgORS
+    ArgORS,
+    ArgNORS,
 };
 
 // ArgORS will match ArgOrigin, ArgRule or ArgStorage.
@@ -110,7 +111,7 @@ enum ArgumentType
     X(push,"Backup a rule to a storage location.",ArgRule,ArgNone) \
     X(remount,"Mount your backup as a file system.",ArgStorage,ArgDir) \
     X(restore,"Restore from your backup into your file system.",ArgStorage,ArgOrigin) \
-    X(status,"Show the status of your backups both locally and remotely.",ArgNone,ArgNone) \
+    X(status,"Show the status of your backups both locally and remotely.",ArgNORS,ArgNone) \
     X(store,"Store your file system into a backup.",ArgOrigin,ArgStorage) \
     X(umount,"Unmount a virtual file system.",ArgDir,ArgNone) \
     X(version,"Show version.",ArgNone,ArgNone) \

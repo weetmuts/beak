@@ -367,11 +367,12 @@ void OriginToolImplementation::restoreFileSystem(FileSystem *view, ReverseTarred
                                                  Options *settings, ptr<StoreStatistics> st, FileSystem *storage_fs)
 {
     // First restore the files,nodes and symlinks and their contents, set the utimes properly for the files.
-    view->recurse([=](Path *path, FileStat *stat) {handleRegularFiles(path,stat,rfs,point,settings,st,storage_fs); });
-    view->recurse([=](Path *path, FileStat *stat) {handleNodes(path,stat,rfs,point,settings,st,storage_fs); });
-    view->recurse([=](Path *path, FileStat *stat) {handleSymbolicLinks(path,stat,rfs,point,settings,st,storage_fs); });
+    Path *r = Path::lookupRoot();
+    view->recurse(r, [=](Path *path, FileStat *stat) {handleRegularFiles(path,stat,rfs,point,settings,st,storage_fs); });
+    view->recurse(r, [=](Path *path, FileStat *stat) {handleNodes(path,stat,rfs,point,settings,st,storage_fs); });
+    view->recurse(r, [=](Path *path, FileStat *stat) {handleSymbolicLinks(path,stat,rfs,point,settings,st,storage_fs); });
     // Then restore the hard links
-    view->recurse([=](Path *path, FileStat *stat) {handleHardLinks(path,stat,rfs,point,settings,st); });
+    view->recurse(r, [=](Path *path, FileStat *stat) {handleHardLinks(path,stat,rfs,point,settings,st); });
     // Then recreate any missing not yet created directories and set the utimes of all the dirs.
-    view->recurse([=](Path *path, FileStat *stat) {handleDirs(path,stat,rfs,point,settings,st); });
+    view->recurse(r, [=](Path *path, FileStat *stat) {handleDirs(path,stat,rfs,point,settings,st); });
 }

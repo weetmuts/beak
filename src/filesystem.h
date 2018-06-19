@@ -249,7 +249,7 @@ struct FileSystem
 {
     virtual bool readdir(Path *p, std::vector<Path*> *vec) = 0;
     virtual ssize_t pread(Path *p, char *buf, size_t size, off_t offset) = 0;
-    virtual void recurse(std::function<void(Path *path, FileStat *stat)> cb) = 0;
+    virtual void recurse(Path *p, std::function<void(Path *path, FileStat *stat)> cb) = 0;
     virtual RC stat(Path *p, FileStat *fs) = 0;
     virtual RC chmod(Path *p, FileStat *stat) = 0;
     virtual RC utime(Path *p, FileStat *stat) = 0;
@@ -282,6 +282,14 @@ struct FileSystem
     // A normal mount forks and the current program continues to run.
     virtual std::unique_ptr<FuseMount> mount(Path *dir, FuseAPI *fuseapi, bool debug=false) = 0;
     virtual RC umount(ptr<FuseMount> fuse_mount) = 0;
+
+    // Enable watching of filesystem changes. Used to warn the user
+    // that the filesystem was changed during backup...
+    virtual RC enableWatch() = 0;
+    // Start watching a directory.
+    virtual RC addWatch(Path *dir) = 0;
+    // Return number of modifications made during watch. Hopefully zero.
+    virtual int endWatch() = 0;
 
     virtual ~FileSystem() = default;
 };

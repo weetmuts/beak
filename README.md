@@ -10,7 +10,7 @@ Beak is work in progress. The text below describes the goal!
 Local filesystem backups.
 ```
 beak store /home/you/Work /home/backups
-beak info /home/backups
+beak check /home/backups
 beak remount /home/backups /home/you/OldWork
 cd /home/you/OldWork/2018-05-14_15:32
 ...copy out stuff...
@@ -21,7 +21,7 @@ beak umount /home/you/OldWork
 Remote rclone cloud storage backups.
 ```
 beak store /home/you/Work s3_work_crypt:
-beak info s3_work_crypt:
+beak check s3_work_crypt:
 beak remount s3_work_crypt: /home/you/OldWork
 cd /home/you/OldWork/2018-05-14_15:32
 ...copy out stuff...
@@ -332,7 +332,7 @@ even be created inside an existing backup using:
 
 You can get information on a _storage location_ using:
 
-`beak info s3_work_crypt:`
+`beak status s3_work_crypt:`
 
 You can check the integrity and garbage collect any loose chunks that
 are no longer referenced from index files, using:
@@ -466,9 +466,7 @@ beak shell
 
 beak config
 
-beak status
-
-beak info
+beak status [{rule}|{storage}]
 
 beak prune {storage}          beak pack {storage}
 ```
