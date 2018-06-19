@@ -59,8 +59,8 @@ struct Beak
     virtual RC mountForwardDaemon(Options *settings) = 0;
     virtual RC mountForward(Options *settings) = 0;
     virtual RC umountForward(Options *settings) = 0;
-    virtual RC remountReverseDaemon(Options *settings) = 0;
-    virtual RC remountReverse(Options *settings) = 0;
+    virtual RC mountReverseDaemon(Options *settings) = 0;
+    virtual RC mountReverse(Options *settings) = 0;
 
     virtual RC status(Options *settings) = 0;
     virtual RC storeForward(Options *settings) = 0;
@@ -104,12 +104,12 @@ enum ArgumentType
     X(help,"Show help. Also: beak push help",ArgORS,ArgNone) \
     X(genautocomplete,"Output bash completion script for beak.",ArgFile,ArgNone) \
     X(genmounttrigger,"Output systemd rule to trigger backup when USB drive is mounted.",ArgFile,ArgNone) \
-    X(mount,"Mount your file system as a backup.",ArgOrigin,ArgDir) \
+    X(bmount,"Mount your file system as a backup.",ArgOrigin,ArgDir) \
     X(history,"Mount all known storages for your backup.",ArgRule,ArgNone) \
     X(prune,"Discard old backups according to the keep rule.",ArgStorage,ArgNone) \
     X(pull,"Merge the most recent backup for the given rule.",ArgRule,ArgNone) \
     X(push,"Backup a rule to a storage location.",ArgRule,ArgNone) \
-    X(remount,"Mount your backup as a file system.",ArgStorage,ArgDir) \
+    X(mount,"Mount your backup as a file system.",ArgStorage,ArgDir) \
     X(restore,"Restore from your backup into your file system.",ArgStorage,ArgOrigin) \
     X(status,"Show the status of your backups both locally and remotely.",ArgNORS,ArgNone) \
     X(store,"Store your file system into a backup.",ArgOrigin,ArgStorage) \

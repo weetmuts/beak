@@ -140,7 +140,7 @@ function startMountTest {
     extra="$2"
     if [ -z "$test" ]; then
         # Normal test execution, spawn the beakfs fuse daemon
-        eval "${BEAK} mount $extra $root $mount > $log"
+        eval "${BEAK} bmount $extra $root $mount > $log"
         # Then run the test
         ${run}
     else
@@ -148,12 +148,12 @@ function startMountTest {
             # Running a chosen test, we want to see the debug output from beak.
             # Spawn the daemon in foreground, delay start of the test by 2 seconds.
             (sleep 2; eval ${run}) &
-            eval "${BEAK} mount -f $extra $root $mount 2>&1 | tee $log &"
+            eval "${BEAK} bmount -f $extra $root $mount 2>&1 | tee $log &"
         else
             # Running a chosen test in gdb. The gdb session must be in the foreground.
             # Delay start of the test by 3 seconds.
             (sleep 3; eval ${run}) &
-            eval "gdb -ex=r --args ${BEAK} mount -f $extra $root $mount"
+            eval "gdb -ex=r --args ${BEAK} bmount -f $extra $root $mount"
         fi
     fi
 }
@@ -162,15 +162,15 @@ function startMountTestArchive {
     run="$1"
     extra="$2"
     if [ -z "$test" ]; then
-        ${BEAK} remount $extra $packed $check > $log
+        ${BEAK} mount $extra $packed $check > $log
         ${run}
     else
         if [ -z "$gdb" ]; then
             (sleep 2; eval ${run}) &
-            ${BEAK} remount -f $extra $packed $check 2>&1 | tee $log &
+            ${BEAK} mount -f $extra $packed $check 2>&1 | tee $log &
         else
             (sleep 3; eval ${run}) &
-            gdb -ex=r --args ${BEAK} remount -f $extra $packed $check
+            gdb -ex=r --args ${BEAK} mount -f $extra $packed $check
         fi
     fi
 }
@@ -180,15 +180,15 @@ function startMountTestExpectFail {
     extra="$2"
     env="$3"
     if [ -z "$test" ]; then
-        "$env" ${BEAK} mount $extra $root $mount > $log 2>&1
+        "$env" ${BEAK} bmount $extra $root $mount > $log 2>&1
         ${run}
     else
         if [ -z "$gdb" ]; then
             (sleep 2; eval ${run}) &
-            "$env" ${BEAK} mount -f $extra $root $mount 2>&1 | tee $log &
+            "$env" ${BEAK} bmount -f $extra $root $mount 2>&1 | tee $log &
         else
             (sleep 3; eval ${run}) &
-            gdb -ex=r --args "$env" ${BEAK} mount -f $extra $root $mount
+            gdb -ex=r --args "$env" ${BEAK} bmount -f $extra $root $mount
         fi
     fi
 }
@@ -214,20 +214,20 @@ function startTwoFS {
     extra="$2"
     extrareverse="$3"
     if [ -z "$test" ]; then
-        ${BEAK} mount $extra $root $mount > $log
+        ${BEAK} bmount $extra $root $mount > $log
         sleep 2
-        ${BEAK} remount $extrareverse $mount $mountreverse > $log
+        ${BEAK} mount $extrareverse $mount $mountreverse > $log
         ${run}
     else
         if [ -z "$gdb" ]; then
             (sleep 4; eval ${run}) &
-            ${BEAK} mount $extra $root $mount 2>&1 | tee $log &
-            ${BEAK} remount -f $extrareverse $mount $mountreverse 2>&1 | tee $logreverse &
+            ${BEAK} bmount $extra $root $mount 2>&1 | tee $log &
+            ${BEAK} mount -f $extrareverse $mount $mountreverse 2>&1 | tee $logreverse &
         else
             (sleep 5; eval ${run}) &
-            ${BEAK} mount $extra $root $mount > $log
+            ${BEAK} bmount $extra $root $mount > $log
             sleep 2
-            gdb -ex=r --args ${BEAK} remount -f $extrareverse $mount $mountreverse
+            gdb -ex=r --args ${BEAK} mount -f $extrareverse $mount $mountreverse
         fi
     fi
 }

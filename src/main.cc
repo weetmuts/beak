@@ -103,7 +103,7 @@ int go(int argc, char *argv[]) {
     case history_cmd:
         break;
 
-    case mount_cmd:
+    case bmount_cmd:
         rc = beak->mountForwardDaemon(&settings);
         break;
 
@@ -118,8 +118,8 @@ int go(int argc, char *argv[]) {
     case pull_cmd:
         break;
 
-    case remount_cmd:
-        rc = beak->remountReverseDaemon(&settings);
+    case mount_cmd:
+        rc = beak->mountReverseDaemon(&settings);
         break;
 
     case restore_cmd:

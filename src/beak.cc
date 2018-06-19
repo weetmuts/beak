@@ -101,8 +101,8 @@ struct BeakImplementation : Beak {
     RC mountForward(Options *settings);
     RC umountForward(Options *settings);
 
-    RC remountReverseDaemon(Options *settings);
-    RC remountReverse(Options *settings);
+    RC mountReverseDaemon(Options *settings);
+    RC mountReverse(Options *settings);
 
     RC status(Options *settings);
     RC storeForward(Options *settings);
@@ -112,7 +112,7 @@ struct BeakImplementation : Beak {
 
     private:
 
-    RC remountReverseInternal(Options *settings, bool daemon);
+    RC mountReverseInternal(Options *settings, bool daemon);
     bool hasPointsInTime(Path *path, FileSystem *fs);
 
     fuse_operations forward_tarredfs_ops;
@@ -892,17 +892,17 @@ static int reverseReadlink(const char *path, char *buf, size_t size)
     return fs->readlinkCB(path, buf, size);
 }
 
-RC BeakImplementation::remountReverseDaemon(Options *settings)
+RC BeakImplementation::mountReverseDaemon(Options *settings)
 {
-    return remountReverseInternal(settings, true);
+    return mountReverseInternal(settings, true);
 }
 
-RC BeakImplementation::remountReverse(Options *settings)
+RC BeakImplementation::mountReverse(Options *settings)
 {
-    return remountReverseInternal(settings, false);
+    return mountReverseInternal(settings, false);
 }
 
-RC BeakImplementation::remountReverseInternal(Options *settings, bool daemon)
+RC BeakImplementation::mountReverseInternal(Options *settings, bool daemon)
 {
     memset(&reverse_tarredfs_ops, 0, sizeof(reverse_tarredfs_ops));
     reverse_tarredfs_ops.getattr = reverseGetattr;

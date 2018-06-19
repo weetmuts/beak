@@ -11,7 +11,7 @@ Local filesystem backups.
 ```
 beak store /home/you/Work /home/backups
 beak check /home/backups
-beak remount /home/backups /home/you/OldWork
+beak mount /home/backups /home/you/OldWork
 cd /home/you/OldWork/2018-05-14_15:32
 ...copy out stuff...
 cd ~
@@ -22,7 +22,7 @@ Remote rclone cloud storage backups.
 ```
 beak store /home/you/Work s3_work_crypt:
 beak check s3_work_crypt:
-beak remount s3_work_crypt: /home/you/OldWork
+beak mount s3_work_crypt: /home/you/OldWork
 cd /home/you/OldWork/2018-05-14_15:32
 ...copy out stuff...
 cd ~
@@ -125,7 +125,7 @@ You can mount a specific _storage location_:
 
 ```
 mkdir OldStuff
-beak remount s3_work_crypt: OldStuff
+beak mount s3_work_crypt: OldStuff
 ```
 
 When you mount without specifying the _point in time_ @x, then the _points in time_ will show as subdirectories.
@@ -140,7 +140,7 @@ When you mount without specifying the _point in time_ @x, then the _points in ti
 If you supply a _point in time_ (eg @2), then it will mount that particular backup.
 
 ```
-beak remount /media/you/USBDrive@2 OldStuff
+beak mount /media/you/USBDrive@2 OldStuff
 ```
 
 You unmount like this:
@@ -247,7 +247,7 @@ backup system.  There are no other meta-data files needed. This means
 that you can roll your own backups without any configuration if you
 wish.
 
-`beak mount /home/you/Work TestBeakFS`
+`beak bmount /home/you/Work TestBeakFS`
 
 Explore the directory `TestBeakFS` to see how beak has chunkified your
 _origin_ directory. Now do:
@@ -263,7 +263,7 @@ Logical, since you have not changed your _origin_ directory.
 
 To access the backed up data do:
 
-`beak remount /home/you/Backup@0 OldStuff`
+`beak mount /home/you/Backup@0 OldStuff`
 
 Now explore OldStuff and do `diff -rq /home/you/Work OldStuff`. There should be no differences.
 The @0 means to mount the most recent _point in time_ in the _storage location_.
@@ -373,7 +373,7 @@ will not include the /home/you/Work subdirectory!
 
 beak is more like a Swiss army knife for backing up, mirroring,
 off-site storage etc. As you have seen, you can do everything by hand
-using: `beak mount` `beak remount` `beak store` `beak restore` and `rclone` or  `rsync`.
+using: `beak bmount` `beak mount` `beak store` `beak restore` and `rclone` or  `rsync`.
 
 But to speed up common tasks you can configure rules with `beak config`.
 A _rule_ (like work:) provides a short cut to the actual _origin_ directory (like /home/you/Work).
@@ -452,7 +452,7 @@ if `beak history work:` is invoked without a target directory.
 ```
 beak store {origin} {storage}    beak restore {storage} {origin}
 
-beak mount {origin} {dir}        beak remount {storage} {dir}
+beak mount {storage} {dir}       beak bmount {origin} {dir}
 
 beak check {storage}
 
