@@ -862,6 +862,10 @@ RC BeakImplementation::mountForward(Options *settings)
 RC BeakImplementation::umountForward(Options *settings)
 {
     ptr<FileSystem> fs = origin_tool_->fs();
+    int unpleasant_modifications = fs->endWatch();
+    if (unpleasant_modifications > 0) {
+        warning(STORE, "Warning! Origin directory modified while being mounted for backup!\n");
+    }
     fs->umount(fuse_mount_);
     return RC::OK;
 }
@@ -1068,11 +1072,6 @@ RC BeakImplementation::storeForward(Options *settings)
             double bytes = (double)st->stats.size_files_stored;
             double bps = bytes/secs;
             string average_speed = humanReadableTwoDecimals(bps);
-
-            info(STORE, "Stored %ju beak files for a total size of %s, "
-                 "time to store %ds and average speed %s/s.\n",
-                 st->stats.num_files_stored, file_sizes.c_str(),
-                 (int)secs, average_speed.c_str());
         }
     }
     if (unpleasant_modifications > 0) {
