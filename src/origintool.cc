@@ -90,7 +90,6 @@ unique_ptr<OriginTool> newOriginTool(ptr<System> sys,
     return unique_ptr<OriginTool>(new OriginToolImplementation(sys, sys_fs, origin_fs));
 }
 
-
 OriginToolImplementation::OriginToolImplementation(ptr<System>sys,
                                                      ptr<FileSystem> sys_fs,
                                                      ptr<FileSystem> origin_fs)
@@ -108,8 +107,7 @@ void OriginToolImplementation::addRestoreWork(ptr<StoreStatistics> st,
                                               ReverseTarredFS *rfs, PointInTime *point)
 {
     Entry *entry = rfs->findEntry(point, path);
-    Path *file_to_extract = path->prepend(settings->from.storage->storage_location);
-
+    Path *file_to_extract = path->prepend(settings->to.origin);
     if (entry->is_hard_link) st->stats.num_hard_links++;
     else if (stat->isRegularFile()) {
         stat->checkStat(origin_fs_.get(), file_to_extract);
