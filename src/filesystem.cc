@@ -24,7 +24,7 @@
 
 using namespace std;
 
-//static ComponentId FILESYSTEM = registerLogComponent("filesystem");
+static ComponentId FILESYSTEM = registerLogComponent("filesystem");
 
 struct FileSystemFuseAPIImplementation : FileSystem
 {
@@ -789,13 +789,43 @@ bool makeDirHelper(const char *path);
 
 bool FileSystem::mkDirp(Path* path)
 {
+    #ifdef PLATFORM_WINAPI
+    // Assume that the drive is always writeable by me...
+    if (path->isDrive()) return true;
+    #endif
+
+    FileStat fs;
+    RC rc = stat(path, &fs);
+    bool delete_path = false;
+    if (rc.isOk()) {
+        if (fs.isDirectory()) {
+            // Directory exists
+            if (!fs.isIWUSR()) {
+                // But is not writeable by me....
+                fs.setIWUSR();
+                rc = chmod(path, &fs);
+                if (rc.isErr()) {
+                    warning(FILESYSTEM, "Could not set directory to be user writeable: %s\n", path);
+                }
+            }
+            // Directory is good to go!
+            return true;
+        }
+        // It exists, but is not a directory.
+        // Remove it! But only after we have checked that the parent is user writable...
+        delete_path = true;
+    }
+
     if (path->parent() && path->parent()->str().length() > 0) {
         bool rc = mkDirp(path->parent());
         if (!rc) return false;
     }
-    #ifdef PLATFORM_WINAPI
-    if (path->isDrive()) return true;
-    #endif
+
+    if (delete_path) {
+        // The parent directory is now writeable, we can delete the non-directory here.
+        deleteFile(path);
+    }
+    // Create the directory, which will be user writable.
     return makeDirHelper(path->c_str());
 }
 

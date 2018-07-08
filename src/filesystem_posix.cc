@@ -62,6 +62,8 @@ bool FileStat::isIROTH() { return st_mode & S_IROTH; }
 bool FileStat::isIWOTH() { return st_mode & S_IWOTH; }
 bool FileStat::isIXOTH() { return st_mode & S_IXOTH; }
 
+void FileStat::setIWUSR() { st_mode |= S_IWUSR; }
+
 string FileStat::uidName()
 {
     struct passwd pwd, *res;
@@ -102,7 +104,6 @@ struct FileSystemImplementationPosix : FileSystem
     RC utime(Path *p, FileStat *stat);
     Path *mkTempFile(string prefix, string content);
     Path *mkTempDir(string prefix);
-    Path *mkDirp(Path *p);
     Path *mkDir(Path *p, string name);
     RC rmDir(Path *p);
     RC loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
@@ -262,12 +263,6 @@ Path *FileSystemImplementationPosix::mkTempDir(string prefix)
         error(FILESYSTEM, "Could not create temp directory!");
     }
     return Path::lookup(mount);
-}
-
-Path *FileSystemImplementationPosix::mkDirp(Path *p)
-{
-
-    return p;
 }
 
 Path *FileSystemImplementationPosix::mkDir(Path *p, string name)

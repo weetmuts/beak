@@ -108,6 +108,8 @@ struct FileStat {
     bool isIWOTH();
     bool isIXOTH();
 
+    void setIWUSR();
+
     std::string uidName();
     std::string gidName();
 };

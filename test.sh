@@ -336,6 +336,7 @@ function fifoTest {
 }
 
 function cleanCheck {
+    find "$check" -type d ! -perm /u+w -exec chmod u+w \{\} \;
     rm -rf "$check"
     mkdir -p "$check"
 }
@@ -571,6 +572,45 @@ if [ $do_test ]; then
     checklsld /Gamma
     cleanCheck
     subdir=""
+    echo OK
+fi
+
+setup write_protected_paths "Extract write protected directories."
+if [ $do_test ]; then
+    echo HEJSAN > $root/Alfa
+    echo HEJSAN > $root/Beta
+    mkdir -p $root/Gamma
+    echo HEJSAN > $root/Gamma/Delta
+    echo HEJSAN > $root/Gamma/Tau
+    chmod a-w $root/Gamma
+    performStore --tarheader=full
+    standardStoreUntarTest
+    cleanCheck
+    standardStoreRestoreTest
+    cleanCheck
+    beakfs="$mount"
+    startMountTest standardTest --tarheader=full
+    compareStoreAndMount
+    stopMount
+    echo OK
+fi
+
+setup update_write_protected_dirs "Restore new file into write protected directories."
+if [ $do_test ]; then
+    echo HEJSAN > $root/Alfa
+    echo HEJSAN > $root/Beta
+    mkdir -p $root/Gamma
+    echo HEJSAN > $root/Gamma/Delta
+    echo HEJSAN > $root/Gamma/Tau
+    chmod a-w $root/Gamma
+    performStore
+    standardStoreRestoreTest
+    chmod u+w $root/Gamma
+    echo HEJSAN > $root/Gamma/Ypsilon
+    chmod u-w $root/Gamma
+    performStore
+    standardStoreRestoreTest
+    cleanCheck
     echo OK
 fi
 

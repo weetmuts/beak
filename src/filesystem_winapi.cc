@@ -54,6 +54,8 @@ bool FileStat::isIROTH() { return false; }
 bool FileStat::isIWOTH() { return false; }
 bool FileStat::isIXOTH() { return false; }
 
+void FileStat::setIWUSR() { st_mode |= S_IWUSR; }
+
 
 string FileStat::uidName()
 {
