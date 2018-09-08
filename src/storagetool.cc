@@ -109,7 +109,7 @@ void handle_tar_file(Path *path,
     TarFile *tar = ffs->findTarFromPath(path);
     assert(tar);
     Path *file_name = tar->path()->prepend(settings->to.storage->storage_location);
-    local_storage_fs->mkDirp(file_name->parent());
+    local_storage_fs->mkDirpWriteable(file_name->parent());
     FileStat old_stat;
     RC rc = local_storage_fs->stat(file_name, &old_stat);
     if (rc.isOk() &&

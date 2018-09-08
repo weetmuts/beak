@@ -105,8 +105,8 @@ struct BeakImplementation : Beak {
     RC mountReverse(Options *settings);
 
     RC status(Options *settings);
-    RC storeForward(Options *settings);
-    RC restoreReverse(Options *settings);
+    RC store(Options *settings);
+    RC restore(Options *settings);
 
     void genAutoComplete(string filename);
 
@@ -1033,7 +1033,7 @@ RC BeakImplementation::status(Options *settings)
     return rc;
 }
 
-RC BeakImplementation::storeForward(Options *settings)
+RC BeakImplementation::store(Options *settings)
 {
     RC rc = RC::OK;
 
@@ -1041,16 +1041,24 @@ RC BeakImplementation::storeForward(Options *settings)
     assert(settings->to.type == ArgStorage);
 
     ptr<FileSystem> ofs = origin_tool_->fs();
+    // Watch the origin file system to detect if it is being changed while doing the store.
     ofs->enableWatch();
 
     auto ffs  = newForwardTarredFS(origin_tool_->fs());
 
     uint64_t start = clockGetTime();
+    // This command scans the origin file system and builds
+    // an in memory representation of the beak file system,
+    // with tar files,index files and directories.
     rc = ffs->scanFileSystem(settings);
 
+    // Acquire a file system api to the beak file system.
     auto beaked_fs = ffs->asFileSystem();
 
+    // The store statistics maintin the progress data for the store.
     auto st = newStoreStatistics();
+
+    // Now store the beak file system into the selected storage.
     storage_tool_->storeFileSystemIntoStorage(beaked_fs,
                                               origin_tool_->fs().get(),
                                               settings->to.storage,
@@ -1081,7 +1089,7 @@ RC BeakImplementation::storeForward(Options *settings)
     return rc;
 }
 
-RC BeakImplementation::restoreReverse(Options *settings)
+RC BeakImplementation::restore(Options *settings)
 {
     RC rc = RC::OK;
 
@@ -1121,7 +1129,8 @@ RC BeakImplementation::restoreReverse(Options *settings)
                   (Path *path, FileStat *stat) {origin_tool_->addRestoreWork(st,path,stat,settings,
                                                                              rfs.get(),point); });
     debug(STORE, "Work to be done: num_files=%ju num_hardlinks=%ju num_symlinks=%ju num_nodes=%ju num_dirs=%ju\n",
-          st->stats.num_files, st->stats.num_hard_links, st->stats.num_symbolic_links, st->stats.num_nodes, st->stats.num_dirs);
+          st->stats.num_files, st->stats.num_hard_links, st->stats.num_symbolic_links,
+          st->stats.num_nodes, st->stats.num_dirs);
 
     origin_tool_->restoreFileSystem(view,rfs.get(),point,settings,st,storage_tool_->fs().get());
 
@@ -1130,7 +1139,8 @@ RC BeakImplementation::restoreReverse(Options *settings)
 
     st->finishProgress();
 
-    if (st->stats.num_files_stored == 0 && st->stats.num_symbolic_links_stored == 0 && st->stats.num_dirs_updated == 0) {
+    if (st->stats.num_files_stored == 0 && st->stats.num_symbolic_links_stored == 0 &&
+        st->stats.num_dirs_updated == 0) {
         info(STORE, "No stores needed, everything was up to date.\n");
     } else {
         if (st->stats.num_files_stored > 0) {

@@ -257,7 +257,7 @@ struct FileSystem
     virtual RC utime(Path *p, FileStat *stat) = 0;
     virtual Path *mkTempFile(std::string prefix, std::string content) = 0;
     virtual Path *mkTempDir(std::string prefix) = 0;
-            bool mkDirp(Path *p);
+            bool mkDirpWriteable(Path *p);
     virtual Path *mkDir(Path *p, std::string name) = 0;
     virtual RC rmDir(Path *p) = 0;
 

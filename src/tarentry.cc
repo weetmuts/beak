@@ -345,7 +345,8 @@ void TarEntry::moveEntryToNewParent(TarEntry *entry, TarEntry *parent) {
 }
 
 void TarEntry::copyEntryToNewParent(TarEntry *entry, TarEntry *parent) {
-    parent->entries_.insert(parent->entries_.end(), entry);
+    TarEntry *copy = new TarEntry(*entry);
+    parent->entries_.insert(parent->entries_.end(), copy);
 }
 
 /**

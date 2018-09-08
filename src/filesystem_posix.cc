@@ -327,8 +327,19 @@ RC FileSystemImplementationPosix::createFile(Path *file, vector<char> *buf)
 {
     int fd = open(file->c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
     if (fd == -1) {
-	failure(FILESYSTEM,"Could not create file %s from buffer (errno=%d)\n", file->c_str(), errno);
-        return RC::ERR;
+        FileStat fs;
+        RC rc = FileSystemImplementationPosix::stat(file, &fs);
+        if (rc.isOk()) {
+            if (!fs.isIWUSR()) {
+                // There was a non-write file in place. Let us remove it.
+                deleteFile(file);
+                fd = open(file->c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
+            }
+        }
+        if (fd == -1) {
+            failure(FILESYSTEM,"Could not create file %s from buffer (errno=%d)\n", file->c_str(), errno);
+            return RC::ERR;
+        }
     }
     char *p = buf->data();
     ssize_t total = buf->size();
@@ -362,10 +373,21 @@ bool FileSystemImplementationPosix::createFile(Path *file,
     off_t offset = 0;
     size_t remaining = stat->st_size;
 
-    int fd = open(file->c_str(), O_WRONLY | O_CREAT, stat->st_mode);
+    int fd = open(file->c_str(), O_WRONLY | O_CREAT | O_TRUNC, stat->st_mode);
     if (fd == -1) {
-	failure(FILESYSTEM,"Could not create file %s from callback(errno=%d)\n", file->c_str(), errno);
-        return false;
+        FileStat fs;
+        RC rc = FileSystemImplementationPosix::stat(file, &fs);
+        if (rc.isOk()) {
+            if (!fs.isIWUSR()) {
+                // There was a non-write file in place. Let us remove it.
+                deleteFile(file);
+                fd = open(file->c_str(), O_WRONLY | O_CREAT | O_TRUNC, stat->st_mode);
+            }
+        }
+        if (fd == -1) {
+            failure(FILESYSTEM,"Could not create file %s from callback(errno=%d)\n", file->c_str(), errno);
+            return false;
+        }
     }
 
     debug(FILESYSTEM,"Writing %ju bytes to file %s\n", remaining, file->c_str());
@@ -648,7 +670,7 @@ RC FileSystemImplementationPosix::addWatch(Path *p)
 
     debug(WATCH,"added \"%s\"\n", p->c_str());
     if (wd == -1) {
-        error(FILESYSTEM, "Could not add watch to \"%s\". (errno=%d %s)\n", p->c_str(), errno, strerror(errno));
+        warning(FILESYSTEM, "Could not add watch to \"%s\". (errno=%d %s)\n", p->c_str(), errno, strerror(errno));
     }
     return RC::OK;
 }

@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2016 Fredrik Öhrström
+    Copyright (C) 2016-2018 Fredrik Öhrström
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -41,7 +41,9 @@ static ComponentId COMMANDLINE = registerLogComponent("commandline");
 static ComponentId FORWARD = registerLogComponent("forward");
 static ComponentId HARDLINKS = registerLogComponent("hardlinks");
 static ComponentId FUSE = registerLogComponent("fuse");
-ForwardTarredFS::ForwardTarredFS(ptr<FileSystem> fs) {
+
+ForwardTarredFS::ForwardTarredFS(ptr<FileSystem> fs)
+{
     pthread_mutexattr_init(&global_attr);
     pthread_mutexattr_settype(&global_attr, PTHREAD_MUTEX_RECURSIVE);
     pthread_mutex_init(&global, &global_attr);
@@ -55,7 +57,8 @@ static int addEntry(const char *fpath, const struct stat *sb, int tflag, struct 
     return current_fs->addTarEntry(fpath, sb);
 }
 
-int ForwardTarredFS::recurse() {
+int ForwardTarredFS::recurse()
+{
     // Recurse into the root dir. Maximum 256 levels deep.
     // Look at symbolic links (ie do not follow them) so that
     // we can store the links in the tar file.
@@ -149,7 +152,7 @@ int ForwardTarredFS::addTarEntry(const char *p, const struct stat *sb)
         // Storing the path in the lookup
         directories[te->path()] = te;
         file_system_->addWatch(abspath);
-        debug(FORWARD, "Added directory >%s<\n", te->path()->c_str());
+        debug(FORWARD, "Added directory >%s< %p %p\n", te->path()->c_str(), te->path(), directories[te->path()]);
     }
     return FTW_CONTINUE;
 }
@@ -428,7 +431,8 @@ void ForwardTarredFS::findHardLinks() {
                 // The shallower files, will be links to the deepest file.
                 // This is only relevant within the BeakFS. When the hard links are restored in
                 // the filesystem, the links have no direction. (Unlike symlinks.)
-                debug(HARDLINKS, "Storing inode %ju contents here '%s'\n", te->stat()->st_ino, te->path()->c_str());
+                debug(HARDLINKS, "Storing inode %ju contents here '%s'\n",
+                      te->stat()->st_ino, te->path()->c_str());
                 hard_links[te->stat()->st_ino] = te;
             } else {
                 // Second occurrence of this inode. Store it as a hard link.
@@ -446,6 +450,7 @@ void ForwardTarredFS::fixHardLinks()
     for (auto & e : tar_storage_directories) {
         TarEntry *storage_dir = e.second;
         vector<pair<TarEntry*,TarEntry*>> to_be_moved;
+        vector<pair<TarEntry*,TarEntry*>> to_be_copied;
 
         for(auto & entry : storage_dir->entries()) {
             if (!entry->isHardLink()) continue;
@@ -457,12 +462,14 @@ void ForwardTarredFS::fixHardLinks()
             // We found the entry inside the storage_dir, therefore the storage dir path must be
             // a prefix to the entry->path().
             if (common->depth() >= storage_dir->path()->depth()) {
-                // This will remove the storage_dir prefix (ie path outside of tar) of the link and update the header.
+                // This will remove the storage_dir prefix (ie path outside of tar) of the link
+                // and update the header.
                 entry->calculateHardLink(storage_dir->path());
                 continue;
             }
             // Ouch, the common prefix is shorter than the storage dir....
-            verbose(HARDLINKS, "Hard link between tars detected! From %s to %s\n", entry->path()->c_str(), entry->link()->c_str());
+            verbose(HARDLINKS, "Hard link between tars detected! From %s to %s\n",
+                    entry->path()->c_str(), entry->link()->c_str());
             // Find the nearest storage directory that share a common root between the entry and the target.
             TarEntry *new_storage_dir = findNearestStorageDirectory(entry->path(), entry->link());
             assert(new_storage_dir); // At least we should find the root.
@@ -471,13 +478,36 @@ void ForwardTarredFS::fixHardLinks()
                   entry->link()->c_str(),
                   storage_dir->path()->c_str(),
                   new_storage_dir->path()->c_str());
-            to_be_moved.push_back(pair<TarEntry*,TarEntry*>(entry, new_storage_dir));
+
+            // Move the cross tar deep hardlink up.
+            to_be_moved.push_back( { entry, new_storage_dir } );
+            // When the cross tar deep hardlink is restored from the upper tar (close to the root),
+            // then it will touch the directories below. Therefore we need to
+            // restore the directories utimes after the hardlinks is restored.
+            Path *p = entry->path()->parent();
+            TarEntry *dir = files[p];
+            assert(dir);
+            while (dir && dir->path()->depth() > storage_dir->path()->depth())  {
+                debug(HARDLINKS, "Copying >%s< from dir >%s< to >%s<\n",
+                      dir->path()->c_str(),
+                      storage_dir->path()->c_str(),
+                      new_storage_dir->path()->c_str());
+                to_be_copied.push_back( { dir, new_storage_dir } );
+                dir = dir->parent();
+            }
         }
+
         for (auto & p : to_be_moved) {
-            TarEntry *link = p.first;
+            TarEntry *entry = p.first;
             TarEntry *to = p.second;
-            storage_dir->moveEntryToNewParent(link, to);
+            storage_dir->moveEntryToNewParent(entry, to);
         }
+
+        for (auto & p : to_be_copied) {
+            TarEntry *entry = p.first;
+            TarEntry *to = p.second;
+            storage_dir->copyEntryToNewParent(entry, to);
+         }
     }
     string saving = humanReadable(hardlinksavings);
     debug(HARDLINKS,"Saved %s bytes using hard links\n", saving.c_str());

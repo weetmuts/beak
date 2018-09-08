@@ -601,7 +601,6 @@ ssize_t readlink(const char *path, char *dest, size_t len)
     return -1;
 }
 
-
 string permissionString(FileStat *fs)
 {
     string s;
@@ -787,7 +786,7 @@ void FileStat::storeIn(struct stat *sb)
 
 bool makeDirHelper(const char *path);
 
-bool FileSystem::mkDirp(Path* path)
+bool FileSystem::mkDirpWriteable(Path* path)
 {
     #ifdef PLATFORM_WINAPI
     // Assume that the drive is always writeable by me...
@@ -817,7 +816,7 @@ bool FileSystem::mkDirp(Path* path)
     }
 
     if (path->parent() && path->parent()->str().length() > 0) {
-        bool rc = mkDirp(path->parent());
+        bool rc = mkDirpWriteable(path->parent());
         if (!rc) return false;
     }
 
@@ -853,7 +852,6 @@ struct ListOnlyFileSystem : FileSystem
 
     ListOnlyFileSystem(map<Path*,FileStat> &contents) : contents_(contents) {
     }
-
 
     bool readdir(Path *p, std::vector<Path*> *vec)
     {

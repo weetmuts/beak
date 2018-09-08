@@ -35,6 +35,7 @@
 enum Command : short;
 enum PointInTimeFormat : short;
 enum TarHeaderStyle : short;
+
 struct Options;
 struct PointInTime;
 struct Rule;
@@ -63,8 +64,8 @@ struct Beak
     virtual RC mountReverse(Options *settings) = 0;
 
     virtual RC status(Options *settings) = 0;
-    virtual RC storeForward(Options *settings) = 0;
-    virtual RC restoreReverse(Options *settings) = 0;
+    virtual RC store(Options *settings) = 0;
+    virtual RC restore(Options *settings) = 0;
 
     virtual void printHelp(Command cmd) = 0;
     virtual void printVersion() = 0;
@@ -91,8 +92,8 @@ enum ArgumentType
     ArgStorage,
     ArgDir,
     ArgFile,
-    ArgORS,
-    ArgNORS,
+    ArgORS,  // Origin, Rule or Storage
+    ArgNORS, // None, Origin, Rule or Storage
 };
 
 // ArgORS will match ArgOrigin, ArgRule or ArgStorage.
@@ -110,7 +111,7 @@ enum ArgumentType
     X(pull,"Merge the most recent backup for the given rule.",ArgRule,ArgNone) \
     X(push,"Backup a rule to a storage location.",ArgRule,ArgNone) \
     X(mount,"Mount your backup as a file system.",ArgStorage,ArgDir) \
-    X(restore,"Restore from your backup into your file system.",ArgStorage,ArgOrigin) \
+    X(restore,"Restore from a backup into your file system.",ArgStorage,ArgOrigin) \
     X(status,"Show the status of your backups both locally and remotely.",ArgNORS,ArgNone) \
     X(store,"Store your file system into a backup.",ArgOrigin,ArgStorage) \
     X(umount,"Unmount a virtual file system.",ArgDir,ArgNone) \

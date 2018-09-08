@@ -254,7 +254,7 @@ function pack {
 }
 
 function untarpacked {
-    (cd "$check"; $THIS_DIR/scripts/restore.sh xa "$packed" "$1")
+    (cd "$check"; $THIS_DIR/scripts/restore.sh xa "$1" "$2")
 }
 
 function checkdiff {
@@ -267,8 +267,19 @@ function checkdiff {
 }
 
 function checklsld {
-    (cd $root$1; find . -exec ls -ld \{\} \; > $org)
-    (cd $check; find . -exec ls -ld \{\} \; > $dest)
+    (cd $root$1; find . ! -path . -exec ls -ld --time-style='+%Y-%m-%d %H:%M:%S.%N %s' \{\} \; > $org)
+    (cd $check; find . ! -path . -exec ls -ld --time-style='+%Y-%m-%d %H:%M:%S.%N %s' \{\} \; > $dest)
+    diff $org $dest
+    if [ $? -ne 0 ]; then
+        echo "$if_test_fail_msg"
+        echo Failed file attributes diff for $1! Check in $dir for more information.
+        exit
+    fi
+}
+
+function checklsld_no_nanos {
+    (cd $root$1; find . ! -path . -exec ls -ld --time-style='+%Y-%m-%d %H:%M:%S %s' \{\} \; > $org)
+    (cd $check; find . ! -path . -exec ls -ld --time-style='+%Y-%m-%d %H:%M:%S %s' \{\} \; > $dest)
     diff $org $dest
     if [ $? -ne 0 ]; then
         echo "$if_test_fail_msg"
@@ -281,7 +292,7 @@ function standardStoreUntarTest {
     if_test_fail_msg="Store untar test failed: "
     untar "$store"
     checkdiff
-    checklsld
+    checklsld_no_nanos
 }
 
 function standardStoreRestoreTest {
@@ -303,14 +314,14 @@ function standardTest {
     if_test_fail_msg="Mount test failed: "
     untar "$beakfs"
     checkdiff
-    checklsld
+    checklsld_no_nanos
 }
 
 function standardPackedTest {
     pack
-    untarpacked
+    untarpacked "$packed"
     checkdiff
-    checklsld
+    checklsld_no_nanos
     stopMount
     echo OK
 }
@@ -318,7 +329,7 @@ function standardPackedTest {
 function fifoStoreUntarTest {
     if_test_fail_msg="Store untar fifo test failed: "
     untar "$store"
-    checklsld
+    checklsld_no_nanos
 }
 
 function fifoStoreUnStoreTest {
@@ -330,7 +341,7 @@ function fifoStoreUnStoreTest {
 function fifoTest {
     if_test_fail_msg="Mount untar fifo test failed: "
     untar "$mount"
-    checklsld
+    checklsld_no_nanos
     stopMount
     echo OK
 }
@@ -563,7 +574,7 @@ if [ $do_test ]; then
     if_test_fail_msg="Store untar test failed: "
     untar "$store/Gamma"
     checkdiff /Gamma
-    checklsld /Gamma
+    checklsld_no_nanos /Gamma
     cleanCheck
     if_test_fail_msg="Store unstor test failed: "
     subdir="/Gamma"
@@ -611,6 +622,28 @@ if [ $do_test ]; then
     performStore
     standardStoreRestoreTest
     cleanCheck
+    # No check of mount since we want to test our own restore write code.
+    # The mount will always render the write-protected file properly.
+    echo OK
+fi
+
+setup update_write_protected_file "Restore write protected file."
+if [ $do_test ]; then
+    echo HEJSAN > $root/Alfa
+    echo HEJSAN > $root/Beta
+    mkdir -p $root/Gamma
+    echo HEJSAN > $root/Gamma/Delta
+    chmod a-w $root/Gamma/Delta
+    performStore
+    standardStoreRestoreTest
+    chmod u+w $root/Gamma/Delta
+    echo HEJSAN > $root/Gamma/Delta
+    chmod u-w $root/Gamma/Delta
+    performStore
+    standardStoreRestoreTest
+    cleanCheck
+    # No check of mount since we want to test our own restore write code.
+    # The mount will always render the write-protected file properly.
     echo OK
 fi
 
@@ -628,11 +661,11 @@ if [ $do_test ]; then
     # require you to be root. So lets just mount /dev and
     # just list the contents of the tars!
     root=/dev
-    performStore "--tarheader=full -x '/shm/**'"
+    performStore "--tarheader=full -x '/vboxusb' -x '/shm/**'"
     beakfs="$store"
     devTest
     beakfs="$mount"
-    startMountTest devTest "--tarheader=full -x '/shm/**'"
+    startMountTest devTest "--tarheader=full -x '/vboxusb' -x '/shm/**'"
     compareStoreAndMount
     stopMount
     echo OK
@@ -791,7 +824,7 @@ fi
 function percentageTest {
     untar "$mount"
     checkdiff
-    checklsld
+    checklsld_no_nanos
     # This error can pop up because of accidental use of printf in perl code.
     # The percentage in the file name will become a printf command.
     $THIS_DIR/scripts/integrity-test.sh -dd "$dir" "$root" "$mount"
@@ -890,7 +923,7 @@ function txTriggerTest {
     fi
     untar "$mount"
     checkdiff
-    checklsld
+    checklsld_no_nanos
 
     stopMount
 }
@@ -965,7 +998,7 @@ fi
 function expectOneBigR01Tar {
     untar "$mount"
     checkdiff
-    checklsld
+    checklsld_no_nanos
     num=$(find $mount -name "s01*.tar" | wc --lines)
     if [ "$num" != "1" ]; then
         echo Expected a single big s01 tar! Check in $dir for more information.
@@ -984,7 +1017,7 @@ fi
 function expect8R01Tar {
     untar "$mount"
     checkdiff
-    checklsld
+    checklsld_no_nanos
     num=$(find $mount -name "s01*.tar" | wc --lines)
     if [ "$num" != "8" ]; then
         echo Expected 8 s01 tar! Check in $dir for more information.
@@ -1073,4 +1106,3 @@ fi
 #fi
 
 echo All tests succeeded!
-rm -rf $tmpdir

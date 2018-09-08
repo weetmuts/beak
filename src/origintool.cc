@@ -155,7 +155,7 @@ bool OriginToolImplementation::extractHardLink(Path *target,
 
     debug(ORIGINTOOL, "Storing hard link %s to %s\n", file_to_extract->c_str(), target->c_str());
 
-    origin_fs_->mkDirp(file_to_extract->parent());
+    origin_fs_->mkDirpWriteable(file_to_extract->parent());
     origin_fs_->createHardLink(file_to_extract, stat, target);
     origin_fs_->utime(file_to_extract, stat);
     statistics->stats.num_hard_links_stored++;
@@ -183,7 +183,7 @@ bool OriginToolImplementation::extractFile(Entry *entry,
           file_to_extract->c_str(), stat->st_size, permissionString(stat).c_str(),
           tar_file->c_str(), tar_file_offset);
 
-    origin_fs_->mkDirp(file_to_extract->parent());
+    origin_fs_->mkDirpWriteable(file_to_extract->parent());
     origin_fs_->createFile(file_to_extract, stat,
         [storage_fs,tar_file_offset,file_to_extract,tar_file] (off_t offset, char *buffer, size_t len)
         {
@@ -226,7 +226,7 @@ bool OriginToolImplementation::extractSymbolicLink(string target,
 
     debug(ORIGINTOOL, "Storing symlink %s to %s\n", file_to_extract->c_str(), target.c_str());
 
-    origin_fs_->mkDirp(file_to_extract->parent());
+    origin_fs_->mkDirpWriteable(file_to_extract->parent());
     if (found) {
         origin_fs_->deleteFile(file_to_extract);
     }
@@ -254,7 +254,7 @@ bool OriginToolImplementation::extractNode(Path *file_to_extract, FileStat *stat
 
     if (stat->isFIFO()) {
         debug(ORIGINTOOL, "Storing FIFO %s\n", file_to_extract->c_str());
-        origin_fs_->mkDirp(file_to_extract->parent());
+        origin_fs_->mkDirpWriteable(file_to_extract->parent());
         origin_fs_->createFIFO(file_to_extract, stat);
         origin_fs_->utime(file_to_extract, stat);
         verbose(ORIGINTOOL, "Stored fifo %s\n", file_to_extract->c_str());
@@ -263,29 +263,29 @@ bool OriginToolImplementation::extractNode(Path *file_to_extract, FileStat *stat
     return true;
 }
 
-bool OriginToolImplementation::chmodDirectory(Path *file_to_extract, FileStat *stat,
+bool OriginToolImplementation::chmodDirectory(Path *dir_to_extract, FileStat *stat,
                                               ptr<StoreStatistics> statistics)
 {
     FileStat old_stat;
-    RC rc = origin_fs_->stat(file_to_extract, &old_stat);
+    RC rc = origin_fs_->stat(dir_to_extract, &old_stat);
     if (rc.isOk()) {
         if (stat->samePermissions(&old_stat) &&
             stat->sameMTime(&old_stat)) {
             // Compare of directory size is ignored since the size differ between
             // different file systems.
-            debug(ORIGINTOOL, "Skipping chmod of dir \"%s\"\n", file_to_extract->c_str());
+            debug(ORIGINTOOL, "Skipping chmod of dir \"%s\"\n", dir_to_extract->c_str());
             return false;
         }
     }
 
-    debug(ORIGINTOOL, "Chmodding directory %s %s\n", file_to_extract->c_str(),
+    debug(ORIGINTOOL, "Chmodding directory %s %s\n", dir_to_extract->c_str(),
           permissionString(stat).c_str());
 
-    origin_fs_->mkDirp(file_to_extract);
-    origin_fs_->chmod(file_to_extract, stat);
-    origin_fs_->utime(file_to_extract, stat);
+    origin_fs_->mkDirpWriteable(dir_to_extract);
+    origin_fs_->chmod(dir_to_extract, stat);
+    origin_fs_->utime(dir_to_extract, stat);
     statistics->stats.num_dirs_updated++;
-    verbose(ORIGINTOOL, "Updated dir %s\n", file_to_extract->c_str());
+    verbose(ORIGINTOOL, "Updated dir %s\n", dir_to_extract->c_str());
     statistics->updateProgress();
     return true;
 }
@@ -295,9 +295,9 @@ void OriginToolImplementation::handleHardLinks(Path *path, FileStat *stat,
                                                Options *settings, ptr<StoreStatistics> st)
 {
     auto entry = rfs->findEntry(point, path);
-    auto file_to_extract = path->prepend(settings->to.origin);
 
     if (entry->is_hard_link) {
+        auto file_to_extract = path->prepend(settings->to.origin);
         // Special case since hard links are not encoded in stat structure.
         extractHardLink(entry->hard_link,
                         settings->to.origin,
@@ -324,9 +324,9 @@ void OriginToolImplementation::handleRegularFiles(Path *path, FileStat *stat,
 }
 
 void OriginToolImplementation::handleNodes(Path *path, FileStat *stat,
-                 ReverseTarredFS *rfs, PointInTime *point,
-                 Options *settings, ptr<StoreStatistics> st,
-                 FileSystem *storage_fs)
+                                           ReverseTarredFS *rfs, PointInTime *point,
+                                           Options *settings, ptr<StoreStatistics> st,
+                                           FileSystem *storage_fs)
 {
     auto entry = rfs->findEntry(point, path);
     auto file_to_extract = path->prepend(settings->to.origin);

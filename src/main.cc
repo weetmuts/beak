@@ -29,20 +29,22 @@
 
 using namespace std;
 
-int go(int argc, char *argv[]);
+int run(int argc, char *argv[]);
 
 int main(int argc, char *argv[])
 {
     try {
-        go(argc, argv);
+        return run(argc, argv);
     }
     catch (...) {
         fprintf(stderr, "Internal error due to C++ exception.\n");
-        // We really want to print the stack trace here!
+        // The catch/print is necessary for winapi hosts, since
+        // a thrown exception is not necessarily printed! The program
+        // just silently terminates. If only we could print the stack trace here...
     }
 }
 
-int go(int argc, char *argv[]) {
+int run(int argc, char *argv[]) {
     RC rc = RC::OK;
 
     // First create the OS interface to invoke external commands like rclone and rsync.
@@ -55,7 +57,7 @@ int go(int argc, char *argv[]) {
     auto local_storage_fs = newDefaultFileSystem();
     // Next create the filesystem where the origin files are found.
     auto origin_fs = newDefaultFileSystem();
-     // Then create the interface to hide the differences between different storages types:
+    // Then create the interface to hide the differences between different storages types:
     // ie rclone, rsync and local file system.
     auto storage_tool = newStorageTool(sys, sys_fs, local_storage_fs);
     // Then create the interface to restore and read files from the origin.
@@ -123,7 +125,7 @@ int go(int argc, char *argv[]) {
         break;
 
     case restore_cmd:
-        rc = beak->restoreReverse(&settings);
+        rc = beak->restore(&settings);
         break;
 
     case status_cmd:
@@ -131,7 +133,7 @@ int go(int argc, char *argv[]) {
         break;
 
     case store_cmd:
-        rc = beak->storeForward(&settings);
+        rc = beak->store(&settings);
         break;
 
     case umount_cmd:
