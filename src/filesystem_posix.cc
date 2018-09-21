@@ -132,15 +132,32 @@ private:
     int inotify_fd_ {};
 };
 
-FileSystem *default_file_system_;
+FileSystem *default_file_system_ {};
 
-FileSystem *defaultFileSystem()
+Path *cache_dir_ {};
+
+Path *configuration_file_ {};
+
+Path *initCacheDir_()
 {
-    return default_file_system_;
+    Path *home = Path::lookup(getenv("HOME"));
+    return home->append(".cache/beak");
+}
+
+Path *initConfigurationFile_()
+{
+    Path *home = Path::lookup(getenv("HOME"));
+    return home->append(".config/beak/beak.conf");
 }
 
 unique_ptr<FileSystem> newDefaultFileSystem()
 {
+    if (!cache_dir_) {
+        cache_dir_ = initCacheDir_();
+    }
+    if (!configuration_file_) {
+        configuration_file_ = initConfigurationFile_();
+    }
     default_file_system_ = new FileSystemImplementationPosix();
     return unique_ptr<FileSystem>(default_file_system_);
 }
@@ -641,8 +658,12 @@ bool makeDirHelper(const char *s)
 
 Path *configurationFile()
 {
-    Path *home = Path::lookup(getenv("HOME"));
-    return home->append(".config/beak/beak.conf");
+    return configuration_file_;
+}
+
+Path *cacheDir()
+{
+    return cache_dir_;
 }
 
 RC FileSystemImplementationPosix::enableWatch()

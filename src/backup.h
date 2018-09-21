@@ -15,8 +15,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef FORWARD_H
-#define FORWARD_H
+#ifndef BACKUP_H
+#define BACKUP_H
 
 #include "always.h"
 #include "beak.h"
@@ -52,7 +52,7 @@ typedef int (*GetAttrCB)(const char*, struct stat*);
 typedef int (*ReaddirCB)(const char*,void*,fuse_fill_dir_t,off_t,struct fuse_file_info*);
 typedef int (*ReadCB)(const char *,char *,size_t,off_t,struct fuse_file_info *);
 
-struct ForwardTarredFS : FuseAPI
+struct Backup : FuseAPI
 {
     RC scanFileSystem(Options *settings);
 
@@ -108,9 +108,9 @@ struct ForwardTarredFS : FuseAPI
 
     void setMessage(std::string m) { message_ = m; }
     void setTarHeaderStyle(TarHeaderStyle ths) { tarheaderstyle_= ths; }
-    ForwardTarredFS(ptr<FileSystem> fs);
+    Backup(ptr<FileSystem> fs);
 
-    virtual ~ForwardTarredFS() = default;
+    virtual ~Backup() = default;
 
 private:
     size_t findNumTarsFromSize(size_t amount, size_t total_size);
@@ -124,6 +124,6 @@ private:
 
 };
 
-std::unique_ptr<ForwardTarredFS> newForwardTarredFS(ptr<FileSystem> fs);
+std::unique_ptr<Backup> newBackup(ptr<FileSystem> fs);
 
 #endif

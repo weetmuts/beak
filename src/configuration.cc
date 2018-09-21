@@ -383,7 +383,6 @@ bool ConfigurationImplementation::save()
     return true;
 }
 
-
 vector<Storage*> Rule::sortedStorages()
 {
     vector<Storage*> v;

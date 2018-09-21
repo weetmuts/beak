@@ -21,7 +21,7 @@
 #include "always.h"
 #include "beak.h"
 #include "configuration.h"
-#include "reverse.h"
+#include "restore.h"
 #include "tarfile.h"
 #include "statistics.h"
 
@@ -34,9 +34,9 @@ struct OriginTool
     virtual RC restoreFileSystemIntoOrigin(FileSystem *fs) = 0;
 
     virtual void addRestoreWork(ptr<StoreStatistics> st, Path *path, FileStat *stat, Options *settings,
-                                ReverseTarredFS *rfs, PointInTime *point) = 0;
+                                Restore *rfs, PointInTime *point) = 0;
 
-    virtual void restoreFileSystem(FileSystem *view, ReverseTarredFS *rfs, PointInTime *point,
+    virtual void restoreFileSystem(FileSystem *view, Restore *rfs, PointInTime *point,
                                    Options *settings, ptr<StoreStatistics> st, FileSystem *storage_fs) = 0;
 
     virtual ptr<FileSystem> fs() = 0;

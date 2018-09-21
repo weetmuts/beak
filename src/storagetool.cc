@@ -17,7 +17,7 @@
 
 #include "storagetool.h"
 
-#include "forward.h"
+#include "backup.h"
 #include "log.h"
 #include "system.h"
 #include "storage_rclone.h"
@@ -37,7 +37,7 @@ struct StorageToolImplementation : public StorageTool
                                   FileSystem *origin_fs,
                                   Storage *storage,
                                   ptr<StoreStatistics> st,
-                                  ptr<ForwardTarredFS> ffs,
+                                  ptr<Backup> ffs,
                                   Options *settings);
 
     RC listPointsInTime(Storage *storage, vector<pair<Path*,struct timespec>> *v);
@@ -97,7 +97,7 @@ void add_forward_work(ptr<StoreStatistics> st,
 
 void handle_tar_file(Path *path,
                      FileStat *stat,
-                     ptr<ForwardTarredFS> ffs,
+                     ptr<Backup> ffs,
                      Options *settings,
                      ptr<StoreStatistics> st,
                      FileSystem *origin_fs,
@@ -139,7 +139,7 @@ RC StorageToolImplementation::storeFileSystemIntoStorage(FileSystem *beaked_fs,
                                                          FileSystem *origin_fs,
                                                          Storage *storage,
                                                          ptr<StoreStatistics> st,
-                                                         ptr<ForwardTarredFS> ffs,
+                                                         ptr<Backup> ffs,
                                                          Options *settings)
 {
     st->startDisplayOfProgress();

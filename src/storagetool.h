@@ -19,10 +19,10 @@
 #define STORAGE_H
 
 #include "always.h"
+#include "backup.h"
 #include "beak.h"
 #include "configuration.h"
-#include "forward.h"
-#include "reverse.h"
+#include "restore.h"
 #include "tarfile.h"
 #include "statistics.h"
 
@@ -36,11 +36,12 @@ struct StorageTool
                                           FileSystem *origin_fs,
                                           Storage *storage,
                                           ptr<StoreStatistics> st,
-                                          ptr<ForwardTarredFS> ffs,
+                                          ptr<Backup> ffs,
                                           Options *settings) = 0;
 
     virtual RC listPointsInTime(Storage *storage, std::vector<std::pair<Path*,struct timespec>> *v) = 0;
 
+    // Return a filesystem for the storage location.
     virtual ptr<FileSystem> fs() = 0;
 };
 

@@ -15,7 +15,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "forward.h"
+#include "backup.h"
 
 #include <string.h>
 #include <sys/stat.h>
@@ -38,11 +38,11 @@
 using namespace std;
 
 static ComponentId COMMANDLINE = registerLogComponent("commandline");
-static ComponentId FORWARD = registerLogComponent("forward");
+static ComponentId BACKUP = registerLogComponent("backup");
 static ComponentId HARDLINKS = registerLogComponent("hardlinks");
 static ComponentId FUSE = registerLogComponent("fuse");
 
-ForwardTarredFS::ForwardTarredFS(ptr<FileSystem> fs)
+Backup::Backup(ptr<FileSystem> fs)
 {
     pthread_mutexattr_init(&global_attr);
     pthread_mutexattr_settype(&global_attr, PTHREAD_MUTEX_RECURSIVE);
@@ -50,14 +50,14 @@ ForwardTarredFS::ForwardTarredFS(ptr<FileSystem> fs)
     file_system_ = fs.get();
 }
 
-thread_local ForwardTarredFS *current_fs;
+thread_local Backup *current_fs;
 
 static int addEntry(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf)
 {
     return current_fs->addTarEntry(fpath, sb);
 }
 
-int ForwardTarredFS::recurse()
+int Backup::recurse()
 {
     // Recurse into the root dir. Maximum 256 levels deep.
     // Look at symbolic links (ie do not follow them) so that
@@ -80,13 +80,13 @@ int ForwardTarredFS::recurse()
     int rc = nftw(root_dir.c_str(), addEntry, 256, FTW_PHYS|FTW_ACTIONRETVAL);
 
     if (rc  == -1) {
-        error(FORWARD,"Error while scanning files: %s", strerror(errno));
+        error(BACKUP,"Error while scanning files: %s", strerror(errno));
         exit(EXIT_FAILURE);
     }
     return 0;
 }
 
-int ForwardTarredFS::addTarEntry(const char *p, const struct stat *sb)
+int Backup::addTarEntry(const char *p, const struct stat *sb)
 {
     Path *abspath = Path::lookup(p);
     Path *path = abspath->subpath(root_dir_path->depth());
@@ -108,7 +108,7 @@ int ForwardTarredFS::addTarEntry(const char *p, const struct stat *sb)
         if (err == 0) {
             // Oups found .beak subdir! This directory and children
             // must be ignored!
-            info(FORWARD,"Skipping subbeak %s\n", abspath->c_str());
+            info(BACKUP,"Skipping subbeak %s\n", abspath->c_str());
             return FTW_SKIP_SUBTREE;
         }
     }
@@ -138,10 +138,10 @@ int ForwardTarredFS::addTarEntry(const char *p, const struct stat *sb)
         }
     }
     if (name[1] != 0 && status) {
-        debug(FORWARD, "Filter dropped \"%s\"\n", name);
+        debug(BACKUP, "Filter dropped \"%s\"\n", name);
         return 0;
     } else {
-        debug(FORWARD, "Filter NOT dropped \"%s\"\n", name);
+        debug(BACKUP, "Filter NOT dropped \"%s\"\n", name);
     }
 
     // Creation and storage of entry.
@@ -152,12 +152,12 @@ int ForwardTarredFS::addTarEntry(const char *p, const struct stat *sb)
         // Storing the path in the lookup
         directories[te->path()] = te;
         file_system_->addWatch(abspath);
-        debug(FORWARD, "Added directory >%s< %p %p\n", te->path()->c_str(), te->path(), directories[te->path()]);
+        debug(BACKUP, "Added directory >%s< %p %p\n", te->path()->c_str(), te->path(), directories[te->path()]);
     }
     return FTW_CONTINUE;
 }
 
-void ForwardTarredFS::findTarCollectionDirs() {
+void Backup::findTarCollectionDirs() {
     // Accumulate blocked sizes into children_size in the parent.
     // Set the parent pointer.
     for(auto & e : files) {
@@ -175,13 +175,13 @@ void ForwardTarredFS::findTarCollectionDirs() {
     for(auto & e : files) {
         TarEntry *te = e.second;
 
-        debug(FORWARD, "ISDIR >%s< %d\n", te->path()->c_str(), te->isDirectory());
+        debug(BACKUP, "ISDIR >%s< %d\n", te->path()->c_str(), te->isDirectory());
 
         if (te->isDirectory()) {
             bool must_generate_tars = (te->path()->depth() <= 1 ||
                                  te->path()->depth() == forced_tar_collection_dir_depth);
 
-            debug(FORWARD, "TARS >%s< %d gentars? %d\n", te->path()->c_str(), te->path()->depth(), must_generate_tars);
+            debug(BACKUP, "TARS >%s< %d gentars? %d\n", te->path()->c_str(), te->path()->depth(), must_generate_tars);
             for (auto &g : triggers) {
                 bool match = g.match(te->path()->c_str());
                 if (match) {
@@ -196,7 +196,7 @@ void ForwardTarredFS::findTarCollectionDirs() {
                 te->setAsStorageDir();
                 tar_storage_directories[te->path()] = te;
                 string hs = humanReadable(te->childrenSize());
-                //verbose(FORWARD, "Collapsed %s\n", te->path()->c_str(), hs.c_str());
+                //verbose(BACKUP, "Collapsed %s\n", te->path()->c_str(), hs.c_str());
                 TarEntry *i = te;
                 while (i->parent() != NULL) {
                     i->parent()->addChildrenSize(-te->childrenSize());
@@ -207,7 +207,7 @@ void ForwardTarredFS::findTarCollectionDirs() {
     }
 }
 
-void ForwardTarredFS::recurseAddDir(Path *path, TarEntry *direntry) {
+void Backup::recurseAddDir(Path *path, TarEntry *direntry) {
     if (direntry->isAddedToDir() || path->isRoot()) {
         // Stop if the direntry is already added to a parent.
         // Stop at the root.
@@ -218,13 +218,13 @@ void ForwardTarredFS::recurseAddDir(Path *path, TarEntry *direntry) {
     if (!direntry->isAddedToDir()) {
         parent->addDir(direntry);
         direntry->setAsAddedToDir();
-        debug(FORWARD, "ADDED recursive dir %s to %s\n",
+        debug(BACKUP, "ADDED recursive dir %s to %s\n",
               path->name()->c_str(), path->parent()->c_str());
         recurseAddDir(path->parent(), parent);
     }
 }
 
-void ForwardTarredFS::addDirsToDirectories() {
+void Backup::addDirsToDirectories() {
     // Find all directories that are tar collection dirs
     // and make sure they can be listed in all the parent
     // directories down to the root. Even if those intermediate
@@ -244,7 +244,7 @@ void ForwardTarredFS::addDirsToDirectories() {
         if (!te->isAddedToDir()) {
             parent->addDir(te);
             te->setAsAddedToDir();
-            debug(FORWARD,"ADDED dir >%s< to >%s\n",
+            debug(BACKUP,"ADDED dir >%s< to >%s\n",
                   path->name()->c_str(), path->parent()->c_str());
 
             // Now make sure the parent is linked to its parent all the way to the root.
@@ -254,7 +254,7 @@ void ForwardTarredFS::addDirsToDirectories() {
     }
 }
 
-void ForwardTarredFS::addEntriesToTarCollectionDirs() {
+void Backup::addEntriesToTarCollectionDirs() {
     for(auto & e : files) {
         Path *path = e.first;
         TarEntry *dir = NULL;
@@ -272,12 +272,12 @@ void ForwardTarredFS::addEntriesToTarCollectionDirs() {
         } while (dir == NULL || !dir->isStorageDir());
         dir->addEntry(te);
 
-        debug(FORWARD,"ADDED content %s            TO          \"%s\"\n",
+        debug(BACKUP,"ADDED content %s            TO          \"%s\"\n",
               te->path()->c_str(), dir->path()->c_str());
     }
 }
 
-void ForwardTarredFS::pruneDirectories() {
+void Backup::pruneDirectories() {
     set<Path*> paths;
     map<string,string> paths_lowercase;
 
@@ -286,7 +286,7 @@ void ForwardTarredFS::pruneDirectories() {
     string utf8 = ".UTF-8";
     if (utf8.size() > lcn.size() ||
         !equal(utf8.rbegin(), utf8.rend(), lcn.rbegin())) {
-        error(FORWARD, "Tarredfs expects your locale to use the encoding UTF-8!\n"
+        error(BACKUP, "Tarredfs expects your locale to use the encoding UTF-8!\n"
               "You might want to: export LC_ALL='en_US.UTF-8' or something similar.\n");
     }
     #endif
@@ -298,7 +298,7 @@ void ForwardTarredFS::pruneDirectories() {
             if (rc.second == false) {
                 break;
             }
-            debug(FORWARD, "Added %s to paths.\n", s->c_str());
+            debug(BACKUP, "Added %s to paths.\n", s->c_str());
             s = s->parent();
         } while (s != NULL);
     }
@@ -306,7 +306,7 @@ void ForwardTarredFS::pruneDirectories() {
     map<Path*,TarEntry*> newd;
     for (auto & d : directories) {
         if (paths.count(d.first) != 0) {
-            debug(FORWARD, "Re-added %s to paths.\n", d.first->c_str());
+            debug(BACKUP, "Re-added %s to paths.\n", d.first->c_str());
             newd[d.first] = d.second;
 
             // Now detect directory case conflicts that will prevent storage
@@ -318,7 +318,7 @@ void ForwardTarredFS::pruneDirectories() {
             // All file name conflicts are handled.
             string dlc = tolowercase(d.first->str());
             if (paths_lowercase.count(dlc) > 0) {
-                error(FORWARD, "Case conflict for:\n%s\n%s\n", d.first->c_str(), paths_lowercase[dlc].c_str());
+                error(BACKUP, "Case conflict for:\n%s\n%s\n", d.first->c_str(), paths_lowercase[dlc].c_str());
             }
             paths_lowercase[dlc] = d.first->str();
         }
@@ -329,13 +329,13 @@ void ForwardTarredFS::pruneDirectories() {
     newd[root]->setAsStorageDir();
 
     directories = newd;
-    debug(FORWARD,"dir size %ju\n", directories.size());
+    debug(BACKUP,"dir size %ju\n", directories.size());
     for (auto & d : directories) {
-        debug(FORWARD,"Dir >%s<\n", d.first->c_str());
+        debug(BACKUP,"Dir >%s<\n", d.first->c_str());
     }
 }
 
-size_t ForwardTarredFS::findNumTarsFromSize(size_t amount, size_t total_size) {
+size_t Backup::findNumTarsFromSize(size_t amount, size_t total_size) {
     // We have 128M of data
     // The amount (= min tar size) is 10M, how many tars?
     // 1 -> 10
@@ -353,7 +353,7 @@ size_t ForwardTarredFS::findNumTarsFromSize(size_t amount, size_t total_size) {
     return n;
 }
 
-void ForwardTarredFS::calculateNumTars(TarEntry *te,
+void Backup::calculateNumTars(TarEntry *te,
                                 size_t *nst, size_t *nmt, size_t *nlt,
                                 size_t *sfs, size_t *mfs, size_t *lfs,
                                 size_t *sc, size_t *mc)
@@ -382,15 +382,15 @@ void ForwardTarredFS::calculateNumTars(TarEntry *te,
         if (entry->blockedSize() < small_size) {
             small_files_size += entry->blockedSize();
             num_small_files++;
-            debug(FORWARD,"Found small file %s %zu\n", entry->tarpath()->c_str(), entry->blockedSize());
+            debug(BACKUP,"Found small file %s %zu\n", entry->tarpath()->c_str(), entry->blockedSize());
         } else if (entry->blockedSize() < medium_size) {
             medium_files_size += entry->blockedSize();
             num_medium_files++;
-            debug(FORWARD,"Found medium file %s %zu\n", entry->tarpath()->c_str(), entry->blockedSize());
+            debug(BACKUP,"Found medium file %s %zu\n", entry->tarpath()->c_str(), entry->blockedSize());
         } else {
             large_files_size += entry->blockedSize();
             num_large_files++;
-            debug(FORWARD,"Found large file %s %zu\n", entry->tarpath()->c_str(), entry->blockedSize());
+            debug(BACKUP,"Found large file %s %zu\n", entry->tarpath()->c_str(), entry->blockedSize());
         }
     }
 
@@ -419,7 +419,7 @@ void ForwardTarredFS::calculateNumTars(TarEntry *te,
     }
 }
 
-void ForwardTarredFS::findHardLinks() {
+void Backup::findHardLinks() {
     for(auto & e : files) {
         TarEntry *te = e.second;
 
@@ -429,7 +429,7 @@ void ForwardTarredFS::findHardLinks() {
                 // Note that the directory tree traversal goes bottom up, which means
                 // that the deepest file (that is hard linked) will be stored in the tar as a file.
                 // The shallower files, will be links to the deepest file.
-                // This is only relevant within the BeakFS. When the hard links are restored in
+                // This is only relevant within the Backup. When the hard links are restored in
                 // the filesystem, the links have no direction. (Unlike symlinks.)
                 debug(HARDLINKS, "Storing inode %ju contents here '%s'\n",
                       te->stat()->st_ino, te->path()->c_str());
@@ -445,7 +445,7 @@ void ForwardTarredFS::findHardLinks() {
     }
 }
 
-void ForwardTarredFS::fixHardLinks()
+void Backup::fixHardLinks()
 {
     for (auto & e : tar_storage_directories) {
         TarEntry *storage_dir = e.second;
@@ -513,7 +513,7 @@ void ForwardTarredFS::fixHardLinks()
     debug(HARDLINKS,"Saved %s bytes using hard links\n", saving.c_str());
 }
 
-void ForwardTarredFS::fixTarPaths() {
+void Backup::fixTarPaths() {
     for (auto & e : tar_storage_directories) {
         TarEntry *te = e.second;
         vector<pair<TarEntry*,TarEntry*>> to_be_moved;
@@ -526,7 +526,7 @@ void ForwardTarredFS::fixTarPaths() {
     }
 }
 
-size_t ForwardTarredFS::groupFilesIntoTars() {
+size_t Backup::groupFilesIntoTars() {
     size_t num = 0;
 
     for (auto & e : files) {
@@ -537,13 +537,13 @@ size_t ForwardTarredFS::groupFilesIntoTars() {
     for (auto & e : tar_storage_directories) {
         TarEntry *te = e.second;
 
-        debug(FORWARD, "TAR COLLECTION DIR >%s< >%s<\n", e.first->c_str(), te->path()->c_str());
+        debug(BACKUP, "TAR COLLECTION DIR >%s< >%s<\n", e.first->c_str(), te->path()->c_str());
 
         size_t nst,nmt,nlt,sfs,mfs,lfs,smallcomp,mediumcomp;
         calculateNumTars(te, &nst,&nmt,&nlt,&sfs,&mfs,&lfs,
                          &smallcomp,&mediumcomp);
 
-        debug(FORWARD, "TAR COLLECTION DIR nst=%zu nmt=%zu nlt=%zu sfs=%zu mfs=%zu lfs=%zu\n",
+        debug(BACKUP, "TAR COLLECTION DIR nst=%zu nmt=%zu nlt=%zu sfs=%zu mfs=%zu lfs=%zu\n",
               nst,nmt,nlt,sfs,mfs,lfs);
 
         // This is the taz file that store sub directories for this tar collection dir.
@@ -603,7 +603,7 @@ size_t ForwardTarredFS::groupFilesIntoTars() {
             tf->calculateHash();
             tf->fixName();
             if (tf->currentTarOffset() > 0) {
-                debug(FORWARD,"%s%s size became %zu\n", te->path()->c_str(), tf->name().c_str(), tf->size());
+                debug(BACKUP,"%s%s size became %zu\n", te->path()->c_str(), tf->name().c_str(), tf->size());
                 te->appendFileName(tf->name());
                 te->largeHashTars()[tf->hash()] = tf;
             }
@@ -614,7 +614,7 @@ size_t ForwardTarredFS::groupFilesIntoTars() {
             tf->calculateHash();
             tf->fixName();
             if (tf->currentTarOffset() > 0) {
-                debug(FORWARD,"%s%s size became %zu\n", te->path()->c_str(), tf->name().c_str(), tf->size());
+                debug(BACKUP,"%s%s size became %zu\n", te->path()->c_str(), tf->name().c_str(), tf->size());
                 te->appendFileName(tf->name());
                 te->mediumHashTars()[tf->hash()] = tf;
             }
@@ -625,7 +625,7 @@ size_t ForwardTarredFS::groupFilesIntoTars() {
             tf->calculateHash();
             tf->fixName();
             if (tf->currentTarOffset() > 0) {
-                debug(FORWARD,"%s%s size became %zu\n", te->path()->c_str(), tf->name().c_str(), tf->size());
+                debug(BACKUP,"%s%s size became %zu\n", te->path()->c_str(), tf->name().c_str(), tf->size());
                 te->appendFileName(tf->name());
                 te->smallHashTars()[tf->hash()] = tf;
             }
@@ -718,7 +718,7 @@ size_t ForwardTarredFS::groupFilesIntoTars() {
 
         if (te->tazFile()->size() > 0 ) {
 
-            debug(FORWARD,"%s%s size became %zu\n", te->path()->c_str(),
+            debug(BACKUP,"%s%s size became %zu\n", te->path()->c_str(),
                   te->tazFile()->name().c_str(), te->tazFile()->size());
 
             te->appendFileName(te->tazFile()->name());
@@ -733,7 +733,7 @@ size_t ForwardTarredFS::groupFilesIntoTars() {
     return num;
 }
 
-void ForwardTarredFS::sortTarCollectionEntries() {
+void Backup::sortTarCollectionEntries() {
     for (auto & p : tar_storage_directories) {
         TarEntry *te = p.second;
         te->sortEntries();
@@ -758,7 +758,7 @@ void ForwardTarredFS::sortTarCollectionEntries() {
 
 // Iterate up in the directory tree and return the nearest storage directory
 // that shares a common prefix with both a and b.
-TarEntry *ForwardTarredFS::findNearestStorageDirectory(Path *a, Path *b) {
+TarEntry *Backup::findNearestStorageDirectory(Path *a, Path *b) {
     Path *common = Path::commonPrefix(a,b);
     TarEntry *te = NULL;
     assert(common);
@@ -773,7 +773,7 @@ TarEntry *ForwardTarredFS::findNearestStorageDirectory(Path *a, Path *b) {
     return te;
 }
 
-TarFile *ForwardTarredFS::findTarFromPath(Path *path) {
+TarFile *Backup::findTarFromPath(Path *path) {
     bool ok;
     string n = path->name()->str();
     string d = path->parent()->name()->str();
@@ -783,51 +783,51 @@ TarFile *ForwardTarredFS::findTarFromPath(Path *path) {
 
     TarEntry *te = directories[path->parent()];
     if (!te) {
-        debug(FORWARD,"Not a directory >%s<\n",d.c_str());
+        debug(BACKUP,"Not a directory >%s<\n",d.c_str());
         return NULL;
     }
     TarFileName tfn;
     ok = TarFile::parseFileName(n, &tfn);
     if (!ok) {
-        debug(FORWARD,"Not a proper file name: \"%s\"\n", n.c_str());
+        debug(BACKUP,"Not a proper file name: \"%s\"\n", n.c_str());
         return NULL;
     }
     vector<char> hash;
     hex2bin(tfn.header_hash, &hash);
 
-    debug(FORWARD, "Hash >%s< hash len %d >%s<\n", tfn.header_hash.c_str(), hash.size(), toHex(hash).c_str());
-    debug(FORWARD, "Type is %d suffix is %s \n", tfn.type, tfn.suffix.c_str());
+    debug(BACKUP, "Hash >%s< hash len %d >%s<\n", tfn.header_hash.c_str(), hash.size(), toHex(hash).c_str());
+    debug(BACKUP, "Type is %d suffix is %s \n", tfn.type, tfn.suffix.c_str());
 
     if (tfn.type == REG_FILE && tfn.suffix == "gz") {
         if (!te->hasGzFile()) {
-            debug(FORWARD, "No such gz file >%s<\n", toHex(hash).c_str());
+            debug(BACKUP, "No such gz file >%s<\n", toHex(hash).c_str());
             return NULL;
         }
         return te->gzFile();
     } else
     if (tfn.type == SINGLE_LARGE_FILE_TAR) {
         if (te->largeHashTars().count(hash) == 0) {
-            debug(FORWARD, "No such large tar >%s<\n", toHex(hash).c_str());
+            debug(BACKUP, "No such large tar >%s<\n", toHex(hash).c_str());
             return NULL;
         }
         return te->largeHashTar(hash);
     } else
     if (tfn.type == MEDIUM_FILES_TAR) {
         if (te->mediumHashTars().count(hash) == 0) {
-            debug(FORWARD, "No such medium tar >%s<\n", toHex(hash).c_str());
+            debug(BACKUP, "No such medium tar >%s<\n", toHex(hash).c_str());
             return NULL;
         }
         return te->mediumHashTar(hash);
     } else
     if (tfn.type == SMALL_FILES_TAR) {
         if (te->smallHashTars().count(hash) == 0) {
-            debug(FORWARD, "No such small tar >%s<\n", toHex(hash).c_str());
+            debug(BACKUP, "No such small tar >%s<\n", toHex(hash).c_str());
             return NULL;
         }
         return te->smallHashTar(hash);
     } else if (tfn.type == DIR_TAR) {
         if (!te->hasTazFile()) {
-            debug(FORWARD, "No such dir tar >%s<\n", toHex(hash).c_str());
+            debug(BACKUP, "No such dir tar >%s<\n", toHex(hash).c_str());
             return NULL;
         }
         return te->tazFile();
@@ -837,7 +837,7 @@ TarFile *ForwardTarredFS::findTarFromPath(Path *path) {
     return NULL;
 }
 
-int ForwardTarredFS::getattrCB(const char *path_char_string, struct stat *stbuf) {
+int Backup::getattrCB(const char *path_char_string, struct stat *stbuf) {
     pthread_mutex_lock(&global);
 
     memset(stbuf, 0, sizeof(struct stat));
@@ -893,7 +893,7 @@ ok:
     return 0;
 }
 
-int ForwardTarredFS::readdirCB(const char *path_char_string, void *buf, fuse_fill_dir_t filler,
+int Backup::readdirCB(const char *path_char_string, void *buf, fuse_fill_dir_t filler,
                                off_t offset, struct fuse_file_info *fi)
 {
 
@@ -931,7 +931,7 @@ int ForwardTarredFS::readdirCB(const char *path_char_string, void *buf, fuse_fil
     return 0;
 }
 
-int ForwardTarredFS::readCB(const char *path_char_string, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
+int Backup::readCB(const char *path_char_string, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
     pthread_mutex_lock(&global);
     size_t n;
@@ -954,12 +954,12 @@ err:
     return -ENOENT;
 }
 
-int ForwardTarredFS::readlinkCB(const char *path_char_string, char *buf, size_t s)
+int Backup::readlinkCB(const char *path_char_string, char *buf, size_t s)
 {
     return 0;
 }
 
-RC ForwardTarredFS::scanFileSystem(Options *settings)
+RC Backup::scanFileSystem(Options *settings)
 {
     if (settings->from.type == ArgOrigin && settings->from.origin) {
         root_dir_path = settings->from.origin;
@@ -1023,7 +1023,7 @@ RC ForwardTarredFS::scanFileSystem(Options *settings)
           target_target_tar_size,
           tar_trigger_size);
 
-    info(FORWARD, "Scanning %s\n", root_dir.c_str());
+    info(BACKUP, "Scanning %s\n", root_dir.c_str());
     uint64_t start = clockGetTime();
     recurse();
     uint64_t stop = clockGetTime();
@@ -1052,7 +1052,7 @@ RC ForwardTarredFS::scanFileSystem(Options *settings)
     stop = clockGetTime();
     uint64_t group_time = stop - start;
 
-    info(FORWARD, "Mounted %s with %zu virtual tars with %zu entries.\n"
+    info(BACKUP, "Mounted %s with %zu virtual tars with %zu entries.\n"
             "Time to scan %jdms, time to group %jdms.\n",
             mount_dir.c_str(), num_tars, files.size(),
             scan_time / 1000, group_time / 1000);
@@ -1060,9 +1060,9 @@ RC ForwardTarredFS::scanFileSystem(Options *settings)
     return RC::OK;
 }
 
-struct ForwardFileSystem : FileSystem
+struct BeakFS : FileSystem
 {
-    ForwardTarredFS *forw_;
+    Backup *forw_;
 
     bool readdir(Path *p, std::vector<Path*> *vec)
     {
@@ -1188,15 +1188,15 @@ struct ForwardFileSystem : FileSystem
         return 0;
     }
 
-    ForwardFileSystem(ForwardTarredFS *forw) : forw_(forw) { }
+    BeakFS(Backup *forw) : forw_(forw) { }
 };
 
-FileSystem *ForwardTarredFS::asFileSystem()
+FileSystem *Backup::asFileSystem()
 {
-    return new ForwardFileSystem(this);
+    return new BeakFS(this);
 }
 
-unique_ptr<ForwardTarredFS> newForwardTarredFS(ptr<FileSystem> fs)
+unique_ptr<Backup> newBackup(ptr<FileSystem> fs)
 {
-    return unique_ptr<ForwardTarredFS>(new ForwardTarredFS(fs));
+    return unique_ptr<Backup>(new Backup(fs));
 }

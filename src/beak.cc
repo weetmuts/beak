@@ -17,11 +17,11 @@
 
 #include "beak.h"
 
+#include "backup.h"
 #include "configuration.h"
 #include "log.h"
 #include "filesystem.h"
-#include "forward.h"
-#include "reverse.h"
+#include "restore.h"
 #include "index.h"
 #include "origintool.h"
 #include "statistics.h"
@@ -792,21 +792,21 @@ RC BeakImplementation::prune(Options *settings)
 
 static int forwardGetattr(const char *path, struct stat *stbuf)
 {
-    ForwardTarredFS *fs = (ForwardTarredFS*)fuse_get_context()->private_data;
+    Backup *fs = (Backup*)fuse_get_context()->private_data;
     return fs->getattrCB(path, stbuf);
 }
 
 static int forwardReaddir(const char *path, void *buf, fuse_fill_dir_t filler,
                           off_t offset, struct fuse_file_info *fi)
 {
-    ForwardTarredFS *fs = (ForwardTarredFS*)fuse_get_context()->private_data;
+    Backup *fs = (Backup*)fuse_get_context()->private_data;
     return fs->readdirCB(path, buf, filler, offset, fi);
 }
 
 static int forwardRead(const char *path, char *buf, size_t size, off_t offset,
                        struct fuse_file_info *fi)
 {
-    ForwardTarredFS *fs = (ForwardTarredFS*)fuse_get_context()->private_data;
+    Backup *fs = (Backup*)fuse_get_context()->private_data;
     return fs->readCB(path, buf, size, offset, fi);
 }
 
@@ -834,7 +834,7 @@ RC BeakImplementation::mountForwardDaemon(Options *settings)
     assert(settings->to.type == ArgDir);
     dir = settings->to.dir;
 
-    auto ffs  = newForwardTarredFS(fs);
+    auto ffs  = newBackup(fs);
     RC rc = ffs->scanFileSystem(settings);
 
     if (rc.isErr()) {
@@ -848,7 +848,7 @@ RC BeakImplementation::mountForward(Options *settings)
 {
     ptr<FileSystem> fs = origin_tool_->fs();
 
-    auto ffs  = newForwardTarredFS(fs);
+    auto ffs  = newBackup(fs);
     RC rc = ffs->scanFileSystem(settings);
 
     if (rc.isErr()) {
@@ -872,27 +872,27 @@ RC BeakImplementation::umountForward(Options *settings)
 
 static int reverseGetattr(const char *path, struct stat *stbuf)
 {
-    ReverseTarredFS *fs = (ReverseTarredFS*)fuse_get_context()->private_data;
+    Restore *fs = (Restore*)fuse_get_context()->private_data;
     return fs->getattrCB(path, stbuf);
 }
 
 static int reverseReaddir(const char *path, void *buf, fuse_fill_dir_t filler,
                           off_t offset, struct fuse_file_info *fi)
 {
-    ReverseTarredFS *fs = (ReverseTarredFS*)fuse_get_context()->private_data;
+    Restore *fs = (Restore*)fuse_get_context()->private_data;
     return fs->readdirCB(path, buf, filler, offset, fi);
 }
 
 static int reverseRead(const char *path, char *buf, size_t size, off_t offset,
                        struct fuse_file_info *fi)
 {
-    ReverseTarredFS *fs = (ReverseTarredFS*)fuse_get_context()->private_data;
+    Restore *fs = (Restore*)fuse_get_context()->private_data;
     return fs->readCB(path, buf, size, offset, fi);
 }
 
 static int reverseReadlink(const char *path, char *buf, size_t size)
 {
-    ReverseTarredFS *fs = (ReverseTarredFS*)fuse_get_context()->private_data;
+    Restore *fs = (Restore*)fuse_get_context()->private_data;
     return fs->readlinkCB(path, buf, size);
 }
 
@@ -915,7 +915,7 @@ RC BeakImplementation::mountReverseInternal(Options *settings, bool daemon)
     reverse_tarredfs_ops.readdir = reverseReaddir;
     reverse_tarredfs_ops.readlink = reverseReadlink;
 
-    auto rfs  = newReverseTarredFS(origin_tool_->fs());
+    auto rfs  = newRestore(origin_tool_->fs());
 
     RC rc = rfs->lookForPointsInTime(PointInTimeFormat::absolute_point, settings->from.storage->storage_location);
     if (rc.isErr()) {
@@ -934,7 +934,7 @@ RC BeakImplementation::mountReverseInternal(Options *settings, bool daemon)
         int rc = fuse_main(settings->fuse_argc, settings->fuse_argv, &reverse_tarredfs_ops,
                            rfs.get()); // The reverse fs structure is passed as private data.
                                        // It is then extracted with
-                                       // (ReverseTarredFS*)fuse_get_context()->private_data;
+                                       // (Restore*)fuse_get_context()->private_data;
                                        // in the static fuse getters/setters.
         if (rc) return RC::ERR;
         return RC::OK;
@@ -1044,7 +1044,7 @@ RC BeakImplementation::store(Options *settings)
     // Watch the origin file system to detect if it is being changed while doing the store.
     ofs->enableWatch();
 
-    auto ffs  = newForwardTarredFS(origin_tool_->fs());
+    auto ffs  = newBackup(origin_tool_->fs());
 
     uint64_t start = clockGetTime();
     // This command scans the origin file system and builds
@@ -1102,7 +1102,7 @@ RC BeakImplementation::restore(Options *settings)
     }
 
     umask(0);
-    auto rfs  = newReverseTarredFS(origin_tool_->fs());
+    auto rfs  = newRestore(origin_tool_->fs());
     auto view = rfs->asFileSystem();
 
     rfs->lookForPointsInTime(PointInTimeFormat::absolute_point, settings->from.storage->storage_location);

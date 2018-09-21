@@ -127,8 +127,52 @@ private:
     Path *cache;
 };
 
+Path *cache_dir_ {};
+
+Path *configuration_file_ {};
+
+Path *initCacheDir_()
+{
+    const char *homedrive = getenv("HOMEDRIVE");
+    const char *homepath = getenv("HOMEPATH");
+
+    if (homedrive == NULL) {
+        error(FILESYSTEM, "Could not find home drive!\n");
+    }
+    if (homepath == NULL) {
+        error(FILESYSTEM, "Could not find home directory!\n");
+    }
+
+    string homes = string(homedrive)+string(homepath);
+    Path *homep = Path::lookup(homes);
+    return homep->append(".cache/beak");
+}
+
+Path *initConfigurationFile_()
+{
+    const char *homedrive = getenv("HOMEDRIVE");
+    const char *homepath = getenv("HOMEPATH");
+
+    if (homedrive == NULL) {
+        error(FILESYSTEM, "Could not find home drive!\n");
+    }
+    if (homepath == NULL) {
+        error(FILESYSTEM, "Could not find home directory!\n");
+    }
+
+    string homes = string(homedrive)+string(homepath);
+    Path *homep = Path::lookup(homes);
+    return homep->append(".config/beak/beak.conf");
+}
+
 unique_ptr<FileSystem> newDefaultFileSystem()
 {
+    if (!cache_dir_) {
+        cache_dir_ = initCacheDir_();
+    }
+    if (!configuration_file_) {
+        configuration_file_ = initConfigurationFile_();
+    }
     return unique_ptr<FileSystem>(new FileSystemImplementationWinapi());
 }
 
@@ -369,20 +413,14 @@ bool makeDirHelper(const char *s)
 
 Path *configurationFile()
 {
-    const char *homedrive = getenv("HOMEDRIVE");
-    const char *homepath = getenv("HOMEPATH");
-
-    if (homedrive == NULL) {
-        error(FILESYSTEM, "Could not find home drive!\n");
-    }
-    if (homepath == NULL) {
-        error(FILESYSTEM, "Could not find home directory!\n");
-    }
-
-    string homes = string(homedrive)+string(homepath);
-    Path *homep = Path::lookup(homes);
-    return homep->append(".config/beak/beak.conf");
+    return configuration_file_;
 }
+
+Path *cacheDir()
+{
+    return cache_dir_;
+}
+
 
 RC FileSystemImplementationWinapi::mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground, bool debug)
 {

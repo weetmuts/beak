@@ -15,8 +15,8 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef REVERSE_H
-#define REVERSE_H
+#ifndef RESTORE_H
+#define RESTORE_H
 
 #include "always.h"
 #include "beak.h"
@@ -84,7 +84,7 @@ struct PointInTime {
     std::set<Path*> loaded_gz_files_;
 };
 
-struct ReverseTarredFS
+struct Restore
 {
     RC loadBeakFileSystem(Options *settings);
 
@@ -112,7 +112,7 @@ struct ReverseTarredFS
     PointInTime *findPointInTime(std::string s);
     PointInTime *setPointInTime(std::string g);
 
-    ReverseTarredFS(ptr<FileSystem> fs);
+    Restore(ptr<FileSystem> fs);
 
     Path *rootDir() { return root_dir_; }
     Path *mountDir() { return mount_dir_; }
@@ -134,6 +134,7 @@ struct ReverseTarredFS
     FileSystem *file_system_;
 };
 
-std::unique_ptr<ReverseTarredFS> newReverseTarredFS(ptr<FileSystem> fs);
+// Take a beak fs and give access to the backed up files inside.
+std::unique_ptr<Restore> newRestore(ptr<FileSystem> beak_fs);
 
 #endif

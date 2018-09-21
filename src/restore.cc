@@ -15,7 +15,7 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "reverse.h"
+#include "restore.h"
 
 #include "filesystem.h"
 #include "index.h"
@@ -40,14 +40,14 @@ using namespace std;
 
 ComponentId REVERSE = registerLogComponent("reverse");
 
-ReverseTarredFS::ReverseTarredFS(ptr<FileSystem> fs)
+Restore::Restore(ptr<FileSystem> fs)
 {
     single_point_in_time_ = NULL;
     file_system_ = fs.get();
 }
 
 // The gz file to load, and the dir to populate with its contents.
-bool ReverseTarredFS::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
+bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
 {
     RC rc = RC::OK;
     if (point->loaded_gz_files_.count(gz) == 1)
@@ -131,7 +131,7 @@ bool ReverseTarredFS::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
     return true;
 }
 
-Path *ReverseTarredFS::loadDirContents(PointInTime *point, Path *path)
+Path *Restore::loadDirContents(PointInTime *point, Path *path)
 {
     FileStat stat;
     Path *gz = point->gz_files_[path];
@@ -148,7 +148,7 @@ Path *ReverseTarredFS::loadDirContents(PointInTime *point, Path *path)
     return gz;
 }
 
-void ReverseTarredFS::loadCache(PointInTime *point, Path *path)
+void Restore::loadCache(PointInTime *point, Path *path)
 {
     Path *opath = path;
 
@@ -187,7 +187,7 @@ void ReverseTarredFS::loadCache(PointInTime *point, Path *path)
 }
 
 
-Entry *ReverseTarredFS::findEntry(PointInTime *point, Path *path)
+Entry *Restore::findEntry(PointInTime *point, Path *path)
 {
     if (point->entries_.count(path) == 0)
     {
@@ -202,7 +202,7 @@ Entry *ReverseTarredFS::findEntry(PointInTime *point, Path *path)
     return &(point->entries_)[path];
 }
 
-int ReverseTarredFS::getattrCB(const char *path_char_string, struct stat *stbuf)
+int Restore::getattrCB(const char *path_char_string, struct stat *stbuf)
 {
     debug(REVERSE, "getattrCB >%s<\n", path_char_string);
 
@@ -335,7 +335,7 @@ int ReverseTarredFS::getattrCB(const char *path_char_string, struct stat *stbuf)
     return 0;
 }
 
-int ReverseTarredFS::readdirCB(const char *path_char_string, void *buf,
+int Restore::readdirCB(const char *path_char_string, void *buf,
 		fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
 {
     debug(REVERSE, "readdirCB >%s<\n", path_char_string);
@@ -400,7 +400,7 @@ int ReverseTarredFS::readdirCB(const char *path_char_string, void *buf,
     return 0;
 }
 
-int ReverseTarredFS::readlinkCB(const char *path_char_string, char *buf, size_t s)
+int Restore::readlinkCB(const char *path_char_string, char *buf, size_t s)
 {
     debug(REVERSE, "readlinkCB >%s<\n", path_char_string);
 
@@ -440,7 +440,7 @@ int ReverseTarredFS::readlinkCB(const char *path_char_string, char *buf, size_t 
     return 0;
 }
 
-int ReverseTarredFS::readCB(const char *path_char_string, char *buf,
+int Restore::readCB(const char *path_char_string, char *buf,
 		size_t size, off_t offset_, struct fuse_file_info *fi)
 {
     debug(REVERSE, "readCB >%s< offset=%ju size=%ju\n", path_char_string, offset_, size);
@@ -505,7 +505,7 @@ int ReverseTarredFS::readCB(const char *path_char_string, char *buf,
 }
 
 
-RC ReverseTarredFS::lookForPointsInTime(PointInTimeFormat f, Path *path)
+RC Restore::lookForPointsInTime(PointInTimeFormat f, Path *path)
 {
     bool ok;
     if (path == NULL) return RC::ERR;
@@ -571,11 +571,11 @@ RC ReverseTarredFS::lookForPointsInTime(PointInTimeFormat f, Path *path)
     return RC::ERR;
 }
 
-PointInTime *ReverseTarredFS::findPointInTime(string s) {
+PointInTime *Restore::findPointInTime(string s) {
     return points_in_time_[s];
 }
 
-PointInTime *ReverseTarredFS::setPointInTime(string g) {
+PointInTime *Restore::setPointInTime(string g) {
     if ((g.length() < 2) | (g[0] != '@')) {
         error(REVERSE,"Specify generation as @0 @1 @2 etc.\n");
     }
@@ -593,7 +593,7 @@ PointInTime *ReverseTarredFS::setPointInTime(string g) {
     return single_point_in_time_;
 }
 
-RC ReverseTarredFS::loadBeakFileSystem(Options *settings)
+RC Restore::loadBeakFileSystem(Options *settings)
 {
     setRootDir(settings->from.storage->storage_location);
     setMountDir(settings->to.origin);
@@ -646,7 +646,7 @@ RC ReverseTarredFS::loadBeakFileSystem(Options *settings)
 
 struct ReverseFileSystem : FileSystem
 {
-    ReverseTarredFS *rev_;
+    Restore *rev_;
     PointInTime *point_;
 
     bool readdir(Path *p, std::vector<Path*> *vec)
@@ -777,15 +777,15 @@ struct ReverseFileSystem : FileSystem
         return 0;
     }
 
-    ReverseFileSystem(ReverseTarredFS *rev) : rev_(rev) { }
+    ReverseFileSystem(Restore *rev) : rev_(rev) { }
 };
 
-FileSystem *ReverseTarredFS::asFileSystem()
+FileSystem *Restore::asFileSystem()
 {
     return new ReverseFileSystem(this);
 }
 
-unique_ptr<ReverseTarredFS> newReverseTarredFS(ptr<FileSystem> fs)
+unique_ptr<Restore> newRestore(ptr<FileSystem> fs)
 {
-    return unique_ptr<ReverseTarredFS>(new ReverseTarredFS(fs));
+    return unique_ptr<Restore>(new Restore(fs));
 }

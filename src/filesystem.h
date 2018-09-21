@@ -301,11 +301,13 @@ std::unique_ptr<FileSystem> newDefaultFileSystem();
 // A file system where you can list the files and their stats,
 // but not read the data nor write to it.
 std::unique_ptr<FileSystem> newListOnlyFileSystem(std::map<Path*,FileStat> contents);
-
+// Access a fuse exported file system as a FileSystem.
 FileSystem *newFileSystem(FuseAPI *api);
-FileSystem *defaultFileSystem();
+// Cache reads from a filesystem.
+FileSystem *newCacheFileSystem(ptr<FileSystem> fs_to_be_cached, ptr<FileSystem> store_cache_here, Path *cache);
 
 Path *configurationFile();
+Path *cacheDir();
 
 dev_t MakeDev(int maj, int min);
 int MajorDev(dev_t d);
