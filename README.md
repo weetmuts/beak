@@ -89,7 +89,8 @@ the store was initiated.)
 
 You configure the beak _rules_ using the command `beak config`.
 
-`s3_work_crypt:` is an rclone _storage location_ , for example an encrypted directory in your google drive.
+`s3_work_crypt:` is an rclone _storage location_ , for example an encrypted directory on S3
+or your Google drive, or somewhere else.
 
 You configure such rclone locations using the command `rclone config` ([see RClone doc](https://rclone.org/docs/)).
 
@@ -294,7 +295,7 @@ To access the backed up data do:
 Now explore OldStuff and do `diff -rq /home/you/Work OldStuff`. There should be no differences.
 The @0 means to mount the most recent _point in time_ in the _storage location_.
 
-You can skip the rclone step if the _storage location_ is a local directory. Then simply do:
+You can of course use store, beak will either store locally or invoke rclone or rsync:
 
 `beak store /home/you/Work /home/you/Backup`
 
@@ -389,17 +390,18 @@ done by a different computer than the computer that stored it.
 ## Use cases
 
 As you might have guessed, beak is not the best tool to restore your whole
-hard disk image from scratch after a hard disk failure. If you are re-installing
-on an empty disk you can use `beak checkout s3_work_crypt: work:` after
-re-configuring rclone and beak.
+hard disk image from scratch after a hard disk failure. There are other toosl for that.
+But if you are re-installing your OS on an empty disk you can use
+`beak restore s3_work_crypt: work:` after re-configuring rclone and beak.
 
 You can safely create a beak _rule_ to backup your home directory (home: = /home/you) and at
 the same time have a _rule_ for a subdirectory (work: = /home/you/Work). The backup for home:
-will not include the /home/you/Work subdirectory!
+will not include the /home/you/Work subdirectory since beak will detect that there is a another
+rule for the subdirectory.
 
 beak is more like a Swiss army knife for backing up, mirroring,
 off-site storage etc. As you have seen, you can do everything by hand
-using: `beak bmount` `beak mount` `beak store` `beak restore` and `rclone` or  `rsync`.
+using: `beak store` `beak mount` `beak restore` `beak bmount` and `rclone` or  `rsync`.
 
 But to speed up common tasks you can configure rules with `beak config`.
 A _rule_ (like work:) provides a short cut to the actual _origin_ directory (like /home/you/Work).
