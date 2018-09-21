@@ -73,10 +73,10 @@ StorageToolImplementation::StorageToolImplementation(ptr<System>sys,
 
 }
 
-void add_forward_work(ptr<StoreStatistics> st,
-                      Path *path, FileStat *stat,
-                      Options *settings,
-                      FileSystem *to_fs)
+void add_backup_work(ptr<StoreStatistics> st,
+                     Path *path, FileStat *stat,
+                     Options *settings,
+                     FileSystem *to_fs)
 {
     Path *file_to_extract = path->prepend(settings->to.storage->storage_location);
 
@@ -97,7 +97,7 @@ void add_forward_work(ptr<StoreStatistics> st,
 
 void handle_tar_file(Path *path,
                      FileStat *stat,
-                     ptr<Backup> ffs,
+                     ptr<Backup> backup,
                      Options *settings,
                      ptr<StoreStatistics> st,
                      FileSystem *origin_fs,
@@ -106,7 +106,7 @@ void handle_tar_file(Path *path,
     if (!stat->isRegularFile()) return;
 
     debug(STORAGETOOL, "PATH %s\n", path->c_str());
-    TarFile *tar = ffs->findTarFromPath(path);
+    TarFile *tar = backup->findTarFromPath(path);
     assert(tar);
     Path *file_name = tar->path()->prepend(settings->to.storage->storage_location);
     local_storage_fs->mkDirpWriteable(file_name->parent());
@@ -161,7 +161,7 @@ RC StorageToolImplementation::storeFileSystemIntoStorage(FileSystem *beaked_fs,
     }
     beaked_fs->recurse(Path::lookupRoot(), [=]
                        (Path *path, FileStat *stat) {
-                           add_forward_work(st,path,stat,settings, storage_fs);
+                           add_backup_work(st,path,stat,settings, storage_fs);
                        });
 
     debug(STORAGETOOL, "Work to be done: num_files=%ju num_dirs=%ju\n", st->stats.num_files, st->stats.num_dirs);

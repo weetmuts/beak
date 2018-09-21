@@ -57,11 +57,11 @@ struct Beak
 
     virtual RC umountDaemon(Options *settings) = 0;
 
-    virtual RC mountForwardDaemon(Options *settings) = 0;
-    virtual RC mountForward(Options *settings) = 0;
-    virtual RC umountForward(Options *settings) = 0;
-    virtual RC mountReverseDaemon(Options *settings) = 0;
-    virtual RC mountReverse(Options *settings) = 0;
+    virtual RC mountBackupDaemon(Options *settings) = 0;
+    virtual RC mountBackup(Options *settings) = 0;
+    virtual RC umountBackup(Options *settings) = 0;
+    virtual RC mountRestoreDaemon(Options *settings) = 0;
+    virtual RC mountRestore(Options *settings) = 0;
 
     virtual RC status(Options *settings) = 0;
     virtual RC store(Options *settings) = 0;

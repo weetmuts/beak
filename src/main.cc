@@ -106,7 +106,7 @@ int run(int argc, char *argv[]) {
         break;
 
     case bmount_cmd:
-        rc = beak->mountForwardDaemon(&settings);
+        rc = beak->mountBackupDaemon(&settings);
         break;
 
     case prune_cmd:
@@ -121,7 +121,7 @@ int run(int argc, char *argv[]) {
         break;
 
     case mount_cmd:
-        rc = beak->mountReverseDaemon(&settings);
+        rc = beak->mountRestoreDaemon(&settings);
         break;
 
     case restore_cmd:

@@ -97,12 +97,12 @@ struct BeakImplementation : Beak {
 
     RC umountDaemon(Options *settings);
 
-    RC mountForwardDaemon(Options *settings);
-    RC mountForward(Options *settings);
-    RC umountForward(Options *settings);
+    RC mountBackupDaemon(Options *settings);
+    RC mountBackup(Options *settings);
+    RC umountBackup(Options *settings);
 
-    RC mountReverseDaemon(Options *settings);
-    RC mountReverse(Options *settings);
+    RC mountRestoreDaemon(Options *settings);
+    RC mountRestore(Options *settings);
 
     RC status(Options *settings);
     RC store(Options *settings);
@@ -112,11 +112,10 @@ struct BeakImplementation : Beak {
 
     private:
 
-    RC mountReverseInternal(Options *settings, bool daemon);
+    RC mountRestoreInternal(Options *settings, bool daemon);
     bool hasPointsInTime(Path *path, FileSystem *fs);
 
-    fuse_operations forward_tarredfs_ops;
-    fuse_operations reverse_tarredfs_ops;
+    fuse_operations restore_fuse_ops;
 
     map<string,CommandEntry*> commands_;
     map<string,OptionEntry*> short_options_;
@@ -749,10 +748,10 @@ RC BeakImplementation::push(Options *settings)
     assert(settings->from.type == ArgRule);
 
     Rule *rule = settings->from.rule;
-    Options forward_settings = settings->copy();
+    Options backup_settings = settings->copy();
     Path *mount = sys_fs_->mkTempDir("beak_push_");
-    forward_settings.to.dir = mount;
-    rc = mountForward(&forward_settings);
+    backup_settings.to.dir = mount;
+    rc = mountBackup(&backup_settings);
     if (rc.isErr()) return RC::ERR;
 
     vector<Storage*> storages = rule->sortedStorages();
@@ -779,7 +778,7 @@ RC BeakImplementation::push(Options *settings)
     // 2018/01/29 20:05:36 INFO  : code/src/s01_001517180913.689221661_11659264_b6f526ca4e988180fe6289213a338ab5a4926f7189dfb9dddff5a30ab50fc7f3_0.tar: Copied (new)
 
     // Unmount virtual filesystem.
-    rc = umountForward(&forward_settings);
+    rc = umountBackup(&backup_settings);
     rmdir(mount->c_str());
 
     return rc;
@@ -788,26 +787,6 @@ RC BeakImplementation::push(Options *settings)
 RC BeakImplementation::prune(Options *settings)
 {
     return RC::OK;
-}
-
-static int forwardGetattr(const char *path, struct stat *stbuf)
-{
-    Backup *fs = (Backup*)fuse_get_context()->private_data;
-    return fs->getattrCB(path, stbuf);
-}
-
-static int forwardReaddir(const char *path, void *buf, fuse_fill_dir_t filler,
-                          off_t offset, struct fuse_file_info *fi)
-{
-    Backup *fs = (Backup*)fuse_get_context()->private_data;
-    return fs->readdirCB(path, buf, filler, offset, fi);
-}
-
-static int forwardRead(const char *path, char *buf, size_t size, off_t offset,
-                       struct fuse_file_info *fi)
-{
-    Backup *fs = (Backup*)fuse_get_context()->private_data;
-    return fs->readCB(path, buf, size, offset, fi);
 }
 
 static int open_callback(const char *path, struct fuse_file_info *fi)
@@ -823,7 +802,7 @@ RC BeakImplementation::umountDaemon(Options *settings)
     return sys_->invoke("fusermount", args);
 }
 
-RC BeakImplementation::mountForwardDaemon(Options *settings)
+RC BeakImplementation::mountBackupDaemon(Options *settings)
 {
     Path *dir;
     ptr<FileSystem> fs = origin_tool_->fs();
@@ -834,32 +813,32 @@ RC BeakImplementation::mountForwardDaemon(Options *settings)
     assert(settings->to.type == ArgDir);
     dir = settings->to.dir;
 
-    auto ffs  = newBackup(fs);
-    RC rc = ffs->scanFileSystem(settings);
+    auto backup  = newBackup(fs);
+    RC rc = backup->scanFileSystem(settings);
 
     if (rc.isErr()) {
         return RC::ERR;
     }
 
-    return origin_tool_->fs()->mountDaemon(dir, ffs.get(), settings->foreground, settings->fusedebug);
+    return origin_tool_->fs()->mountDaemon(dir, backup.get(), settings->foreground, settings->fusedebug);
 }
 
-RC BeakImplementation::mountForward(Options *settings)
+RC BeakImplementation::mountBackup(Options *settings)
 {
     ptr<FileSystem> fs = origin_tool_->fs();
 
-    auto ffs  = newBackup(fs);
-    RC rc = ffs->scanFileSystem(settings);
+    auto backup  = newBackup(fs);
+    RC rc = backup->scanFileSystem(settings);
 
     if (rc.isErr()) {
         return RC::ERR;
     }
 
-    fuse_mount_ = origin_tool_->fs()->mount(settings->to.dir, ffs.get(), settings->fusedebug);
+    fuse_mount_ = origin_tool_->fs()->mount(settings->to.dir, backup.get(), settings->fusedebug);
     return RC::OK;
 }
 
-RC BeakImplementation::umountForward(Options *settings)
+RC BeakImplementation::umountBackup(Options *settings)
 {
     ptr<FileSystem> fs = origin_tool_->fs();
     int unpleasant_modifications = fs->endWatch();
@@ -896,43 +875,43 @@ static int reverseReadlink(const char *path, char *buf, size_t size)
     return fs->readlinkCB(path, buf, size);
 }
 
-RC BeakImplementation::mountReverseDaemon(Options *settings)
+RC BeakImplementation::mountRestoreDaemon(Options *settings)
 {
-    return mountReverseInternal(settings, true);
+    return mountRestoreInternal(settings, true);
 }
 
-RC BeakImplementation::mountReverse(Options *settings)
+RC BeakImplementation::mountRestore(Options *settings)
 {
-    return mountReverseInternal(settings, false);
+    return mountRestoreInternal(settings, false);
 }
 
-RC BeakImplementation::mountReverseInternal(Options *settings, bool daemon)
+RC BeakImplementation::mountRestoreInternal(Options *settings, bool daemon)
 {
-    memset(&reverse_tarredfs_ops, 0, sizeof(reverse_tarredfs_ops));
-    reverse_tarredfs_ops.getattr = reverseGetattr;
-    reverse_tarredfs_ops.open = open_callback;
-    reverse_tarredfs_ops.read = reverseRead;
-    reverse_tarredfs_ops.readdir = reverseReaddir;
-    reverse_tarredfs_ops.readlink = reverseReadlink;
+    memset(&restore_fuse_ops, 0, sizeof(restore_fuse_ops));
+    restore_fuse_ops.getattr = reverseGetattr;
+    restore_fuse_ops.open = open_callback;
+    restore_fuse_ops.read = reverseRead;
+    restore_fuse_ops.readdir = reverseReaddir;
+    restore_fuse_ops.readlink = reverseReadlink;
 
-    auto rfs  = newRestore(origin_tool_->fs());
+    auto restore  = newRestore(origin_tool_->fs());
 
-    RC rc = rfs->lookForPointsInTime(PointInTimeFormat::absolute_point, settings->from.storage->storage_location);
+    RC rc = restore->lookForPointsInTime(PointInTimeFormat::absolute_point, settings->from.storage->storage_location);
     if (rc.isErr()) {
         error(COMMANDLINE, "No points in time found!\n");
     }
 
     if (settings->pointintime != "") {
-        auto point = rfs->setPointInTime(settings->pointintime);
+        auto point = restore->setPointInTime(settings->pointintime);
         if (!point) return RC::ERR;
     }
 
-    rc = rfs->loadBeakFileSystem(settings);
+    rc = restore->loadBeakFileSystem(settings);
     if (rc.isErr()) return RC::ERR;
 
     if (daemon) {
-        int rc = fuse_main(settings->fuse_argc, settings->fuse_argv, &reverse_tarredfs_ops,
-                           rfs.get()); // The reverse fs structure is passed as private data.
+        int rc = fuse_main(settings->fuse_argc, settings->fuse_argv, &restore_fuse_ops,
+                           restore.get()); // The reverse fs structure is passed as private data.
                                        // It is then extracted with
                                        // (Restore*)fuse_get_context()->private_data;
                                        // in the static fuse getters/setters.
@@ -947,9 +926,9 @@ RC BeakImplementation::mountReverseInternal(Options *settings, bool daemon)
     struct fuse_chan *chan = fuse_mount(settings->to.dir->c_str(), &args);
     fuse_ = fuse_new(chan,
                      &args,
-                     &reverse_tarredfs_ops,
-                     sizeof(reverse_tarredfs_ops),
-                     rfs.get()); // Passed as private data to fuse context.
+                     &restore_fuse_ops,
+                     sizeof(restore_fuse_ops),
+                     restore.get()); // Passed as private data to fuse context.
 
     loop_pid_ = fork();
 
@@ -1044,16 +1023,16 @@ RC BeakImplementation::store(Options *settings)
     // Watch the origin file system to detect if it is being changed while doing the store.
     ofs->enableWatch();
 
-    auto ffs  = newBackup(origin_tool_->fs());
+    auto backup  = newBackup(origin_tool_->fs());
 
     uint64_t start = clockGetTime();
     // This command scans the origin file system and builds
     // an in memory representation of the beak file system,
     // with tar files,index files and directories.
-    rc = ffs->scanFileSystem(settings);
+    rc = backup->scanFileSystem(settings);
 
     // Acquire a file system api to the beak file system.
-    auto beaked_fs = ffs->asFileSystem();
+    auto beaked_fs = backup->asFileSystem();
 
     // The store statistics maintin the progress data for the store.
     auto st = newStoreStatistics();
@@ -1063,7 +1042,7 @@ RC BeakImplementation::store(Options *settings)
                                               origin_tool_->fs().get(),
                                               settings->to.storage,
                                               st,
-                                              ffs,
+                                              backup,
                                               settings);
 
     uint64_t stop = clockGetTime();
@@ -1102,22 +1081,22 @@ RC BeakImplementation::restore(Options *settings)
     }
 
     umask(0);
-    auto rfs  = newRestore(origin_tool_->fs());
-    auto view = rfs->asFileSystem();
+    auto restore  = newRestore(origin_tool_->fs());
+    auto view = restore->asFileSystem();
 
-    rfs->lookForPointsInTime(PointInTimeFormat::absolute_point, settings->from.storage->storage_location);
+    restore->lookForPointsInTime(PointInTimeFormat::absolute_point, settings->from.storage->storage_location);
 
-    auto point = rfs->setPointInTime("@0");
+    auto point = restore->setPointInTime("@0");
     if (settings->pointintime != "") {
-        point = rfs->setPointInTime(settings->pointintime);
+        point = restore->setPointInTime(settings->pointintime);
     }
     if (!point) {
         error(STORE, "No such point in time!\n");
     }
-    assert(rfs->singlePointInTime());
+    assert(restore->singlePointInTime());
 
     uint64_t start = clockGetTime();
-    rc = rfs->loadBeakFileSystem(settings);
+    rc = restore->loadBeakFileSystem(settings);
     if (rc.isErr()) rc = RC::ERR;
 
     auto st = newStoreStatistics();
@@ -1125,14 +1104,14 @@ RC BeakImplementation::restore(Options *settings)
     st->startDisplayOfProgress();
 
     view->recurse(Path::lookupRoot(),
-                  [&rfs,this,point,settings,&st]
+                  [&restore,this,point,settings,&st]
                   (Path *path, FileStat *stat) {origin_tool_->addRestoreWork(st,path,stat,settings,
-                                                                             rfs.get(),point); });
+                                                                             restore.get(),point); });
     debug(STORE, "Work to be done: num_files=%ju num_hardlinks=%ju num_symlinks=%ju num_nodes=%ju num_dirs=%ju\n",
           st->stats.num_files, st->stats.num_hard_links, st->stats.num_symbolic_links,
           st->stats.num_nodes, st->stats.num_dirs);
 
-    origin_tool_->restoreFileSystem(view,rfs.get(),point,settings,st,storage_tool_->fs().get());
+    origin_tool_->restoreFileSystem(view,restore.get(),point,settings,st,storage_tool_->fs().get());
 
     uint64_t stop = clockGetTime();
     uint64_t store_time = stop - start;
