@@ -53,24 +53,26 @@ _beak()
     if [ "$prev" = ":" ]; then prev="$prevprev" ; prevprev="$prevprevprev"; fi
 
     case "$prev" in
-        push) _beakrules ;;
-        pull) _beakrules ;;
-        prune) _beakrules ;;
         mount) _beakrules ;;
-        umount) _beakusermounts ;;
+        prune) _beakrules ;;
+        pull) _beakrules ;;
+        push) _beakrules ;;
+        restore) _beakremotes ;;
         store) _beakrules ;;
+        umount) _beakusermounts ;;
     esac
 
     case "$prevprev" in
-        push) _beakremotes ;;
-        pull) _beakremotes ;;
-        prune) _beakremotes ;;
         mount) _filedir -d ;;
-        store) _filedir -d ;;
+        prune) _beakremotes ;;
+        pull) _beakremotes ;;
+        push) _beakremotes ;;
+        restore) _beakrules ;;
+        store) _beakremotes ;;
     esac
 
     if [ -z "$COMPREPLY" ]; then
-        COMPREPLY=($(compgen -W "push pull prune mount umount store" -- $cur))
+        COMPREPLY=($(compgen -W "mount prune pull push restore store umount" -- $cur))
     fi
 }
 
