@@ -40,10 +40,10 @@ using namespace std;
 
 ComponentId REVERSE = registerLogComponent("reverse");
 
-Restore::Restore(ptr<FileSystem> fs)
+Restore::Restore(ptr<FileSystem> backup_fs)
 {
     single_point_in_time_ = NULL;
-    file_system_ = fs.get();
+    backup_file_system_ = backup_fs.get();
 }
 
 // The gz file to load, and the dir to populate with its contents.
@@ -57,7 +57,7 @@ bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
     point->loaded_gz_files_.insert(gz);
 
     vector<char> buf;
-    rc = file_system_->loadVector(gz, T_BLOCKSIZE, &buf);
+    rc = backup_file_system_->loadVector(gz, T_BLOCKSIZE, &buf);
     if (rc.isErr()) return false;
 
     vector<char> contents;
@@ -138,7 +138,7 @@ Path *Restore::loadDirContents(PointInTime *point, Path *path)
     debug(REVERSE, "Looking for z01 gz file in dir >%s< (found %p)\n", path->c_str(), gz);
     if (gz != NULL) {
         gz = gz->prepend(rootDir());
-        RC rc = file_system_->stat(gz, &stat);
+        RC rc = backup_file_system_->stat(gz, &stat);
         debug(REVERSE, "%s --- rc=%d %d\n", gz->c_str(), rc.toInteger(), stat.isRegularFile());
         if (rc.isOk() && stat.isRegularFile()) {
             // Found a gz file!
@@ -485,7 +485,7 @@ int Restore::readCB(const char *path_char_string, char *buf,
     offset += e->offset;
 
     debug(REVERSE, "Reading %ju bytes from offset %ju in file %s\n", size, offset, tar->c_str());
-    rc = file_system_->pread(tar, buf, size, offset);
+    rc = backup_file_system_->pread(tar, buf, size, offset);
     if (rc == -1)
     {
         failure(REVERSE,
@@ -511,7 +511,7 @@ RC Restore::lookForPointsInTime(PointInTimeFormat f, Path *path)
     if (path == NULL) return RC::ERR;
 
     vector<Path*> contents;
-    if (!file_system_->readdir(path, &contents)) {
+    if (!backup_file_system_->readdir(path, &contents)) {
         return RC::ERR;
     }
     for (auto f : contents)
@@ -593,7 +593,7 @@ PointInTime *Restore::setPointInTime(string g) {
     return single_point_in_time_;
 }
 
-RC Restore::loadBeakFileSystem(Options *settings)
+RC Restore::loadBeakFileSystem(Settings *settings)
 {
     setRootDir(settings->from.storage->storage_location);
     setMountDir(settings->to.origin);
@@ -785,7 +785,7 @@ FileSystem *Restore::asFileSystem()
     return new ReverseFileSystem(this);
 }
 
-unique_ptr<Restore> newRestore(ptr<FileSystem> fs)
+unique_ptr<Restore> newRestore(ptr<FileSystem> backup_fs)
 {
-    return unique_ptr<Restore>(new Restore(fs));
+    return unique_ptr<Restore>(new Restore(backup_fs));
 }

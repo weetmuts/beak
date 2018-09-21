@@ -86,7 +86,7 @@ struct PointInTime {
 
 struct Restore
 {
-    RC loadBeakFileSystem(Options *settings);
+    RC loadBeakFileSystem(Settings *settings);
 
     pthread_mutex_t global;
 
@@ -131,10 +131,13 @@ struct Restore
     PointInTime *single_point_in_time_;
     PointInTime *most_recent_point_in_time_;
 
-    FileSystem *file_system_;
+    // This is the file system where the backup containing beak files are stored.
+    // It can point directly to the default OS file system or to a cached
+    // storage tool file system.
+    FileSystem *backup_file_system_;
 };
 
-// Take a beak fs and give access to the backed up files inside.
-std::unique_ptr<Restore> newRestore(ptr<FileSystem> beak_fs);
+// Restore from a file system containing a backup full of beak files
+std::unique_ptr<Restore> newRestore(ptr<FileSystem> backup_fs);
 
 #endif

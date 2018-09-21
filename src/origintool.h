@@ -33,11 +33,11 @@ struct OriginTool
 {
     virtual RC restoreFileSystemIntoOrigin(FileSystem *fs) = 0;
 
-    virtual void addRestoreWork(ptr<StoreStatistics> st, Path *path, FileStat *stat, Options *settings,
+    virtual void addRestoreWork(ptr<StoreStatistics> st, Path *path, FileStat *stat, Settings *settings,
                                 Restore *rfs, PointInTime *point) = 0;
 
     virtual void restoreFileSystem(FileSystem *view, Restore *rfs, PointInTime *point,
-                                   Options *settings, ptr<StoreStatistics> st, FileSystem *storage_fs) = 0;
+                                   Settings *settings, ptr<StoreStatistics> st, FileSystem *storage_fs) = 0;
 
     virtual ptr<FileSystem> fs() = 0;
 };

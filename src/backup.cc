@@ -959,7 +959,7 @@ int Backup::readlinkCB(const char *path_char_string, char *buf, size_t s)
     return 0;
 }
 
-RC Backup::scanFileSystem(Options *settings)
+RC Backup::scanFileSystem(Settings *settings)
 {
     if (settings->from.type == ArgOrigin && settings->from.origin) {
         root_dir_path = settings->from.origin;

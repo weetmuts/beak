@@ -1,27 +1,55 @@
+## The Beak backup tool
+
 Beak is a backup-mirror-share-rotation-pruning tool that is designed
 to co-exist with the cloud/remote storage (rclone, rsync) of your
-choice. Beak enables push/pull to share the remotely
+choice. Beak enables push/pull-merge to share the remotely
 stored backups between multiple client computers.
 
-Beak is work in progress. The text below describes the goal!
+## Summary
+
+beak is the tool for the impatient who wants to initiate a backup
+manually and want to see it finished, quickly. In other words, after
+finishing some important work, you trigger the backup and wait for it
+to finish, which should not take too long. This is necessary for me,
+since I often work on my laptop. I want my work to be backed up before
+I shut down the laptop and put it in my bag. Once in the bag, the
+laptop risks being dropped on the ground and destroyed or risks being stolen
+or it might just break down because the warranty just expired.
+
+I also often move my work between the laptop and a stationary computer
+and it is convenient to push/pull-merge the work between them since
+the work might not be stored in remote git repository nor in a
+distributed file system.
+
+I also like to have multiple backups in multiple locations, in the latop,
+on a removable storage, on a remote cloud storage etc. The backups can be
+pruned with different rules for different storage locations.
+
+I also like to keep large data sets in the cloud and not on the latop,
+then I simply mount the remote cloud to access it. To have a proper
+backup of the large data, it is of course imperative to have it stored
+in multiple independent cloud locations.
 
 ## Short short manual....
 
 Local filesystem backups.
 ```
+# Store whenever you feel the need to make a backup.
 beak store /home/you/Work /home/backups
-beak check /home/backups
+mkdir /home/you/OldWork
 beak mount /home/backups /home/you/OldWork
+# OldWork now contain one subdirectory for each backup.
 cd /home/you/OldWork/2018-05-14_15:32
 ...copy out stuff...
 cd ~
 beak umount /home/you/OldWork
+# Or you can restore the entire recent backup without mount.
+beak restore /home/backups /home/you/Work
 ```
 
-Remote rclone cloud storage backups.
+Remote rclone cloud storage backups, s3_work_crypt is an rclone config.
 ```
 beak store /home/you/Work s3_work_crypt:
-beak check s3_work_crypt:
 beak mount s3_work_crypt: /home/you/OldWork
 cd /home/you/OldWork/2018-05-14_15:32
 ...copy out stuff...
@@ -32,15 +60,13 @@ beak umount /home/you/OldWork
 Configure a rule for /home/you/Work
 ```
 beak config
+# Depending on the configuration push might store in multiple local and remote locations.
 beak push work:
-beak history work:
-cd /home/you/Work/.beak/history/2018-05-14_15:32_s3_work_crypt
-... copy out stuff...
-cd ~
-beak umount history
+# Pull will pull the latest backup and merge it into your origin.
+beak pull work:
 ```
 
-## Manually trigger the backup
+## Details.....
 
 beak is the tool for the impatient who wants to initiate a backup
 manually and want to see it finished, quickly. In other words, after

@@ -38,7 +38,7 @@ struct StorageToolImplementation : public StorageTool
                                   Storage *storage,
                                   ptr<StoreStatistics> st,
                                   ptr<Backup> ffs,
-                                  Options *settings);
+                                  Settings *settings);
 
     RC listPointsInTime(Storage *storage, vector<pair<Path*,struct timespec>> *v);
 
@@ -75,7 +75,7 @@ StorageToolImplementation::StorageToolImplementation(ptr<System>sys,
 
 void add_backup_work(ptr<StoreStatistics> st,
                      Path *path, FileStat *stat,
-                     Options *settings,
+                     Settings *settings,
                      FileSystem *to_fs)
 {
     Path *file_to_extract = path->prepend(settings->to.storage->storage_location);
@@ -98,7 +98,7 @@ void add_backup_work(ptr<StoreStatistics> st,
 void handle_tar_file(Path *path,
                      FileStat *stat,
                      ptr<Backup> backup,
-                     Options *settings,
+                     Settings *settings,
                      ptr<StoreStatistics> st,
                      FileSystem *origin_fs,
                      FileSystem *local_storage_fs)
@@ -140,7 +140,7 @@ RC StorageToolImplementation::storeFileSystemIntoStorage(FileSystem *beaked_fs,
                                                          Storage *storage,
                                                          ptr<StoreStatistics> st,
                                                          ptr<Backup> ffs,
-                                                         Options *settings)
+                                                         Settings *settings)
 {
     st->startDisplayOfProgress();
 

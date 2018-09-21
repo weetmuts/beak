@@ -54,7 +54,7 @@ typedef int (*ReadCB)(const char *,char *,size_t,off_t,struct fuse_file_info *);
 
 struct Backup : FuseAPI
 {
-    RC scanFileSystem(Options *settings);
+    RC scanFileSystem(Settings *settings);
 
     pthread_mutex_t global;
     pthread_mutexattr_t global_attr;

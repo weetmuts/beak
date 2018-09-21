@@ -36,7 +36,7 @@ enum Command : short;
 enum PointInTimeFormat : short;
 enum TarHeaderStyle : short;
 
-struct Options;
+struct Settings;
 struct PointInTime;
 struct Rule;
 struct Storage;
@@ -47,31 +47,31 @@ struct Beak
 {
     virtual void captureStartTime() = 0;
     virtual std::string argsToVector(int argc, char **argv, std::vector<std::string> *args) = 0;
-    virtual Command parseCommandLine(int argc, char **argv, Options *settings) = 0;
+    virtual Command parseCommandLine(int argc, char **argv, Settings *settings) = 0;
     virtual std::vector<PointInTime> history() = 0;
 
-    virtual RC check(Options *settings) = 0;
-    virtual RC configure(Options *settings) = 0;
-    virtual RC push(Options *settings) = 0;
-    virtual RC prune(Options *settings) = 0;
+    virtual RC check(Settings *settings) = 0;
+    virtual RC configure(Settings *settings) = 0;
+    virtual RC push(Settings *settings) = 0;
+    virtual RC prune(Settings *settings) = 0;
 
-    virtual RC umountDaemon(Options *settings) = 0;
+    virtual RC umountDaemon(Settings *settings) = 0;
 
-    virtual RC mountBackupDaemon(Options *settings) = 0;
-    virtual RC mountBackup(Options *settings) = 0;
-    virtual RC umountBackup(Options *settings) = 0;
-    virtual RC mountRestoreDaemon(Options *settings) = 0;
-    virtual RC mountRestore(Options *settings) = 0;
+    virtual RC mountBackupDaemon(Settings *settings) = 0;
+    virtual RC mountBackup(Settings *settings) = 0;
+    virtual RC umountBackup(Settings *settings) = 0;
+    virtual RC mountRestoreDaemon(Settings *settings) = 0;
+    virtual RC mountRestore(Settings *settings) = 0;
 
-    virtual RC status(Options *settings) = 0;
-    virtual RC store(Options *settings) = 0;
-    virtual RC restore(Options *settings) = 0;
+    virtual RC status(Settings *settings) = 0;
+    virtual RC store(Settings *settings) = 0;
+    virtual RC restore(Settings *settings) = 0;
 
     virtual void printHelp(Command cmd) = 0;
     virtual void printVersion() = 0;
     virtual void printLicense() = 0;
     virtual void printCommands() = 0;
-    virtual void printOptions() = 0;
+    virtual void printSettings() = 0;
 
     virtual void genAutoComplete(std::string filename) = 0;
 
@@ -170,7 +170,7 @@ struct Argument
     std::string point_in_time;
 };
 
-struct Options
+struct Settings
 {
     Argument from, to;
     ArgumentType expected_from, expected_to;
@@ -186,7 +186,7 @@ LIST_OF_OPTIONS
     Command help_me_on_this_cmd {};
     int point_in_time {};
 
-    Options copy() { return *this; }
+    Settings copy() { return *this; }
 };
 
 

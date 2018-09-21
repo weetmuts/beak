@@ -72,7 +72,7 @@ int run(int argc, char *argv[]) {
     beak->captureStartTime();
 
     // Configure the settings by parsing the command line and extract the command.
-    Options settings;
+    Settings settings;
     Command cmd = beak->parseCommandLine(argc, argv, &settings);
 
     // We now know the command the user intends to invoke.

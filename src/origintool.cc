@@ -30,11 +30,11 @@ struct OriginToolImplementation : public OriginTool
 
     RC restoreFileSystemIntoOrigin(FileSystem *fs);
 
-    void addRestoreWork(ptr<StoreStatistics> st, Path *path, FileStat *stat, Options *settings,
+    void addRestoreWork(ptr<StoreStatistics> st, Path *path, FileStat *stat, Settings *settings,
                         Restore *restore, PointInTime *point);
 
     void restoreFileSystem(FileSystem *view, Restore *restore, PointInTime *point,
-                           Options *settings, ptr<StoreStatistics> st, FileSystem *storage_fs);
+                           Settings *settings, ptr<StoreStatistics> st, FileSystem *storage_fs);
 
     ptr<FileSystem> fs() { return origin_fs_; }
 
@@ -43,7 +43,7 @@ struct OriginToolImplementation : public OriginTool
                          ptr<StoreStatistics> statistics);
     void handleHardLinks(Path *path, FileStat *stat,
                          Restore *restore, PointInTime *point,
-                         Options *settings, ptr<StoreStatistics> st);
+                         Settings *settings, ptr<StoreStatistics> st);
     bool extractFile(Entry *entry,
                      FileSystem *storage_fs, Path *tar_file, off_t tar_file_offset,
                      Path *file_to_extract, FileStat *stat,
@@ -51,7 +51,7 @@ struct OriginToolImplementation : public OriginTool
 
     void handleRegularFiles(Path *path, FileStat *stat,
                             Restore *restore, PointInTime *point,
-                            Options *settings, ptr<StoreStatistics> st,
+                            Settings *settings, ptr<StoreStatistics> st,
                             FileSystem *storage_fs);
 
     bool extractSymbolicLink(string target,
@@ -66,17 +66,17 @@ struct OriginToolImplementation : public OriginTool
 
     void handleNodes(Path *path, FileStat *stat,
                      Restore *restore, PointInTime *point,
-                     Options *settings, ptr<StoreStatistics> st,
+                     Settings *settings, ptr<StoreStatistics> st,
                      FileSystem *storage_fs);
 
     void handleSymbolicLinks(Path *path, FileStat *stat,
                              Restore *restore, PointInTime *point,
-                             Options *settings, ptr<StoreStatistics> st,
+                             Settings *settings, ptr<StoreStatistics> st,
                              FileSystem *storage_fs);
 
     void handleDirs(Path *path, FileStat *stat,
                     Restore *restore, PointInTime *point,
-                    Options *settings, ptr<StoreStatistics> st);
+                    Settings *settings, ptr<StoreStatistics> st);
 
     ptr<System> sys_;
     ptr<FileSystem> sys_fs_;
@@ -103,7 +103,7 @@ RC OriginToolImplementation::restoreFileSystemIntoOrigin(FileSystem *fs)
 }
 
 void OriginToolImplementation::addRestoreWork(ptr<StoreStatistics> st,
-                                              Path *path, FileStat *stat, Options *settings,
+                                              Path *path, FileStat *stat, Settings *settings,
                                               Restore *restore, PointInTime *point)
 {
     Entry *entry = restore->findEntry(point, path);
@@ -292,7 +292,7 @@ bool OriginToolImplementation::chmodDirectory(Path *dir_to_extract, FileStat *st
 
 void OriginToolImplementation::handleHardLinks(Path *path, FileStat *stat,
                                                Restore *restore, PointInTime *point,
-                                               Options *settings, ptr<StoreStatistics> st)
+                                               Settings *settings, ptr<StoreStatistics> st)
 {
     auto entry = restore->findEntry(point, path);
 
@@ -307,7 +307,7 @@ void OriginToolImplementation::handleHardLinks(Path *path, FileStat *stat,
 
 void OriginToolImplementation::handleRegularFiles(Path *path, FileStat *stat,
                                                   Restore *restore, PointInTime *point,
-                                                  Options *settings, ptr<StoreStatistics> st,
+                                                  Settings *settings, ptr<StoreStatistics> st,
                                                   FileSystem *storage_fs)
 {
     auto entry = restore->findEntry(point, path);
@@ -325,7 +325,7 @@ void OriginToolImplementation::handleRegularFiles(Path *path, FileStat *stat,
 
 void OriginToolImplementation::handleNodes(Path *path, FileStat *stat,
                                            Restore *restore, PointInTime *point,
-                                           Options *settings, ptr<StoreStatistics> st,
+                                           Settings *settings, ptr<StoreStatistics> st,
                                            FileSystem *storage_fs)
 {
     auto entry = restore->findEntry(point, path);
@@ -338,7 +338,7 @@ void OriginToolImplementation::handleNodes(Path *path, FileStat *stat,
 
 void OriginToolImplementation::handleSymbolicLinks(Path *path, FileStat *stat,
                                                    Restore *restore, PointInTime *point,
-                                                   Options *settings, ptr<StoreStatistics> st,
+                                                   Settings *settings, ptr<StoreStatistics> st,
                                                    FileSystem *storage_fs)
 {
     auto entry = restore->findEntry(point, path);
@@ -351,7 +351,7 @@ void OriginToolImplementation::handleSymbolicLinks(Path *path, FileStat *stat,
 
 void OriginToolImplementation::handleDirs(Path *path, FileStat *stat,
                                           Restore *restore, PointInTime *point,
-                                          Options *settings, ptr<StoreStatistics> st)
+                                          Settings *settings, ptr<StoreStatistics> st)
 {
     auto file_to_extract = path->prepend(settings->to.origin);
 
@@ -362,7 +362,7 @@ void OriginToolImplementation::handleDirs(Path *path, FileStat *stat,
 
 
 void OriginToolImplementation::restoreFileSystem(FileSystem *view, Restore *restore, PointInTime *point,
-                                                 Options *settings, ptr<StoreStatistics> st, FileSystem *storage_fs)
+                                                 Settings *settings, ptr<StoreStatistics> st, FileSystem *storage_fs)
 {
     // First restore the files,nodes and symlinks and their contents, set the utimes properly for the files.
     Path *r = Path::lookupRoot();

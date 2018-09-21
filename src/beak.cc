@@ -76,11 +76,11 @@ struct BeakImplementation : Beak {
                        ptr<OriginTool> origin_tool);
 
     void printCommands();
-    void printOptions();
+    void printSettings();
 
     void captureStartTime() {  ::captureStartTime(); }
     string argsToVector(int argc, char **argv, vector<string> *args);
-    Command parseCommandLine(int argc, char **argv, Options *settings);
+    Command parseCommandLine(int argc, char **argv, Settings *settings);
 
     void printHelp(Command cmd);
     void printVersion();
@@ -90,29 +90,29 @@ struct BeakImplementation : Beak {
     RC findPointsInTime(string remote, vector<struct timespec> *v);
     RC fetchPointsInTime(string remote, Path *cache);
 
-    RC check(Options *settings);
-    RC configure(Options *settings);
-    RC push(Options *settings);
-    RC prune(Options *settings);
+    RC check(Settings *settings);
+    RC configure(Settings *settings);
+    RC push(Settings *settings);
+    RC prune(Settings *settings);
 
-    RC umountDaemon(Options *settings);
+    RC umountDaemon(Settings *settings);
 
-    RC mountBackupDaemon(Options *settings);
-    RC mountBackup(Options *settings);
-    RC umountBackup(Options *settings);
+    RC mountBackupDaemon(Settings *settings);
+    RC mountBackup(Settings *settings);
+    RC umountBackup(Settings *settings);
 
-    RC mountRestoreDaemon(Options *settings);
-    RC mountRestore(Options *settings);
+    RC mountRestoreDaemon(Settings *settings);
+    RC mountRestore(Settings *settings);
 
-    RC status(Options *settings);
-    RC store(Options *settings);
-    RC restore(Options *settings);
+    RC status(Settings *settings);
+    RC store(Settings *settings);
+    RC restore(Settings *settings);
 
     void genAutoComplete(string filename);
 
     private:
 
-    RC mountRestoreInternal(Options *settings, bool daemon);
+    RC mountRestoreInternal(Settings *settings, bool daemon);
     bool hasPointsInTime(Path *path, FileSystem *fs);
 
     fuse_operations restore_fuse_ops;
@@ -127,7 +127,7 @@ struct BeakImplementation : Beak {
 
     CommandEntry *parseCommand(string s);
     OptionEntry *parseOption(string s, bool *has_value, string *value);
-    Argument parseArgument(std::string arg, ArgumentType expected_type, Options *settings);
+    Argument parseArgument(std::string arg, ArgumentType expected_type, Settings *settings);
 
     unique_ptr<FuseMount> fuse_mount_;
     struct fuse_chan *chan_;
@@ -230,7 +230,7 @@ OptionEntry *BeakImplementation::parseOption(string s, bool *has_value, string *
     return ce;
 }
 
-Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_type, Options *settings)
+Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_type, Settings *settings)
 {
     Argument argument;
 
@@ -355,9 +355,9 @@ void BeakImplementation::printCommands()
     }
 }
 
-void BeakImplementation::printOptions()
+void BeakImplementation::printSettings()
 {
-    fprintf(stdout, "Options:\n");
+    fprintf(stdout, "Settings:\n");
 
     size_t max = 0;
     for (auto &e : option_entries_) {
@@ -409,7 +409,7 @@ string BeakImplementation::argsToVector(int argc, char **argv, vector<string> *a
     return argv[0];
 }
 
-Command BeakImplementation::parseCommandLine(int argc, char **argv, Options *settings)
+Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *settings)
 {
     vector<string> args;
     argsToVector(argc, argv, &args);
@@ -635,7 +635,7 @@ vector<PointInTime> BeakImplementation::history()
     return tmp;
 }
 
-RC BeakImplementation::check(Options *settings)
+RC BeakImplementation::check(Settings *settings)
 {
     RC rc = RC::OK;
 
@@ -736,19 +736,19 @@ RC BeakImplementation::check(Options *settings)
     return rc;
 }
 
-RC BeakImplementation::configure(Options *settings)
+RC BeakImplementation::configure(Settings *settings)
 {
     return configuration_->configure();
 }
 
-RC BeakImplementation::push(Options *settings)
+RC BeakImplementation::push(Settings *settings)
 {
     RC rc = RC::OK;
 
     assert(settings->from.type == ArgRule);
 
     Rule *rule = settings->from.rule;
-    Options backup_settings = settings->copy();
+    Settings backup_settings = settings->copy();
     Path *mount = sys_fs_->mkTempDir("beak_push_");
     backup_settings.to.dir = mount;
     rc = mountBackup(&backup_settings);
@@ -784,7 +784,7 @@ RC BeakImplementation::push(Options *settings)
     return rc;
 }
 
-RC BeakImplementation::prune(Options *settings)
+RC BeakImplementation::prune(Settings *settings)
 {
     return RC::OK;
 }
@@ -794,7 +794,7 @@ static int open_callback(const char *path, struct fuse_file_info *fi)
     return 0;
 }
 
-RC BeakImplementation::umountDaemon(Options *settings)
+RC BeakImplementation::umountDaemon(Settings *settings)
 {
     vector<string> args;
     args.push_back("-u");
@@ -802,7 +802,7 @@ RC BeakImplementation::umountDaemon(Options *settings)
     return sys_->invoke("fusermount", args);
 }
 
-RC BeakImplementation::mountBackupDaemon(Options *settings)
+RC BeakImplementation::mountBackupDaemon(Settings *settings)
 {
     Path *dir;
     ptr<FileSystem> fs = origin_tool_->fs();
@@ -823,7 +823,7 @@ RC BeakImplementation::mountBackupDaemon(Options *settings)
     return origin_tool_->fs()->mountDaemon(dir, backup.get(), settings->foreground, settings->fusedebug);
 }
 
-RC BeakImplementation::mountBackup(Options *settings)
+RC BeakImplementation::mountBackup(Settings *settings)
 {
     ptr<FileSystem> fs = origin_tool_->fs();
 
@@ -838,7 +838,7 @@ RC BeakImplementation::mountBackup(Options *settings)
     return RC::OK;
 }
 
-RC BeakImplementation::umountBackup(Options *settings)
+RC BeakImplementation::umountBackup(Settings *settings)
 {
     ptr<FileSystem> fs = origin_tool_->fs();
     int unpleasant_modifications = fs->endWatch();
@@ -875,17 +875,17 @@ static int reverseReadlink(const char *path, char *buf, size_t size)
     return fs->readlinkCB(path, buf, size);
 }
 
-RC BeakImplementation::mountRestoreDaemon(Options *settings)
+RC BeakImplementation::mountRestoreDaemon(Settings *settings)
 {
     return mountRestoreInternal(settings, true);
 }
 
-RC BeakImplementation::mountRestore(Options *settings)
+RC BeakImplementation::mountRestore(Settings *settings)
 {
     return mountRestoreInternal(settings, false);
 }
 
-RC BeakImplementation::mountRestoreInternal(Options *settings, bool daemon)
+RC BeakImplementation::mountRestoreInternal(Settings *settings, bool daemon)
 {
     memset(&restore_fuse_ops, 0, sizeof(restore_fuse_ops));
     restore_fuse_ops.getattr = reverseGetattr;
@@ -975,7 +975,7 @@ RC BeakImplementation::fetchPointsInTime(string remote, Path *cache)
     return rc;
 }
 
-RC BeakImplementation::status(Options *settings)
+RC BeakImplementation::status(Settings *settings)
 {
     RC rc = RC::OK;
 
@@ -1012,7 +1012,7 @@ RC BeakImplementation::status(Options *settings)
     return rc;
 }
 
-RC BeakImplementation::store(Options *settings)
+RC BeakImplementation::store(Settings *settings)
 {
     RC rc = RC::OK;
 
@@ -1031,7 +1031,7 @@ RC BeakImplementation::store(Options *settings)
     // with tar files,index files and directories.
     rc = backup->scanFileSystem(settings);
 
-    // Acquire a file system api to the beak file system.
+    // Acquire a file system api to the virtual beak file system.
     auto beaked_fs = backup->asFileSystem();
 
     // The store statistics maintin the progress data for the store.
@@ -1068,7 +1068,7 @@ RC BeakImplementation::store(Options *settings)
     return rc;
 }
 
-RC BeakImplementation::restore(Options *settings)
+RC BeakImplementation::restore(Settings *settings)
 {
     RC rc = RC::OK;
 
@@ -1107,6 +1107,7 @@ RC BeakImplementation::restore(Options *settings)
                   [&restore,this,point,settings,&st]
                   (Path *path, FileStat *stat) {origin_tool_->addRestoreWork(st,path,stat,settings,
                                                                              restore.get(),point); });
+
     debug(STORE, "Work to be done: num_files=%ju num_hardlinks=%ju num_symlinks=%ju num_nodes=%ju num_dirs=%ju\n",
           st->stats.num_files, st->stats.num_hard_links, st->stats.num_symbolic_links,
           st->stats.num_nodes, st->stats.num_dirs);
@@ -1152,7 +1153,7 @@ void BeakImplementation::printHelp(Command cmd)
                 "\n");
         printCommands();
         fprintf(stdout,"\n");
-        printOptions();
+        printSettings();
         fprintf(stdout,"\n");
         fprintf(stdout,"Beak is licensed to you under the GPLv3. For details do: "
                 "beak help --license\n");
@@ -1171,7 +1172,7 @@ void BeakImplementation::printVersion()
 void BeakImplementation::printLicense()
 {
     fprintf(stdout, "Beak contains software developed:\n"
-            "by Fredrik Öhrström Copyright (C) 2016-2017\n"
+            "by Fredrik Öhrström Copyright (C) 2016-2018\n"
             "licensed to you under the GPLv3 or later.\n"
             "https://github.com/weetmuts/beak\n\n"
             "This build of beak also includes third party code:\n"

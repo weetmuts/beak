@@ -37,7 +37,7 @@ struct StorageTool
                                           Storage *storage,
                                           ptr<StoreStatistics> st,
                                           ptr<Backup> ffs,
-                                          Options *settings) = 0;
+                                          Settings *settings) = 0;
 
     virtual RC listPointsInTime(Storage *storage, std::vector<std::pair<Path*,struct timespec>> *v) = 0;
 
