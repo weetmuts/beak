@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2017 Fredrik Öhrström
+ Copyright (C) 2017-2018 Fredrik Öhrström
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -112,14 +112,11 @@ struct FileSystemImplementationWinapi : FileSystem
     bool readLink(Path *file, string *target);
     bool deleteFile(Path *file);
 
-    RC mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground=false, bool debug=false);
-    unique_ptr<FuseMount> mount(Path *dir, FuseAPI *fuseapi, bool debug=false);
-
-    RC umount(ptr<FuseMount> fuse_mount);
-
     RC enableWatch();
     RC addWatch(Path *dir);
     int endWatch();
+
+    FileSystemImplementationWinapi() : FileSystem("FileSystemImplementationWinapi") {}
 
 private:
 
@@ -419,22 +416,6 @@ Path *configurationFile()
 Path *cacheDir()
 {
     return cache_dir_;
-}
-
-
-RC FileSystemImplementationWinapi::mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground, bool debug)
-{
-    return RC::ERR;
-}
-
-unique_ptr<FuseMount> FileSystemImplementationWinapi::mount(Path *dir, FuseAPI *fuseapi, bool debug)
-{
-    return NULL;
-}
-
-RC FileSystemImplementationWinapi::umount(ptr<FuseMount> fuse_mount_info)
-{
-    return RC::ERR;
 }
 
 RC  FileSystemImplementationWinapi::enableWatch()

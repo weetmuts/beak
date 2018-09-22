@@ -20,6 +20,8 @@
 
 #include "always.h"
 
+#include "filesystem.h"
+
 #include <memory>
 #include <string>
 #include <vector>
@@ -41,11 +43,19 @@ std::unique_ptr<ThreadCallback> newRegularThreadCallback(int millis, std::functi
 
 struct System
 {
+    // Invoke another program within the OS
     virtual RC invoke(std::string program,
                        std::vector<std::string> args,
                        std::vector<char> *output = NULL,
                        Capture capture = CaptureStdout,
                        std::function<void(char *buf, size_t len)> output_cb = NULL) = 0;
+
+    // A daemon mount will exit the current program and continue to run in the background as a daemon,
+    virtual RC mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground=false, bool debug=false) = 0;
+    // A normal mount forks and the current program continues to run.
+    virtual std::unique_ptr<FuseMount> mount(Path *dir, FuseAPI *fuseapi, bool debug=false) = 0;
+    // Unmount the previous mount.
+    virtual RC umount(ptr<FuseMount> fuse_mount) = 0;
 
     virtual ~System() = default;
 };

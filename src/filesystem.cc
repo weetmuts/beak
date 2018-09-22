@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2017 Fredrik Öhrström
+ Copyright (C) 2017-2018 Fredrik Öhrström
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -17,6 +17,7 @@
 
 #include "filesystem.h"
 
+#include "filesystem_helpers.h"
 #include "log.h"
 
 #include <assert.h>
@@ -77,6 +78,7 @@ FileSystem *newFileSystem(FuseAPI *api)
 }
 
 FileSystemFuseAPIImplementation::FileSystemFuseAPIImplementation(FuseAPI *api)
+    : FileSystem("FileSystemFuseAPIImplementation")
 {
     api_ = api;
 }
@@ -95,7 +97,7 @@ bool FileSystemFuseAPIImplementation::readdir(Path *p, vector<Path*> *vec)
 ssize_t FileSystemFuseAPIImplementation::pread(Path *p, char *buf, size_t size, off_t offset)
 {
     //int rc = api_->readCB(p->c_str(), char *buf, size_t size, off_t offset, 0);
-    return 0; // rc;
+    return 4712; // rc;
 }
 
 void FileSystemFuseAPIImplementation::recurse(Path *root, function<void(Path *path, FileStat *stat)> cb)
@@ -176,22 +178,6 @@ bool FileSystemFuseAPIImplementation::readLink(Path *path, string *target)
 bool FileSystemFuseAPIImplementation::deleteFile(Path *path)
 {
     return false;
-}
-
-
-RC  FileSystemFuseAPIImplementation::mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground, bool debug)
-{
-    return RC::ERR;
-}
-
-unique_ptr<FuseMount>  FileSystemFuseAPIImplementation::mount(Path *dir, FuseAPI *fuseapi, bool debug)
-{
-    return NULL;
-}
-
-RC  FileSystemFuseAPIImplementation::umount(ptr<FuseMount> fuse_mount)
-{
-    return RC::ERR;
 }
 
 size_t basepos(string &s)
@@ -846,124 +832,7 @@ void FileStat::checkStat(FileSystem *dst, Path *target)
     disk_update = Store;
 }
 
-struct ListOnlyFileSystem : FileSystem
+unique_ptr<FileSystem> newStatOnlyFileSystem(map<Path*,FileStat> contents)
 {
-    map<Path*,FileStat> contents_;
-
-    ListOnlyFileSystem(map<Path*,FileStat> &contents) : contents_(contents) {
-    }
-
-    bool readdir(Path *p, std::vector<Path*> *vec)
-    {
-        return false;
-    }
-
-    ssize_t pread(Path *p, char *buf, size_t size, off_t offset)
-    {
-        return 0;
-    }
-
-    void recurse(Path *root, std::function<void(Path *path, FileStat *stat)> cb)
-    {
-    }
-
-    RC stat(Path *p, FileStat *fs)
-    {
-        if (contents_.count(p) != 0) {
-            *fs = contents_[p];
-            return RC::OK;
-        }
-        return RC::ERR;
-    }
-    RC chmod(Path *p, FileStat *fs)
-    {
-        return RC::ERR;
-    }
-    RC utime(Path *p, FileStat *fs)
-    {
-        return RC::ERR;
-    }
-    Path *mkTempFile(std::string prefix, std::string content)
-    {
-        return NULL;
-    }
-    Path *mkTempDir(std::string prefix)
-    {
-        return NULL;
-    }
-    Path *mkDir(Path *p, std::string name)
-    {
-        return NULL;
-    }
-    RC rmDir(Path *p)
-    {
-        return RC::ERR;
-    }
-    RC loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
-    {
-        return RC::OK;
-    }
-    RC createFile(Path *file, std::vector<char> *buf)
-    {
-        return RC::ERR;
-    }
-    bool createFile(Path *path, FileStat *stat,
-                     std::function<size_t(off_t offset, char *buffer, size_t len)> cb)
-    {
-        return false;
-    }
-    bool createSymbolicLink(Path *file, FileStat *stat, string target)
-    {
-        return false;
-    }
-    bool createHardLink(Path *file, FileStat *stat, Path *target)
-    {
-        return false;
-    }
-    bool createFIFO(Path *file, FileStat *stat)
-    {
-        return false;
-    }
-    bool readLink(Path *file, string *target)
-    {
-        return false;
-    }
-    bool deleteFile(Path *file)
-    {
-        return false;
-    }
-    RC mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground=false, bool debug=false)
-    {
-        return RC::ERR;
-    }
-    unique_ptr<FuseMount> mount(Path *dir, FuseAPI *fuseapi, bool debug=false)
-    {
-        return NULL;
-    }
-
-    RC umount(ptr<FuseMount> fuse_mount)
-    {
-        return RC::ERR;
-    }
-
-    RC enableWatch()
-    {
-        return RC::ERR;
-    }
-
-    RC addWatch(Path *dir)
-    {
-        return RC::ERR;
-    }
-
-    int endWatch()
-    {
-        return 0;
-    }
-
-};
-
-unique_ptr<FileSystem> newListOnlyFileSystem(map<Path*,FileStat> contents)
-{
-    return unique_ptr<FileSystem>(new ListOnlyFileSystem(contents));
+    return unique_ptr<FileSystem>(new StatOnlyFileSystem(contents));
 }

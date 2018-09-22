@@ -45,6 +45,9 @@ private:
     int val {};
 };
 
+// The RC return code type is used instead of an integer typedef.
+// This is necessary to prevent all those annoying automatic
+// to integer conversions that introduce bugs in the code.
 typedef ReturnCode RC;
 
 #define XSTR(s) STR(s)
@@ -71,8 +74,9 @@ class ptr {
 
 public:
     T* operator ->() { return t; }
-    T* get() { return t; }
+    operator T*() { return t; }
     ptr() = default;
+    ptr(T* p) : t(p) { }
     ptr(std::unique_ptr<T>& p) : t(p.get()) { }
     ptr(const ptr& that) { t = that.t; }
 };

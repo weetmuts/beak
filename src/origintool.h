@@ -29,21 +29,31 @@
 #include<string>
 #include<vector>
 
+// The origin tool manages the origin file system.
+// Such a file system can be the actual local filesystem,
+// or a virtual filesystem containing images exported by a camera app,
+// or a virtual filesystem exported by a database, or something else.
+
 struct OriginTool
 {
-    virtual RC restoreFileSystemIntoOrigin(FileSystem *fs) = 0;
+    virtual void restoreFileSystem(FileSystem *backup_fs, // Gives access to the backups .tar and .gz files.
+                                   FileSystem *backup_contents_fs, // Lists all backed up files stored in the backup.
+                                   Restore *restore,
+                                   PointInTime *point,
+                                   Settings *settings,
+                                   StoreStatistics *st) = 0;
 
-    virtual void addRestoreWork(ptr<StoreStatistics> st, Path *path, FileStat *stat, Settings *settings,
-                                Restore *rfs, PointInTime *point) = 0;
-
-    virtual void restoreFileSystem(FileSystem *view, Restore *rfs, PointInTime *point,
-                                   Settings *settings, ptr<StoreStatistics> st, FileSystem *storage_fs) = 0;
+    virtual void addRestoreWork(StoreStatistics *st,
+                                Path *path,
+                                FileStat *stat,
+                                Settings *settings,
+                                Restore *restore,
+                                PointInTime *point) = 0;
 
     virtual ptr<FileSystem> fs() = 0;
 };
 
 std::unique_ptr<OriginTool> newOriginTool(ptr<System> sys,
-                                          ptr<FileSystem> sys_fs,
                                           ptr<FileSystem> origin_fs);
 
 

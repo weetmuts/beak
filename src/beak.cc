@@ -71,7 +71,7 @@ struct OptionEntry;
 struct BeakImplementation : Beak {
 
     BeakImplementation(ptr<Configuration> configuration,
-                       ptr<System> sys, ptr<FileSystem> sys_fs,
+                       ptr<System> sys, ptr<FileSystem> local_fs,
                        ptr<StorageTool> storage_tool,
                        ptr<OriginTool> origin_tool);
 
@@ -136,17 +136,17 @@ struct BeakImplementation : Beak {
 
     ptr<Configuration> configuration_;
     ptr<System> sys_;
-    ptr<FileSystem> sys_fs_;
+    ptr<FileSystem> local_fs_;
     ptr<StorageTool> storage_tool_;
     ptr<OriginTool> origin_tool_;
 };
 
 unique_ptr<Beak> newBeak(ptr<Configuration> configuration,
                          ptr<System> sys,
-                         ptr<FileSystem> sys_fs,
+                         ptr<FileSystem> local_fs,
                          ptr<StorageTool> storage_tool,
                          ptr<OriginTool> origin_tool) {
-    return unique_ptr<Beak>(new BeakImplementation(configuration, sys, sys_fs, storage_tool, origin_tool));
+    return unique_ptr<Beak>(new BeakImplementation(configuration, sys, local_fs, storage_tool, origin_tool));
 }
 
 struct CommandEntry {
@@ -177,12 +177,12 @@ LIST_OF_OPTIONS
 };
 
 BeakImplementation::BeakImplementation(ptr<Configuration> configuration,
-                                       ptr<System> sys, ptr<FileSystem> sys_fs,
+                                       ptr<System> sys, ptr<FileSystem> local_fs,
                                        ptr<StorageTool> storage_tool,
                                        ptr<OriginTool> origin_tool) :
     configuration_(configuration),
     sys_(sys),
-    sys_fs_(sys_fs),
+    local_fs_(local_fs),
     storage_tool_(storage_tool),
     origin_tool_(origin_tool)
 {
@@ -312,7 +312,7 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
         Path *origin = Path::lookup(arg);
         Path *rp = origin->realpath();
         if (rp) {
-            if (hasPointsInTime(rp, origin_tool_->fs().get()) && !settings->yesorigin) {
+            if (hasPointsInTime(rp, origin_tool_->fs()) && !settings->yesorigin) {
                 error(COMMANDLINE, "You passed a storage location as an origin. If this is what you want add --yes-origin\n");
             }
             argument.origin = rp;
@@ -694,7 +694,7 @@ RC BeakImplementation::check(Settings *settings)
     set<Path*> set_of_beak_files;
     for (auto& f : indexes) {
         Path *gz = f->path->prepend(rule->cache_path);
-        rc = Index::listFilesReferencedInIndex(sys_fs_, gz, &set_of_beak_files);
+        rc = Index::listFilesReferencedInIndex(local_fs_, gz, &set_of_beak_files);
         if (rc.isErr()) {
             failure(CHECK, "Cannot read index file %s\n", gz->c_str());
             return rc;
@@ -749,7 +749,7 @@ RC BeakImplementation::push(Settings *settings)
 
     Rule *rule = settings->from.rule;
     Settings backup_settings = settings->copy();
-    Path *mount = sys_fs_->mkTempDir("beak_push_");
+    Path *mount = local_fs_->mkTempDir("beak_push_");
     backup_settings.to.dir = mount;
     rc = mountBackup(&backup_settings);
     if (rc.isErr()) return RC::ERR;
@@ -805,36 +805,36 @@ RC BeakImplementation::umountDaemon(Settings *settings)
 RC BeakImplementation::mountBackupDaemon(Settings *settings)
 {
     Path *dir;
-    ptr<FileSystem> fs = origin_tool_->fs();
-    fs->enableWatch();
+    ptr<FileSystem> origin_fs = origin_tool_->fs();
+    origin_fs->enableWatch();
     if (settings->to.type == ArgOrigin) {
         dir = settings->to.origin;
     }
     assert(settings->to.type == ArgDir);
     dir = settings->to.dir;
 
-    auto backup  = newBackup(fs);
+    unique_ptr<Backup> backup  = newBackup(origin_fs);
     RC rc = backup->scanFileSystem(settings);
 
     if (rc.isErr()) {
         return RC::ERR;
     }
 
-    return origin_tool_->fs()->mountDaemon(dir, backup.get(), settings->foreground, settings->fusedebug);
+    return sys_->mountDaemon(dir, backup.get(), settings->foreground, settings->fusedebug);
 }
 
 RC BeakImplementation::mountBackup(Settings *settings)
 {
     ptr<FileSystem> fs = origin_tool_->fs();
 
-    auto backup  = newBackup(fs);
+    unique_ptr<Backup> backup  = newBackup(fs);
     RC rc = backup->scanFileSystem(settings);
 
     if (rc.isErr()) {
         return RC::ERR;
     }
 
-    fuse_mount_ = origin_tool_->fs()->mount(settings->to.dir, backup.get(), settings->fusedebug);
+    fuse_mount_ = sys_->mount(settings->to.dir, backup.get(), settings->fusedebug);
     return RC::OK;
 }
 
@@ -845,7 +845,7 @@ RC BeakImplementation::umountBackup(Settings *settings)
     if (unpleasant_modifications > 0) {
         warning(STORE, "Warning! Origin directory modified while being mounted for backup!\n");
     }
-    fs->umount(fuse_mount_);
+    sys_->umount(fuse_mount_);
     return RC::OK;
 }
 
@@ -894,7 +894,7 @@ RC BeakImplementation::mountRestoreInternal(Settings *settings, bool daemon)
     restore_fuse_ops.readdir = reverseReaddir;
     restore_fuse_ops.readlink = reverseReadlink;
 
-    auto restore  = newRestore(origin_tool_->fs());
+    unique_ptr<Restore> restore  = newRestore(origin_tool_->fs());
 
     RC rc = restore->lookForPointsInTime(PointInTimeFormat::absolute_point, settings->from.storage->storage_location);
     if (rc.isErr()) {
@@ -968,7 +968,7 @@ RC BeakImplementation::fetchPointsInTime(string remote, Path *cache)
     string r = remote;
     r.pop_back();
     p = p->appendName(Atom::lookup(r+".ls"));
-    sys_fs_->createFile(p, &out);
+    local_fs_->createFile(p, &out);
     UI::clearLine();
     fflush(stdout);
 
@@ -1019,36 +1019,30 @@ RC BeakImplementation::store(Settings *settings)
     assert(settings->from.type == ArgOrigin || settings->from.type == ArgRule);
     assert(settings->to.type == ArgStorage);
 
-    ptr<FileSystem> ofs = origin_tool_->fs();
     // Watch the origin file system to detect if it is being changed while doing the store.
-    ofs->enableWatch();
+    origin_tool_->fs()->enableWatch();
 
-    auto backup  = newBackup(origin_tool_->fs());
+    unique_ptr<Backup> backup  = newBackup(origin_tool_->fs());
 
     uint64_t start = clockGetTime();
     // This command scans the origin file system and builds
-    // an in memory representation of the beak file system,
+    // an in memory representation of the backup file system,
     // with tar files,index files and directories.
     rc = backup->scanFileSystem(settings);
 
-    // Acquire a file system api to the virtual beak file system.
-    auto beaked_fs = backup->asFileSystem();
-
     // The store statistics maintin the progress data for the store.
-    auto st = newStoreStatistics();
+    unique_ptr<StoreStatistics> st = newStoreStatistics();
 
     // Now store the beak file system into the selected storage.
-    storage_tool_->storeFileSystemIntoStorage(beaked_fs,
-                                              origin_tool_->fs().get(),
-                                              settings->to.storage,
-                                              st,
-                                              backup,
-                                              settings);
+    storage_tool_->storeBackupIntoStorage(backup.get(),
+                                          settings->to.storage,
+                                          st.get(),
+                                          settings);
 
     uint64_t stop = clockGetTime();
     uint64_t store_time = stop - start;
 
-    int unpleasant_modifications = ofs->endWatch();
+    int unpleasant_modifications = origin_tool_->fs()->endWatch();
     if (st->stats.num_files_stored == 0 && st->stats.num_dirs_updated == 0) {
         info(STORE, "No stores needed, everything was up to date.\n");
     } else {
@@ -1081,8 +1075,9 @@ RC BeakImplementation::restore(Settings *settings)
     }
 
     umask(0);
-    auto restore  = newRestore(origin_tool_->fs());
-    auto view = restore->asFileSystem();
+    FileSystem *backup_fs = storage_tool_->asCachedReadOnlyFS(settings->to.storage);
+    unique_ptr<Restore> restore  = newRestore(backup_fs);
+    FileSystem *backup_contents_fs = restore->asFileSystem();
 
     restore->lookForPointsInTime(PointInTimeFormat::absolute_point, settings->from.storage->storage_location);
 
@@ -1103,16 +1098,20 @@ RC BeakImplementation::restore(Settings *settings)
 
     st->startDisplayOfProgress();
 
-    view->recurse(Path::lookupRoot(),
-                  [&restore,this,point,settings,&st]
-                  (Path *path, FileStat *stat) {origin_tool_->addRestoreWork(st,path,stat,settings,
-                                                                             restore.get(),point); });
+    backup_contents_fs->recurse(Path::lookupRoot(),
+                                [&restore,this,point,settings,&st]
+                                (Path *path, FileStat *stat) {origin_tool_->addRestoreWork(st.get(),
+                                                                                           path,
+                                                                                           stat,
+                                                                                           settings,
+                                                                                           restore.get(),
+                                                                                           point); });
 
     debug(STORE, "Work to be done: num_files=%ju num_hardlinks=%ju num_symlinks=%ju num_nodes=%ju num_dirs=%ju\n",
           st->stats.num_files, st->stats.num_hard_links, st->stats.num_symbolic_links,
           st->stats.num_nodes, st->stats.num_dirs);
 
-    origin_tool_->restoreFileSystem(view,restore.get(),point,settings,st,storage_tool_->fs().get());
+    origin_tool_->restoreFileSystem(backup_fs, backup_contents_fs, restore.get(), point, settings, st.get());
 
     uint64_t stop = clockGetTime();
     uint64_t store_time = stop - start;

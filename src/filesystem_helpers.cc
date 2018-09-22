@@ -20,10 +20,140 @@
 #include "log.h"
 
 #include <vector>
+#include <map>
 
 using namespace std;
 
 static ComponentId CACHE = registerLogComponent("cache");
+
+RC ReadOnlyFileSystem::chmod(Path *p, FileStat *fs)
+{
+    return RC::ERR;
+}
+
+RC ReadOnlyFileSystem::utime(Path *p, FileStat *fs)
+{
+    return RC::ERR;
+}
+
+Path *ReadOnlyFileSystem::mkTempFile(string prefix, string content)
+{
+    return NULL;
+}
+
+Path *ReadOnlyFileSystem::mkTempDir(string prefix)
+{
+    return NULL;
+}
+
+Path *ReadOnlyFileSystem::mkDir(Path *p, string name)
+{
+    return NULL;
+}
+
+RC ReadOnlyFileSystem::rmDir(Path *p)
+{
+    return RC::ERR;
+}
+
+RC ReadOnlyFileSystem::createFile(Path *file, std::vector<char> *buf)
+{
+    return RC::ERR;
+}
+
+bool ReadOnlyFileSystem::createFile(Path *path, FileStat *stat,
+                                                 std::function<size_t(off_t offset, char *buffer, size_t len)> cb)
+{
+    return false;
+}
+
+bool ReadOnlyFileSystem::createSymbolicLink(Path *path, FileStat *stat, string link)
+{
+    return false;
+}
+
+bool ReadOnlyFileSystem::createHardLink(Path *path, FileStat *stat, Path *target)
+{
+    return false;
+}
+
+bool ReadOnlyFileSystem::createFIFO(Path *path, FileStat *stat)
+{
+    return false;
+}
+
+bool ReadOnlyFileSystem::deleteFile(Path *path)
+{
+    return false;
+}
+
+RC ReadOnlyFileSystem::enableWatch()
+{
+    return RC::ERR;
+}
+
+RC ReadOnlyFileSystem::addWatch(Path *dir)
+{
+    return RC::ERR;
+}
+
+int ReadOnlyFileSystem::endWatch()
+{
+    return 0;
+}
+
+RC ReadOnlyFileSystem::mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground, bool debug)
+{
+    return RC::ERR;
+}
+
+unique_ptr<FuseMount> ReadOnlyFileSystem::mount(Path *dir, FuseAPI *fuseapi, bool debug)
+{
+    return NULL;
+}
+
+RC ReadOnlyFileSystem::umount(ptr<FuseMount> fuse_mount)
+{
+    return RC::ERR;
+}
+
+bool StatOnlyFileSystem::readdir(Path *p, vector<Path*> *vec)
+{
+    return false;
+}
+
+ssize_t StatOnlyFileSystem::pread(Path *p, char *buf, size_t size, off_t offset)
+{
+    return -4711;
+}
+
+void StatOnlyFileSystem::recurse(Path *root, std::function<void(Path *path, FileStat *stat)> cb)
+{
+}
+
+RC StatOnlyFileSystem::stat(Path *p, FileStat *fs)
+{
+    if (contents_.count(p) != 0) {
+        *fs = contents_[p];
+        return RC::OK;
+    }
+    return RC::ERR;
+}
+
+RC StatOnlyFileSystem::loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
+{
+    return RC::OK;
+}
+
+bool StatOnlyFileSystem::readLink(Path *file, string *target)
+{
+    return false;
+}
+
+RC ReadOnlyCacheFileSystemBaseImplementation::stat(Path *p, FileStat *fs)
+{
+    return RC::ERR;
+}
 
 bool ReadOnlyCacheFileSystemBaseImplementation::readdir(Path *p, vector<Path*> *vec)
 {
@@ -60,109 +190,13 @@ void ReadOnlyCacheFileSystemBaseImplementation::recurse(Path *root, function<voi
 {
 }
 
-RC ReadOnlyCacheFileSystemBaseImplementation::stat(Path *p, FileStat *fs)
-{
-    return RC::ERR;
-}
-
-RC ReadOnlyCacheFileSystemBaseImplementation::chmod(Path *p, FileStat *fs)
-{
-    return RC::ERR;
-}
-
-RC ReadOnlyCacheFileSystemBaseImplementation::utime(Path *p, FileStat *fs)
-{
-    return RC::ERR;
-}
-
-Path *ReadOnlyCacheFileSystemBaseImplementation::mkTempFile(string prefix, string content)
-{
-    return NULL;
-}
-
-Path *ReadOnlyCacheFileSystemBaseImplementation::mkTempDir(string prefix)
-{
-    return NULL;
-}
-
-Path *ReadOnlyCacheFileSystemBaseImplementation::mkDir(Path *p, string name)
-{
-    return NULL;
-}
-
-RC ReadOnlyCacheFileSystemBaseImplementation::rmDir(Path *p)
-{
-    return RC::ERR;
-}
 
 RC ReadOnlyCacheFileSystemBaseImplementation::loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
 {
     return RC::ERR;
 }
 
-RC ReadOnlyCacheFileSystemBaseImplementation::createFile(Path *file, std::vector<char> *buf)
-{
-    return RC::ERR;
-}
-
-bool ReadOnlyCacheFileSystemBaseImplementation::createFile(Path *path, FileStat *stat,
-                                                 std::function<size_t(off_t offset, char *buffer, size_t len)> cb)
-{
-    return false;
-}
-
-bool ReadOnlyCacheFileSystemBaseImplementation::createSymbolicLink(Path *path, FileStat *stat, string link)
-{
-    return false;
-}
-
-bool ReadOnlyCacheFileSystemBaseImplementation::createHardLink(Path *path, FileStat *stat, Path *target)
-{
-    return false;
-}
-
-bool ReadOnlyCacheFileSystemBaseImplementation::createFIFO(Path *path, FileStat *stat)
-{
-    return false;
-}
-
 bool ReadOnlyCacheFileSystemBaseImplementation::readLink(Path *path, string *target)
 {
     return false;
-}
-
-bool ReadOnlyCacheFileSystemBaseImplementation::deleteFile(Path *path)
-{
-    return false;
-}
-
-
-RC  ReadOnlyCacheFileSystemBaseImplementation::mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground, bool debug)
-{
-    return RC::ERR;
-}
-
-unique_ptr<FuseMount>  ReadOnlyCacheFileSystemBaseImplementation::mount(Path *dir, FuseAPI *fuseapi, bool debug)
-{
-    return NULL;
-}
-
-RC  ReadOnlyCacheFileSystemBaseImplementation::umount(ptr<FuseMount> fuse_mount)
-{
-    return RC::ERR;
-}
-
-RC ReadOnlyCacheFileSystemBaseImplementation::enableWatch()
-{
-    return RC::ERR;
-}
-
-RC ReadOnlyCacheFileSystemBaseImplementation::addWatch(Path *dir)
-{
-    return RC::ERR;
-}
-
-int ReadOnlyCacheFileSystemBaseImplementation::endWatch()
-{
-    return 0;
 }

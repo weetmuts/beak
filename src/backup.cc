@@ -42,12 +42,12 @@ static ComponentId BACKUP = registerLogComponent("backup");
 static ComponentId HARDLINKS = registerLogComponent("hardlinks");
 static ComponentId FUSE = registerLogComponent("fuse");
 
-Backup::Backup(ptr<FileSystem> fs)
+Backup::Backup(ptr<FileSystem> origin_fs)
 {
     pthread_mutexattr_init(&global_attr);
     pthread_mutexattr_settype(&global_attr, PTHREAD_MUTEX_RECURSIVE);
     pthread_mutex_init(&global, &global_attr);
-    file_system_ = fs.get();
+    origin_fs_ = origin_fs;
 }
 
 thread_local Backup *current_fs;
@@ -151,7 +151,7 @@ int Backup::addTarEntry(const char *p, const struct stat *sb)
     if (te->isDirectory()) {
         // Storing the path in the lookup
         directories[te->path()] = te;
-        file_system_->addWatch(abspath);
+        origin_fs_->addWatch(abspath);
         debug(BACKUP, "Added directory >%s< %p %p\n", te->path()->c_str(), te->path(), directories[te->path()]);
     }
     return FTW_CONTINUE;
@@ -944,7 +944,7 @@ int Backup::readCB(const char *path_char_string, char *buf, size_t size, off_t o
         goto err;
     }
 
-    n = tar->copy(buf, size, offset, file_system_);
+    n = tar->copy(buf, size, offset, origin_fs_);
 
     pthread_mutex_unlock(&global);
     return n;
@@ -1159,36 +1159,20 @@ struct BeakFS : FileSystem
     {
         return false;
     }
-    RC mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground=false, bool debug=false)
-    {
-        return RC::ERR;
-    }
-    unique_ptr<FuseMount> mount(Path *dir, FuseAPI *fuseapi, bool debug=false)
-    {
-        return NULL;
-    }
-
-    RC umount(ptr<FuseMount> fuse_mount)
-    {
-        return RC::ERR;
-    }
-
     RC enableWatch()
     {
         return RC::ERR;
     }
-
     RC addWatch(Path *dir)
     {
         return RC::ERR;
     }
-
     int endWatch()
     {
         return 0;
     }
 
-    BeakFS(Backup *forw) : forw_(forw) { }
+    BeakFS(Backup *forw) : FileSystem("BeakFS"), forw_(forw) { }
 };
 
 FileSystem *Backup::asFileSystem()

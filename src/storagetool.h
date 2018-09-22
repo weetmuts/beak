@@ -32,21 +32,17 @@
 
 struct StorageTool
 {
-    virtual RC storeFileSystemIntoStorage(FileSystem *beaked_fs,
-                                          FileSystem *origin_fs,
-                                          Storage *storage,
-                                          ptr<StoreStatistics> st,
-                                          ptr<Backup> ffs,
-                                          Settings *settings) = 0;
+    virtual RC storeBackupIntoStorage(Backup *backup,
+                                      Storage *storage,
+                                      StoreStatistics *st,
+                                      Settings *settings) = 0;
 
     virtual RC listPointsInTime(Storage *storage, std::vector<std::pair<Path*,struct timespec>> *v) = 0;
 
-    // Return a filesystem for the storage location.
-    virtual ptr<FileSystem> fs() = 0;
+    virtual FileSystem *asCachedReadOnlyFS(Storage *storage) = 0;
 };
 
 std::unique_ptr<StorageTool> newStorageTool(ptr<System> sys,
-                                            ptr<FileSystem> sys_fs,
-                                            ptr<FileSystem> local_storage_fs);
+                                            ptr<FileSystem> local_fs);
 
 #endif

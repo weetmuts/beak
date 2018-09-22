@@ -112,14 +112,14 @@ struct Restore
     PointInTime *findPointInTime(std::string s);
     PointInTime *setPointInTime(std::string g);
 
-    Restore(ptr<FileSystem> fs);
+    Restore(FileSystem *backup_fs);
 
     Path *rootDir() { return root_dir_; }
     Path *mountDir() { return mount_dir_; }
     void setRootDir(Path *p) { root_dir_ = p; }
     void setMountDir(Path *p) { mount_dir_ = p; }
 
-    FileSystem *asFileSystem();
+    ptr<FileSystem> asFileSystem() { return contents_fs_; }
 
     private:
 
@@ -135,6 +135,8 @@ struct Restore
     // It can point directly to the default OS file system or to a cached
     // storage tool file system.
     FileSystem *backup_file_system_;
+
+    std::unique_ptr<FileSystem> contents_fs_;
 };
 
 // Restore from a file system containing a backup full of beak files

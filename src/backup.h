@@ -98,6 +98,7 @@ struct Backup : FuseAPI
 
     TarFile *findTarFromPath(Path *path);
     FileSystem *asFileSystem();
+    FileSystem *originFileSystem() { return origin_fs_; }
 
     // Implement a FUSE API
     int getattrCB(const char *path, struct stat *stbuf);
@@ -108,7 +109,7 @@ struct Backup : FuseAPI
 
     void setMessage(std::string m) { message_ = m; }
     void setTarHeaderStyle(TarHeaderStyle ths) { tarheaderstyle_= ths; }
-    Backup(ptr<FileSystem> fs);
+    Backup(ptr<FileSystem> origin_fs);
 
     virtual ~Backup() = default;
 
@@ -120,7 +121,7 @@ private:
     std::string message_;
     TarHeaderStyle tarheaderstyle_;
 
-    FileSystem* file_system_;
+    FileSystem* origin_fs_;
 
 };
 

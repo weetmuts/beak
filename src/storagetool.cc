@@ -31,14 +31,12 @@ using namespace std;
 
 struct StorageToolImplementation : public StorageTool
 {
-    StorageToolImplementation(ptr<System> sys, ptr<FileSystem> sys_fs, ptr<FileSystem> local_storage_fs);
+    StorageToolImplementation(ptr<System> sys, ptr<FileSystem> local_fs);
 
-    RC storeFileSystemIntoStorage(FileSystem *beaked_fs,
-                                  FileSystem *origin_fs,
-                                  Storage *storage,
-                                  ptr<StoreStatistics> st,
-                                  ptr<Backup> ffs,
-                                  Settings *settings);
+    RC storeBackupIntoStorage(Backup *backup,
+                              Storage *storage,
+                              StoreStatistics *st,
+                              Settings *settings);
 
     RC listPointsInTime(Storage *storage, vector<pair<Path*,struct timespec>> *v);
 
@@ -51,24 +49,21 @@ struct StorageToolImplementation : public StorageTool
     RC sendBeakFilesToStorage(Path *dir, Storage *storage, std::vector<TarFileName*> *files);
     RC fetchBeakFilesFromStorage(Storage *storage, std::vector<TarFileName*> *files, Path *dir);
 
-    ptr<FileSystem> fs() { return local_storage_fs_; }
+    FileSystem *asCachedReadOnlyFS(Storage *storage);
 
-    ptr<System> sys_;
-    ptr<FileSystem> sys_fs_;
-    ptr<FileSystem> local_storage_fs_;
+    System *sys_;
+    FileSystem *local_fs_;
 };
 
 unique_ptr<StorageTool> newStorageTool(ptr<System> sys,
-                                       ptr<FileSystem> sys_fs,
-                                       ptr<FileSystem> local_storage_fs)
+                                       ptr<FileSystem> local_fs)
 {
-    return unique_ptr<StorageTool>(new StorageToolImplementation(sys, sys_fs, local_storage_fs));
+    return unique_ptr<StorageTool>(new StorageToolImplementation(sys, local_fs));
 }
 
 StorageToolImplementation::StorageToolImplementation(ptr<System>sys,
-                                                     ptr<FileSystem> sys_fs,
-                                                     ptr<FileSystem> local_storage_fs)
-    : sys_(sys), sys_fs_(sys_fs), local_storage_fs_(local_storage_fs)
+                                                     ptr<FileSystem> local_fs)
+    : sys_(sys), local_fs_(local_fs)
 {
 
 }
@@ -95,23 +90,25 @@ void add_backup_work(ptr<StoreStatistics> st,
     else if (stat->isDirectory()) st->stats.num_dirs++;
 }
 
-void handle_tar_file(Path *path,
-                     FileStat *stat,
-                     ptr<Backup> backup,
-                     Settings *settings,
-                     ptr<StoreStatistics> st,
-                     FileSystem *origin_fs,
-                     FileSystem *local_storage_fs)
+void store_local_backup_file(Backup *backup,
+                             FileSystem *backup_fs,
+                             FileSystem *origin_fs,
+                             FileSystem *storage_fs,
+                             Path *path,
+                             FileStat *stat,
+                             Settings *settings,
+                             ptr<StoreStatistics> st)
 {
     if (!stat->isRegularFile()) return;
 
-    debug(STORAGETOOL, "PATH %s\n", path->c_str());
     TarFile *tar = backup->findTarFromPath(path);
     assert(tar);
-    Path *file_name = tar->path()->prepend(settings->to.storage->storage_location);
-    local_storage_fs->mkDirpWriteable(file_name->parent());
+
+    debug(STORAGETOOL, "PATH %s\n", path->c_str());
+    Path *file_name = path->prepend(settings->to.storage->storage_location);
+    storage_fs->mkDirpWriteable(file_name->parent());
     FileStat old_stat;
-    RC rc = local_storage_fs->stat(file_name, &old_stat);
+    RC rc = storage_fs->stat(file_name, &old_stat);
     if (rc.isOk() &&
         stat->samePermissions(&old_stat) &&
         stat->sameSize(&old_stat) &&
@@ -120,13 +117,13 @@ void handle_tar_file(Path *path,
         debug(STORAGETOOL, "Skipping %s\n", file_name->c_str());
     } else {
         if (rc.isOk()) {
-            local_storage_fs->deleteFile(file_name);
+            storage_fs->deleteFile(file_name);
         }
         // The size gets incrementally update while the tar file is written!
         auto func = [&st](size_t n){ st->stats.size_files_stored += n; };
-        tar->createFile(file_name, stat, origin_fs, local_storage_fs, 0, func);
+        tar->createFile(file_name, stat, origin_fs, storage_fs, 0, func);
 
-        local_storage_fs->utime(file_name, stat);
+        storage_fs->utime(file_name, stat);
         st->stats.num_files_stored++;
         verbose(STORAGETOOL, "Stored %s\n", file_name->c_str());
     }
@@ -135,19 +132,25 @@ void handle_tar_file(Path *path,
     st->updateProgress();
 }
 
-RC StorageToolImplementation::storeFileSystemIntoStorage(FileSystem *beaked_fs,
-                                                         FileSystem *origin_fs,
-                                                         Storage *storage,
-                                                         ptr<StoreStatistics> st,
-                                                         ptr<Backup> ffs,
-                                                         Settings *settings)
+RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backup,
+                                                     Storage *storage,
+                                                     StoreStatistics *st,
+                                                     Settings *settings)
 {
     st->startDisplayOfProgress();
 
-    FileSystem *storage_fs = local_storage_fs_.get();
+    // The backup archive files (.tar .gz) are found here.
+    FileSystem *backup_fs = backup->asFileSystem();
+    // The where the origin files can be found.
+    FileSystem *origin_fs = backup->originFileSystem();
+    // Store the archive files here.
+    FileSystem *storage_fs = NULL;
 
     map<Path*,FileStat> contents;
     unique_ptr<FileSystem> fs;
+    if (storage->type == FileSystemStorage) {
+        storage_fs = local_fs_;
+    } else
     if (storage->type == RCloneStorage) {
         vector<TarFileName> files, bad_files;
         vector<string> other_files;
@@ -156,12 +159,12 @@ RC StorageToolImplementation::storeFileSystemIntoStorage(FileSystem *beaked_fs,
             error(STORAGETOOL, "Could not list files in rclone storage %s\n", storage->storage_location->c_str());
         }
 
-        fs = newListOnlyFileSystem(contents);
+        fs = newStatOnlyFileSystem(contents);
         storage_fs = fs.get();
     }
-    beaked_fs->recurse(Path::lookupRoot(), [=]
+    backup_fs->recurse(Path::lookupRoot(), [=]
                        (Path *path, FileStat *stat) {
-                           add_backup_work(st,path,stat,settings, storage_fs);
+                           add_backup_work(st, path, stat, settings, storage_fs);
                        });
 
     debug(STORAGETOOL, "Work to be done: num_files=%ju num_dirs=%ju\n", st->stats.num_files, st->stats.num_dirs);
@@ -169,21 +172,22 @@ RC StorageToolImplementation::storeFileSystemIntoStorage(FileSystem *beaked_fs,
     switch (storage->type) {
     case FileSystemStorage:
     {
-        beaked_fs->recurse(Path::lookupRoot(), [=]
-                           (Path *path, FileStat *stat) {handle_tar_file(path,
-                                                                         stat,
-                                                                         ffs,
-                                                                         settings,
-                                                                         st,
-                                                                         origin_fs,
-                                                                         local_storage_fs_.get()); });
+        backup_fs->recurse(Path::lookupRoot(), [=]
+                           (Path *path, FileStat *stat) {store_local_backup_file(backup,
+                                                                                 backup_fs,
+                                                                                 origin_fs,
+                                                                                 storage_fs,
+                                                                                 path,
+                                                                                 stat,
+                                                                                 settings,
+                                                                                 st); });
         break;
     }
     case RSyncStorage: break;
     case RCloneStorage:
     {
-        Path *mount = sys_fs_->mkTempDir("beak_push_");
-        unique_ptr<FuseMount> fuse_mount = origin_fs->mount(mount, ffs.get(), settings->fusedebug);
+        Path *mount = local_fs_->mkTempDir("beak_push_");
+        unique_ptr<FuseMount> fuse_mount = sys_->mount(mount, backup, settings->fusedebug);
 
         if (!fuse_mount) {
             error(STORAGETOOL, "Could not mount beak filesyset for rclone.\n");
@@ -229,11 +233,11 @@ RC StorageToolImplementation::storeFileSystemIntoStorage(FileSystem *beaked_fs,
         }
 
         // Unmount virtual filesystem.
-        rc = origin_fs->umount(fuse_mount);
+        rc = sys_->umount(fuse_mount);
         if (rc.isErr()) {
             error(STORAGETOOL, "Could not unmount beak filesystem \"%s\".\n", mount->c_str());
         }
-        rc = origin_fs->rmDir(mount);
+        rc = local_fs_->rmDir(mount);
 
         break;
     }
@@ -259,7 +263,7 @@ RC StorageToolImplementation::sendBeakFilesToStorage(Path *dir, Storage *storage
         }
     }
 
-    tmp = sys_fs_->mkTempFile("beak_fetching", files_to_fetch);
+    tmp = local_fs_->mkTempFile("beak_fetching", files_to_fetch);
 
     RC rc = RC::OK;
     vector<char> out;
@@ -286,7 +290,7 @@ RC StorageToolImplementation::fetchBeakFilesFromStorage(Storage *storage, vector
         files_to_fetch.append("\n");
     }
 
-    Path *tmp = sys_fs_->mkTempFile("beak_fetching", files_to_fetch);
+    Path *tmp = local_fs_->mkTempFile("beak_fetching", files_to_fetch);
 
     RC rc = RC::OK;
     vector<char> out;
@@ -414,4 +418,10 @@ RC StorageToolImplementation::listPointsInTime(Storage *storage, vector<pair<Pat
     }
 
     return RC::OK;
+}
+
+
+FileSystem *StorageToolImplementation::asCachedReadOnlyFS(Storage *storage)
+{
+    return local_fs_;
 }

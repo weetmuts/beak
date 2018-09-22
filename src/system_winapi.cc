@@ -32,6 +32,10 @@ struct SystemImplementationWinapi : System
                Capture capture,
                function<void(char *buffer, size_t len)> cb);
 
+    RC mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground, bool debug);
+    std::unique_ptr<FuseMount> mount(Path *dir, FuseAPI *fuseapi, bool debug);
+    RC umount(ptr<FuseMount> fuse_mount);
+
 private:
     int *rooot {};
 };
@@ -52,11 +56,26 @@ RC SystemImplementationWinapi::invoke(string program,
                                        Capture capture,
                                        function<void(char *buffer, size_t len)> cb)
 {
-    fprintf(stderr, "INOKING!\n");
+    fprintf(stderr, "INVOKING!\n");
     return RC::OK;
 }
 
 unique_ptr<ThreadCallback> newRegularThreadCallback(int millis, std::function<bool()> thread_cb)
 {
     return NULL;
+}
+
+RC SystemImplementationWinapi::mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground, bool debug)
+{
+    return RC::ERR;
+}
+
+std::unique_ptr<FuseMount> SystemImplementationWinapi::mount(Path *dir, FuseAPI *fuseapi, bool debug)
+{
+    return NULL;
+}
+
+RC SystemImplementationWinapi::umount(ptr<FuseMount> fuse_mount)
+{
+    return RC::ERR;
 }

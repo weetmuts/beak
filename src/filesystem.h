@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2017 Fredrik Öhrström
+ Copyright (C) 2017-2018 Fredrik Öhrström
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -279,12 +279,6 @@ struct FileSystem
 
     virtual bool deleteFile(Path *file) = 0;
 
-    // A daemon mount will exit the current program and continue to run in the background as a daemon,
-    virtual RC mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground=false, bool debug=false) = 0;
-    // A normal mount forks and the current program continues to run.
-    virtual std::unique_ptr<FuseMount> mount(Path *dir, FuseAPI *fuseapi, bool debug=false) = 0;
-    virtual RC umount(ptr<FuseMount> fuse_mount) = 0;
-
     // Enable watching of filesystem changes. Used to warn the user
     // that the filesystem was changed during backup...
     virtual RC enableWatch() = 0;
@@ -294,17 +288,25 @@ struct FileSystem
     virtual int endWatch() = 0;
 
     virtual ~FileSystem() = default;
+
+    FileSystem(const char *n) : name_(n) {}
+
+    const char *name() { return name_; }
+
+    private:
+
+    const char *name_ {};
 };
 
 // The default file system for this computer/OS.
 std::unique_ptr<FileSystem> newDefaultFileSystem();
-// A file system where you can list the files and their stats,
-// but not read the data nor write to it.
-std::unique_ptr<FileSystem> newListOnlyFileSystem(std::map<Path*,FileStat> contents);
+
+// A file system where you can only stat the files...
+std::unique_ptr<FileSystem> newStatOnlyFileSystem(std::map<Path*,FileStat> contents);
+
 // Access a fuse exported file system as a FileSystem.
 FileSystem *newFileSystem(FuseAPI *api);
-// Cache reads from a filesystem.
-FileSystem *newCacheFileSystem(ptr<FileSystem> fs_to_be_cached, ptr<FileSystem> store_cache_here, Path *cache);
+
 
 Path *configurationFile();
 Path *cacheDir();

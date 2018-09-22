@@ -49,25 +49,23 @@ int run(int argc, char *argv[]) {
 
     // First create the OS interface to invoke external commands like rclone and rsync.
     auto sys = newSystem();
-    // Next create the interface to the file system that stores the beak configuration files
+    // Next create the interface to the local file system where we find:
+    // the orgin files and directories, the beak configuration file, the rclone configuration file,
     // and the temporary/cache files.
-    auto sys_fs = newDefaultFileSystem();
-    // Next create the filesystem that can be used as a storage location,
-    // but it might not be used, if storing remotely.
-    auto local_storage_fs = newDefaultFileSystem();
-    // Next create the filesystem where the origin files are found.
-    auto origin_fs = newDefaultFileSystem();
+    auto local_fs = newDefaultFileSystem();
     // Then create the interface to hide the differences between different storages types:
     // ie rclone, rsync and local file system.
-    auto storage_tool = newStorageTool(sys, sys_fs, local_storage_fs);
+    auto storage_tool = newStorageTool(sys, local_fs);
     // Then create the interface to restore and read files from the origin.
-    auto origin_tool = newOriginTool(sys, sys_fs, origin_fs);
+    // Here we backup the local fs, but we could backup any virtual filesystem
+    // for example one exported by a camera app.
+    auto origin_tool = newOriginTool(sys, local_fs);
     // Fetch the beak configuration from ~/.config/beak/beak.conf
-    auto configuration = newConfiguration(sys, sys_fs);
+    auto configuration = newConfiguration(sys, local_fs);
     configuration->load();
 
     // Now create the beak backup software.
-    auto beak = newBeak(configuration, sys, sys_fs, storage_tool, origin_tool);
+    auto beak = newBeak(configuration, sys, local_fs, storage_tool, origin_tool);
 
     beak->captureStartTime();
 

@@ -40,10 +40,147 @@ using namespace std;
 
 ComponentId REVERSE = registerLogComponent("reverse");
 
-Restore::Restore(ptr<FileSystem> backup_fs)
+struct RestoreFileSystem : FileSystem
+{
+    Restore *rev_;
+    PointInTime *point_;
+
+    bool readdir(Path *p, std::vector<Path*> *vec)
+    {
+        return false;
+    }
+    ssize_t pread(Path *p, char *buf, size_t size, off_t offset)
+    {
+        return 0;
+    }
+
+    void recurseInto(Entry *d, std::function<void(Path*,FileStat*)> cb)
+    {
+        rev_->loadDirContents(point_, d->path);
+
+        // Recurse depth first.
+        for (auto e : d->dir) {
+            if (e->fs.isDirectory()) {
+                recurseInto(e, cb);
+                cb(e->path, &e->fs);
+            }
+        }
+        for (auto e : d->dir) {
+            if (!e->fs.isDirectory()) {
+                cb(e->path, &e->fs);
+            }
+        }
+    }
+
+    void recurse(Path *root, std::function<void(Path *path, FileStat *stat)> cb)
+    {
+        point_ = rev_->singlePointInTime();
+        assert(point_);
+
+        Entry *d = rev_->findEntry(point_, Path::lookupRoot());
+        assert(d);
+        recurseInto(d, cb);
+    }
+
+    RC stat(Path *p, FileStat *fs)
+    {
+        return RC::ERR;
+    }
+    RC chmod(Path *p, FileStat *fs)
+    {
+        return RC::ERR;
+    }
+    RC utime(Path *p, FileStat *fs)
+    {
+        return RC::ERR;
+    }
+    Path *mkTempFile(std::string prefix, std::string content)
+    {
+        return NULL;
+    }
+    Path *mkTempDir(std::string prefix)
+    {
+        return NULL;
+    }
+    Path *mkDir(Path *p, std::string name)
+    {
+        return NULL;
+    }
+    RC rmDir(Path *p)
+    {
+        return RC::ERR;
+    }
+    RC loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
+    {
+        return RC::OK;
+    }
+    RC createFile(Path *file, std::vector<char> *buf)
+    {
+        return RC::ERR;
+    }
+    bool createFile(Path *path, FileStat *stat,
+                     std::function<size_t(off_t offset, char *buffer, size_t len)> cb)
+    {
+        return false;
+    }
+    bool createSymbolicLink(Path *file, FileStat *stat, string target)
+    {
+        return false;
+    }
+    bool createHardLink(Path *file, FileStat *stat, Path *target)
+    {
+        return false;
+    }
+    bool createFIFO(Path *file, FileStat *stat)
+    {
+        return false;
+    }
+    bool readLink(Path *file, string *target)
+    {
+        return false;
+    }
+    bool deleteFile(Path *file)
+    {
+        return false;
+    }
+
+    RC mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground=false, bool debug=false)
+    {
+        return RC::ERR;
+    }
+    unique_ptr<FuseMount> mount(Path *dir, FuseAPI *fuseapi, bool debug=false)
+    {
+        return NULL;
+    }
+
+    RC umount(ptr<FuseMount> fuse_mount)
+    {
+        return RC::ERR;
+    }
+
+    RC enableWatch()
+    {
+        return RC::ERR;
+    }
+
+    RC addWatch(Path *dir)
+    {
+        return RC::ERR;
+    }
+
+    int endWatch()
+    {
+        return 0;
+    }
+
+    RestoreFileSystem(Restore *rev) : FileSystem("RestoreFileSystem"), rev_(rev) { }
+};
+
+Restore::Restore(FileSystem *backup_fs)
 {
     single_point_in_time_ = NULL;
-    backup_file_system_ = backup_fs.get();
+    backup_file_system_ = backup_fs;
+    contents_fs_ = unique_ptr<FileSystem>(new RestoreFileSystem(this));
 }
 
 // The gz file to load, and the dir to populate with its contents.
@@ -642,147 +779,6 @@ RC Restore::loadBeakFileSystem(Settings *settings)
         e->fs.st_mtim.tv_nsec = youngest_nanos;
     }
     return RC::OK;
-}
-
-struct ReverseFileSystem : FileSystem
-{
-    Restore *rev_;
-    PointInTime *point_;
-
-    bool readdir(Path *p, std::vector<Path*> *vec)
-    {
-        return false;
-    }
-    ssize_t pread(Path *p, char *buf, size_t size, off_t offset)
-    {
-        return 0;
-    }
-
-    void recurseInto(Entry *d, std::function<void(Path*,FileStat*)> cb)
-    {
-        rev_->loadDirContents(point_, d->path);
-
-        // Recurse depth first.
-        for (auto e : d->dir) {
-            if (e->fs.isDirectory()) {
-                recurseInto(e, cb);
-                cb(e->path, &e->fs);
-            }
-        }
-        for (auto e : d->dir) {
-            if (!e->fs.isDirectory()) {
-                cb(e->path, &e->fs);
-            }
-        }
-    }
-
-    void recurse(Path *root, std::function<void(Path *path, FileStat *stat)> cb)
-    {
-        point_ = rev_->singlePointInTime();
-        assert(point_);
-
-        Entry *d = rev_->findEntry(point_, Path::lookupRoot());
-        assert(d);
-        recurseInto(d, cb);
-    }
-
-    RC stat(Path *p, FileStat *fs)
-    {
-        return RC::ERR;
-    }
-    RC chmod(Path *p, FileStat *fs)
-    {
-        return RC::ERR;
-    }
-    RC utime(Path *p, FileStat *fs)
-    {
-        return RC::ERR;
-    }
-    Path *mkTempFile(std::string prefix, std::string content)
-    {
-        return NULL;
-    }
-    Path *mkTempDir(std::string prefix)
-    {
-        return NULL;
-    }
-    Path *mkDir(Path *p, std::string name)
-    {
-        return NULL;
-    }
-    RC rmDir(Path *p)
-    {
-        return RC::ERR;
-    }
-    RC loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
-    {
-        return RC::OK;
-    }
-    RC createFile(Path *file, std::vector<char> *buf)
-    {
-        return RC::ERR;
-    }
-    bool createFile(Path *path, FileStat *stat,
-                     std::function<size_t(off_t offset, char *buffer, size_t len)> cb)
-    {
-        return false;
-    }
-    bool createSymbolicLink(Path *file, FileStat *stat, string target)
-    {
-        return false;
-    }
-    bool createHardLink(Path *file, FileStat *stat, Path *target)
-    {
-        return false;
-    }
-    bool createFIFO(Path *file, FileStat *stat)
-    {
-        return false;
-    }
-    bool readLink(Path *file, string *target)
-    {
-        return false;
-    }
-    bool deleteFile(Path *file)
-    {
-        return false;
-    }
-
-    RC mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground=false, bool debug=false)
-    {
-        return RC::ERR;
-    }
-    unique_ptr<FuseMount> mount(Path *dir, FuseAPI *fuseapi, bool debug=false)
-    {
-        return NULL;
-    }
-
-    RC umount(ptr<FuseMount> fuse_mount)
-    {
-        return RC::ERR;
-    }
-
-    RC enableWatch()
-    {
-        return RC::ERR;
-    }
-
-    RC addWatch(Path *dir)
-    {
-        return RC::ERR;
-    }
-
-    int endWatch()
-    {
-        return 0;
-    }
-
-    ReverseFileSystem(Restore *rev) : rev_(rev) { }
-};
-
-FileSystem *Restore::asFileSystem()
-{
-    return new ReverseFileSystem(this);
 }
 
 unique_ptr<Restore> newRestore(ptr<FileSystem> backup_fs)

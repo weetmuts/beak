@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2017 Fredrik Öhrström
+ Copyright (C) 2017-2018 Fredrik Öhrström
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -86,14 +86,6 @@ string FileStat::gidName()
     return to_string(st_gid);
 }
 
-struct FuseMountImplementationPosix : FuseMount
-{
-    Path *dir;
-    struct fuse_chan *chan;
-    struct fuse *fuse;
-    pid_t loop_pid;
-};
-
 struct FileSystemImplementationPosix : FileSystem
 {
     bool readdir(Path *p, vector<Path*> *vec);
@@ -116,14 +108,11 @@ struct FileSystemImplementationPosix : FileSystem
     bool readLink(Path *path, string *target);
     bool deleteFile(Path *file);
 
-    RC mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground=false, bool debug=false);
-    unique_ptr<FuseMount> mount(Path *dir, FuseAPI *fuseapi, bool debug=false);
-
-    RC umount(ptr<FuseMount> fuse_mount);
-
     RC enableWatch();
     RC addWatch(Path *dir);
     int endWatch();
+
+    FileSystemImplementationPosix() : FileSystem("FileSystemImplementationPosix") {}
 
 private:
 
@@ -473,109 +462,6 @@ bool FileSystemImplementationPosix::deleteFile(Path *file)
         error(FILESYSTEM, "Could not delete file \"%s\"\n", file->c_str());
     }
     return true;
-}
-
-static int mountGetattr(const char *path, struct stat *stbuf)
-{
-    FuseAPI *fuseapi = (FuseAPI*)fuse_get_context()->private_data;
-    return fuseapi->getattrCB(path, stbuf);
-}
-
-static int mountReaddir(const char *path, void *buf, fuse_fill_dir_t filler,
-                          off_t offset, struct fuse_file_info *fi)
-{
-    FuseAPI *fuseapi = (FuseAPI*)fuse_get_context()->private_data;
-    return fuseapi->readdirCB(path, buf, filler, offset, fi);
-}
-
-static int mountRead(const char *path, char *buf, size_t size, off_t offset,
-                       struct fuse_file_info *fi)
-{
-    FuseAPI *fuseapi = (FuseAPI*)fuse_get_context()->private_data;
-    return fuseapi->readCB(path, buf, size, offset, fi);
-}
-
-static int open_callback(const char *path, struct fuse_file_info *fi)
-{
-    return 0;
-}
-
-RC FileSystemImplementationPosix::mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground, bool debug)
-{
-    unique_ptr<FuseMount> fm;
-    return mountInternal(dir, fuseapi, true, fm, foreground, debug);
-}
-
-unique_ptr<FuseMount> FileSystemImplementationPosix::mount(Path *dir, FuseAPI *fuseapi, bool debug)
-{
-    unique_ptr<FuseMount> fm;
-    mountInternal(dir, fuseapi, false, fm, false, debug);
-    return fm;
-}
-
-RC FileSystemImplementationPosix::mountInternal(Path *dir, FuseAPI *fuseapi,
-                                                bool daemon, unique_ptr<FuseMount> &fm,
-                                                bool foreground, bool debug)
-{
-    vector<string> fuse_args;
-    fuse_args.push_back("beak");
-    if (foreground) fuse_args.push_back("-f");
-    if (debug) fuse_args.push_back("-d");
-    if (daemon) fuse_args.push_back(dir->str());
-
-    int fuse_argc = fuse_args.size();
-    char **fuse_argv = new char*[fuse_argc+1];
-    int j = 0;
-    for (auto &s : fuse_args) {
-        fuse_argv[j] = (char*)s.c_str();
-        j++;
-    }
-    fuse_argv[j] = 0;
-
-    fuse_operations *ops = new fuse_operations;
-    memset(ops, 0, sizeof(*ops));
-    ops->getattr = mountGetattr;
-    ops->open = open_callback;
-    ops->read = mountRead;
-    ops->readdir = mountReaddir;
-
-    if (daemon) {
-        int rc = fuse_main(fuse_argc, fuse_argv, ops, fuseapi);
-        if (rc) return RC::ERR;
-        return RC::OK;
-    }
-
-    auto *fuse_mount_info = new FuseMountImplementationPosix;
-
-    struct fuse_args args;
-    args.argc = fuse_argc;
-    args.argv = fuse_argv;
-    args.allocated = 0;
-    fuse_mount_info->dir = dir;
-    fuse_mount_info->chan = fuse_mount(dir->c_str(), &args);
-    fuse_mount_info->fuse = fuse_new(fuse_mount_info->chan,
-                                &args,
-                                ops,
-                                sizeof(*ops),
-                                fuseapi);
-
-    fuse_mount_info->loop_pid = fork();
-
-    if (fuse_mount_info->loop_pid == 0) {
-        // This is the child process. Serve the virtual file system.
-        fuse_loop_mt (fuse_mount_info->fuse);
-        exit(0);
-    }
-    fm = unique_ptr<FuseMount>(fuse_mount_info);
-    return RC::OK;
-}
-
-RC FileSystemImplementationPosix::umount(ptr<FuseMount> fuse_mount_info)
-{
-    FuseMountImplementationPosix *fmi = (FuseMountImplementationPosix*)fuse_mount_info.get();
-    fuse_exit(fmi->fuse);
-    fuse_unmount (fmi->dir->c_str(), fmi->chan);
-    return RC::OK;
 }
 
 string ownergroupString(uid_t uid, gid_t gid)
