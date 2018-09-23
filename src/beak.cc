@@ -494,10 +494,10 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
                 }
                 break;
             case foreground_option:
-                settings->fuse_args.push_back("-f");
+                settings->foreground = true;
                 break;
             case fusedebug_option:
-                settings->fuse_args.push_back("-d");
+                settings->fusedebug = true;
                 break;
             case include_option:
                 settings->include.push_back(value);
@@ -810,7 +810,7 @@ RC BeakImplementation::mountBackupDaemon(Settings *settings)
         return RC::ERR;
     }
 
-    return sys_->mountDaemon(dir, backup.get(), settings->foreground, settings->fusedebug);
+    return sys_->mountDaemon(dir, backup->asFuseAPI(), settings->foreground, settings->fusedebug);
 }
 
 RC BeakImplementation::mountBackup(Settings *settings)
@@ -824,7 +824,7 @@ RC BeakImplementation::mountBackup(Settings *settings)
         return RC::ERR;
     }
 
-    backup_fuse_mount_ = sys_->mount(settings->to.dir, backup.get(), settings->fusedebug);
+    backup_fuse_mount_ = sys_->mount(settings->to.dir, backup->asFuseAPI(), settings->fusedebug);
     return RC::OK;
 }
 
@@ -853,9 +853,9 @@ RC BeakImplementation::mountRestoreInternal(Settings *settings, bool daemon)
 {
     FileSystem *backup_fs {};
 
-    if (settings->from.type == ArgDir) {
-        backup_fs = local_fs_;
-    } else if (settings->from.type == ArgStorage) {
+    assert(settings->from.type == ArgStorage);
+    backup_fs = local_fs_;
+    if (settings->from.storage->type == RCloneStorage) {
         backup_fs = storage_tool_->asCachedReadOnlyFS(settings->from.storage);
     }
 
@@ -876,9 +876,9 @@ RC BeakImplementation::mountRestoreInternal(Settings *settings, bool daemon)
     if (rc.isErr()) return RC::ERR;
 
     if (daemon) {
-        return sys_->mountDaemon(settings->to.dir, restore.get(), settings->foreground, settings->fusedebug);
+        return sys_->mountDaemon(settings->to.dir, restore->asFuseAPI(), settings->foreground, settings->fusedebug);
     } else {
-        restore_fuse_mount_ = sys_->mount(settings->to.dir, restore.get(), settings->fusedebug);
+        restore_fuse_mount_ = sys_->mount(settings->to.dir, restore->asFuseAPI(), settings->fusedebug);
     }
 
     return RC::OK;
@@ -1069,7 +1069,11 @@ RC BeakImplementation::restore(Settings *settings)
     }
 
     umask(0);
-    FileSystem *backup_fs = storage_tool_->asCachedReadOnlyFS(settings->to.storage);
+    assert(settings->from.type == ArgStorage);
+    FileSystem *backup_fs = local_fs_;
+    if (settings->from.storage->type == RCloneStorage) {
+        backup_fs = storage_tool_->asCachedReadOnlyFS(settings->from.storage);
+    }
     unique_ptr<Restore> restore  = newRestore(backup_fs);
     FileSystem *backup_contents_fs = restore->asFileSystem();
 

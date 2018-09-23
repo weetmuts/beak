@@ -17,9 +17,10 @@
 
 #include "restore.h"
 
+#include "beak.h"
 #include "filesystem.h"
 #include "index.h"
-#include "beak.h"
+#include "lock.h"
 #include "tarfile.h"
 
 #include <algorithm>
@@ -179,6 +180,9 @@ struct RestoreFileSystem : FileSystem
 Restore::Restore(FileSystem *backup_fs)
 {
     single_point_in_time_ = NULL;
+    pthread_mutexattr_init(&global_attr);
+    pthread_mutexattr_settype(&global_attr, PTHREAD_MUTEX_RECURSIVE);
+    pthread_mutex_init(&global, &global_attr);
     backup_fs_ = backup_fs;
     contents_fs_ = unique_ptr<FileSystem>(new RestoreFileSystem(this));
 }
@@ -339,308 +343,315 @@ Entry *Restore::findEntry(PointInTime *point, Path *path)
     return &(point->entries_)[path];
 }
 
-int Restore::getattrCB(const char *path_char_string, struct stat *stbuf)
+struct RestoreFuseAPI : FuseAPI
 {
-    debug(RESTORE, "getattrCB >%s<\n", path_char_string);
+    Restore *restore_;
 
-    pthread_mutex_lock(&global);
+    RestoreFuseAPI(Restore *r) : restore_(r) {}
 
-    string path_string = path_char_string;
-    Path *path = Path::lookup(path_string);
-    Entry *e;
-    PointInTime *point;
 
-    if (path->depth() == 1)
+    int getattrCB(const char *path_char_string, struct stat *stbuf)
     {
-        memset(stbuf, 0, sizeof(struct stat));
-        stbuf->st_mode = S_IFDIR | S_IRUSR | S_IXUSR;
-        stbuf->st_nlink = 2;
-        stbuf->st_size = 0;
-        stbuf->st_uid = geteuid();
-        stbuf->st_gid = getegid();
-        #if HAS_ST_MTIM
-        stbuf->st_mtim.tv_sec = most_recent_point_in_time_->ts.tv_sec;
-        stbuf->st_mtim.tv_nsec = most_recent_point_in_time_->ts.tv_nsec;
-        stbuf->st_atim.tv_sec = most_recent_point_in_time_->ts.tv_sec;
-        stbuf->st_atim.tv_nsec = most_recent_point_in_time_->ts.tv_nsec;
-        stbuf->st_ctim.tv_sec = most_recent_point_in_time_->ts.tv_sec;
-        stbuf->st_ctim.tv_nsec = most_recent_point_in_time_->ts.tv_nsec;
-        #elif HAS_ST_MTIME
-        stbuf->st_mtime = most_recent_point_in_time_->ts.tv_sec;
-        stbuf->st_atime = most_recent_point_in_time_->ts.tv_sec;
-        stbuf->st_ctime = most_recent_point_in_time_->ts.tv_sec;
-        #else
-        #error
-        #endif
+        debug(RESTORE, "getattrCB >%s<\n", path_char_string);
 
-        goto ok;
-    }
+        LOCK(&restore_->global);
 
-    point = single_point_in_time_;
-    if (!point) {
-        Path *root = path->subpath(1,1);
-        point = findPointInTime(root->str());
-        if (!point) goto err;
-        if (path->depth() == 2) {
-            // We are getting the attributes for the virtual point_in_time directory.
+        string path_string = path_char_string;
+        Path *path = Path::lookup(path_string);
+        Entry *e;
+        PointInTime *point;
+
+        if (path->depth() == 1)
+        {
             memset(stbuf, 0, sizeof(struct stat));
             stbuf->st_mode = S_IFDIR | S_IRUSR | S_IXUSR;
             stbuf->st_nlink = 2;
             stbuf->st_size = 0;
             stbuf->st_uid = geteuid();
             stbuf->st_gid = getegid();
-            #if HAS_ST_MTIM
-            stbuf->st_mtim.tv_sec = point->ts.tv_sec;
-            stbuf->st_mtim.tv_nsec = point->ts.tv_nsec;
-            stbuf->st_atim.tv_sec = point->ts.tv_sec;
-            stbuf->st_atim.tv_nsec = point->ts.tv_nsec;
-            stbuf->st_ctim.tv_sec = point->ts.tv_sec;
-            stbuf->st_ctim.tv_nsec = point->ts.tv_nsec;
-            #elif HAS_ST_MTIME
-            stbuf->st_mtime = point->ts.tv_sec;
-            stbuf->st_atime = point->ts.tv_sec;
-            stbuf->st_ctime = point->ts.tv_sec;
-            #else
-            #error
-            #endif
+#if HAS_ST_MTIM
+            stbuf->st_mtim.tv_sec = restore_->mostRecentPointInTime()->ts.tv_sec;
+            stbuf->st_mtim.tv_nsec = restore_->mostRecentPointInTime()->ts.tv_nsec;
+            stbuf->st_atim.tv_sec = restore_->mostRecentPointInTime()->ts.tv_sec;
+            stbuf->st_atim.tv_nsec = restore_->mostRecentPointInTime()->ts.tv_nsec;
+            stbuf->st_ctim.tv_sec = restore_->mostRecentPointInTime()->ts.tv_sec;
+            stbuf->st_ctim.tv_nsec = restore_->mostRecentPointInTime()->ts.tv_nsec;
+#elif HAS_ST_MTIME
+            stbuf->st_mtime = restore_->mostRecentPointInTime()->ts.tv_sec;
+            stbuf->st_atime = restore_->mostRecentPointInTime()->ts.tv_sec;
+            stbuf->st_ctime = restore_->mostRecentPointInTime()->ts.tv_sec;
+#else
+#error
+#endif
+
             goto ok;
         }
-        if (path->depth() > 2) {
-            path = path->subpath(2)->prepend(Path::lookupRoot());
+
+        point = restore_->singlePointInTime();
+        if (!point) {
+            Path *root = path->subpath(1,1);
+            point = restore_->findPointInTime(root->str());
+            if (!point) goto err;
+            if (path->depth() == 2) {
+                // We are getting the attributes for the virtual point_in_time directory.
+                memset(stbuf, 0, sizeof(struct stat));
+                stbuf->st_mode = S_IFDIR | S_IRUSR | S_IXUSR;
+                stbuf->st_nlink = 2;
+                stbuf->st_size = 0;
+                stbuf->st_uid = geteuid();
+                stbuf->st_gid = getegid();
+#if HAS_ST_MTIM
+                stbuf->st_mtim.tv_sec = point->ts.tv_sec;
+                stbuf->st_mtim.tv_nsec = point->ts.tv_nsec;
+                stbuf->st_atim.tv_sec = point->ts.tv_sec;
+                stbuf->st_atim.tv_nsec = point->ts.tv_nsec;
+                stbuf->st_ctim.tv_sec = point->ts.tv_sec;
+                stbuf->st_ctim.tv_nsec = point->ts.tv_nsec;
+#elif HAS_ST_MTIME
+                stbuf->st_mtime = point->ts.tv_sec;
+                stbuf->st_atime = point->ts.tv_sec;
+                stbuf->st_ctime = point->ts.tv_sec;
+#else
+#error
+#endif
+                goto ok;
+            }
+            if (path->depth() > 2) {
+                path = path->subpath(2)->prepend(Path::lookupRoot());
+            }
         }
-    }
 
-    e = findEntry(point, path);
-    if (!e) goto err;
+        e = restore_->findEntry(point, path);
+        if (!e) goto err;
 
-    memset(stbuf, 0, sizeof(struct stat));
+        memset(stbuf, 0, sizeof(struct stat));
 
-    if (e->fs.isDirectory())
-    {
+        if (e->fs.isDirectory())
+        {
+            stbuf->st_mode = e->fs.st_mode;
+            stbuf->st_nlink = 2;
+            stbuf->st_size = e->fs.st_size;
+            stbuf->st_uid = e->fs.st_uid;
+            stbuf->st_gid = e->fs.st_gid;
+#if HAS_ST_MTIM
+            stbuf->st_mtim.tv_sec = e->fs.st_mtim.tv_sec;
+            stbuf->st_mtim.tv_nsec = e->fs.st_mtim.tv_nsec;
+            stbuf->st_atim.tv_sec = e->fs.st_mtim.tv_sec;
+            stbuf->st_atim.tv_nsec = e->fs.st_mtim.tv_nsec;
+            stbuf->st_ctim.tv_sec = e->fs.st_mtim.tv_sec;
+            stbuf->st_ctim.tv_nsec = e->fs.st_mtim.tv_nsec;
+#elif HAS_ST_MTIME
+            stbuf->st_mtime = e->fs.st_mtim.tv_sec;
+            stbuf->st_atime = e->fs.st_mtim.tv_sec;
+            stbuf->st_ctime = e->fs.st_mtim.tv_sec;
+#else
+#error
+#endif
+            goto ok;
+        }
+
         stbuf->st_mode = e->fs.st_mode;
-        stbuf->st_nlink = 2;
+        stbuf->st_nlink = 1;
         stbuf->st_size = e->fs.st_size;
         stbuf->st_uid = e->fs.st_uid;
         stbuf->st_gid = e->fs.st_gid;
-        #if HAS_ST_MTIM
+#if HAS_ST_MTIM
         stbuf->st_mtim.tv_sec = e->fs.st_mtim.tv_sec;
         stbuf->st_mtim.tv_nsec = e->fs.st_mtim.tv_nsec;
         stbuf->st_atim.tv_sec = e->fs.st_mtim.tv_sec;
         stbuf->st_atim.tv_nsec = e->fs.st_mtim.tv_nsec;
         stbuf->st_ctim.tv_sec = e->fs.st_mtim.tv_sec;
         stbuf->st_ctim.tv_nsec = e->fs.st_mtim.tv_nsec;
-        #elif HAS_ST_MTIME
+#elif HAS_ST_MTIME
         stbuf->st_mtime = e->fs.st_mtim.tv_sec;
         stbuf->st_atime = e->fs.st_mtim.tv_sec;
         stbuf->st_ctime = e->fs.st_mtim.tv_sec;
-        #else
-        #error
-        #endif
+#else
+#error
+#endif
+        stbuf->st_rdev = e->fs.st_rdev;
         goto ok;
-    }
-
-    stbuf->st_mode = e->fs.st_mode;
-    stbuf->st_nlink = 1;
-    stbuf->st_size = e->fs.st_size;
-    stbuf->st_uid = e->fs.st_uid;
-    stbuf->st_gid = e->fs.st_gid;
-    #if HAS_ST_MTIM
-    stbuf->st_mtim.tv_sec = e->fs.st_mtim.tv_sec;
-    stbuf->st_mtim.tv_nsec = e->fs.st_mtim.tv_nsec;
-    stbuf->st_atim.tv_sec = e->fs.st_mtim.tv_sec;
-    stbuf->st_atim.tv_nsec = e->fs.st_mtim.tv_nsec;
-    stbuf->st_ctim.tv_sec = e->fs.st_mtim.tv_sec;
-    stbuf->st_ctim.tv_nsec = e->fs.st_mtim.tv_nsec;
-    #elif HAS_ST_MTIME
-    stbuf->st_mtime = e->fs.st_mtim.tv_sec;
-    stbuf->st_atime = e->fs.st_mtim.tv_sec;
-    stbuf->st_ctime = e->fs.st_mtim.tv_sec;
-    #else
-    #error
-    #endif
-    stbuf->st_rdev = e->fs.st_rdev;
-    goto ok;
 
     err:
 
-    pthread_mutex_unlock(&global);
-    return -ENOENT;
+        UNLOCK(&restore_->global);
+        return -ENOENT;
 
     ok:
 
-    pthread_mutex_unlock(&global);
-    return 0;
-}
+        UNLOCK(&restore_->global);
+        return 0;
+    }
 
-int Restore::readdirCB(const char *path_char_string, void *buf,
-		fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
-{
-    debug(RESTORE, "readdirCB >%s<\n", path_char_string);
+    int readdirCB(const char *path_char_string, void *buf,
+                  fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
+    {
+        debug(RESTORE, "readdirCB >%s<\n", path_char_string);
 
-    pthread_mutex_lock(&global);
+        LOCK(&restore_->global);
 
-    string path_string = path_char_string;
-    Path *path = Path::lookup(path_string);
-    Entry *e;
-    PointInTime *point = single_point_in_time_;
+        string path_string = path_char_string;
+        Path *path = Path::lookup(path_string);
+        Entry *e;
+        PointInTime *point = restore_->singlePointInTime();
 
-    if (!point) {
-        if (path->depth() == 1) {
-            filler(buf, ".", NULL, 0);
-            filler(buf, "..", NULL, 0);
+        if (!point) {
+            if (path->depth() == 1) {
+                filler(buf, ".", NULL, 0);
+                filler(buf, "..", NULL, 0);
 
-            for (auto &p : history_)
-            {
-                char filename[256];
-                memset(filename, 0, 256);
-                snprintf(filename, 255, "%s", p.direntry.c_str());
-                filler(buf, filename, NULL, 0);
+                for (auto &p : restore_->history())
+                {
+                    char filename[256];
+                    memset(filename, 0, 256);
+                    snprintf(filename, 255, "%s", p.direntry.c_str());
+                    filler(buf, filename, NULL, 0);
+                }
+                goto ok;
             }
+
+            Path *pnt_dir = path->subpath(1,1);
+            point = restore_->findPointInTime(pnt_dir->str());
+            if (!point) goto err;
+            path = path->subpath(2)->prepend(Path::lookupRoot());
+        }
+
+        e = restore_->findEntry(point, path);
+        if (!e) goto err;
+
+        if (!e->fs.isDirectory()) goto err;
+
+        if (!e->loaded) {
+            debug(RESTORE,"Not loaded %s\n", e->path->c_str());
+            restore_->loadCache(point, e->path);
+        }
+        filler(buf, ".", NULL, 0);
+        filler(buf, "..", NULL, 0);
+
+        for (auto i : e->dir)
+        {
+            char filename[256];
+            memset(filename, 0, 256);
+            snprintf(filename, 255, "%s", i->path->name()->c_str());
+            filler(buf, filename, NULL, 0);
+        }
+        goto ok;
+
+    err:
+
+        UNLOCK(&restore_->global);
+        return -ENOENT;
+
+    ok:
+
+        UNLOCK(&restore_->global);
+        return 0;
+    }
+
+    int readlinkCB(const char *path_char_string, char *buf, size_t s)
+    {
+        debug(RESTORE, "readlinkCB >%s<\n", path_char_string);
+
+        LOCK(&restore_->global);
+
+        string path_string = path_char_string;
+        Path *path = Path::lookup(path_string);
+        size_t c;
+        Entry *e;
+        PointInTime *point = restore_->singlePointInTime();
+        if (!point) {
+            Path *pnt_dir = path->subpath(1,1);
+            point = restore_->findPointInTime(pnt_dir->c_str());
+            if (!point) goto err;
+            path = path->subpath(2)->prepend(Path::lookupRoot());
+        }
+        e = restore_->findEntry(point, path);
+        if (!e) goto err;
+
+        c = e->symlink.length();
+        if (c > s) c = s;
+
+        memcpy(buf, e->symlink.c_str(), c);
+        buf[c] = 0;
+        debug(RESTORE, "readlinkCB >%s< bufsiz=%ju returns buf=>%s<\n", path, s, buf);
+
+        goto ok;
+
+    err:
+
+        UNLOCK(&restore_->global);
+        return -ENOENT;
+
+    ok:
+
+        UNLOCK(&restore_->global);
+        return 0;
+    }
+
+    int readCB(const char *path_char_string, char *buf,
+               size_t size, off_t offset_, struct fuse_file_info *fi)
+    {
+        debug(RESTORE, "readCB >%s< offset=%ju size=%ju\n", path_char_string, offset_, size);
+
+        LOCK(&restore_->global);
+
+        off_t offset = offset_;
+        int rc = 0;
+        string path_string = path_char_string;
+        Path *path = Path::lookup(path_string);
+
+        Entry *e;
+        Path *tar;
+
+        PointInTime *point = restore_->singlePointInTime();
+        if (!point) {
+            Path *pnt_dir = path->subpath(1,1);
+            point = restore_->findPointInTime(pnt_dir->str());
+            if (!point) goto err;
+            path = path->subpath(2)->prepend(Path::lookupRoot());
+        }
+
+        e = restore_->findEntry(point, path);
+        if (!e) goto err;
+
+        tar = e->tar->prepend(restore_->rootDir());
+
+        if (offset > e->fs.st_size)
+        {
+            // Read outside of file size
+            rc = 0;
             goto ok;
         }
 
-        Path *pnt_dir = path->subpath(1,1);
-        point = findPointInTime(pnt_dir->str());
-        if (!point) goto err;
-        path = path->subpath(2)->prepend(Path::lookupRoot());
-    }
+        if (offset + (off_t)size > e->fs.st_size)
+        {
+            // Shrink actual read to fit file.
+            size = e->fs.st_size - offset;
+        }
 
-    e = findEntry(point, path);
-    if (!e) goto err;
+        // Offset into tar file.
+        offset += e->offset;
 
-    if (!e->fs.isDirectory()) goto err;
+        debug(RESTORE, "Reading %ju bytes from offset %ju in file %s\n", size, offset, tar->c_str());
+        rc = restore_->backupFileSystem()->pread(tar, buf, size, offset);
+        if (rc == -1)
+        {
+            failure(RESTORE,
+                    "Could not read from file >%s< in underlying filesystem err %d",
+                    tar->c_str(), errno);
+            goto err;
+        }
+    ok:
 
-    if (!e->loaded) {
-        debug(RESTORE,"Not loaded %s\n", e->path->c_str());
-        loadCache(point, e->path);
-    }
-    filler(buf, ".", NULL, 0);
-    filler(buf, "..", NULL, 0);
-
-    for (auto i : e->dir)
-    {
-        char filename[256];
-        memset(filename, 0, 256);
-        snprintf(filename, 255, "%s", i->path->name()->c_str());
-        filler(buf, filename, NULL, 0);
-    }
-    goto ok;
+        UNLOCK(&restore_->global);
+        return rc;
 
     err:
 
-    pthread_mutex_unlock(&global);
-    return -ENOENT;
-
-    ok:
-
-    pthread_mutex_unlock(&global);
-    return 0;
-}
-
-int Restore::readlinkCB(const char *path_char_string, char *buf, size_t s)
-{
-    debug(RESTORE, "readlinkCB >%s<\n", path_char_string);
-
-    pthread_mutex_lock(&global);
-
-    string path_string = path_char_string;
-    Path *path = Path::lookup(path_string);
-    size_t c;
-    Entry *e;
-    PointInTime *point = single_point_in_time_;
-    if (!point) {
-        Path *pnt_dir = path->subpath(1,1);
-        point = findPointInTime(pnt_dir->c_str());
-        if (!point) goto err;
-        path = path->subpath(2)->prepend(Path::lookupRoot());
+        UNLOCK(&restore_->global);
+        return -ENOENT;
     }
-    e = findEntry(point, path);
-    if (!e) goto err;
-
-    c = e->symlink.length();
-    if (c > s) c = s;
-
-    memcpy(buf, e->symlink.c_str(), c);
-    buf[c] = 0;
-    debug(RESTORE, "readlinkCB >%s< bufsiz=%ju returns buf=>%s<\n", path, s, buf);
-
-    goto ok;
-
-    err:
-
-    pthread_mutex_unlock(&global);
-    return -ENOENT;
-
-    ok:
-
-    pthread_mutex_unlock(&global);
-    return 0;
-}
-
-int Restore::readCB(const char *path_char_string, char *buf,
-		size_t size, off_t offset_, struct fuse_file_info *fi)
-{
-    debug(RESTORE, "readCB >%s< offset=%ju size=%ju\n", path_char_string, offset_, size);
-
-    pthread_mutex_lock(&global);
-
-    off_t offset = offset_;
-    int rc = 0;
-    string path_string = path_char_string;
-    Path *path = Path::lookup(path_string);
-
-    Entry *e;
-    Path *tar;
-
-    PointInTime *point = single_point_in_time_;
-    if (!point) {
-        Path *pnt_dir = path->subpath(1,1);
-        point = findPointInTime(pnt_dir->str());
-        if (!point) goto err;
-        path = path->subpath(2)->prepend(Path::lookupRoot());
-    }
-
-    e = findEntry(point, path);
-    if (!e) goto err;
-
-    tar = e->tar->prepend(rootDir());
-
-    if (offset > e->fs.st_size)
-    {
-        // Read outside of file size
-        rc = 0;
-        goto ok;
-    }
-
-    if (offset + (off_t)size > e->fs.st_size)
-    {
-        // Shrink actual read to fit file.
-        size = e->fs.st_size - offset;
-    }
-
-    // Offset into tar file.
-    offset += e->offset;
-
-    debug(RESTORE, "Reading %ju bytes from offset %ju in file %s\n", size, offset, tar->c_str());
-    rc = backup_fs_->pread(tar, buf, size, offset);
-    if (rc == -1)
-    {
-        failure(RESTORE,
-                "Could not read from file >%s< in underlying filesystem err %d",
-                tar->c_str(), errno);
-        goto err;
-    }
-    ok:
-
-    pthread_mutex_unlock(&global);
-    return rc;
-
-    err:
-
-    pthread_mutex_unlock(&global);
-    return -ENOENT;
-}
-
+};
 
 RC Restore::lookForPointsInTime(PointInTimeFormat f, Path *path)
 {
@@ -779,6 +790,11 @@ RC Restore::loadBeakFileSystem(Settings *settings)
         e->fs.st_mtim.tv_nsec = youngest_nanos;
     }
     return RC::OK;
+}
+
+FuseAPI *Restore::asFuseAPI()
+{
+    return new RestoreFuseAPI(this);
 }
 
 unique_ptr<Restore> newRestore(ptr<FileSystem> backup_fs)

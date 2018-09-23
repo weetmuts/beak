@@ -17,6 +17,10 @@
 
 #include "backup.h"
 
+#include "lock.h"
+#include "log.h"
+#include "tarfile.h"
+
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -30,10 +34,6 @@
 #include <locale>
 #include <set>
 #include <zlib.h>
-
-
-#include "log.h"
-#include "tarfile.h"
 
 using namespace std;
 
@@ -837,127 +837,135 @@ TarFile *Backup::findTarFromPath(Path *path) {
     return NULL;
 }
 
-int Backup::getattrCB(const char *path_char_string, struct stat *stbuf) {
-    pthread_mutex_lock(&global);
+struct BackupFuseAPI : FuseAPI
+{
+    Backup *backup_;
 
-    memset(stbuf, 0, sizeof(struct stat));
-    debug(FUSE,"getattrCB >%s<\n", path_char_string);
-    if (path_char_string[0] == '/') {
+    BackupFuseAPI(Backup *b) : backup_(b) {}
+
+    int getattrCB(const char *path_char_string, struct stat *stbuf)
+    {
+        LOCK(&backup_->global);
+
+        memset(stbuf, 0, sizeof(struct stat));
+        debug(FUSE,"getattrCB >%s<\n", path_char_string);
+        if (path_char_string[0] == '/') {
+            string path_string = path_char_string;
+            Path *path = Path::lookup(path_string);
+
+            TarEntry *te = backup_->directories[path];
+            if (te) {
+                memset(stbuf, 0, sizeof(struct stat));
+                stbuf->st_mode = S_IFDIR | 0500;
+                stbuf->st_nlink = 2;
+                stbuf->st_size = 0;
+#ifdef PLATFORM_POSIX
+                stbuf->st_blksize = 512;
+                stbuf->st_blocks = 0;
+#endif
+                goto ok;
+            }
+
+            TarFile *tar = backup_->findTarFromPath(path);
+            if (tar) {
+                stbuf->st_uid = geteuid();
+                stbuf->st_gid = getegid();
+                stbuf->st_mode = S_IFREG | 0500;
+                stbuf->st_nlink = 1;
+                stbuf->st_size = tar->size();
+#ifdef PLATFORM_POSIX
+                stbuf->st_blksize = 512;
+                if (tar->size() > 0) {
+                    stbuf->st_blocks = 1+(tar->size()/512);
+                } else {
+                    stbuf->st_blocks = 0;
+                }
+#endif
+#if HAS_ST_MTIM
+                memcpy(&stbuf->st_mtim, tar->mtim(), sizeof(stbuf->st_mtim));
+#elif HAS_ST_MTIME
+                stbuf->st_mtime = tar->mtim()->tv_sec;
+#else
+#error
+#endif
+                goto ok;
+            }
+        }
+
+        UNLOCK(&backup_->global);
+        return -ENOENT;
+
+    ok:
+        UNLOCK(&backup_->global);
+        return 0;
+    }
+
+    int readdirCB(const char *path_char_string, void *buf, fuse_fill_dir_t filler,
+                  off_t offset, struct fuse_file_info *fi)
+    {
+
+        debug(FUSE,"readdirCB >%s<\n", path_char_string);
+
+        if (path_char_string[0] != '/') {
+            return ENOENT;
+        }
+
         string path_string = path_char_string;
         Path *path = Path::lookup(path_string);
 
-        TarEntry *te = directories[path];
-        if (te) {
-            memset(stbuf, 0, sizeof(struct stat));
-            stbuf->st_mode = S_IFDIR | 0500;
-            stbuf->st_nlink = 2;
-            stbuf->st_size = 0;
-            #ifdef PLATFORM_POSIX
-            stbuf->st_blksize = 512;
-            stbuf->st_blocks = 0;
-            #endif
-            goto ok;
+        TarEntry *te = backup_->directories[path];
+        if (!te) {
+            return ENOENT;
         }
 
-        TarFile *tar = findTarFromPath(path);
-        if (tar) {
-            stbuf->st_uid = geteuid();
-            stbuf->st_gid = getegid();
-            stbuf->st_mode = S_IFREG | 0500;
-            stbuf->st_nlink = 1;
-            stbuf->st_size = tar->size();
-            #ifdef PLATFORM_POSIX
-            stbuf->st_blksize = 512;
-            if (tar->size() > 0) {
-                stbuf->st_blocks = 1+(tar->size()/512);
-            } else {
-                stbuf->st_blocks = 0;
-            }
-            #endif
-            #if HAS_ST_MTIM
-            memcpy(&stbuf->st_mtim, tar->mtim(), sizeof(stbuf->st_mtim));
-            #elif HAS_ST_MTIME
-            stbuf->st_mtime = tar->mtim()->tv_sec;
-            #else
-            #error
-            #endif
-            goto ok;
+        LOCK(&backup_->global);
+
+        filler(buf, ".", NULL, 0);
+        filler(buf, "..", NULL, 0);
+        for (auto & e : te->dirs()) {
+            char filename[256];
+            snprintf(filename, 256, "%s", e->path()->name()->c_str());
+            filler(buf, filename, NULL, 0);
         }
+
+        for (auto & f : te->files()) {
+            char filename[256];
+            snprintf(filename, 256, "%s", f.c_str());
+            filler(buf, filename, NULL, 0);
+        }
+
+        UNLOCK(&backup_->global);
+        return 0;
     }
 
-    pthread_mutex_unlock(&global);
-    return -ENOENT;
+    int readCB(const char *path_char_string, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
+    {
+        LOCK(&backup_->global);
+        size_t n;
+        debug(FUSE,"readCB >%s< size %zu offset %zu\n", path_char_string, size, offset);
+        string path_string = path_char_string;
+        Path *path = Path::lookup(path_string);
 
-ok:
-    pthread_mutex_unlock(&global);
-    return 0;
-}
+        TarFile *tar = backup_->findTarFromPath(path);
+        if (!tar) {
+            goto err;
+        }
 
-int Backup::readdirCB(const char *path_char_string, void *buf, fuse_fill_dir_t filler,
-                               off_t offset, struct fuse_file_info *fi)
-{
+        n = tar->copy(buf, size, offset, backup_->originFileSystem());
 
-    debug(FUSE,"readdirCB >%s<\n", path_char_string);
+        UNLOCK(&backup_->global);
+        return n;
 
-    if (path_char_string[0] != '/') {
-        return ENOENT;
+    err:
+        UNLOCK(&backup_->global);
+        return -ENOENT;
     }
 
-    string path_string = path_char_string;
-    Path *path = Path::lookup(path_string);
-
-    TarEntry *te = directories[path];
-    if (!te) {
-        return ENOENT;
+    int readlinkCB(const char *path_char_string, char *buf, size_t s)
+    {
+        return 0;
     }
-
-    pthread_mutex_lock(&global);
-
-    filler(buf, ".", NULL, 0);
-    filler(buf, "..", NULL, 0);
-    for (auto & e : te->dirs()) {
-        char filename[256];
-        snprintf(filename, 256, "%s", e->path()->name()->c_str());
-        filler(buf, filename, NULL, 0);
-    }
-
-    for (auto & f : te->files()) {
-        char filename[256];
-        snprintf(filename, 256, "%s", f.c_str());
-        filler(buf, filename, NULL, 0);
-    }
-
-    pthread_mutex_unlock(&global);
-    return 0;
-}
-
-int Backup::readCB(const char *path_char_string, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
-{
-    pthread_mutex_lock(&global);
-    size_t n;
-    debug(FUSE,"readCB >%s< size %zu offset %zu\n", path_char_string, size, offset);
-    string path_string = path_char_string;
-    Path *path = Path::lookup(path_string);
-
-    TarFile *tar = findTarFromPath(path);
-    if (!tar) {
-        goto err;
-    }
-
-    n = tar->copy(buf, size, offset, origin_fs_);
-
-    pthread_mutex_unlock(&global);
-    return n;
-
-err:
-    pthread_mutex_unlock(&global);
-    return -ENOENT;
-}
-
-int Backup::readlinkCB(const char *path_char_string, char *buf, size_t s)
-{
-    return 0;
-}
+};
 
 RC Backup::scanFileSystem(Settings *settings)
 {
@@ -1178,6 +1186,11 @@ struct BeakFS : FileSystem
 FileSystem *Backup::asFileSystem()
 {
     return new BeakFS(this);
+}
+
+FuseAPI *Backup::asFuseAPI()
+{
+    return new BackupFuseAPI(this);
 }
 
 unique_ptr<Backup> newBackup(ptr<FileSystem> fs)

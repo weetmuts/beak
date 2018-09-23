@@ -189,7 +189,7 @@ RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backup,
     case RCloneStorage:
     {
         Path *mount = local_fs_->mkTempDir("beak_push_");
-        unique_ptr<FuseMount> fuse_mount = sys_->mount(mount, backup, settings->fusedebug);
+        unique_ptr<FuseMount> fuse_mount = sys_->mount(mount, backup->asFuseAPI(), settings->fusedebug);
 
         if (!fuse_mount) {
             error(STORAGETOOL, "Could not mount beak filesyset for rclone.\n");

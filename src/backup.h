@@ -47,12 +47,7 @@ struct Filter {
     Filter(std::string rule_, FilterType type_) : rule(rule_), type(type_) { }
 };
 
-typedef int (*FileCB)(const char *,const struct stat *,int,struct FTW *);
-typedef int (*GetAttrCB)(const char*, struct stat*);
-typedef int (*ReaddirCB)(const char*,void*,fuse_fill_dir_t,off_t,struct fuse_file_info*);
-typedef int (*ReadCB)(const char *,char *,size_t,off_t,struct fuse_file_info *);
-
-struct Backup : FuseAPI
+struct Backup
 {
     RC scanFileSystem(Settings *settings);
 
@@ -99,13 +94,7 @@ struct Backup : FuseAPI
     TarFile *findTarFromPath(Path *path);
     FileSystem *asFileSystem();
     FileSystem *originFileSystem() { return origin_fs_; }
-
-    // Implement a FUSE API
-    int getattrCB(const char *path, struct stat *stbuf);
-    int readdirCB(const char *path, void *buf, fuse_fill_dir_t filler,
-                  off_t offset, struct fuse_file_info *fi);
-    int readCB(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi);
-    int readlinkCB(const char *path_char_string, char *buf, size_t s);
+    FuseAPI *asFuseAPI();
 
     void setMessage(std::string m) { message_ = m; }
     void setTarHeaderStyle(TarHeaderStyle ths) { tarheaderstyle_= ths; }

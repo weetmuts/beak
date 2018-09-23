@@ -84,11 +84,12 @@ struct PointInTime {
     std::set<Path*> loaded_gz_files_;
 };
 
-struct Restore : FuseAPI
+struct Restore
 {
     RC loadBeakFileSystem(Settings *settings);
 
     pthread_mutex_t global;
+    pthread_mutexattr_t global_attr;
 
     Entry *findEntry(PointInTime *point, Path *path);
 
@@ -107,6 +108,7 @@ struct Restore : FuseAPI
     void loadCache(PointInTime *point, Path *path);
 
     PointInTime *singlePointInTime() { return single_point_in_time_; }
+    PointInTime *mostRecentPointInTime() { return most_recent_point_in_time_; }
     RC lookForPointsInTime(PointInTimeFormat f, Path *src);
     std::vector<PointInTime> &history() { return history_; }
     PointInTime *findPointInTime(std::string s);
@@ -120,6 +122,8 @@ struct Restore : FuseAPI
     void setMountDir(Path *p) { mount_dir_ = p; }
 
     ptr<FileSystem> asFileSystem() { return contents_fs_; }
+    FuseAPI *asFuseAPI();
+    FileSystem *backupFileSystem() { return backup_fs_; }
 
     private:
 
