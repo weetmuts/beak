@@ -62,6 +62,9 @@ struct Beak
     virtual RC umountBackup(Settings *settings) = 0;
     virtual RC mountRestoreDaemon(Settings *settings) = 0;
     virtual RC mountRestore(Settings *settings) = 0;
+    virtual RC umountRestore(Settings *settings) = 0;
+
+    virtual RC shell(Settings *settings) = 0;
 
     virtual RC status(Settings *settings) = 0;
     virtual RC store(Settings *settings) = 0;
@@ -112,6 +115,7 @@ enum ArgumentType
     X(push,"Backup a rule to a storage location.",ArgRule,ArgNone) \
     X(mount,"Mount your backup as a file system.",ArgStorage,ArgDir) \
     X(restore,"Restore from a backup into your file system.",ArgStorage,ArgOrigin) \
+    X(shell,"Mount your backup and spawn a shell. Exit the shell to unmount.",ArgStorage,ArgNone) \
     X(status,"Show the status of your backups both locally and remotely.",ArgNORS,ArgNone) \
     X(store,"Store your file system into a backup.",ArgOrigin,ArgStorage) \
     X(umount,"Unmount a virtual file system.",ArgDir,ArgNone) \
@@ -187,6 +191,7 @@ LIST_OF_OPTIONS
     int point_in_time {};
 
     Settings copy() { return *this; }
+    void updateFuseArgsArray();
 };
 
 

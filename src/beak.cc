@@ -64,6 +64,7 @@ using namespace std;
 static ComponentId COMMANDLINE = registerLogComponent("commandline");
 static ComponentId STORE = registerLogComponent("store");
 static ComponentId CHECK = registerLogComponent("check");
+static ComponentId FUSE = registerLogComponent("fuse");
 
 struct CommandEntry;
 struct OptionEntry;
@@ -103,6 +104,9 @@ struct BeakImplementation : Beak {
 
     RC mountRestoreDaemon(Settings *settings);
     RC mountRestore(Settings *settings);
+    RC umountRestore(Settings *settings);
+
+    RC shell(Settings *settings);
 
     RC status(Settings *settings);
     RC store(Settings *settings);
@@ -129,10 +133,8 @@ struct BeakImplementation : Beak {
     OptionEntry *parseOption(string s, bool *has_value, string *value);
     Argument parseArgument(std::string arg, ArgumentType expected_type, Settings *settings);
 
-    unique_ptr<FuseMount> fuse_mount_;
-    struct fuse_chan *chan_;
-    struct fuse *fuse_;
-    pid_t loop_pid_;
+    unique_ptr<FuseMount> backup_fuse_mount_;
+    unique_ptr<FuseMount> restore_fuse_mount_;
 
     ptr<Configuration> configuration_;
     ptr<System> sys_;
@@ -617,14 +619,7 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
         }
     }
 
-    settings->fuse_argc = settings->fuse_args.size();
-    settings->fuse_argv = new char*[settings->fuse_argc+1];
-    int j = 0;
-    for (auto &s : settings->fuse_args) {
-        settings->fuse_argv[j] = (char*)s.c_str();
-        j++;
-    }
-    settings->fuse_argv[j] = 0;
+    settings->updateFuseArgsArray();
 
     return cmd;
 }
@@ -789,11 +784,6 @@ RC BeakImplementation::prune(Settings *settings)
     return RC::OK;
 }
 
-static int open_callback(const char *path, struct fuse_file_info *fi)
-{
-    return 0;
-}
-
 RC BeakImplementation::umountDaemon(Settings *settings)
 {
     vector<string> args;
@@ -834,7 +824,7 @@ RC BeakImplementation::mountBackup(Settings *settings)
         return RC::ERR;
     }
 
-    fuse_mount_ = sys_->mount(settings->to.dir, backup.get(), settings->fusedebug);
+    backup_fuse_mount_ = sys_->mount(settings->to.dir, backup.get(), settings->fusedebug);
     return RC::OK;
 }
 
@@ -845,34 +835,8 @@ RC BeakImplementation::umountBackup(Settings *settings)
     if (unpleasant_modifications > 0) {
         warning(STORE, "Warning! Origin directory modified while being mounted for backup!\n");
     }
-    sys_->umount(fuse_mount_);
+    sys_->umount(backup_fuse_mount_);
     return RC::OK;
-}
-
-static int reverseGetattr(const char *path, struct stat *stbuf)
-{
-    Restore *fs = (Restore*)fuse_get_context()->private_data;
-    return fs->getattrCB(path, stbuf);
-}
-
-static int reverseReaddir(const char *path, void *buf, fuse_fill_dir_t filler,
-                          off_t offset, struct fuse_file_info *fi)
-{
-    Restore *fs = (Restore*)fuse_get_context()->private_data;
-    return fs->readdirCB(path, buf, filler, offset, fi);
-}
-
-static int reverseRead(const char *path, char *buf, size_t size, off_t offset,
-                       struct fuse_file_info *fi)
-{
-    Restore *fs = (Restore*)fuse_get_context()->private_data;
-    return fs->readCB(path, buf, size, offset, fi);
-}
-
-static int reverseReadlink(const char *path, char *buf, size_t size)
-{
-    Restore *fs = (Restore*)fuse_get_context()->private_data;
-    return fs->readlinkCB(path, buf, size);
 }
 
 RC BeakImplementation::mountRestoreDaemon(Settings *settings)
@@ -887,16 +851,10 @@ RC BeakImplementation::mountRestore(Settings *settings)
 
 RC BeakImplementation::mountRestoreInternal(Settings *settings, bool daemon)
 {
-    memset(&restore_fuse_ops, 0, sizeof(restore_fuse_ops));
-    restore_fuse_ops.getattr = reverseGetattr;
-    restore_fuse_ops.open = open_callback;
-    restore_fuse_ops.read = reverseRead;
-    restore_fuse_ops.readdir = reverseReaddir;
-    restore_fuse_ops.readlink = reverseReadlink;
-
     unique_ptr<Restore> restore  = newRestore(origin_tool_->fs());
 
-    RC rc = restore->lookForPointsInTime(PointInTimeFormat::absolute_point, settings->from.storage->storage_location);
+    RC rc = restore->lookForPointsInTime(PointInTimeFormat::absolute_point,
+                                         settings->from.storage->storage_location);
     if (rc.isErr()) {
         error(COMMANDLINE, "No points in time found!\n");
     }
@@ -910,33 +868,17 @@ RC BeakImplementation::mountRestoreInternal(Settings *settings, bool daemon)
     if (rc.isErr()) return RC::ERR;
 
     if (daemon) {
-        int rc = fuse_main(settings->fuse_argc, settings->fuse_argv, &restore_fuse_ops,
-                           restore.get()); // The reverse fs structure is passed as private data.
-                                       // It is then extracted with
-                                       // (Restore*)fuse_get_context()->private_data;
-                                       // in the static fuse getters/setters.
-        if (rc) return RC::ERR;
-        return RC::OK;
+        return sys_->mountDaemon(settings->to.dir, restore.get(), settings->foreground, settings->fusedebug);
+    } else {
+        restore_fuse_mount_ = sys_->mount(settings->to.dir, restore.get(), settings->fusedebug);
     }
 
-    struct fuse_args args;
-    args.argc = settings->fuse_argc;
-    args.argv = settings->fuse_argv;
-    args.allocated = 0;
-    struct fuse_chan *chan = fuse_mount(settings->to.dir->c_str(), &args);
-    fuse_ = fuse_new(chan,
-                     &args,
-                     &restore_fuse_ops,
-                     sizeof(restore_fuse_ops),
-                     restore.get()); // Passed as private data to fuse context.
+    return RC::OK;
+}
 
-    loop_pid_ = fork();
-
-    if (loop_pid_ == 0) {
-        // This is the child process. Serve the virtual file system.
-        fuse_loop_mt (fuse_);
-        exit(0);
-    }
+RC BeakImplementation::umountRestore(Settings *settings)
+{
+    sys_->umount(restore_fuse_mount_);
     return RC::OK;
 }
 
@@ -974,6 +916,50 @@ RC BeakImplementation::fetchPointsInTime(string remote, Path *cache)
 
     return rc;
 }
+
+RC BeakImplementation::shell(Settings *settings)
+{
+    RC rc = RC::OK;
+
+    assert(settings->from.type == ArgStorage);
+
+    string storage = "";
+    if (settings->from.type == ArgStorage) {
+        storage = settings->from.storage->storage_location->str();
+    } else if (settings->from.type == ArgDir) {
+        storage = settings->from.dir->str();
+    }
+
+    Path *mount = local_fs_->mkTempDir("beak_shell_");
+    Path *stop = local_fs_->mkTempFile("beak_shell_stop_", "echo Unmounting backup "+storage);
+    Path *start = local_fs_->mkTempFile("beak_shell_start_", "trap "+stop->str()+" EXIT; cd "+mount->str()+"; echo Mounted "+storage+"; echo Exit shell to unmount backup.\n");
+    FileStat fs;
+    fs.setAsExecutable();
+    local_fs_->chmod(start, &fs);
+    local_fs_->chmod(stop, &fs);
+
+    settings->to.type = ArgDir;
+    settings->to.dir = mount;
+    settings->fuse_args.push_back(mount->str());
+    settings->updateFuseArgsArray();
+
+    rc = mountRestore(settings);
+    if (rc.isErr()) {
+        // Remove start/stop files and mount dir
+        fprintf(stderr, "GURKA %p", start);
+    }
+
+    rc = sys_->invokeShell(start);
+
+    rc = umountRestore(settings);
+
+    local_fs_->deleteFile(start);
+    local_fs_->deleteFile(stop);
+    local_fs_->rmDir(mount);
+
+    return rc;
+}
+
 
 RC BeakImplementation::status(Settings *settings)
 {
@@ -1215,4 +1201,18 @@ bool BeakImplementation::hasPointsInTime(Path *path, FileSystem *fs)
     }
 
     return false;
+}
+
+void Settings::updateFuseArgsArray()
+{
+    fuse_argc = fuse_args.size();
+    fuse_argv = new char*[fuse_argc+1];
+    int j = 0;
+    debug(FUSE, "Fuse args %d:", fuse_argc);
+    for (auto &s : fuse_args) {
+        fuse_argv[j] = (char*)s.c_str();
+        debug(FUSE, "\"%s\"", fuse_argv[j]);
+        j++;
+    }
+    fuse_argv[j] = 0;
 }

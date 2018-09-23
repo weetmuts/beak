@@ -125,6 +125,8 @@ struct SystemImplementation : System
                Capture capture,
                function<void(char *buf, size_t len)> cb);
 
+    RC invokeShell(Path *init_file);
+
     RC mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground, bool debug);
     std::unique_ptr<FuseMount> mount(Path *dir, FuseAPI *fuseapi, bool debug);
     RC umount(ptr<FuseMount> fuse_mount);
@@ -234,6 +236,26 @@ RC SystemImplementation::invoke(string program,
     return RC::OK;
 }
 
+RC SystemImplementation::invokeShell(Path *init_file)
+{
+    const char **argv = new const char*[4];
+    argv[0] = "/bin/bash";
+    argv[1] = "--init-file";
+    argv[2] = init_file->c_str();
+    argv[3] = NULL;
+    debug(SYSTEM, "Invoking shell: \"%s --init-file %s\"\n", argv[0], argv[2]);
+
+    int pid = fork();
+    if (pid == 0) {
+        // This is the child process, run the shell here.
+        execvp(argv[0], (char*const*)argv);
+    }
+    int status;
+    waitpid(pid, &status, 0);
+
+    return RC::OK;
+}
+
 function<void()> exit_handler;
 
 void exitHandler(int signum)
@@ -303,6 +325,12 @@ static int staticReadDispatch_(const char *path, char *buf, size_t size, off_t o
     return fuseapi->readCB(path, buf, size, offset, fi);
 }
 
+static int staticReadlinkDispatch_(const char *path, char *buf, size_t size)
+{
+    FuseAPI *fuseapi = (FuseAPI*)fuse_get_context()->private_data;
+    return fuseapi->readlinkCB(path, buf, size);
+}
+
 static int staticOpenDispatch_(const char *path, struct fuse_file_info *fi)
 {
     return 0;
@@ -317,8 +345,8 @@ struct FuseMountImplementationPosix : FuseMount
 };
 
 RC SystemImplementation::mountInternal(Path *dir, FuseAPI *fuseapi,
-                                                bool daemon, unique_ptr<FuseMount> &fm,
-                                                bool foreground, bool debug)
+                                       bool daemon, unique_ptr<FuseMount> &fm,
+                                       bool foreground, bool debug)
 {
     vector<string> fuse_args;
     fuse_args.push_back("beak");
@@ -341,6 +369,7 @@ RC SystemImplementation::mountInternal(Path *dir, FuseAPI *fuseapi,
     ops->open = staticOpenDispatch_;
     ops->read = staticReadDispatch_;
     ops->readdir = staticReaddirDispatch_;
+    ops->readlink = staticReadlinkDispatch_;
 
     if (daemon) {
         int rc = fuse_main(fuse_argc, fuse_argv, ops, fuseapi);

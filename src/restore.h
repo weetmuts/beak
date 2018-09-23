@@ -84,7 +84,7 @@ struct PointInTime {
     std::set<Path*> loaded_gz_files_;
 };
 
-struct Restore
+struct Restore : FuseAPI
 {
     RC loadBeakFileSystem(Settings *settings);
 

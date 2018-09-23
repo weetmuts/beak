@@ -126,6 +126,10 @@ int run(int argc, char *argv[]) {
         rc = beak->restore(&settings);
         break;
 
+    case shell_cmd:
+        rc = beak->shell(&settings);
+        break;
+
     case status_cmd:
         rc = beak->status(&settings);
         break;

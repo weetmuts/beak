@@ -33,6 +33,7 @@ bool FileStat::isRegularFile() { return S_ISREG(st_mode); }
 bool FileStat::isDirectory() { return S_ISDIR(st_mode); }
 void FileStat::setAsRegularFile() { st_mode |= S_IFREG; }
 void FileStat::setAsDirectory() { st_mode |= S_IFDIR; }
+void FileStat::setAsExecutable() { st_mode |= S_IXUSR | S_IRUSR | S_IWUSR; }
 bool FileStat::isSymbolicLink() { return false; }
 bool FileStat::isCharacterDevice() { return false; }
 bool FileStat::isBlockDevice() { return false; }

@@ -84,6 +84,7 @@ struct FileStat {
     void loadFrom(const struct stat *sb);
     void setAsRegularFile();
     void setAsDirectory();
+    void setAsExecutable();
     void storeIn(struct stat *sb);
     bool isRegularFile();
     bool isDirectory();

@@ -12,17 +12,17 @@ manually and want to see it finished, quickly. In other words, after
 finishing some important work, you trigger the backup and wait for it
 to finish, which should not take too long. This is necessary for me,
 since I often work on my laptop. I want my work to be backed up before
-I shut down the laptop and put it in my bag. Once in the bag, the
+I close the laptop and put it in my bag. Once in the bag, the
 laptop risks being dropped on the ground and destroyed or risks being stolen
-or it might just break down because the warranty just expired.
+or it might break down because the warranty just expired.
 
 I also often move my work between the laptop and a stationary computer
 and it is convenient to push/pull-merge the work between them since
-the work might not be stored in remote git repository nor in a
+the work might not (yet) be stored in remote git repository nor in a
 distributed file system.
 
 I also like to have multiple backups in multiple locations, in the latop,
-on a removable storage, on a remote cloud storage etc. The backups can be
+on a removable storage, on multiple remote cloud storages etc. The backups can be
 pruned with different rules for different storage locations.
 
 I also like to keep large data sets in the cloud and not on the latop,
@@ -35,26 +35,26 @@ in multiple independent cloud locations.
 Local filesystem backups.
 ```
 # Store whenever you feel the need to make a backup.
-beak store /home/you/Work /home/backups
-mkdir /home/you/OldWork
-beak mount /home/backups /home/you/OldWork
-# OldWork now contain one subdirectory for each backup.
-cd /home/you/OldWork/2018-05-14_15:32
-...copy out stuff...
-cd ~
-beak umount /home/you/OldWork
-# Or you can restore the entire recent backup without mount.
-beak restore /home/backups /home/you/Work
+>beak store /home/you/Work /home/backups
+>beak shell /home/backups
+Mounted /home/backups
+Exit shell to unmount backup.
+>ls
+2017-03-14_12:12  2018-02-05_11:08  2018-09-23_09:17
+>find . -name "MyMissingFile"
+>exit
+Unmounting backup /home/you/backups
 ```
 
 Remote rclone cloud storage backups, s3_work_crypt is an rclone config.
 ```
 beak store /home/you/Work s3_work_crypt:
-beak mount s3_work_crypt: /home/you/OldWork
-cd /home/you/OldWork/2018-05-14_15:32
-...copy out stuff...
-cd ~
-beak umount /home/you/OldWork
+beak shell s3_work_crypt:
+```
+
+```
+# You can restore the third most recent backup. (0=latest 1=second latest 2=third latest)
+beak restore s3_work_crypt:@2 /home/you/Work
 ```
 
 Configure a rule for /home/you/Work
@@ -179,31 +179,20 @@ beak umount OldStuff
 ## Accessing all backups at once.
 
 If you have configured a _rule_ that backups in many different _storage locations_,
-then the easiest way to access your _points in time_, is to do a history
-mount. Create the directory OldStuff, then do:
+then the easiest way to access all your _points in time_, is to do a shell
+mount.
 
-`beak history work: OldStuff`
-
-(The history command mounts all known local and remote _storage locations_ and merges
-their history into single timeline.)
-
-Now you can simply browse OldStuff and copy whatever file your are
-missing from the historical backups. You will see the _points in
-times_ as subdirectories, marked with the _storage location_
-it was stored to. You can have the same backup in multiple _storage locations_.
+`beak shell work:`
 
 ```
->ls OldStuff
+>ls
 @0 2017-09-07 14:27 2 minutes ago to s3_work_crypt:
 @1 2017-09-07 14:27 2 minutes ago to local
 @2 2017-09-05 10:01 2 days ago to gd_work_crypt:
 @3 2017-07-01 08:23 2 months ago to s3_work_crypt:
 ```
 
-(If you type `beak history work:`, then it will use the configuration of your _rule_ to find
-the default directory for the history mount. Typically /home/you/Work/.beak/history)
-
-## Status of your _origin_ directory
+## Status of your _origin_ directories
 
 You can check the status of your configured _origin_ directories with:
 
@@ -467,18 +456,17 @@ Beak will use a snapshot and recreate the old _beakfs_ from that snapshot
 instead of storing the _beakfs_ files. Thus saving disk space.
 
 `.beak/cache` stores downloaded chunks when you mount remote _storage locations_
-or mount them all using the history command. It is also used
+or mount them all using the shell command. It is also used
 to download index files when checking remote repositories, performing diffs
 and restores. You can clean the cache at any time when you are not mounting
 or otherwise executing a beak command.
-
-`.beak/history` is the default directory to place the _point in time_ history,
-if `beak history work:` is invoked without a target directory.
 
 ## Command summary
 
 ```
 beak store {origin} {storage}    beak restore {storage} {origin}
+
+beak shell {storage}
 
 beak mount {storage} {dir}       beak bmount {origin} {dir}
 
@@ -486,17 +474,13 @@ beak check {storage}
 
 beak push {rule}                 beak pull {rule}
 
-beak history {rule} [dir]
-
 beak diff {storage/origin/rule} {storage/origin/rule}
-
-beak shell
 
 beak config
 
 beak status [{rule}|{storage}]
 
-beak prune {storage}          beak pack {storage}
+beak prune {storage}             beak pack {storage}
 ```
 
 ## Development
