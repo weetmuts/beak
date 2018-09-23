@@ -73,19 +73,19 @@ struct StatOnlyFileSystem : ReadOnlyFileSystem
 
 struct CacheEntry
 {
-    FileStat fs;
+    FileStat stat;
     Path *path {};
     bool cached {}; // Have we a cached version of this file/dir?
     std::vector<CacheEntry*> direntries; // If this is a directory, list its contents here.
 
     CacheEntry() { }
-    CacheEntry(FileStat s, Path *p, bool c) : fs(s), path(p), cached(c) { }
+    CacheEntry(FileStat s, Path *p, bool c) : stat(s), path(p), cached(c) { }
 
-    // Check if the dst:target exists and the file has the correct size
+    // Check if the file exists in the cache, and the file has the correct size
     // and ownership settings, if so return true, because we believe
-    // it is a properly cached file. If not return false, the cache is
+    // it is a properly cached file. If not, then return false, the cache is
     // empty or broken.
-    bool isCached(FileSystem *dst, Path *target);
+    bool isCached(FileSystem *cache_fs, Path *cache_dir, Path *f);
 };
 
 // The cached file system base implementation can only cache plain files.
@@ -94,21 +94,22 @@ struct CacheEntry
 
 struct ReadOnlyCacheFileSystemBaseImplementation : ReadOnlyFileSystem
 {
-    ReadOnlyCacheFileSystemBaseImplementation(ptr<FileSystem> cache_fs, Path *cache_dir) :
-        ReadOnlyFileSystem("ReadOnlyCacheFileSystemBaseImplementation"),
-        cache_fs_(cache_fs), cache_dir_(cache_dir) {}
+    ReadOnlyCacheFileSystemBaseImplementation(const char *name, ptr<FileSystem> cache_fs, Path *cache_dir) :
+    ReadOnlyFileSystem(name), cache_fs_(cache_fs), cache_dir_(cache_dir) {}
+
+    virtual void refreshCache() = 0;
 
     // Implement the two following methods to complete your cached filesystem.
 
     // Store the entiry directory structure of the filesystem you want to cache in
     // the supplied entries map.
-    virtual void loadDirectoryStructure(std::map<Path*,CacheEntry> *entries) = 0;
+    virtual RC loadDirectoryStructure(std::map<Path*,CacheEntry> *entries) = 0;
 
     // Fetch a file to be cached and store it in the cache_fs_:cache_dir_ + file
-    virtual void fetchFile(Path *file) = 0;
+    virtual RC fetchFile(Path *file) = 0;
+    virtual RC fetchFiles(std::vector<Path*> *files) = 0;
 
     // The base provides implementations for the file system api below.
-
     bool readdir(Path *p, std::vector<Path*> *vec);
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
     void recurse(Path *root, std::function<void(Path *path, FileStat *stat)> cb);

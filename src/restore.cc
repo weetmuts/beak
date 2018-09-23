@@ -38,7 +38,7 @@
 
 using namespace std;
 
-ComponentId REVERSE = registerLogComponent("reverse");
+ComponentId RESTORE = registerLogComponent("restore");
 
 struct RestoreFileSystem : FileSystem
 {
@@ -179,7 +179,7 @@ struct RestoreFileSystem : FileSystem
 Restore::Restore(FileSystem *backup_fs)
 {
     single_point_in_time_ = NULL;
-    backup_file_system_ = backup_fs;
+    backup_fs_ = backup_fs;
     contents_fs_ = unique_ptr<FileSystem>(new RestoreFileSystem(this));
 }
 
@@ -194,14 +194,14 @@ bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
     point->loaded_gz_files_.insert(gz);
 
     vector<char> buf;
-    rc = backup_file_system_->loadVector(gz, T_BLOCKSIZE, &buf);
+    rc = backup_fs_->loadVector(gz, T_BLOCKSIZE, &buf);
     if (rc.isErr()) return false;
 
     vector<char> contents;
     gunzipit(&buf, &contents);
     auto i = contents.begin();
 
-    debug(REVERSE, "Parsing %s for files in %s\n", gz->c_str(), dir_to_prepend->c_str());
+    debug(RESTORE, "Parsing %s for files in %s\n", gz->c_str(), dir_to_prepend->c_str());
     struct IndexEntry index_entry;
     struct IndexTar index_tar;
 
@@ -211,11 +211,11 @@ bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
     rc = Index::loadIndex(contents, i, &index_entry, &index_tar, dir_to_prepend,
              [this,point,&es,dir_to_prepend](IndexEntry *ie){
                          if (point->entries_.count(ie->path) == 0) {
-                             debug(REVERSE, "Adding entry for >%s< %p\n", ie->path->c_str());
+                             debug(RESTORE, "Adding entry for >%s< %p\n", ie->path->c_str());
                              // Trigger storage of entry.
                              point->entries_[ie->path];
                          } else {
-                             debug(REVERSE, "Using existing entry for >%s< %p\n", ie->path->c_str());
+                             debug(RESTORE, "Using existing entry for >%s< %p\n", ie->path->c_str());
                          }
                          Entry *e = &(point->entries_)[ie->path];
                          assert(e->path = ie->path);
@@ -243,7 +243,7 @@ bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
                      });
 
     if (rc.isErr()) {
-        failure(REVERSE, "Could not parse the index file %s\n", gz->c_str());
+        failure(RESTORE, "Could not parse the index file %s\n", gz->c_str());
         return false;
     }
 
@@ -258,12 +258,12 @@ bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
         if (c == 0) {
             d->path = pp;
         }
-        debug(REVERSE, "Added %s %p to dir >%s< %p\n", i->path->c_str(), i, pp->c_str(), d);
+        debug(RESTORE, "Added %s %p to dir >%s< %p\n", i->path->c_str(), i, pp->c_str(), d);
         d->dir.push_back(i);
         d->loaded = true;
     }
 
-    debug(REVERSE, "Found proper gz file! %s\n", gz->c_str());
+    debug(RESTORE, "Found proper gz file! %s\n", gz->c_str());
 
     return true;
 }
@@ -272,11 +272,11 @@ Path *Restore::loadDirContents(PointInTime *point, Path *path)
 {
     FileStat stat;
     Path *gz = point->gz_files_[path];
-    debug(REVERSE, "Looking for z01 gz file in dir >%s< (found %p)\n", path->c_str(), gz);
+    debug(RESTORE, "Looking for z01 gz file in dir >%s< (found %p)\n", path->c_str(), gz);
     if (gz != NULL) {
         gz = gz->prepend(rootDir());
-        RC rc = backup_file_system_->stat(gz, &stat);
-        debug(REVERSE, "%s --- rc=%d %d\n", gz->c_str(), rc.toInteger(), stat.isRegularFile());
+        RC rc = backup_fs_->stat(gz, &stat);
+        debug(RESTORE, "%s --- rc=%d %d\n", gz->c_str(), rc.toInteger(), stat.isRegularFile());
         if (rc.isOk() && stat.isRegularFile()) {
             // Found a gz file!
             loadGz(point, gz, path);
@@ -296,25 +296,25 @@ void Restore::loadCache(PointInTime *point, Path *path)
         }
     }
 
-    debug(REVERSE, "Load cache for >%s<\n", path->c_str());
+    debug(RESTORE, "Load cache for >%s<\n", path->c_str());
     // Walk up in the directory structure until a gz file is found.
     for (;;)
     {
         Path *gz = loadDirContents(point, path);
         if (point->entries_.count(path) == 1) {
             // Success
-            debug(REVERSE, "Found %s in gz %s\n", path->c_str(), gz->c_str());
+            debug(RESTORE, "Found %s in gz %s\n", path->c_str(), gz->c_str());
             return;
         }
         if (path != opath) {
             // The file, if it exists should have been found here. Therefore we
             // conclude that the file does not exist.
-            debug(REVERSE, "NOT found %s in gz %s\n", path->c_str(), gz->c_str());
+            debug(RESTORE, "NOT found %s in gz %s\n", path->c_str(), gz->c_str());
             return;
         }
         if (path->isRoot()) {
             // No gz file found anywhere! This filesystem should not have been mounted!
-            debug(REVERSE, "No gz found anywhere!\n");
+            debug(RESTORE, "No gz found anywhere!\n");
             return;
         }
         // Move up in the directory tree.
@@ -331,7 +331,7 @@ Entry *Restore::findEntry(PointInTime *point, Path *path)
         loadCache(point, path);
         if (point->entries_.count(path) == 0)
         {
-            debug(REVERSE, "Not found %s!\n", path->c_str());
+            debug(RESTORE, "Not found %s!\n", path->c_str());
             return NULL;
         }
     }
@@ -341,7 +341,7 @@ Entry *Restore::findEntry(PointInTime *point, Path *path)
 
 int Restore::getattrCB(const char *path_char_string, struct stat *stbuf)
 {
-    debug(REVERSE, "getattrCB >%s<\n", path_char_string);
+    debug(RESTORE, "getattrCB >%s<\n", path_char_string);
 
     pthread_mutex_lock(&global);
 
@@ -475,7 +475,7 @@ int Restore::getattrCB(const char *path_char_string, struct stat *stbuf)
 int Restore::readdirCB(const char *path_char_string, void *buf,
 		fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
 {
-    debug(REVERSE, "readdirCB >%s<\n", path_char_string);
+    debug(RESTORE, "readdirCB >%s<\n", path_char_string);
 
     pthread_mutex_lock(&global);
 
@@ -511,7 +511,7 @@ int Restore::readdirCB(const char *path_char_string, void *buf,
     if (!e->fs.isDirectory()) goto err;
 
     if (!e->loaded) {
-        debug(REVERSE,"Not loaded %s\n", e->path->c_str());
+        debug(RESTORE,"Not loaded %s\n", e->path->c_str());
         loadCache(point, e->path);
     }
     filler(buf, ".", NULL, 0);
@@ -539,7 +539,7 @@ int Restore::readdirCB(const char *path_char_string, void *buf,
 
 int Restore::readlinkCB(const char *path_char_string, char *buf, size_t s)
 {
-    debug(REVERSE, "readlinkCB >%s<\n", path_char_string);
+    debug(RESTORE, "readlinkCB >%s<\n", path_char_string);
 
     pthread_mutex_lock(&global);
 
@@ -562,7 +562,7 @@ int Restore::readlinkCB(const char *path_char_string, char *buf, size_t s)
 
     memcpy(buf, e->symlink.c_str(), c);
     buf[c] = 0;
-    debug(REVERSE, "readlinkCB >%s< bufsiz=%ju returns buf=>%s<\n", path, s, buf);
+    debug(RESTORE, "readlinkCB >%s< bufsiz=%ju returns buf=>%s<\n", path, s, buf);
 
     goto ok;
 
@@ -580,7 +580,7 @@ int Restore::readlinkCB(const char *path_char_string, char *buf, size_t s)
 int Restore::readCB(const char *path_char_string, char *buf,
 		size_t size, off_t offset_, struct fuse_file_info *fi)
 {
-    debug(REVERSE, "readCB >%s< offset=%ju size=%ju\n", path_char_string, offset_, size);
+    debug(RESTORE, "readCB >%s< offset=%ju size=%ju\n", path_char_string, offset_, size);
 
     pthread_mutex_lock(&global);
 
@@ -621,11 +621,11 @@ int Restore::readCB(const char *path_char_string, char *buf,
     // Offset into tar file.
     offset += e->offset;
 
-    debug(REVERSE, "Reading %ju bytes from offset %ju in file %s\n", size, offset, tar->c_str());
-    rc = backup_file_system_->pread(tar, buf, size, offset);
+    debug(RESTORE, "Reading %ju bytes from offset %ju in file %s\n", size, offset, tar->c_str());
+    rc = backup_fs_->pread(tar, buf, size, offset);
     if (rc == -1)
     {
-        failure(REVERSE,
+        failure(RESTORE,
                 "Could not read from file >%s< in underlying filesystem err %d",
                 tar->c_str(), errno);
         goto err;
@@ -648,7 +648,7 @@ RC Restore::lookForPointsInTime(PointInTimeFormat f, Path *path)
     if (path == NULL) return RC::ERR;
 
     vector<Path*> contents;
-    if (!backup_file_system_->readdir(path, &contents)) {
+    if (!backup_fs_->readdir(path, &contents)) {
         return RC::ERR;
     }
     for (auto f : contents)
@@ -714,7 +714,7 @@ PointInTime *Restore::findPointInTime(string s) {
 
 PointInTime *Restore::setPointInTime(string g) {
     if ((g.length() < 2) | (g[0] != '@')) {
-        error(REVERSE,"Specify generation as @0 @1 @2 etc.\n");
+        error(RESTORE,"Specify generation as @0 @1 @2 etc.\n");
     }
     for (size_t i=1; i<g.length(); ++i) {
         if (g[i] < '0' || g[i] > '9') {
@@ -737,22 +737,22 @@ RC Restore::loadBeakFileSystem(Settings *settings)
 
     for (auto &point : history()) {
         string name = point.filename;
-        debug(REVERSE,"Found backup for %s\n", point.ago.c_str());
+        debug(RESTORE,"Found backup for %s\n", point.ago.c_str());
 
         // Check that it is a proper file.
-        struct stat sb;
+        FileStat stat;
         Path *gz = Path::lookup(rootDir()->str() + "/" + name);
 
-        int rc = stat(gz->c_str(), &sb);
-        if (rc || !S_ISREG(sb.st_mode))
+        RC rc = backup_fs_->stat(gz, &stat);
+        if (rc.isErr() || !stat.isRegularFile())
         {
-            error(REVERSE, "Not a regular file %s\n", gz->c_str());
+            error(RESTORE, "Not a regular file %s\n", gz->c_str());
         }
 
         // Populate the list of all tars from the root z01 gz file.
         bool ok = loadGz(&point, gz, Path::lookupRoot());
         if (!ok) {
-            error(REVERSE, "Fatal error, could not load root z01 file for backup %s!\n", point.ago.c_str());
+            error(RESTORE, "Fatal error, could not load root z01 file for backup %s!\n", point.ago.c_str());
         }
 
         // Populate the root directory with its contents.

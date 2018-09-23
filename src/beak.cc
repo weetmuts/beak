@@ -851,7 +851,15 @@ RC BeakImplementation::mountRestore(Settings *settings)
 
 RC BeakImplementation::mountRestoreInternal(Settings *settings, bool daemon)
 {
-    unique_ptr<Restore> restore  = newRestore(origin_tool_->fs());
+    FileSystem *backup_fs {};
+
+    if (settings->from.type == ArgDir) {
+        backup_fs = local_fs_;
+    } else if (settings->from.type == ArgStorage) {
+        backup_fs = storage_tool_->asCachedReadOnlyFS(settings->from.storage);
+    }
+
+    unique_ptr<Restore> restore  = newRestore(backup_fs);
 
     RC rc = restore->lookForPointsInTime(PointInTimeFormat::absolute_point,
                                          settings->from.storage->storage_location);

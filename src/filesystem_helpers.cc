@@ -152,7 +152,12 @@ bool StatOnlyFileSystem::readLink(Path *file, string *target)
 
 RC ReadOnlyCacheFileSystemBaseImplementation::stat(Path *p, FileStat *fs)
 {
-    return RC::ERR;
+    if (entries_.count(p) == 0) {
+        return RC::ERR;
+    }
+    CacheEntry *ce = &entries_[p];
+    *fs = ce->stat;
+    return RC::OK;
 }
 
 bool ReadOnlyCacheFileSystemBaseImplementation::readdir(Path *p, vector<Path*> *vec)
@@ -162,15 +167,41 @@ bool ReadOnlyCacheFileSystemBaseImplementation::readdir(Path *p, vector<Path*> *
     }
     CacheEntry *ce = &entries_[p];
     for (CacheEntry *e : ce->direntries) {
-        vec->push_back(e->path);
+        vec->push_back(e->path->subpath(1));
     }
     return true;
 }
 
 bool ReadOnlyCacheFileSystemBaseImplementation::fileCached(Path *p)
 {
-    error(CACHE, "Could not fetch file for caching!");
-    return true;
+    if (entries_.count(p) == 0) {
+        // No such file found!
+        debug(CACHE, "No such file found in cache index: %s\n", p->c_str());
+        return false;
+    }
+    CacheEntry *e = &entries_[p];
+    if (e->cached) {
+        return true;
+    }
+    e->cached = e->isCached(cache_fs_, cache_dir_, p);
+    if (e->cached) {
+        return true;
+    }
+
+    debug(CACHE, "Fetching file: %s\n", p->c_str());
+    RC rc = fetchFile(p);
+
+    if (rc.isErr()) {
+        failure(CACHE, "Could not fetch file: %s\n", p->c_str());
+        return false;
+    }
+
+    e->cached = e->isCached(cache_fs_, cache_dir_, p);
+
+    if (!e->cached) {
+        failure(CACHE, "Failed to fetch file: %s\n", p->c_str());
+    }
+    return e->cached;
 }
 
 CacheEntry *ReadOnlyCacheFileSystemBaseImplementation::cacheEntry(Path *p)
@@ -182,21 +213,48 @@ CacheEntry *ReadOnlyCacheFileSystemBaseImplementation::cacheEntry(Path *p)
 ssize_t ReadOnlyCacheFileSystemBaseImplementation::pread(Path *p, char *buf, size_t size, off_t offset)
 {
     if (!fileCached(p)) {  return -1; }
-
-    return cache_fs_->pread(p, buf, size, offset);
+    Path *pp = p->prepend(cache_dir_);
+    return cache_fs_->pread(pp, buf, size, offset);
 }
 
 void ReadOnlyCacheFileSystemBaseImplementation::recurse(Path *root, function<void(Path *path, FileStat *stat)> cb)
 {
+    fprintf(stderr, "recurse not implemented...\n");
 }
 
-
-RC ReadOnlyCacheFileSystemBaseImplementation::loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
+RC ReadOnlyCacheFileSystemBaseImplementation::loadVector(Path *p, size_t blocksize, std::vector<char> *buf)
 {
-    return RC::ERR;
+    if (!fileCached(p)) { return RC::ERR; }
+    Path *pp = p->prepend(cache_dir_);
+    return cache_fs_->loadVector(pp, blocksize, buf);
 }
 
 bool ReadOnlyCacheFileSystemBaseImplementation::readLink(Path *path, string *target)
 {
+    fprintf(stderr, "readLink not implemented...\n");
     return false;
+}
+
+bool CacheEntry::isCached(FileSystem *cache_fs, Path *cache_dir, Path *f)
+{
+    Path *p = f->prepend(cache_dir);
+    FileStat st;
+    RC rc = cache_fs->stat(p, &st);
+    if (rc.isErr()) {
+        debug(CACHE, "stat (not found) \"%s\"\n", p->c_str());
+        return false;
+    }
+
+    if (st.st_size != stat.st_size ||
+        st.st_mtim.tv_sec != stat.st_mtim.tv_sec ||
+        st.st_mtim.tv_nsec != stat.st_mtim.tv_nsec) {
+        debug(CACHE, "stat (wrong size %zu (%zu) or mtime %zd:%d (%zd:%d) ) \"%s\"\n",
+              st.st_size,
+              stat.st_size,
+              st.st_mtim.tv_sec, st.st_mtim.tv_nsec,
+              stat.st_mtim.tv_sec, stat.st_mtim.tv_nsec,
+              p->c_str());
+        return false;
+    }
+    return true;
 }

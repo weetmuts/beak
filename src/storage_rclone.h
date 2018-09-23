@@ -31,3 +31,9 @@ RC rcloneListBeakFiles(Storage *storage,
                        std::vector<std::string> *other_files,
                        std::map<Path*,FileStat> *contents,
                        ptr<System> sys);
+
+RC rcloneFetchFiles(Storage *storage,
+                    std::vector<Path*> *files,
+                    Path *dir,
+                    System *sys,
+                    FileSystem *local_fs);

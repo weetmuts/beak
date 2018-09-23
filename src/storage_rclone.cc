@@ -47,7 +47,6 @@ RC rcloneListBeakFiles(Storage *storage,
         eatWhitespace(out, i, &eof);
         if (eof) break;
         string size = eatTo(out, i, ' ', 64, &eof, &err);
-
         if (eof || err) break;
         string file_name = eatTo(out, i, '\n', 4096, &eof, &err);
         if (err) break;
@@ -68,6 +67,8 @@ RC rcloneListBeakFiles(Storage *storage,
                 fs.st_size = (off_t)siz;
                 fs.st_mtim.tv_sec = tfn.secs;
                 fs.st_mtim.tv_nsec = tfn.nsecs;
+                fs.st_mode |= S_IRUSR;
+                fs.st_mode |= S_IFREG;
                 (*contents)[p] = fs;
             }
             else
@@ -81,4 +82,37 @@ RC rcloneListBeakFiles(Storage *storage,
     if (err) return RC::ERR;
 
     return RC::OK;
+}
+
+
+RC rcloneFetchFiles(Storage *storage,
+                    vector<Path*> *files,
+                    Path *dir,
+                    System *sys,
+                    FileSystem *local_fs)
+{
+    Path *target_dir = storage->storage_location->prepend(dir);
+
+    string files_to_fetch;
+    for (auto& p : *files) {
+        Path *n = p->subpath(1);
+        files_to_fetch.append(n->str());
+        files_to_fetch.append("\n");
+    }
+
+    Path *tmp = local_fs->mkTempFile("beak_fetching_", files_to_fetch);
+
+    RC rc = RC::OK;
+    vector<char> out;
+    vector<string> args;
+    args.push_back("copy");
+    args.push_back("--include-from");
+    args.push_back(tmp->c_str());
+    args.push_back(storage->storage_location->c_str());
+    args.push_back(target_dir->c_str());
+    rc = sys->invoke("rclone", args, &out);
+
+    local_fs->deleteFile(tmp);
+
+    return rc;
 }

@@ -134,7 +134,7 @@ struct Restore : FuseAPI
     // This is the file system where the backup containing beak files are stored.
     // It can point directly to the default OS file system or to a cached
     // storage tool file system.
-    FileSystem *backup_file_system_;
+    FileSystem *backup_fs_;
 
     std::unique_ptr<FileSystem> contents_fs_;
 };

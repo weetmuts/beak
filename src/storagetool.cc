@@ -18,6 +18,7 @@
 #include "storagetool.h"
 
 #include "backup.h"
+#include "filesystem_helpers.h"
 #include "log.h"
 #include "system.h"
 #include "storage_rclone.h"
@@ -26,6 +27,7 @@
 
 static ComponentId STORAGETOOL = registerLogComponent("storagetool");
 static ComponentId RCLONE = registerLogComponent("rclone");
+static ComponentId CACHE = registerLogComponent("cache");
 
 using namespace std;
 
@@ -420,8 +422,107 @@ RC StorageToolImplementation::listPointsInTime(Storage *storage, vector<pair<Pat
     return RC::OK;
 }
 
+struct CacheFS : ReadOnlyCacheFileSystemBaseImplementation
+{
+    CacheFS(ptr<FileSystem> cache_fs, Path *cache_dir, Storage *storage, System *sys) :
+        ReadOnlyCacheFileSystemBaseImplementation("CacheFS", cache_fs, cache_dir),
+        sys_(sys), storage_(storage) {}
+
+    void refreshCache();
+    RC loadDirectoryStructure(std::map<Path*,CacheEntry> *entries);
+    RC fetchFile(Path *file);
+    RC fetchFiles(vector<Path*> *files);
+
+protected:
+
+    System *sys_ {};
+    Storage *storage_ {};
+};
+
+void CacheFS::refreshCache() {
+    loadDirectoryStructure(&entries_);
+}
+
+RC CacheFS::loadDirectoryStructure(map<Path*,CacheEntry> *entries)
+{
+    vector<TarFileName> files;
+    vector<TarFileName> bad_files;
+    vector<std::string> other_files;
+    map<Path*,FileStat> contents;
+
+    switch (storage_->type) {
+    case NoSuchStorage:
+    case FileSystemStorage:
+    {
+        break;
+    }
+    case RSyncStorage:
+    case RCloneStorage:
+        fprintf(stdout, "Fetching list of files in %s ...", storage_->storage_location->c_str());
+        fflush(stdout);
+        RC rc = rcloneListBeakFiles(storage_, &files, &bad_files, &other_files, &contents, sys_);
+        fprintf(stdout, "done. (%zu files)\n", files.size());
+        fflush(stdout);
+        if (rc.isErr()) return RC::ERR;
+    }
+
+    Path *prev_dir = NULL;
+    CacheEntry *prev_dir_cache_entry = NULL;
+    FileStat dir_stat;
+    dir_stat.setAsDirectory();
+
+    for (auto&p:contents) {
+        Path *dir = p.first->parent();
+        CacheEntry *dir_entry = NULL;
+        if (dir == prev_dir) {
+            dir_entry = prev_dir_cache_entry;
+        } else {
+            if (entries->count(dir) == 0) {
+                (*entries)[dir] = CacheEntry(dir_stat, dir, true);
+            }
+            dir_entry = prev_dir_cache_entry = &(*entries)[dir];
+        }
+        (*entries)[p.first] = CacheEntry(p.second, p.first, false);
+        // Add this file to its directory.
+        dir_entry->direntries.push_back(&(*entries)[p.first]);
+    }
+
+    for (auto&p:*entries) {
+        if (p.second.direntries.size()) {
+//            fprintf(stderr, ">%s<=  %zd %zd %s\n", p.first->c_str(), p.second.direntries.size(), p.second.fs.st_size, p.second.path->c_str());
+        }
+    }
+
+    return RC::ERR;
+}
+
+RC CacheFS::fetchFile(Path *file)
+{
+    vector<Path*> files;
+    files.push_back(file);
+    return fetchFiles(&files);
+}
+
+RC CacheFS::fetchFiles(vector<Path*> *files)
+{
+    switch (storage_->type) {
+    case NoSuchStorage:
+    case FileSystemStorage:
+    case RSyncStorage:
+    case RCloneStorage:
+    {
+        debug(CACHE,"Fetching %d files from %s.\n", files->size(), storage_->storage_location->c_str());
+        return rcloneFetchFiles(storage_, files, cache_dir_, sys_, cache_fs_);
+    }
+    }
+    return RC::ERR;
+}
 
 FileSystem *StorageToolImplementation::asCachedReadOnlyFS(Storage *storage)
 {
-    return local_fs_;
+    Path *cache_dir = cacheDir();
+    local_fs_->mkDirpWriteable(cache_dir);
+    CacheFS *fs = new CacheFS(local_fs_, cache_dir, storage, sys_);
+    fs->refreshCache();
+    return fs;
 }
