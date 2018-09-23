@@ -48,22 +48,22 @@ Unmounting backup /home/you/backups
 
 Remote rclone cloud storage backups, s3_work_crypt is an rclone config.
 ```
-beak store /home/you/Work s3_work_crypt:
-beak shell s3_work_crypt:
+>beak store /home/you/Work s3_work_crypt:
+>beak shell s3_work_crypt:
 ```
 
 ```
 # You can restore the third most recent backup. (0=latest 1=second latest 2=third latest)
-beak restore s3_work_crypt:@2 /home/you/Work
+>beak restore s3_work_crypt:@2 /home/you/Work
 ```
 
 Configure a rule for /home/you/Work
 ```
-beak config
+>beak config
 # Depending on the configuration push might store in multiple local and remote locations.
-beak push work:
+>beak push work:
 # Pull will pull the latest backup and merge it into your origin.
-beak pull work:
+>beak pull work:
 ```
 
 ## Details.....
@@ -73,7 +73,7 @@ manually and want to see it finished, quickly. In other words, after
 finishing some important work, you type:
 
 ```
-beak store work: s3_work_crypt:
+>beak store work: s3_work_crypt:
 ```
 
 and wait for it to finish.  You can now be sure that your work directory
@@ -107,7 +107,7 @@ Actually you do not need to use a beak _rule_ at all. `beak store /home/you/Work
 But a beak _rule_ helps with remembering where the backups are stored,
 how and where to store them and how to prune them.  An even simpler way of triggering the backup is therefore:
 
-`beak push work:`
+`>beak push work:`
 
 beak will then figure out which _storage location_ to use for this
 push. (It might be round robin through several _storage locations_, or always push
@@ -118,14 +118,14 @@ to all of them, or push to a special USB storage dongle if it is available.)
 You can restore the the most recent _point in time_ from a _storage location_ to a directory:
 
 ```
-mkdir RestoreHere
-beak restore s3_work_crypt: RestoreHere
+>mkdir RestoreHere
+>beak restore s3_work_crypt: RestoreHere
 ```
 
 or from an arbitrary file system backup (here we pick the fourth most recent _point in time_ @0 is the most recent, @1 the second most recent etc):
 
 ```
-beak restore /media/you/USBDrive@3 RestoreHere
+>beak restore /media/you/USBDrive@3 RestoreHere
 ```
 
 You can also restore a backup for merge into your _origin_
@@ -136,14 +136,14 @@ trigger an external merge program (like meld) to finalize the changes.
 For binary files, it stores the concurrently changed versions in the
 directory with the suffix .CCC (concurrent change conflict).
 ```
-beak restore s3_work_crypt: work:
-beak restore /media/you/USBDevice /home/you/Work
+>beak restore s3_work_crypt: work:
+>beak restore /media/you/USBDevice /home/you/Work
 ```
 
 or simply:
 
 ```
-beak pull work:
+>beak pull work:
 ```
 
 ## Accessing files in backups
@@ -151,8 +151,8 @@ beak pull work:
 You can mount a specific _storage location_:
 
 ```
-mkdir OldStuff
-beak mount s3_work_crypt: OldStuff
+>mkdir OldStuff
+>beak mount s3_work_crypt: OldStuff
 ```
 
 When you mount without specifying the _point in time_ @x, then the _points in time_ will show as subdirectories.
@@ -167,13 +167,19 @@ When you mount without specifying the _point in time_ @x, then the _points in ti
 If you supply a _point in time_ (eg @2), then it will mount that particular backup.
 
 ```
-beak mount /media/you/USBDrive@2 OldStuff
+>beak mount /media/you/USBDrive@2 OldStuff
 ```
 
 You unmount like this:
 
 ```
-beak umount OldStuff
+>beak umount OldStuff
+```
+
+You can also do:
+
+```
+>beak shell s3_work_crypt:
 ```
 
 ## Accessing all backups at once.
@@ -182,7 +188,7 @@ If you have configured a _rule_ that backups in many different _storage location
 then the easiest way to access all your _points in time_, is to do a shell
 mount.
 
-`beak shell work:`
+`>beak shell work:`
 
 ```
 >ls
@@ -196,13 +202,13 @@ mount.
 
 You can check the status of your configured _origin_ directories with:
 
-`beak status`
+`>beak status`
 
 ## Removing old backups
 
 After a while you probably want to remove backups to save space.
 
-`beak prune s3_work_crypt:`
+`>beak prune s3_work_crypt:`
 
 The default _keep_ configuration is:
 ```
@@ -215,7 +221,7 @@ One point in time per month for the last 2 years.
 As usual, you usually want to do:
 
 ```
-beak prune work:
+>beak prune work:
 ```
 
 and let the configured _rule_ select how to prune in the different _storage locations_.
@@ -259,40 +265,38 @@ using tar.  Tthere is a shell script that can do the proper
 extraction for you, you do not need the beak binary.
 
 Why discuss the storage format? Because the storage format _is_ the
-backup system.  There are no other meta-data files needed. This means
-that you can roll your own backups without any configuration if you
-wish.
+backup system.  There are no other meta-data files needed. Try:
 
-`beak bmount /home/you/Work TestBeakFS`
+`>beak bmount /home/you/Work TestBeakFS`
 
 Explore the directory `TestBeakFS` to see how beak has chunkified your
 _origin_ directory. Now do:
 
-`rclone copy TestBeakFS /home/you/Backup`
+`>rclone copy TestBeakFS /home/you/Backup`
 
 and you have a proper backup! To unmount the chunky filesystem:
 
-`beak umount TestBeakFS`
+`>beak umount TestBeakFS`
 
 Now mount and rclone again. Rclone will exit early because there is nothing to do.
-Logical, since you have not changed your _origin_ directory.
+Logical, since you have not changed your _origin_ directory. This is due
+to the design of beak, the backup files are deterministic and has the same
+timestamps and sizes.
 
 To access the backed up data do:
 
-`beak mount /home/you/Backup@0 OldStuff`
+`>beak mount /home/you/Backup@0 OldStuff`
 
 Now explore OldStuff and do `diff -rq /home/you/Work OldStuff`. There should be no differences.
 The @0 means to mount the most recent _point in time_ in the _storage location_.
 
 You can of course use store, beak will either store locally or invoke rclone or rsync:
 
-`beak store /home/you/Work /home/you/Backup`
+`>beak store /home/you/Work /home/you/Backup`
 
 which will store any chunk files that are missing into Backup. The extraction process is symmetrical:
 
-`beak restore /home/you/Backup@0 /home/you/Work`
-
-(This will not delete superfluous files. Add --delete-superfluous to remove them automatically.)
+`>beak restore /home/you/Backup@0 /home/you/Work`
 
 Cloud storages often has case-insensitive filesystems and can only store plain files.
 The chunks however, will properly store your case-sensitive filesystem with symbolic links etc.
@@ -326,7 +330,7 @@ when extracting the backup using the shell script.)
 Assuming that your _origin_ directory `/home/you/Work/` above contained `rclonesrc/` and `gamesrc/`
 and you made the backup to `/home/you/Backup`. Now modify a file in `gamesrc/` and do another backup:
 
-`beak store /home/you/Work /home/you/Backup`
+`>beak store /home/you/Work /home/you/Backup`
 
 You now have two _points in time_ stored in the _storage location_. Since you made no changes
 to `rclonesrc` the new index file will point to the existing rclonesrc/chunks.
@@ -344,16 +348,12 @@ a small file, then there is a lot of unnecessarily backed up data. But
 if we store local backups, then beak can create diff chunks and diff chunks can
 even be created inside an existing backup using:
 
-`git pack s3_work_crypt:`
-
-You can get information on a _storage location_ using:
-
-`beak status s3_work_crypt:`
+`>git pack s3_work_crypt:`
 
 You can check the integrity and garbage collect any loose chunks that
 are no longer referenced from index files, using:
 
-`beak check s3_work_crypt:`
+`>beak check s3_work_crypt:`
 
 Local backups are useful if you want to revert a mistake you yourself
 did, like erasing a file or breaking some source code. If you have
@@ -375,71 +375,6 @@ If a _storage location_ (local or remote) is later packed, the new
 diff chunks are first uploaded and verified to have reached their
 destination, before the non-diff chunks are removed. The pack can be
 done by a different computer than the computer that stored it.
-
-## Use cases
-
-As you might have guessed, beak is not the best tool to restore your whole
-hard disk image from scratch after a hard disk failure. There are other toosl for that.
-But if you are re-installing your OS on an empty disk you can use
-`beak restore s3_work_crypt: work:` after re-configuring rclone and beak.
-
-You can safely create a beak _rule_ to backup your home directory (home: = /home/you) and at
-the same time have a _rule_ for a subdirectory (work: = /home/you/Work). The backup for home:
-will not include the /home/you/Work subdirectory since beak will detect that there is a another
-rule for the subdirectory.
-
-beak is more like a Swiss army knife for backing up, mirroring,
-off-site storage etc. As you have seen, you can do everything by hand
-using: `beak store` `beak mount` `beak restore` `beak bmount` and `rclone` or  `rsync`.
-
-But to speed up common tasks you can configure rules with `beak config`.
-A _rule_ (like work:) provides a short cut to the actual _origin_ directory (like /home/you/Work).
-The push and pull commands require a single argument which is a _rule_.
-
-A configured _rule_ can be of a type:
-
-```
-LocalAndRemoteBackups = A push stores locally and the rclones to the remote. Diff chunks are possible.
-RemoteBackupsOnly     = A push rclones directly to the remote from a virtual BeakFS.
-MountOnly             = Only mount off-site storage
-```
-
-A _source directory_ can have multiple remotes pre-configured and push round-robin
-or to all of them at every push.
-
-You can have separate configurations your Work, your Media, your
-Archive, your Home directory etc.  If you use S3 you can have separate
-passwords for the remote _storage locations_ to create safety barriers.
-
-You can have different _keep_ configurations for all _storage locations_. Your local backup
-can be kept at a minimum and if you are using btrfs it can use snapshots.
-
-You can move your work between computers using beak. A typical use case for me is:
-happily programming on your laptop and the suddenly, the kids must see frozen
-and you have to relinguish the laptop before child-induced calamity ensues.
-beak comes to the rescue:
-
-`beak store work: s3_work_crypt:`
-
-You then sit down in front of the desktop computer and perform:
-
-`beak restore s3_work_crypt: work:`
-
-Beak will fetch remote chunk files and then update your _origin directory_
-accordingly and try to merge the contents if possible.
-
-You can examine the differences between your current _source directory_
-and a backup, or the difference between two backups using:
-
-`beak diff work: s3_work_crypt:@0`
-
-`beak diff s3_work_crypt:@0 s3_work_crypt:@1`
-
-If you do not have a user file system (FUSE) available you can use:
-
-`beak shell s3_work_crypt:`
-
-To start a minimal shell to simply find and copy data from the backup.
 
 ## Configuration options
 
