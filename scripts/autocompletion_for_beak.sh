@@ -30,7 +30,7 @@ _beakremotes()
   local cur=${COMP_WORDS[COMP_CWORD]}
   local prev=${COMP_WORDS[COMP_CWORD-1]}
   if [ "$prev" = ":" ]; then prev=${COMP_WORDS[COMP_CWORD-2]}; fi
-  local remotes=$(sed -n "/^\[${prev}\]/,/^\[/p" ~/.config/beak/beak.conf | grep -e 'remote\ *=' | sed 's/remote.*= \?//g' | sort)
+  local remotes=$(cat ~/.config/beak/beak.conf | grep -e 'remote\ *=' | sed 's/remote.*= \?//g' | sort | uniq)
   if [ "$remotes" != "" ]; then
       COMPREPLY=($(compgen -W "$remotes" -- $cur))
       if [ -z "$COMPREPLY" ]; then
@@ -58,7 +58,8 @@ _beak()
         pull) _beakrules ;;
         push) _beakrules ;;
         restore) _beakremotes ;;
-        store) _beakrules ;;
+        shell) _beakremotes ;;
+        store) _beakremotes ;;
         umount) _beakusermounts ;;
     esac
 
@@ -72,7 +73,7 @@ _beak()
     esac
 
     if [ -z "$COMPREPLY" ]; then
-        COMPREPLY=($(compgen -W "mount prune pull push restore store umount" -- $cur))
+        COMPREPLY=($(compgen -W "mount prune pull push restore shell store umount" -- $cur))
     fi
 }
 
