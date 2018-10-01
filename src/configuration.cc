@@ -1017,7 +1017,7 @@ bool ConfigurationImplementation::isRCloneStorage(Path *storage_location, string
             string type = eatTo(out, i, '\n', 64, &eof, &err);
             if (err) break;
             trimWhitespace(&type);
-            configs[target+":"] = type;
+            configs[target] = type;
         }
 
         if (configs.count(name) > 0) {

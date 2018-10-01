@@ -191,6 +191,13 @@ void warning(ComponentId ci, const char* fmt, ...) {
     va_end(args);
 }
 
+void logSystem(ComponentId ci, const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    vsyslog(LOG_INFO, fmt, args);
+    va_end(args);
+}
+
 void logDebug(ComponentId ci, const char* fmt, ...) {
     if (log_level == DEBUG &&
     		(log_components.size()==0 ||

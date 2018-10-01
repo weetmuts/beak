@@ -117,17 +117,67 @@ unique_ptr<ThreadCallback> newRegularThreadCallback(int millis, std::function<bo
     return unique_ptr<ThreadCallback>(new ThreadCallbackImplementation(millis, thread_cb));
 }
 
+function<void()> exit_handler_;
+
+void exitHandler(int signum)
+{
+    if (exit_handler_) exit_handler_();
+}
+
+function<void()> child_exit_handler_;
+
+void childExitHandler(int signum)
+{
+    if (child_exit_handler_) child_exit_handler_();
+}
+
+void doNothing(int signum) {
+}
+
+void onExit(string msg, function<void()> cb)
+{
+    exit_handler_ = cb;
+    struct sigaction new_action, old_action;
+
+    new_action.sa_handler = exitHandler;
+    sigemptyset (&new_action.sa_mask);
+    new_action.sa_flags = 0;
+
+    sigaction (SIGINT, NULL, &old_action);
+    if (old_action.sa_handler != SIG_IGN) sigaction(SIGINT, &new_action, NULL);
+
+    sigaction (SIGHUP, NULL, &old_action);
+    if (old_action.sa_handler != SIG_IGN) sigaction (SIGHUP, &new_action, NULL);
+
+    sigaction (SIGTERM, NULL, &old_action);
+    if (old_action.sa_handler != SIG_IGN) sigaction (SIGTERM, &new_action, NULL);
+}
+
+void onChildExit(string msg, function<void()> cb)
+{
+    child_exit_handler_ = cb;
+    struct sigaction new_action, old_action;
+
+    new_action.sa_handler = childExitHandler;
+    sigemptyset (&new_action.sa_mask);
+    new_action.sa_flags = 0;
+
+    sigaction (SIGCHLD, NULL, &old_action);
+    if (old_action.sa_handler != SIG_IGN) sigaction(SIGCHLD, &new_action, NULL);
+}
+
 struct SystemImplementation : System
 {
     RC invoke(string program,
                vector<string> args,
-               vector<char> *out,
-               Capture capture,
-               function<void(char *buf, size_t len)> cb);
+              std::vector<char> *output = NULL,
+              Capture capture = CaptureStdout,
+              std::function<void(char *buf, size_t len)> output_cb = NULL);
 
     RC invokeShell(Path *init_file);
 
     RC mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground, bool debug);
+    RC umountDaemon(Path *dir);
     std::unique_ptr<FuseMount> mount(Path *dir, FuseAPI *fuseapi, bool debug);
     RC umount(ptr<FuseMount> fuse_mount);
 
@@ -136,11 +186,15 @@ struct SystemImplementation : System
                      bool foreground, bool debug);
 
     ~SystemImplementation() = default;
+
+    private:
+
+    pid_t running_shell_pid_ {};
+
 };
 
 unique_ptr<System> newSystem()
 {
-//    onExit([](){ printf("\nInterrupted, cleaning up.\n"); exit(0); });
     return unique_ptr<System>(new SystemImplementation());
 }
 
@@ -211,11 +265,9 @@ RC SystemImplementation::invoke(string program,
                     output->insert(output->end(), buf, buf+n);
                     if (cb) { cb(buf, n); }
                     debug(SYSTEM, "Input: \"%*s\"\n", n, buf);
-                    //fprintf(stderr, "BANANAS >%*s<\n", n, buf);
                 } else {
                     // No more data to read.
                     debug(SYSTEM, "Input: done\n");
-                    //fprintf(stderr, "NOMORE GURKA\n");
                     break;
                 }
             }
@@ -246,56 +298,36 @@ RC SystemImplementation::invokeShell(Path *init_file)
     debug(SYSTEM, "Invoking shell: \"%s --init-file %s\"\n", argv[0], argv[2]);
 
     int pid = fork();
+
     if (pid == 0) {
+        onExit("Invoke shell", [&](){
+                // Cleanup here?
+            });
         // This is the child process, run the shell here.
         execvp(argv[0], (char*const*)argv);
+    } else {
+        running_shell_pid_ = pid;
     }
     int status;
-    waitpid(pid, &status, 0);
+    waitpid(running_shell_pid_, &status, 0);
+    logSystem(SYSTEM, "Beak shell exited!\n");
 
     return RC::OK;
 }
-
-function<void()> exit_handler;
-
-void exitHandler(int signum)
-{
-    if (exit_handler) exit_handler();
-}
-
-void doNothing(int signum) {
-}
-
-void onExit(function<void()> cb)
-{
-    /*
-    exit_handler = cb;
-    struct sigaction new_action, old_action;
-
-    new_action.sa_handler = exitHandler;
-    sigemptyset (&new_action.sa_mask);
-    new_action.sa_flags = 0;*/
-/*
-    sigaction (SIGINT, NULL, &old_action);
-    if (old_action.sa_handler != SIG_IGN) sigaction(SIGINT, &new_action, NULL);
-    sigaction (SIGHUP, NULL, &old_action);
-    if (old_action.sa_handler != SIG_IGN) sigaction (SIGHUP, &new_action, NULL);
-    sigaction (SIGTERM, NULL, &old_action);
-    if (old_action.sa_handler != SIG_IGN) sigaction (SIGTERM, &new_action, NULL);
-*/
-/*    new_action.sa_handler = doNothing;
-    sigemptyset (&new_action.sa_mask);
-    new_action.sa_flags = 0;*/
-
-    //sigaction (SIGUSR2, NULL, &old_action);
-    //if (old_action.sa_handler != SIG_IGN) sigaction(SIGUSR2, &new_action, NULL);
-}
-
 
 RC SystemImplementation::mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground, bool debug)
 {
     unique_ptr<FuseMount> fm;
     return mountInternal(dir, fuseapi, true, fm, foreground, debug);
+}
+
+RC SystemImplementation::umountDaemon(Path *dir)
+{
+    vector<char> out;
+    vector<string> args;
+    args.push_back("-u");
+    args.push_back(dir->c_str());
+    return invoke("fusermount", args, &out);
 }
 
 unique_ptr<FuseMount> SystemImplementation::mount(Path *dir, FuseAPI *fuseapi, bool debug)
@@ -372,6 +404,8 @@ RC SystemImplementation::mountInternal(Path *dir, FuseAPI *fuseapi,
     ops->readlink = staticReadlinkDispatch_;
 
     if (daemon) {
+        // The fuse daemon gracefully handles its own exit.
+        // No need to track it here.
         int rc = fuse_main(fuse_argc, fuse_argv, ops, fuseapi);
         if (rc) return RC::ERR;
         return RC::OK;
@@ -394,11 +428,34 @@ RC SystemImplementation::mountInternal(Path *dir, FuseAPI *fuseapi,
     fuse_mount_info->loop_pid = fork();
 
     if (fuse_mount_info->loop_pid == 0) {
-        // This is the child process. Serve the virtual file system.
+        // This is the child process.
+        onExit("Child running fuse mount",
+               [this,fuse_mount_info,dir](){
+                logSystem(SYSTEM, "Child running fuse mount terminated! %s\n", dir->c_str());
+                umount(fuse_mount_info);
+                exit(-1);
+            });
+        // Serve the virtual file system.
         fuse_loop_mt (fuse_mount_info->fuse);
         exit(0);
     }
+    onChildExit("Fuse mount",
+                [this,fuse_mount_info,dir](){
+                    pid_t pid;
+                    int   status;
+                    pid = waitpid(-1, &status, WNOHANG);
+                    logSystem(SYSTEM, "Child %d %x exited! %s\n", pid, status, dir->c_str());
+                });
+    onExit("Beak process",
+        [this,fuse_mount_info,dir](){
+            logSystem(SYSTEM, "Beak terminated! \n", dir->c_str());
+            umount(fuse_mount_info);
+            if (running_shell_pid_ != 0) {
+                kill(running_shell_pid_, SIGTERM);
+            }
+        });
     fm = unique_ptr<FuseMount>(fuse_mount_info);
+
     return RC::OK;
 }
 

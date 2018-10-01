@@ -51,6 +51,9 @@ void info(ComponentId ci, const char* fmt, ...);
 // Silenced with: -q -q
 void warning(ComponentId ci, const char* fmt, ...);
 
+// Log on syslog.
+void logSystem(ComponentId ci, const char* fmt, ...);
+
 extern bool debug_logging_;
 
 // Debug logging

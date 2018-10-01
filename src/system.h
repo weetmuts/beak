@@ -54,6 +54,8 @@ struct System
 
     // A daemon mount will exit the current program and continue to run in the background as a daemon,
     virtual RC mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground=false, bool debug=false) = 0;
+    // Unmount the daemon
+    virtual RC umountDaemon(Path *dir) = 0;
     // A normal mount forks and the current program continues to run.
     virtual std::unique_ptr<FuseMount> mount(Path *dir, FuseAPI *fuseapi, bool debug=false) = 0;
     // Unmount the previous mount.
@@ -63,7 +65,5 @@ struct System
 };
 
 std::unique_ptr<System> newSystem();
-
-void onExit(std::function<void()> cb);
 
 #endif

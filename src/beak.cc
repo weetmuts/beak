@@ -786,10 +786,7 @@ RC BeakImplementation::prune(Settings *settings)
 
 RC BeakImplementation::umountDaemon(Settings *settings)
 {
-    vector<string> args;
-    args.push_back("-u");
-    args.push_back(settings->from.dir->str());
-    return sys_->invoke("fusermount", args);
+    return sys_->umountDaemon(settings->from.dir);
 }
 
 RC BeakImplementation::mountBackupDaemon(Settings *settings)
@@ -952,14 +949,13 @@ RC BeakImplementation::shell(Settings *settings)
     settings->updateFuseArgsArray();
 
     rc = mountRestore(settings);
-    if (rc.isErr()) {
-        // Remove start/stop files and mount dir
-        fprintf(stderr, "GURKA %p", start);
-    }
+    if (rc.isErr()) goto cleanup;
 
     rc = sys_->invokeShell(start);
 
     rc = umountRestore(settings);
+
+cleanup:
 
     local_fs_->deleteFile(start);
     local_fs_->deleteFile(stop);
