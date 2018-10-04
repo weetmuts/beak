@@ -26,7 +26,6 @@
 #include <algorithm>
 
 static ComponentId STORAGETOOL = registerLogComponent("storagetool");
-static ComponentId RCLONE = registerLogComponent("rclone");
 static ComponentId CACHE = registerLogComponent("cache");
 
 using namespace std;
@@ -41,15 +40,6 @@ struct StorageToolImplementation : public StorageTool
                               Settings *settings);
 
     RC listPointsInTime(Storage *storage, vector<pair<Path*,struct timespec>> *v);
-
-    RC listBeakFiles(Storage *storage,
-                     std::vector<TarFileName> *files,
-                     std::vector<TarFileName> *bad_files,
-                     std::vector<std::string> *other_files,
-                     map<Path*,FileStat> *contents);
-
-    RC sendBeakFilesToStorage(Path *dir, Storage *storage, std::vector<TarFileName*> *files);
-    RC fetchBeakFilesFromStorage(Storage *storage, std::vector<TarFileName*> *files, Path *dir);
 
     FileSystem *asCachedReadOnlyFS(Storage *storage);
 
@@ -87,7 +77,6 @@ void add_backup_work(ptr<StoreStatistics> st,
         }
         st->stats.num_files++;
         st->stats.size_files+=stat->st_size;
-        //printf("PREP %ju/%ju \"%s\"\n", st->stats.num_files_to_store, st->stats.num_files, file_to_extract->c_str());
     }
     else if (stat->isDirectory()) st->stats.num_dirs++;
 }
@@ -156,7 +145,7 @@ RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backup,
     if (storage->type == RCloneStorage) {
         vector<TarFileName> files, bad_files;
         vector<string> other_files;
-        RC rc = listBeakFiles(storage, &files, &bad_files, &other_files, &contents);
+        RC rc = rcloneListBeakFiles(storage, &files, &bad_files, &other_files, &contents, sys_);
         if (rc.isErr()) {
             error(STORAGETOOL, "Could not list files in rclone storage %s\n", storage->storage_location->c_str());
         }
@@ -195,40 +184,12 @@ RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backup,
             error(STORAGETOOL, "Could not mount beak filesyset for rclone.\n");
         }
 
-        vector<string> args;
-        args.push_back("copy");
-        args.push_back("-v");
-        args.push_back(mount->c_str());
-        args.push_back(storage->storage_location->str());
-        vector<char> output;
-        RC rc = sys_->invoke("rclone", args, &output, CaptureBoth,
-                             [&st, storage](char *buf, size_t len) {
-                                 size_t from, to;
-                                 for (from=1; from<len-1; ++from) {
-                                     if (buf[from-1] == ' ' && buf[from] == ':' && buf[from+1] == ' ') {
-                                         from = from+2;
-                                         break;
-                                     }
-                                 }
-                                 for (to=len-2; to>from; --to) {
-                                     if (buf[to] == ':' && buf[to+1] == ' ') {
-                                         break;
-                                     }
-                                 }
-                                 string file = storage->storage_location->str()+"/"+string(buf+from, to-from);
-                                 Path *path = Path::lookup(file);
-                                 size_t size = 0;
-
-                                 debug(RCLONE, "copied: %ju \"%s\"\n", st->stats.file_sizes.count(path), path->c_str());
-                                 if (st->stats.file_sizes.count(path)) {
-                                     size = st->stats.file_sizes[path];
-                                     st->stats.size_files_stored += size;
-                                     st->stats.num_files_stored++;
-                                     st->updateProgress();
-                                 }
-                             });
-        // Parse verbose output and look for:
-        // 2018/01/29 20:05:36 INFO  : code/src/s01_001517180913.689221661_11659264_b6f526ca4e988180fe6289213a338ab5a4926f7189dfb9dddff5a30ab50fc7f3_0.tar: Copied (new)
+        RC rc = rcloneSendFiles(storage,
+                                NULL,
+                                mount,
+                                st,
+                                local_fs_,
+                                sys_);
 
         if (rc.isErr()) {
             error(STORAGETOOL, "Error when invoking rclone.\n");
@@ -252,122 +213,6 @@ RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backup,
     return RC::OK;
 }
 
-RC StorageToolImplementation::sendBeakFilesToStorage(Path *dir, Storage *storage, vector<TarFileName*> *files)
-{
-    assert(storage->type == RCloneStorage);
-
-    string files_to_fetch;
-    Path *tmp;
-    if (files) {
-        for (auto& tfn : *files) {
-            files_to_fetch.append(tfn->path->str());
-            files_to_fetch.append("\n");
-        }
-    }
-
-    tmp = local_fs_->mkTempFile("beak_fetching", files_to_fetch);
-
-    RC rc = RC::OK;
-    vector<char> out;
-    vector<string> args;
-    args.push_back("copy");
-    if (files) {
-        args.push_back("--include-from");
-        args.push_back(tmp->c_str());
-    }
-    args.push_back(dir->c_str());
-    args.push_back(storage->storage_location->c_str());
-    rc = sys_->invoke("rclone", args, &out);
-
-    return rc;
-}
-
-RC StorageToolImplementation::fetchBeakFilesFromStorage(Storage *storage, vector<TarFileName*> *files, Path *dir)
-{
-    assert(storage->type == RCloneStorage);
-
-    string files_to_fetch;
-    for (auto& tfn : *files) {
-        files_to_fetch.append(tfn->path->str());
-        files_to_fetch.append("\n");
-    }
-
-    Path *tmp = local_fs_->mkTempFile("beak_fetching", files_to_fetch);
-
-    RC rc = RC::OK;
-    vector<char> out;
-    vector<string> args;
-    args.push_back("copy");
-    args.push_back("--include-from");
-    args.push_back(tmp->c_str());
-    args.push_back(storage->storage_location->c_str());
-    args.push_back(dir->c_str());
-    rc = sys_->invoke("rclone", args, &out);
-
-    return rc;
-}
-
-RC StorageToolImplementation::listBeakFiles(Storage *storage,
-                                            vector<TarFileName> *files,
-                                            vector<TarFileName> *bad_files,
-                                            vector<string> *other_files,
-                                            map<Path*,FileStat> *contents)
-{
-    assert(storage->type == RCloneStorage);
-
-    RC rc = RC::OK;
-    vector<char> out;
-    vector<string> args;
-    args.push_back("ls");
-    args.push_back(storage->storage_location->c_str());
-    rc = sys_->invoke("rclone", args, &out);
-
-    if (rc.isErr()) return RC::ERR;
-
-    auto i = out.begin();
-    bool eof = false, err = false;
-
-    for (;;) {
-	// Example line:
-	// 12288 z01_001506595429.268937346_0_7eb62d8e0097d5eaa99f332536236e6ba9dbfeccf0df715ec96363f8ddd495b6_0.gz
-        eatWhitespace(out, i, &eof);
-        if (eof) break;
-        string size = eatTo(out, i, ' ', 64, &eof, &err);
-
-        if (eof || err) break;
-        string file_name = eatTo(out, i, '\n', 4096, &eof, &err);
-        if (err) break;
-        TarFileName tfn;
-        bool ok = TarFile::parseFileName(file_name, &tfn);
-        // Only files that have proper beakfs names are included.
-        if (ok) {
-            // Check that the remote size equals the content. If there is a mismatch,
-            // then for sure the file must be overwritte/updated. Perhaps there was an earlier
-            // transfer interruption....
-            size_t siz = (size_t)atol(size.c_str());
-            if ( (tfn.type != REG_FILE && tfn.size == siz) ||
-                 (tfn.type == REG_FILE && tfn.size == 0) )
-            {
-                files->push_back(tfn);
-                Path *p = tfn.path->prepend(storage->storage_location);
-                FileStat fs;
-                fs.st_size = (off_t)siz;
-                fs.st_mtim.tv_sec = tfn.secs;
-                fs.st_mtim.tv_nsec = tfn.nsecs;
-                (*contents)[p] = fs;
-            }
-            else
-            {
-                bad_files->push_back(tfn);
-            }
-        } else {
-            other_files->push_back(file_name);
-        }
-    }
-    if (err) return RC::ERR;
-
-    return RC::OK;
-}
 
 RC StorageToolImplementation::listPointsInTime(Storage *storage, vector<pair<Path*,struct timespec>> *v)
 {
@@ -378,41 +223,9 @@ RC StorageToolImplementation::listPointsInTime(Storage *storage, vector<pair<Pat
     }
     case RSyncStorage:
     {
-        /*
-        vector<char> out;
-        vector<string> args;
-        args.push_back("--list-only");
-        args.push_back(storage->storage_location->str());
-        RC rc = sys_->invoke("rsync", args, &out);
-        if (rc.isErr()) return RC::ERR;
-        */
-        /*auto i = out.begin();
-        bool eof, err;
-
-        for (;;) {
-            // Example line:
-            // -rw-rw-r--         15,920 2018/05/26 08:43:32 z01_.....gz
-            }*/
-        break;
     }
     case RCloneStorage:
     {
-        vector<TarFileName> files;
-        vector<TarFileName> bad_files;
-        vector<std::string> other_files;
-        map<Path*,FileStat> contents;
-        RC rc = rcloneListBeakFiles(storage, &files, &bad_files, &other_files, &contents, sys_);
-        if (rc.isErr()) return RC::ERR;
-
-        /*
-        sort(v->begin(), v->end(),
-             [](struct timespec &a, struct timespec &b)->bool {
-                 return (b.tv_sec < a.tv_sec) ||
-                     (b.tv_sec == a.tv_sec &&
-                      b.tv_nsec < a.tv_nsec);
-             });
-        */
-
         break;
     }
     case NoSuchStorage:
@@ -458,12 +271,15 @@ RC CacheFS::loadDirectoryStructure(map<Path*,CacheEntry> *entries)
     }
     case RSyncStorage:
     case RCloneStorage:
-        fprintf(stdout, "Fetching list of files in %s ...", storage_->storage_location->c_str());
-        fflush(stdout);
         RC rc = rcloneListBeakFiles(storage_, &files, &bad_files, &other_files, &contents, sys_);
-        fprintf(stdout, "done. (%zu files)\n", files.size());
-        fflush(stdout);
         if (rc.isErr()) return RC::ERR;
+    }
+
+    vector<Path*> index_files;
+    for (auto &p : files) {
+        if (p.isIndexFile()) {
+            index_files.push_back(p.path);
+        }
     }
 
     Path *prev_dir = NULL;
@@ -471,26 +287,24 @@ RC CacheFS::loadDirectoryStructure(map<Path*,CacheEntry> *entries)
     FileStat dir_stat;
     dir_stat.setAsDirectory();
 
-    for (auto&p:contents) {
+    for (auto &p : contents) {
         Path *dir = p.first->parent();
         CacheEntry *dir_entry = NULL;
         if (dir == prev_dir) {
             dir_entry = prev_dir_cache_entry;
         } else {
             if (entries->count(dir) == 0) {
+                // Create a new directory cache entry.
+                // Directories cache entries are always marked as cached.
                 (*entries)[dir] = CacheEntry(dir_stat, dir, true);
             }
             dir_entry = prev_dir_cache_entry = &(*entries)[dir];
         }
+        // Create a new file cache entry.
+        // Initially the cache entry is marked as not cached.
         (*entries)[p.first] = CacheEntry(p.second, p.first, false);
         // Add this file to its directory.
         dir_entry->direntries.push_back(&(*entries)[p.first]);
-    }
-
-    for (auto&p:*entries) {
-        if (p.second.direntries.size()) {
-//            fprintf(stderr, ">%s<=  %zd %zd %s\n", p.first->c_str(), p.second.direntries.size(), p.second.fs.st_size, p.second.path->c_str());
-        }
     }
 
     return RC::ERR;

@@ -18,6 +18,7 @@
 #include "always.h"
 
 #include "configuration.h"
+#include "statistics.h"
 #include "system.h"
 #include "tarfile.h"
 
@@ -37,3 +38,10 @@ RC rcloneFetchFiles(Storage *storage,
                     Path *dir,
                     System *sys,
                     FileSystem *local_fs);
+
+RC rcloneSendFiles(Storage *storage,
+                   std::vector<Path*> *files,
+                   Path *dir,
+                   StoreStatistics *st,
+                   FileSystem *local_fs,
+                   ptr<System> sys);

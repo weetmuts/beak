@@ -167,6 +167,7 @@ RC parseHumanReadable(string s, size_t *out)
     string suffix;
     char c = s.back();
 
+    // Extract the suffix from the end
     while (c < '0' || c > '9') {
         if (c != ' ') {
             suffix = s.back() + suffix;
@@ -197,11 +198,16 @@ RC parseHumanReadable(string s, size_t *out)
         mul *= KB * KB;
     }
 
+    string n;
     for (auto c : s)
     {
-        if (!isdigit(c))
-        {
-            return RC::ERR;
+        if (isdigit(c)) {
+            n.push_back(c);
+        } else {
+            // Commans are ok and ignored, everything else is bad.
+            if (c != ',') {
+                return RC::ERR;
+            }
         }
     }
 

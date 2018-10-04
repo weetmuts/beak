@@ -17,7 +17,12 @@
 
 #include "storage_rclone.h"
 
+#include "log.h"
+#include "statistics.h"
+
 using namespace std;
+
+static ComponentId RCLONE = registerLogComponent("rclone");
 
 RC rcloneListBeakFiles(Storage *storage,
                        vector<TarFileName> *files,
@@ -51,7 +56,7 @@ RC rcloneListBeakFiles(Storage *storage,
         string file_name = eatTo(out, i, '\n', 4096, &eof, &err);
         if (err) break;
         TarFileName tfn;
-        bool ok = TarFile::parseFileName(file_name, &tfn);
+        bool ok = tfn.parseFileName(file_name);
         // Only files that have proper beakfs names are included.
         if (ok) {
             // Check that the remote size equals the content. If there is a mismatch,
@@ -115,4 +120,60 @@ RC rcloneFetchFiles(Storage *storage,
     local_fs->deleteFile(tmp);
 
     return rc;
+}
+
+void parseRcloneVerboseOutput_(StoreStatistics *st,
+                               Storage *storage,
+                               char *buf,
+                               size_t len)
+{
+    // Parse verbose output and look for:
+    // 2018/01/29 20:05:36 INFO  : code/src/s01_001517180913.689221661_11659264_b6f526ca4e988180fe6289213a338ab5a4926f7189dfb9dddff5a30ab50fc7f3_0.tar: Copied (new)
+
+    size_t from, to;
+    for (from=1; from<len-1; ++from) {
+        if (buf[from-1] == ' ' && buf[from] == ':' && buf[from+1] == ' ') {
+            from = from+2;
+            break;
+        }
+    }
+    for (to=len-2; to>from; --to) {
+        if (buf[to] == ':' && buf[to+1] == ' ') {
+            break;
+        }
+    }
+    string file = storage->storage_location->str()+"/"+string(buf+from, to-from);
+    Path *path = Path::lookup(file);
+    size_t size = 0;
+
+    debug(RCLONE, "copied: %ju \"%s\"\n", st->stats.file_sizes.count(path), path->c_str());
+
+    if (st->stats.file_sizes.count(path)) {
+        size = st->stats.file_sizes[path];
+        st->stats.size_files_stored += size;
+        st->stats.num_files_stored++;
+        st->updateProgress();
+    }
+}
+
+RC rcloneSendFiles(Storage *storage,
+                   vector<Path*> *files,
+                   Path *dir,
+                   StoreStatistics *st,
+                   FileSystem *local_fs,
+                   ptr<System> sys)
+{
+    vector<string> args;
+    args.push_back("copy");
+    args.push_back("-v");
+    args.push_back(dir->c_str());
+    args.push_back(storage->storage_location->str());
+    vector<char> output;
+    return sys->invoke("rclone", args, &output, CaptureBoth,
+                        [&st, storage](char *buf, size_t len) {
+                            parseRcloneVerboseOutput_(st,
+                                                      storage,
+                                                      buf,
+                                                      len);
+                        });
 }

@@ -787,7 +787,7 @@ TarFile *Backup::findTarFromPath(Path *path) {
         return NULL;
     }
     TarFileName tfn;
-    ok = TarFile::parseFileName(n, &tfn);
+    ok = tfn.parseFileName(n);
     if (!ok) {
         debug(BACKUP,"Not a proper file name: \"%s\"\n", n.c_str());
         return NULL;

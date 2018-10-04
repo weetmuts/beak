@@ -175,11 +175,11 @@ void TarFile::fixName() {
     char gztype[] = "gz";
     char tartype[] = "tar";
     char *type = tartype;
-    if (chartype() == 'z') {
+    if (TarFileName::chartype(tar_contents) == 'z') {
         type = gztype;
     }
     snprintf(buffer, sizeof(buffer), "%c01_%s_%s_%s_0.%s",
-             chartype(), secs_and_nanos, sizes, toHex(hash()).c_str(), type);
+             TarFileName::chartype(tar_contents), secs_and_nanos, sizes, toHex(hash()).c_str(), type);
     name_ = buffer;
     path_ = in_directory_->path()->appendName(Atom::lookup(name_));
 
@@ -252,7 +252,7 @@ static bool hexDigitsOnly(char *p, size_t len, string *s) {
     return true;
 }
 
-bool TarFile::parseFileName(string &name, TarFileName *c)
+bool TarFileName::parseFileName(string &name)
 {
     bool k;
     // Example file name:
@@ -263,7 +263,7 @@ bool TarFile::parseFileName(string &name, TarFileName *c)
     size_t p0 = name.rfind('/');
     if (p0 == string::npos) { p0=0; } else { p0++; }
 
-    k = typeFromChar(name[p0], &c->type);
+    k = typeFromChar(name[p0], &type);
     if (!k) return false;
 
     size_t p1 = name.find('_', p0); if (p1 == string::npos) return false;
@@ -273,35 +273,35 @@ bool TarFile::parseFileName(string &name, TarFileName *c)
     size_t p5 = name.find('_', p4+1); if (p5 == string::npos) return false;
     size_t p6 = name.find('.', p5+1); if (p6 == string::npos) return false;
 
-    string version;
-    k = digitsOnly(&name[p0+1], p1-p0-1, &version);
+    string versions;
+    k = digitsOnly(&name[p0+1], p1-p0-1, &versions);
     if (!k) return false;
-    c->version = atoi(version.c_str());
+    version = atoi(versions.c_str());
 
-    string secs;
-    k = digitsOnly(&name[p1+1], p2-p1-1, &secs);
+    string secss;
+    k = digitsOnly(&name[p1+1], p2-p1-1, &secss);
     if (!k) return false;
-    c->secs = atol(secs.c_str());
+    secs = atol(secss.c_str());
 
-    string nsecs;
-    k = digitsOnly(&name[p2+1], p3-p2-1, &nsecs);
+    string nsecss;
+    k = digitsOnly(&name[p2+1], p3-p2-1, &nsecss);
     if (!k) return false;
-    c->nsecs = atol(nsecs.c_str());
+    nsecs = atol(nsecss.c_str());
 
-    string size;
-    k = digitsOnly(&name[p3+1], p4-p3-1, &size);
+    string sizes;
+    k = digitsOnly(&name[p3+1], p4-p3-1, &sizes);
     if (!k) return false;
-    c->size = atol(size.c_str());
+    size = atol(sizes.c_str());
 
-    k = hexDigitsOnly(&name[p4+1], p5-p4-1, &c->header_hash);
-    if (!k) return false;
-
-    k = hexDigitsOnly(&name[p5+1], p6-p5-1, &c->content_hash);
+    k = hexDigitsOnly(&name[p4+1], p5-p4-1, &header_hash);
     if (!k) return false;
 
-    c->suffix = name.substr(p6+1);
+    k = hexDigitsOnly(&name[p5+1], p6-p5-1, &content_hash);
+    if (!k) return false;
 
-    c->path = Path::lookup(name);
+    suffix = name.substr(p6+1);
+
+    path = Path::lookup(name);
     return true;
 }
 

@@ -665,7 +665,7 @@ RC Restore::lookForPointsInTime(PointInTimeFormat f, Path *path)
     for (auto f : contents)
     {
         TarFileName tfn;
-        ok = TarFile::parseFileName(f->str(), &tfn);
+        ok = tfn.parseFileName(f->str());
 
         if (ok && tfn.type == REG_FILE) {
             PointInTime p;

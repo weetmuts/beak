@@ -1201,7 +1201,7 @@ bool BeakImplementation::hasPointsInTime(Path *path, FileSystem *fs)
     for (auto f : contents)
     {
         TarFileName tfn;
-        bool ok = TarFile::parseFileName(f->str(), &tfn);
+        bool ok = tfn.parseFileName(f->str());
 
         if (ok && tfn.type == REG_FILE) {
             return true;

@@ -66,6 +66,35 @@ struct TarFileName {
             tfn->content_hash == content_hash &&
             tfn->suffix == suffix;
     }
+
+    bool isIndexFile() {
+        return type == REG_FILE && suffix == "gz";
+    }
+
+    bool parseFileName(std::string &name);
+
+    static char chartype(TarContents type) {
+        switch (type) {
+        case REG_FILE: return REG_FILE_CHAR;
+        case DIR_TAR: return DIR_TAR_CHAR;
+        case SMALL_FILES_TAR: return SMALL_FILES_TAR_CHAR;
+        case MEDIUM_FILES_TAR: return MEDIUM_FILES_TAR_CHAR;
+        case SINGLE_LARGE_FILE_TAR: return SINGLE_LARGE_FILE_TAR_CHAR;
+        }
+        return 0;
+    }
+
+    static bool typeFromChar(char c, TarContents *tc) {
+        switch (c) {
+        case REG_FILE_CHAR: *tc = REG_FILE; return true;
+        case DIR_TAR_CHAR: *tc = DIR_TAR; return true;
+        case SMALL_FILES_TAR_CHAR: *tc = SMALL_FILES_TAR; return true;
+        case MEDIUM_FILES_TAR_CHAR: *tc = MEDIUM_FILES_TAR; return true;
+        case SINGLE_LARGE_FILE_TAR_CHAR: *tc = SINGLE_LARGE_FILE_TAR; return true;
+        }
+        return false;
+    }
+
 };
 
 struct TarFile
@@ -113,28 +142,6 @@ struct TarFile
     void updateMtim(struct timespec *mtim);
 
     std::string line(Path *p);
-
-    char chartype() {
-        switch (tar_contents) {
-        case REG_FILE: return REG_FILE_CHAR;
-        case DIR_TAR: return DIR_TAR_CHAR;
-        case SMALL_FILES_TAR: return SMALL_FILES_TAR_CHAR;
-        case MEDIUM_FILES_TAR: return MEDIUM_FILES_TAR_CHAR;
-        case SINGLE_LARGE_FILE_TAR: return SINGLE_LARGE_FILE_TAR_CHAR;
-        }
-        return 0;
-    }
-
-    static bool typeFromChar(char c, TarContents *tc) {
-        switch (c) {
-        case REG_FILE_CHAR: *tc = REG_FILE; return true;
-        case DIR_TAR_CHAR: *tc = DIR_TAR; return true;
-        case SMALL_FILES_TAR_CHAR: *tc = SMALL_FILES_TAR; return true;
-        case MEDIUM_FILES_TAR_CHAR: *tc = MEDIUM_FILES_TAR; return true;
-        case SINGLE_LARGE_FILE_TAR_CHAR: *tc = SINGLE_LARGE_FILE_TAR; return true;
-        }
-        return false;
-    }
 
     static bool parseFileName(std::string &name, TarFileName *c);
 
