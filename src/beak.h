@@ -53,6 +53,7 @@ struct Beak
     virtual RC check(Settings *settings) = 0;
     virtual RC configure(Settings *settings) = 0;
     virtual RC push(Settings *settings) = 0;
+    virtual RC pull(Settings *settings) = 0;
     virtual RC prune(Settings *settings) = 0;
 
     virtual RC umountDaemon(Settings *settings) = 0;

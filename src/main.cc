@@ -116,6 +116,7 @@ int run(int argc, char *argv[]) {
         break;
 
     case pull_cmd:
+        rc = beak->pull(&settings);
         break;
 
     case mount_cmd:

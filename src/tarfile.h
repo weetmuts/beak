@@ -71,6 +71,8 @@ struct TarFileName {
         return type == REG_FILE && suffix == "gz";
     }
 
+    static bool isIndexFile(Path *);
+
     bool parseFileName(std::string &name);
 
     static char chartype(TarContents type) {

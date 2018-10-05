@@ -73,7 +73,7 @@ manually and want to see it finished, quickly. In other words, after
 finishing some important work, you type:
 
 ```
->beak store work: s3_work_crypt:
+>beak push work:
 ```
 
 and wait for it to finish.  You can now be sure that your work directory
@@ -85,14 +85,15 @@ timestamp of the most recently changed file/directory within the
 _origin_ directory that was backed up. (I.e. it is not the time when
 the store was initiated.)
 
-`work:` a beak _rule_ that you have created to backup the _origin_ directory /home/you/Work.
+`work:` a beak _rule_ that you have created to backup the _origin_ directory /home/you/Work to
+the remote cloud storage location s3_work_crypt:
+
+`s3_work_crypt:` is an rclone _storage location_ , for example an
+encrypted directory on S3 or your Google drive, or somewhere else. You
+configure such rclone locations using the command `rclone config`
+([see RClone doc](https://rclone.org/docs/)).
 
 You configure the beak _rules_ using the command `beak config`.
-
-`s3_work_crypt:` is an rclone _storage location_ , for example an encrypted directory on S3
-or your Google drive, or somewhere else.
-
-You configure such rclone locations using the command `rclone config` ([see RClone doc](https://rclone.org/docs/)).
 
 Another example is: `beak store work: backup@192.168.0.1:/backups`
 

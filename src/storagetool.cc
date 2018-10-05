@@ -266,6 +266,7 @@ RC StorageToolImplementation::listPointsInTime(Storage *storage, vector<pair<Pat
     }
     case RSyncStorage:
     {
+        break;
     }
     case RCloneStorage:
     {
@@ -327,18 +328,12 @@ RC CacheFS::loadDirectoryStructure(map<Path*,CacheEntry> *entries)
         if (rc.isErr()) return RC::ERR;
     }
 
-    vector<Path*> index_files;
-    for (auto &p : files) {
-        if (p.isIndexFile()) {
-            index_files.push_back(p.path);
-//            fprintf(stderr, "Found index %s\n", p.path->c_str());
-        }
-    }
-
     Path *prev_dir = NULL;
     CacheEntry *prev_dir_cache_entry = NULL;
     FileStat dir_stat;
     dir_stat.setAsDirectory();
+
+    vector<Path*> index_files;
 
     for (auto &p : contents) {
         Path *dir = p.first->parent();
@@ -357,11 +352,23 @@ RC CacheFS::loadDirectoryStructure(map<Path*,CacheEntry> *entries)
         // Initially the cache entry is marked as not cached.
         (*entries)[p.first] = CacheEntry(p.second, p.first, false);
         CacheEntry *ce = &(*entries)[p.first];
+        if (TarFileName::isIndexFile(p.first) && !ce->isCached(cache_fs_, cache_dir_, p.first))
+        {
+            index_files.push_back(p.first);
+            debug(CACHE, "Needs index %s\n", p.first->c_str());
+
+        }
         // Add this file to its directory.
         dir_entry->direntries.push_back(ce);
     }
 
-    return RC::ERR;
+    RC rc = RC::OK;
+    if (index_files.size() > 0) {
+        info(CACHE, "Prefetching %zu index files...", index_files.size());
+        rc = fetchFiles(&index_files);
+        info(CACHE, "done.\n");
+    }
+    return rc;
 }
 
 RC CacheFS::fetchFile(Path *file)

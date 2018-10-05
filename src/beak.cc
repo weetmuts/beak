@@ -88,12 +88,11 @@ struct BeakImplementation : Beak {
     void printLicense();
 
     vector<PointInTime> history();
-    RC findPointsInTime(string remote, vector<struct timespec> *v);
-    RC fetchPointsInTime(string remote, Path *cache);
 
     RC check(Settings *settings);
     RC configure(Settings *settings);
     RC push(Settings *settings);
+    RC pull(Settings *settings);
     RC prune(Settings *settings);
 
     RC umountDaemon(Settings *settings);
@@ -738,45 +737,12 @@ RC BeakImplementation::configure(Settings *settings)
 
 RC BeakImplementation::push(Settings *settings)
 {
-    RC rc = RC::OK;
+    return RC::ERR;
+}
 
-    assert(settings->from.type == ArgRule);
-
-    Rule *rule = settings->from.rule;
-    Settings backup_settings = settings->copy();
-    Path *mount = local_fs_->mkTempDir("beak_push_");
-    backup_settings.to.dir = mount;
-    rc = mountBackup(&backup_settings);
-    if (rc.isErr()) return RC::ERR;
-
-    vector<Storage*> storages = rule->sortedStorages();
-    Storage *storage = NULL;
-    for (auto s : storages) {
-        if (s != rule->local) storage = s;
-    }
-    if (storage == NULL) {
-        error(COMMANDLINE, "No remote storage configured for rule \"%s\"\n", rule->name.c_str());
-    }
-
-    // Beak file system is now mounted, lets store it into a storage location.
-    vector<string> args;
-    args.push_back("copy");
-    args.push_back("-v");
-    args.push_back(mount->c_str());
-    args.push_back(storage->storage_location->str());
-    vector<char> output;
-    rc = sys_->invoke("rclone", args, &output, CaptureBoth,
-                      [=](char *buf, size_t len) {
-                          fprintf(stderr, "RCLONE COPY: >%*s<\n", (int)len, buf);
-                      });
-    // Parse verbose output and look for:
-    // 2018/01/29 20:05:36 INFO  : code/src/s01_001517180913.689221661_11659264_b6f526ca4e988180fe6289213a338ab5a4926f7189dfb9dddff5a30ab50fc7f3_0.tar: Copied (new)
-
-    // Unmount virtual filesystem.
-    rc = umountBackup(&backup_settings);
-    rmdir(mount->c_str());
-
-    return rc;
+RC BeakImplementation::pull(Settings *settings)
+{
+    return RC::ERR;
 }
 
 RC BeakImplementation::prune(Settings *settings)
@@ -888,41 +854,6 @@ RC BeakImplementation::umountRestore(Settings *settings)
     return RC::OK;
 }
 
-RC BeakImplementation::fetchPointsInTime(string remote, Path *cache)
-{
-    vector<char> out;
-    vector<string> args;
-
-    args.push_back("copy");
-    args.push_back("--include");
-    args.push_back("/z01*");
-    args.push_back(remote);
-    args.push_back(cache->str());
-    UI::clearLine();
-    UI::output("Copying index files from %s", remote.c_str());
-    fflush(stdout);
-    RC rc = sys_->invoke("rclone", args, &out);
-
-    out.clear();
-    args.clear();
-    args.push_back("ls");
-    args.push_back(remote);
-    UI::clearLine();
-    UI::output("Listing files in %s", remote.c_str());
-    fflush(stdout);
-    rc = sys_->invoke("rclone", args, &out);
-
-    Path *p = cache;
-    string r = remote;
-    r.pop_back();
-    p = p->appendName(Atom::lookup(r+".ls"));
-    local_fs_->createFile(p, &out);
-    UI::clearLine();
-    fflush(stdout);
-
-    return rc;
-}
-
 RC BeakImplementation::shell(Settings *settings)
 {
     RC rc = RC::OK;
@@ -938,7 +869,11 @@ RC BeakImplementation::shell(Settings *settings)
 
     Path *mount = local_fs_->mkTempDir("beak_shell_");
     Path *stop = local_fs_->mkTempFile("beak_shell_stop_", "echo Unmounting backup "+storage);
-    Path *start = local_fs_->mkTempFile("beak_shell_start_", "trap "+stop->str()+" EXIT; cd "+mount->str()+"; echo Mounted "+storage+"; echo Exit shell to unmount backup.\n");
+    Path *start = local_fs_->mkTempFile("beak_shell_start_",
+                                        "trap "+stop->str()+" EXIT"
+                                        +"; cd "+mount->str()
+                                        +"; echo Mounted "+storage
+                                        +"; echo Exit shell to unmount backup.\n");
     FileStat fs;
     fs.setAsExecutable();
     local_fs_->chmod(start, &fs);
@@ -985,8 +920,8 @@ RC BeakImplementation::status(Settings *settings)
 	}
 
 	for (auto storage : rule->sortedStorages()) {
-	    rc = fetchPointsInTime(storage->storage_location->str(), rule->cache_path);
-	    if (rc.isErr()) continue;
+	    //rc = fetchPointsInTime(storage->storage_location->str(), rule->cache_path);
+	    //if (rc.isErr()) continue;
 
 	    vector<struct timespec> points;
 	    //rc = findPointsInTime(storage->storage_location->str(), &points);
@@ -1068,7 +1003,8 @@ RC BeakImplementation::restore(Settings *settings)
     umask(0);
     assert(settings->from.type == ArgStorage);
     FileSystem *backup_fs = local_fs_;
-    if (settings->from.storage->type == RCloneStorage) {
+    if (settings->from.storage->type == RCloneStorage ||
+        settings->from.storage->type == RSyncStorage) {
         backup_fs = storage_tool_->asCachedReadOnlyFS(settings->from.storage);
     }
     unique_ptr<Restore> restore  = newRestore(backup_fs);
@@ -1204,7 +1140,7 @@ bool BeakImplementation::hasPointsInTime(Path *path, FileSystem *fs)
         TarFileName tfn;
         bool ok = tfn.parseFileName(f->str());
 
-        if (ok && tfn.type == REG_FILE) {
+        if (ok && tfn.isIndexFile()) {
             return true;
         }
     }

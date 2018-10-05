@@ -252,6 +252,18 @@ static bool hexDigitsOnly(char *p, size_t len, string *s) {
     return true;
 }
 
+bool TarFileName::isIndexFile(Path *p)
+{
+    // Example file name:
+    // foo/bar/dir/z01_(001501080787).(579054757)_(0)_(3b5e4ec7fe38d0f9846947207a0ea44c)_(0).gz
+
+    size_t len = p->name()->str().length();
+    if (len < 20) return false;
+    const char *s = p->name()->c_str();
+
+    return 0==strncmp(s, "z01_", 3) && 0==strncmp(s+len-3, ".gz", 3);
+}
+
 bool TarFileName::parseFileName(string &name)
 {
     bool k;
