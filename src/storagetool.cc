@@ -75,7 +75,7 @@ void add_backup_work(ptr<StoreStatistics> st,
 
         // Remember the size of this file. This is necessary to
         // know how many bytes has been transferred when
-        // rclone later reports that a file has been successfully sent.
+        // rclone/rsync later reports that a file has been successfully sent.
         assert(st->stats.file_sizes.count(file_to_extract) == 0);
         st->stats.file_sizes[file_to_extract] = stat->st_size;
 
@@ -281,8 +281,12 @@ RC StorageToolImplementation::listPointsInTime(Storage *storage, vector<pair<Pat
 struct CacheFS : ReadOnlyCacheFileSystemBaseImplementation
 {
     CacheFS(ptr<FileSystem> cache_fs, Path *cache_dir, Storage *storage, System *sys) :
-        ReadOnlyCacheFileSystemBaseImplementation("CacheFS", cache_fs, cache_dir),
-        sys_(sys), storage_(storage) {}
+        ReadOnlyCacheFileSystemBaseImplementation("CacheFS", cache_fs, cache_dir, storage->storage_location->depth()),
+        sys_(sys), storage_(storage) {
+
+
+
+    }
 
     void refreshCache();
     RC loadDirectoryStructure(std::map<Path*,CacheEntry> *entries);
@@ -314,7 +318,12 @@ RC CacheFS::loadDirectoryStructure(map<Path*,CacheEntry> *entries)
     }
     case RSyncStorage:
     case RCloneStorage:
-        RC rc = rcloneListBeakFiles(storage_, &files, &bad_files, &other_files, &contents, sys_);
+        RC rc = RC::OK;
+        if (storage_->type == RCloneStorage) {
+            rc = rcloneListBeakFiles(storage_, &files, &bad_files, &other_files, &contents, sys_);
+        } else {
+            rc = rsyncListBeakFiles(storage_, &files, &bad_files, &other_files, &contents, sys_);
+        }
         if (rc.isErr()) return RC::ERR;
     }
 
@@ -322,6 +331,7 @@ RC CacheFS::loadDirectoryStructure(map<Path*,CacheEntry> *entries)
     for (auto &p : files) {
         if (p.isIndexFile()) {
             index_files.push_back(p.path);
+//            fprintf(stderr, "Found index %s\n", p.path->c_str());
         }
     }
 
@@ -346,8 +356,9 @@ RC CacheFS::loadDirectoryStructure(map<Path*,CacheEntry> *entries)
         // Create a new file cache entry.
         // Initially the cache entry is marked as not cached.
         (*entries)[p.first] = CacheEntry(p.second, p.first, false);
+        CacheEntry *ce = &(*entries)[p.first];
         // Add this file to its directory.
-        dir_entry->direntries.push_back(&(*entries)[p.first]);
+        dir_entry->direntries.push_back(ce);
     }
 
     return RC::ERR;
@@ -366,6 +377,10 @@ RC CacheFS::fetchFiles(vector<Path*> *files)
     case NoSuchStorage:
     case FileSystemStorage:
     case RSyncStorage:
+    {
+        debug(CACHE,"Fetching %d files from %s.\n", files->size(), storage_->storage_location->c_str());
+        return rsyncFetchFiles(storage_, files, cache_dir_, sys_, cache_fs_);
+    }
     case RCloneStorage:
     {
         debug(CACHE,"Fetching %d files from %s.\n", files->size(), storage_->storage_location->c_str());

@@ -37,7 +37,8 @@ RC rsyncListBeakFiles(Storage *storage,
     vector<string> args;
 
     args.push_back("-r");
-    args.push_back(storage->storage_location->c_str());
+    string p = storage->storage_location->str()+"/"; // rsync needs the trailing slash
+    args.push_back(p.c_str());
     rc = sys->invoke("rsync", args, &out);
 
     if (rc.isErr()) return RC::ERR;
@@ -47,11 +48,12 @@ RC rsyncListBeakFiles(Storage *storage,
 
     for (;;) {
 	// Example line:
-        // -r--------         43,008 2017/10/28 17:58:22 Backup/apis/z01_001509206302.681804342_0_1a599a3c00aec163169081a7e7b6dcdda25b2792daa80ba6454f81c6802d8ec4_0.gz
+        // -r--------         43,008 2017/10/28 17:58:22 apis/z01_001509206302.681804342_0_1a599a3c00aec163169081a7e7b6dcdda25b2792daa80ba6454f81c6802d8ec4_0.gz
         eatWhitespace(out, i, &eof); if (eof) break;
         string permissions = eatTo(out, i, ' ', 64, &eof, &err); if (eof || err) break;
         eatWhitespace(out, i, &eof); if (eof) break;
         string size = eatTo(out, i, ' ', 64, &eof, &err); if (eof || err) break;
+        size = keepDigits(size); // Remove commas
         eatWhitespace(out, i, &eof); if (eof) break;
         string date = eatTo(out, i, ' ', 64, &eof, &err); if (eof || err) break;
         string time = eatTo(out, i, ' ', 64, &eof, &err); if (eof || err) break;
@@ -64,8 +66,7 @@ RC rsyncListBeakFiles(Storage *storage,
             // Check that the remote size equals the content. If there is a mismatch,
             // then for sure the file must be overwritte/updated. Perhaps there was an earlier
             // transfer interruption....
-            size_t siz;
-            RC rc = parseHumanReadable(size, &siz);
+            size_t siz = (size_t)atol(size.c_str());
             if (rc.isErr()) {
                 siz = -1;
             }
@@ -103,10 +104,9 @@ RC rsyncFetchFiles(Storage *storage,
                     FileSystem *local_fs)
 {
     Path *target_dir = storage->storage_location->prepend(dir);
-
     string files_to_fetch;
     for (auto& p : *files) {
-        Path *n = p->subpath(1);
+        Path *n = p->subpath(storage->storage_location->depth());
         files_to_fetch.append(n->str());
         files_to_fetch.append("\n");
     }
@@ -164,8 +164,8 @@ RC rsyncSendFiles(Storage *storage,
 {
     string files_to_fetch;
     for (auto& p : *files) {
-        Path *n = p->subpath(1);
-        files_to_fetch.append(n->str());
+        // The p file will begin with /, but this is ok for rsync.
+        files_to_fetch.append(p->str());
         files_to_fetch.append("\n");
     }
     Path *tmp = local_fs->mkTempFile("beak_sending_", files_to_fetch);
@@ -175,7 +175,9 @@ RC rsyncSendFiles(Storage *storage,
     args.push_back("-v");
     args.push_back("--files-from");
     args.push_back(tmp->c_str());
-    args.push_back(dir->c_str());
+
+    string p = dir->str()+"/"; // not strictly needed since we have --files-from
+    args.push_back(p.c_str());
     args.push_back(storage->storage_location->str());
     vector<char> output;
     RC rc = sys->invoke("rsync", args, &output, CaptureBoth,
@@ -185,6 +187,8 @@ RC rsyncSendFiles(Storage *storage,
                                                         buf,
                                                         len);
                         });
+
+    local_fs->deleteFile(tmp);
 
     return rc;
 }

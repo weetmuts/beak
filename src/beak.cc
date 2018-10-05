@@ -852,7 +852,8 @@ RC BeakImplementation::mountRestoreInternal(Settings *settings, bool daemon)
 
     assert(settings->from.type == ArgStorage);
     backup_fs = local_fs_;
-    if (settings->from.storage->type == RCloneStorage) {
+    if (settings->from.storage->type == RCloneStorage ||
+        settings->from.storage->type == RSyncStorage) {
         backup_fs = storage_tool_->asCachedReadOnlyFS(settings->from.storage);
     }
 

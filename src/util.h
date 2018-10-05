@@ -35,6 +35,7 @@ std::string humanReadable(size_t s);
 std::string humanReadableTwoDecimals(size_t s);
 size_t roundoffHumanReadable(size_t s);
 RC parseHumanReadable(std::string s, size_t *out);
+std::string keepDigits(std::string &s);
 bool parseTimeZoneOffset(std::string o, time_t *out);
 bool parseLengthOfTime(std::string s, time_t *out);
 std::string getLengthOfTime(time_t t);

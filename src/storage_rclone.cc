@@ -100,6 +100,7 @@ RC rcloneFetchFiles(Storage *storage,
 
     string files_to_fetch;
     for (auto& p : *files) {
+        // Rclone does not like to have a leading /, we have to remove it.
         Path *n = p->subpath(1);
         files_to_fetch.append(n->str());
         files_to_fetch.append("\n");
@@ -170,7 +171,8 @@ RC rcloneSendFiles(Storage *storage,
 {
     string files_to_fetch;
     for (auto& p : *files) {
-        Path *n = p->subpath(1);
+        Path *n = p->subpath(1); // storage->storage_location->depth());
+        fprintf(stderr, "FROM %s TO %s\n", p->c_str(), n->c_str());
         files_to_fetch.append(n->str());
         files_to_fetch.append("\n");
     }

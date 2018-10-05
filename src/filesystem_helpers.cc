@@ -167,7 +167,7 @@ bool ReadOnlyCacheFileSystemBaseImplementation::readdir(Path *p, vector<Path*> *
     }
     CacheEntry *ce = &entries_[p];
     for (CacheEntry *e : ce->direntries) {
-        vec->push_back(e->path->subpath(1));
+        vec->push_back(e->path->subpath(drop_prefix_depth_));
     }
     return true;
 }

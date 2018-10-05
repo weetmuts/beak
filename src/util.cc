@@ -161,6 +161,19 @@ size_t roundoffHumanReadable(size_t s)
     return s;
 }
 
+string keepDigits(string &s)
+{
+    string r;
+
+    for (auto c : s)
+    {
+        if (isdigit(c)) {
+            r.push_back(c);
+        }
+    }
+    return r;
+}
+
 RC parseHumanReadable(string s, size_t *out)
 {
     size_t mul = 1;
@@ -204,10 +217,7 @@ RC parseHumanReadable(string s, size_t *out)
         if (isdigit(c)) {
             n.push_back(c);
         } else {
-            // Commans are ok and ignored, everything else is bad.
-            if (c != ',') {
-                return RC::ERR;
-            }
+            return RC::ERR;
         }
     }
 

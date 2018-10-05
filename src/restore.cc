@@ -668,6 +668,7 @@ RC Restore::lookForPointsInTime(PointInTimeFormat f, Path *path)
         ok = tfn.parseFileName(f->str());
 
         if (ok && tfn.type == REG_FILE) {
+
             PointInTime p;
             p.ts.tv_sec = tfn.secs;
             p.ts.tv_nsec = tfn.nsecs;
@@ -748,7 +749,7 @@ RC Restore::loadBeakFileSystem(Settings *settings)
 
     for (auto &point : history()) {
         string name = point.filename;
-        debug(RESTORE,"Found backup for %s\n", point.ago.c_str());
+        debug(RESTORE,"Found backup for %s filename %s\n", point.ago.c_str(), name.c_str());
 
         // Check that it is a proper file.
         FileStat stat;
@@ -763,7 +764,7 @@ RC Restore::loadBeakFileSystem(Settings *settings)
         // Populate the list of all tars from the root z01 gz file.
         bool ok = loadGz(&point, gz, Path::lookupRoot());
         if (!ok) {
-            error(RESTORE, "Fatal error, could not load root z01 file for backup %s!\n", point.ago.c_str());
+            error(RESTORE, "Could not load root z01 file for backup %s!\n", point.ago.c_str());
         }
 
         // Populate the root directory with its contents.
