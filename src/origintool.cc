@@ -356,7 +356,6 @@ void OriginToolImplementation::handleDirs(Path *path, FileStat *stat,
     }
 }
 
-
 void OriginToolImplementation::restoreFileSystem(FileSystem *backup_fs,
                                                  FileSystem *backup_contents_fs,
                                                  Restore *restore,

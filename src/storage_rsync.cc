@@ -15,31 +15,30 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "storage_rclone.h"
+#include "storage_rsync.h"
 
 #include "log.h"
-#include "statistics.h"
 
 using namespace std;
 
-static ComponentId RCLONE = registerLogComponent("rclone");
+static ComponentId RSYNC = registerLogComponent("rsync");
 
-RC rcloneListBeakFiles(Storage *storage,
+RC rsyncListBeakFiles(Storage *storage,
                        vector<TarFileName> *files,
                        vector<TarFileName> *bad_files,
                        vector<string> *other_files,
                        map<Path*,FileStat> *contents,
                        ptr<System> sys)
 {
-    assert(storage->type == RCloneStorage);
+    assert(storage->type == RSyncStorage);
 
     RC rc = RC::OK;
     vector<char> out;
     vector<string> args;
 
-    args.push_back("ls");
+    args.push_back("-r");
     args.push_back(storage->storage_location->c_str());
-    rc = sys->invoke("rclone", args, &out);
+    rc = sys->invoke("rsync", args, &out);
 
     if (rc.isErr()) return RC::ERR;
 
@@ -48,13 +47,16 @@ RC rcloneListBeakFiles(Storage *storage,
 
     for (;;) {
 	// Example line:
-	// 12288 z01_001506595429.268937346_0_7eb62d8e0097d5eaa99f332536236e6ba9dbfeccf0df715ec96363f8ddd495b6_0.gz
-        eatWhitespace(out, i, &eof);
-        if (eof) break;
-        string size = eatTo(out, i, ' ', 64, &eof, &err);
-        if (eof || err) break;
-        string file_name = eatTo(out, i, '\n', 4096, &eof, &err);
-        if (err) break;
+        // -r--------         43,008 2017/10/28 17:58:22 Backup/apis/z01_001509206302.681804342_0_1a599a3c00aec163169081a7e7b6dcdda25b2792daa80ba6454f81c6802d8ec4_0.gz
+        eatWhitespace(out, i, &eof); if (eof) break;
+        string permissions = eatTo(out, i, ' ', 64, &eof, &err); if (eof || err) break;
+        eatWhitespace(out, i, &eof); if (eof) break;
+        string size = eatTo(out, i, ' ', 64, &eof, &err); if (eof || err) break;
+        eatWhitespace(out, i, &eof); if (eof) break;
+        string date = eatTo(out, i, ' ', 64, &eof, &err); if (eof || err) break;
+        string time = eatTo(out, i, ' ', 64, &eof, &err); if (eof || err) break;
+        string file_name = eatTo(out, i, '\n', 1024, &eof, &err); if (err) break;
+
         TarFileName tfn;
         bool ok = tfn.parseFileName(file_name);
         // Only files that have proper beakfs names are included.
@@ -62,7 +64,11 @@ RC rcloneListBeakFiles(Storage *storage,
             // Check that the remote size equals the content. If there is a mismatch,
             // then for sure the file must be overwritte/updated. Perhaps there was an earlier
             // transfer interruption....
-            size_t siz = (size_t)atol(size.c_str());
+            size_t siz;
+            RC rc = parseHumanReadable(size, &siz);
+            if (rc.isErr()) {
+                siz = -1;
+            }
             if ( (tfn.type != REG_FILE && tfn.size == siz) ||
                  (tfn.type == REG_FILE && tfn.size == 0) )
             {
@@ -90,7 +96,7 @@ RC rcloneListBeakFiles(Storage *storage,
 }
 
 
-RC rcloneFetchFiles(Storage *storage,
+RC rsyncFetchFiles(Storage *storage,
                     vector<Path*> *files,
                     Path *dir,
                     System *sys,
@@ -110,47 +116,35 @@ RC rcloneFetchFiles(Storage *storage,
     RC rc = RC::OK;
     vector<char> out;
     vector<string> args;
-    args.push_back("copy");
-    args.push_back("--include-from");
+    args.push_back("-a");
+    args.push_back("--files-from");
     args.push_back(tmp->c_str());
     args.push_back(storage->storage_location->c_str());
     args.push_back(target_dir->c_str());
-    rc = sys->invoke("rclone", args, &out);
+    rc = sys->invoke("rsync", args, &out);
 
     local_fs->deleteFile(tmp);
 
     return rc;
 }
 
-void parse_rclone_verbose_output(StoreStatistics *st,
+void parse_rsync_verbose_output_(StoreStatistics *st,
                                  Storage *storage,
                                  char *buf,
                                  size_t len)
 {
     // Parse verbose output and look for:
-    // 2018/01/29 20:05:36 INFO  : code/src/s01_001517180913.689221661_11659264_b6f526ca4e988180fe6289213a338ab5a4926f7189dfb9dddff5a30ab50fc7f3_0.tar: Copied (new)
+    // zlib-1.2.11-winapi/z01_001516784332.462127151_0_3393fb3d96b545ebf05ad9406fff9435eca8cd3eb97714883fa42d92d2fc8ded_0.gz
 
-    size_t from, to;
-    // Find the beginning of the file path.
-    for (from=1; from<len-1; ++from) {
-        if (buf[from-1] == ' ' && buf[from] == ':' && buf[from+1] == ' ') {
-            from = from+2;
-            break;
-        }
-    }
-    // Find the end of the file path.
-    for (to=len-2; to>from; --to) {
-        if (buf[to] == ':' && buf[to+1] == ' ') {
-            break;
-        }
-    }
-    string file = storage->storage_location->str()+"/"+string(buf+from, to-from);
+    string file = storage->storage_location->str()+"/"+string(buf, len);
+    while (file.back() == '\n') file.pop_back();
     TarFileName tfn;
     if (tfn.parseFileName(file)) {
+        // This was a valid verbose output beak file name.
         Path *path = tfn.path;
         size_t size = 0;
 
-        debug(RCLONE, "copied: %ju \"%s\"\n", st->stats.file_sizes.count(path), path->c_str());
+        debug(RSYNC, "copied: %ju \"%s\"\n", st->stats.file_sizes.count(path), path->c_str());
 
         if (st->stats.file_sizes.count(path)) {
             size = st->stats.file_sizes[path];
@@ -161,12 +155,12 @@ void parse_rclone_verbose_output(StoreStatistics *st,
     }
 }
 
-RC rcloneSendFiles(Storage *storage,
-                   vector<Path*> *files,
-                   Path *dir,
-                   StoreStatistics *st,
-                   FileSystem *local_fs,
-                   ptr<System> sys)
+RC rsyncSendFiles(Storage *storage,
+                  vector<Path*> *files,
+                  Path *dir,
+                  StoreStatistics *st,
+                  FileSystem *local_fs,
+                  ptr<System> sys)
 {
     string files_to_fetch;
     for (auto& p : *files) {
@@ -177,22 +171,20 @@ RC rcloneSendFiles(Storage *storage,
     Path *tmp = local_fs->mkTempFile("beak_sending_", files_to_fetch);
 
     vector<string> args;
-    args.push_back("copy");
+    args.push_back("-a");
     args.push_back("-v");
-    args.push_back("--include-from");
+    args.push_back("--files-from");
     args.push_back(tmp->c_str());
     args.push_back(dir->c_str());
     args.push_back(storage->storage_location->str());
     vector<char> output;
-    RC rc = sys->invoke("rclone", args, &output, CaptureBoth,
+    RC rc = sys->invoke("rsync", args, &output, CaptureBoth,
                         [&st, storage](char *buf, size_t len) {
-                            parse_rclone_verbose_output(st,
+                            parse_rsync_verbose_output_(st,
                                                         storage,
                                                         buf,
                                                         len);
                         });
-
-    local_fs->deleteFile(tmp);
 
     return rc;
 }

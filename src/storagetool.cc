@@ -22,6 +22,7 @@
 #include "log.h"
 #include "system.h"
 #include "storage_rclone.h"
+#include "storage_rsync.h"
 
 #include <algorithm>
 
@@ -61,24 +62,46 @@ StorageToolImplementation::StorageToolImplementation(ptr<System>sys,
 }
 
 void add_backup_work(ptr<StoreStatistics> st,
+                     vector<Path*> *files_to_backup,
                      Path *path, FileStat *stat,
                      Settings *settings,
                      FileSystem *to_fs)
 {
     Path *file_to_extract = path->prepend(settings->to.storage->storage_location);
 
+    // The backup fs has already wrapped any non-regular files inside tars.
+    // Thus we only want to send those to the cloud storage site.
     if (stat->isRegularFile()) {
+
+        // Remember the size of this file. This is necessary to
+        // know how many bytes has been transferred when
+        // rclone later reports that a file has been successfully sent.
         assert(st->stats.file_sizes.count(file_to_extract) == 0);
         st->stats.file_sizes[file_to_extract] = stat->st_size;
+
+        // Compare our local file with the stats of the one stored remotely.
         stat->checkStat(to_fs, file_to_extract);
+
         if (stat->disk_update == Store) {
+            // Yep, we need to store the local file remotely.
+            // The remote might be missing, or it has the wrong size/date.
+
+            // Accumulate the count/size of files to be uploaded.
             st->stats.num_files_to_store++;
             st->stats.size_files_to_store += stat->st_size;
+            // Remember the files to be uploaded.
+            files_to_backup->push_back(path);
         }
+        // Accumulate the total count of files.
         st->stats.num_files++;
         st->stats.size_files+=stat->st_size;
     }
-    else if (stat->isDirectory()) st->stats.num_dirs++;
+    else if (stat->isDirectory())
+    {
+        // We count the directories, only for information.
+        // Directories are created implicitly on the storage side anyway.
+        st->stats.num_dirs++;
+    }
 }
 
 void store_local_backup_file(Backup *backup,
@@ -136,26 +159,36 @@ RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backup,
     FileSystem *origin_fs = backup->originFileSystem();
     // Store the archive files here.
     FileSystem *storage_fs = NULL;
+    // This is the list of files to be sent to the storage.
+    vector<Path*> files_to_backup;
 
     map<Path*,FileStat> contents;
     unique_ptr<FileSystem> fs;
     if (storage->type == FileSystemStorage) {
         storage_fs = local_fs_;
     } else
-    if (storage->type == RCloneStorage) {
+    if (storage->type == RCloneStorage || storage->type == RSyncStorage) {
         vector<TarFileName> files, bad_files;
         vector<string> other_files;
-        RC rc = rcloneListBeakFiles(storage, &files, &bad_files, &other_files, &contents, sys_);
+        RC rc = RC::OK;
+        if (storage->type == RCloneStorage) {
+            rc = rcloneListBeakFiles(storage, &files, &bad_files, &other_files, &contents, sys_);
+        } else {
+            rc = rsyncListBeakFiles(storage, &files, &bad_files, &other_files, &contents, sys_);
+        }
         if (rc.isErr()) {
             error(STORAGETOOL, "Could not list files in rclone storage %s\n", storage->storage_location->c_str());
         }
 
+        // Present the listed files at the storage site as a read only file system
+        // that can only be listed and stated. This is enough to determine if
+        // the storage site files need to be updated.
         fs = newStatOnlyFileSystem(contents);
         storage_fs = fs.get();
     }
-    backup_fs->recurse(Path::lookupRoot(), [=]
+    backup_fs->recurse(Path::lookupRoot(), [=,&files_to_backup]
                        (Path *path, FileStat *stat) {
-                           add_backup_work(st, path, stat, settings, storage_fs);
+                           add_backup_work(st, &files_to_backup, path, stat, settings, storage_fs);
                        });
 
     debug(STORAGETOOL, "Work to be done: num_files=%ju num_dirs=%ju\n", st->stats.num_files, st->stats.num_dirs);
@@ -174,25 +207,35 @@ RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backup,
                                                                                  st); });
         break;
     }
-    case RSyncStorage: break;
+    case RSyncStorage:
     case RCloneStorage:
     {
-        Path *mount = local_fs_->mkTempDir("beak_push_");
+        Path *mount = local_fs_->mkTempDir("beak_send_");
         unique_ptr<FuseMount> fuse_mount = sys_->mount(mount, backup->asFuseAPI(), settings->fusedebug);
 
         if (!fuse_mount) {
-            error(STORAGETOOL, "Could not mount beak filesyset for rclone.\n");
+            error(STORAGETOOL, "Could not mount beak filesystem for rclone/rsync.\n");
         }
 
-        RC rc = rcloneSendFiles(storage,
-                                NULL,
+        RC rc = RC::OK;
+        if (storage->type == RCloneStorage) {
+            rc = rcloneSendFiles(storage,
+                                 &files_to_backup,
+                                 mount,
+                                 st,
+                                 local_fs_,
+                                 sys_);
+        } else {
+            rc = rsyncSendFiles(storage,
+                                &files_to_backup,
                                 mount,
                                 st,
                                 local_fs_,
                                 sys_);
+        }
 
         if (rc.isErr()) {
-            error(STORAGETOOL, "Error when invoking rclone.\n");
+            error(STORAGETOOL, "Error when invoking rclone/rsync.\n");
         }
 
         // Unmount virtual filesystem.

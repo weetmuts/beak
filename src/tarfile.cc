@@ -256,7 +256,7 @@ bool TarFileName::parseFileName(string &name)
 {
     bool k;
     // Example file name:
-    // (r)01_(001501080787).(579054757)_(1119232)_(3b5e4ec7fe38d0f9846947207a0ea44c)_(0).(tar)
+    // foo/bar/dir/(r)01_(001501080787).(579054757)_(1119232)_(3b5e4ec7fe38d0f9846947207a0ea44c)_(0).(tar)
 
     if (name.size() == 0) return false;
 

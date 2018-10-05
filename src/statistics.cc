@@ -83,8 +83,11 @@ bool StoreStatisticsImplementation::redrawLine()
         msg = "Incr";
     }
     double max_bytes = (double)copy.size_files_to_store;
-    double eta_1s_speed, eta_immediate, eta_average;
+    double eta_1s_speed, eta_immediate, eta_average; // estimated total time
+    double etr;                                      // estimated time remaining
     predict_all(secsbytes, secsbytes.size()-1, max_bytes, &eta_1s_speed, &eta_immediate, &eta_average);
+
+    etr = eta_immediate - secs;
 
     debug(STATISTICS, "stored(secs,bytes)\t"
           "%.1f\t"
@@ -99,10 +102,11 @@ bool StoreStatisticsImplementation::redrawLine()
           eta_average);
 
 
-    UI::redrawLineOutput("%s store: %d%% (%ju/%ju), %s %s/s| %.1f (%.0fs,%.0fs,%.0fs)",
+    UI::redrawLineOutput("%s store: %d%% (%ju/%ju), %s %s/s| %.1f/(%.0fs,%.0fs,%.0fs) ETR %.0fs",
                          msg.c_str(),
                          percentage, copy.num_files_stored, copy.num_files_to_store, mibs.c_str(),
-                         average_speed.c_str(), secs, eta_1s_speed, eta_immediate, eta_average);
+                         average_speed.c_str(), secs, eta_1s_speed, eta_immediate, eta_average,
+                         etr);
     return true;
 }
 
