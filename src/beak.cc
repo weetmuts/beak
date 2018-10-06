@@ -625,7 +625,6 @@ RC BeakImplementation::store(Settings *settings)
 
     unique_ptr<Backup> backup  = newBackup(origin_tool_->fs());
 
-    uint64_t start = clockGetTime();
     // This command scans the origin file system and builds
     // an in memory representation of the backup file system,
     // with tar files,index files and directories.
@@ -640,21 +639,9 @@ RC BeakImplementation::store(Settings *settings)
                                           st.get(),
                                           settings);
 
-    uint64_t stop = clockGetTime();
-    uint64_t store_time = stop - start;
-
     int unpleasant_modifications = origin_tool_->fs()->endWatch();
     if (st->stats.num_files_stored == 0 && st->stats.num_dirs_updated == 0) {
         info(STORE, "No stores needed, everything was up to date.\n");
-    } else {
-        if (st->stats.num_files_stored > 0) {
-            string file_sizes = humanReadable(st->stats.size_files_stored);
-            double secs = ((double)((store_time)/1000))/1000.0;
-            string seconds = humanReadableTwoDecimals(secs);
-            double bytes = (double)st->stats.size_files_stored;
-            double bps = bytes/secs;
-            string average_speed = humanReadableTwoDecimals(bps);
-        }
     }
     if (unpleasant_modifications > 0) {
         warning(STORE, "Warning! Origin directory modified while doing backup!\n");
@@ -1017,39 +1004,59 @@ RC BeakImplementation::umountRestore(Settings *settings)
     return RC::OK;
 }
 
+thread_local struct timespec mtim_max {};  /* time of last modification */
+thread_local struct timespec ctim_max {};  /* time of last meta data modification */
+
+void update_mctim_maxes(const struct stat *sb)
+{
+    const struct timespec *mt = &sb->st_mtim;
+    const struct timespec *ct = &sb->st_ctim;
+
+    if (mt->tv_sec > mtim_max.tv_sec || (mt->tv_sec == mtim_max.tv_sec && mt->tv_nsec > mtim_max.tv_nsec))
+    {
+        // Found a more recent timestamp for mtime.
+        mtim_max = *mt;
+    }
+    if (ct->tv_sec > ctim_max.tv_sec || (ct->tv_sec == ctim_max.tv_sec && ct->tv_nsec > ctim_max.tv_nsec))
+    {
+        // Found a more recent timestamp for mtime.
+        ctim_max = *ct;
+    }
+}
+
 RC BeakImplementation::status(Settings *settings)
 {
     RC rc = RC::OK;
 
-    for (auto rule : configuration_->sortedRules()) {
-	UI::output("%-20s %s\n", rule->name.c_str(), rule->origin_path->c_str());
-	{
-	    vector<pair<Path*,struct timespec>> points;
-	    rc = storage_tool_->listPointsInTime(rule->local, &points);
-            /*
-	    if (points.size() > 0) {
-		string ago = timeAgo(&points.front());
-		UI::output("%-20s %s\n", ago.c_str(), "local");
-	    } else {
-		UI::output("%-20s %s\n", "No backup!", "local");
-                }*/
-	}
+    assert(settings->from.type == ArgRule);
 
-	for (auto storage : rule->sortedStorages()) {
-	    //rc = fetchPointsInTime(storage->storage_location->str(), rule->cache_path);
-	    //if (rc.isErr()) continue;
+    Rule *rule = settings->from.rule;
 
-	    vector<struct timespec> points;
-	    //rc = findPointsInTime(storage->storage_location->str(), &points);
-	    if (points.size() > 0) {
-		string ago = timeAgo(&points.front());
-		UI::output("%-20s %s\n", ago.c_str(), storage->storage_location->c_str());
-	    } else {
-		UI::output("%-20s %s\n", "No backup!", storage->storage_location->c_str());
-	    }
-	}
-	UI::output("\n");
-    }
+    info(COMMANDLINE, "Scanning %s...", rule->origin_path->c_str());
+
+    memset(&mtim_max, 0, sizeof(mtim_max));
+    memset(&ctim_max, 0, sizeof(ctim_max));
+    uint64_t start = clockGetTime();
+    rc = origin_tool_->fs()->recurse(rule->origin_path,
+                                     [=](const char *path, const struct stat *sb) {
+                                         update_mctim_maxes(sb);
+                                         return RecurseContinue;
+                                     });
+
+    uint64_t stop = clockGetTime();
+    uint64_t store_time = stop - start;
+
+    info(COMMANDLINE, "in %jdms.\n", store_time / 1000);
+
+    char most_recent_mtime[20];
+    memset(most_recent_mtime, 0, sizeof(most_recent_mtime));
+    strftime(most_recent_mtime, 20, "%Y-%m-%d_%H:%M:%S", localtime(&mtim_max.tv_sec));
+
+    char most_recent_ctime[20];
+    memset(most_recent_ctime, 0, sizeof(most_recent_ctime));
+    strftime(most_recent_ctime, 20, "%Y-%m-%d_%H:%M:%S", localtime(&ctim_max.tv_sec));
+
+    info(COMMANDLINE, "mtime=%s ctime=%s\n", most_recent_mtime, most_recent_ctime);
 
     return rc;
 }

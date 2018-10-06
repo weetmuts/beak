@@ -84,7 +84,16 @@ struct RestoreFileSystem : FileSystem
         return RC::OK;
     }
 
-    RC listFilesBelow(Path *p, std::vector<Path*> files, SortOrder so)
+    RC recurse(Path *root, std::function<RecurseOption(const char *path, const struct stat *sb)> cb)
+    {
+        return recurse(root, [=](Path *p, FileStat *st) {
+                struct stat sb;
+                st->storeIn(&sb);
+                return cb(p->c_str(), &sb);
+            });
+    }
+
+    RC listFilesBelow(Path *p, std::vector<Path*> *files, SortOrder so)
     {
         // TODO
         return RC::ERR;

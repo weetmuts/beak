@@ -92,7 +92,8 @@ struct FileSystemImplementationPosix : FileSystem
     bool readdir(Path *p, vector<Path*> *vec);
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
     RC recurse(Path *p, function<RecurseOption(Path *path, FileStat *stat)> cb);
-    RC listFilesBelow(Path *p, std::vector<Path*> files, SortOrder so);
+    RC recurse(Path *p, function<RecurseOption(const char *path, const struct stat *sb)> cb);
+    RC listFilesBelow(Path *p, std::vector<Path*> *files, SortOrder so);
     RC ctimeTouch(Path *file);
     RC stat(Path *p, FileStat *fs);
     RC chmod(Path *p, FileStat *stat);
@@ -187,14 +188,14 @@ ssize_t FileSystemImplementationPosix::pread(Path *p, char *buf, size_t size, of
     return n;
 }
 
-thread_local function<int(Path *path, FileStat *stat)> recurse_cb_;
+thread_local function<int(Path *path, FileStat *stat)> recurse_cb1_;
 thread_local FileStat recurse_stat_;
 
-static int recurseCB_(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf)
+static int recurseCB1_(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf)
 {
     Path *p = Path::lookup(fpath);
     recurse_stat_.loadFrom(sb);
-    return recurse_cb_(p, &recurse_stat_);
+    return recurse_cb1_(p, &recurse_stat_);
 }
 
 RC FileSystemImplementationPosix::recurse(Path *p, function<RecurseOption(Path *path, FileStat *stat)> cb)
@@ -202,7 +203,7 @@ RC FileSystemImplementationPosix::recurse(Path *p, function<RecurseOption(Path *
     // Recurse into the root dir. Maximum 256 levels deep.
     // Look at symbolic links (ie do not follow them) so that
     // we can store the links in the tar file.
-    recurse_cb_ = cb;
+    recurse_cb1_ = cb;
 
     // Warning! nftw depth first is a standard depth first. I.e.
     // alfa/x.cc is sorted before
@@ -217,7 +218,7 @@ RC FileSystemImplementationPosix::recurse(Path *p, function<RecurseOption(Path *
     // Thus the work done in addEntry simply records the file system entries.
     // Relationships between the entries, like hard links, are calculated later,
     // because they expect earlier entries to be deeper or equal depth.
-    int rc = nftw(p->c_str(), recurseCB_, 256, FTW_PHYS|FTW_ACTIONRETVAL);
+    int rc = nftw(p->c_str(), recurseCB1_, 256, FTW_PHYS|FTW_ACTIONRETVAL);
 
     if (rc  == -1) {
         return RC::ERR;
@@ -225,7 +226,25 @@ RC FileSystemImplementationPosix::recurse(Path *p, function<RecurseOption(Path *
     return RC::OK;
 }
 
-RC FileSystemImplementationPosix::listFilesBelow(Path *p, std::vector<Path*> files, SortOrder so)
+thread_local function<int(const char *path, const struct stat *sb)> recurse_cb2_;
+
+static int recurseCB2_(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf)
+{
+    return recurse_cb2_(fpath, sb);
+}
+
+RC FileSystemImplementationPosix::recurse(Path *p, function<RecurseOption(const char *path, const struct stat *sb)> cb)
+{
+    recurse_cb2_ = cb;
+    int rc = nftw(p->c_str(), recurseCB2_, 256, FTW_PHYS|FTW_ACTIONRETVAL);
+
+    if (rc  == -1) {
+        return RC::ERR;
+    }
+    return RC::OK;
+}
+
+RC FileSystemImplementationPosix::listFilesBelow(Path *p, std::vector<Path*> *files, SortOrder so)
 {
     // TODO
     return RC::ERR;

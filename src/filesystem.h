@@ -82,10 +82,10 @@ struct FileStat {
 
     mode_t permissions() { return st_mode & 07777; }
     void loadFrom(const struct stat *sb);
+    void storeIn(struct stat *sb);
     void setAsRegularFile();
     void setAsDirectory();
     void setAsExecutable();
-    void storeIn(struct stat *sb);
     bool isRegularFile();
     bool isDirectory();
     bool isSymbolicLink();
@@ -263,8 +263,9 @@ struct FileSystem
     virtual bool readdir(Path *p, std::vector<Path*> *vec) = 0;
     virtual ssize_t pread(Path *p, char *buf, size_t size, off_t offset) = 0;
     virtual RC recurse(Path *p, std::function<RecurseOption(Path *path, FileStat *stat)> cb) = 0;
+    virtual RC recurse(Path *p, std::function<RecurseOption(const char *path, const struct stat *sb)> cb) = 0;
     // List all files below p, sort on CTimeDesc
-    virtual RC listFilesBelow(Path *p, std::vector<Path*> files, SortOrder so) = 0;
+    virtual RC listFilesBelow(Path *p, std::vector<Path*> *files, SortOrder so) = 0;
     // Touch the meta data of the file to trigger an update of the ctime to NOW.
     virtual RC ctimeTouch(Path *file) = 0;
     virtual RC stat(Path *p, FileStat *fs) = 0;
