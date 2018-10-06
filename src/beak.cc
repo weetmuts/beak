@@ -296,7 +296,7 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
 
         if (expected_type == ArgRule) {
             // We expected a rule, but there was none....
-            error(COMMANDLINE, "Expected origin directory or rule. Got \"%s\" instead.\n", arg.c_str());
+            error(COMMANDLINE, "Expected a rule. Got \"%s\" instead.\n", arg.c_str());
         }
 
         // If there is no rule, then we expect an origin directory.
@@ -1009,8 +1009,19 @@ thread_local struct timespec ctim_max {};  /* time of last meta data modificatio
 
 void update_mctim_maxes(const struct stat *sb)
 {
+#if HAS_ST_MTIM
     const struct timespec *mt = &sb->st_mtim;
     const struct timespec *ct = &sb->st_ctim;
+#elif HAS_ST_MTIME
+    struct timespec smt {};
+    smt.tv_sec = sb->st_mtime;
+    const struct timespec *mt = &smt;
+    struct timespec sct {};
+    sct.tv_sec = sb->st_ctime;
+    const struct timespec *ct = &sct;
+#else
+#error
+#endif
 
     if (mt->tv_sec > mtim_max.tv_sec || (mt->tv_sec == mtim_max.tv_sec && mt->tv_nsec > mtim_max.tv_nsec))
     {
