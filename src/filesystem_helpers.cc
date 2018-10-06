@@ -278,16 +278,43 @@ bool CacheEntry::isCached(FileSystem *cache_fs, Path *cache_dir, Path *f)
         return false;
     }
 
-    if (st.st_size != stat.st_size ||
-        st.st_mtim.tv_sec != stat.st_mtim.tv_sec ||
-        st.st_mtim.tv_nsec != stat.st_mtim.tv_nsec) {
-        debug(CACHE, "stat (wrong size %zu (%zu) or mtime %zd:%d (%zd:%d) ) \"%s\"\n",
-              st.st_size,
-              stat.st_size,
-              st.st_mtim.tv_sec, st.st_mtim.tv_nsec,
-              stat.st_mtim.tv_sec, stat.st_mtim.tv_nsec,
-              p->c_str());
-        return false;
+    // The size must be exactly right.
+    if (st.st_size == stat.st_size) {
+        // All storages can handle seconds resolution.
+        if (st.st_mtim.tv_sec == stat.st_mtim.tv_sec) {
+            // Nanosecond match! Yay!
+            if (st.st_mtim.tv_nsec == stat.st_mtim.tv_nsec) {
+                return true;
+            }
+            if (st.st_mtim.tv_nsec/1000 == stat.st_mtim.tv_nsec/1000) {
+                long remainder = st.st_mtim.tv_nsec - (st.st_mtim.tv_nsec/1000)*1000;
+                if (remainder == 0) {
+                    // The file in the file system has been stored
+                    // somewhere that only stores micros. NTFS does this.
+                    // Fine, lets utime the file to its correct value!
+                    debug(CACHE, "storage truncated mtime to microseconds, fixing utime for %s\n", p->c_str());
+                    cache_fs->utime(p, &stat);
+                    return true;
+                }
+            }
+            if (st.st_mtim.tv_nsec/1000000 == stat.st_mtim.tv_nsec/1000000) {
+                long remainder = st.st_mtim.tv_nsec - (st.st_mtim.tv_nsec/1000000)*1000000;
+                if (remainder == 0) {
+                    // The file in the file system has been stored
+                    // somewhere that only stores millis. Google Drive for example.
+                    // Fine, lets utime the file to its correct value!
+                    debug(CACHE, "storage truncated mtime to milliseconds, fixing utime for %s\n", p->c_str());
+                    cache_fs->utime(p, &stat);
+                    return true;
+                }
+            }
+        }
     }
-    return true;
+    debug(CACHE, "stat (wrong size %zu (%zu) or mtime %zd:%d (%zd:%d) ) \"%s\"\n",
+          st.st_size,
+          stat.st_size,
+          st.st_mtim.tv_sec, st.st_mtim.tv_nsec,
+          stat.st_mtim.tv_sec, stat.st_mtim.tv_nsec,
+          p->c_str());
+    return false;
 }
