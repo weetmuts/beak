@@ -1105,7 +1105,15 @@ struct BeakFS : FileSystem
             cb(dir, &stat);
         }
     }
-
+    RC listFilesBelow(Path *p, std::vector<Path*> files, SortOrder so)
+    {
+        // TODO
+        return RC::ERR;
+    }
+    RC ctimeTouch(Path *p)
+    {
+        return RC::ERR;
+    }
     RC stat(Path *p, FileStat *fs)
     {
         return RC::ERR;

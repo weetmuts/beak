@@ -131,6 +131,17 @@ void StatOnlyFileSystem::recurse(Path *root, std::function<void(Path *path, File
 {
 }
 
+RC StatOnlyFileSystem::listFilesBelow(Path *p, std::vector<Path*> files, SortOrder so)
+{
+    // TODO
+    return RC::ERR;
+}
+
+RC StatOnlyFileSystem::ctimeTouch(Path *p)
+{
+    return RC::ERR;
+}
+
 RC StatOnlyFileSystem::stat(Path *p, FileStat *fs)
 {
     if (contents_.count(p) != 0) {
@@ -220,6 +231,17 @@ ssize_t ReadOnlyCacheFileSystemBaseImplementation::pread(Path *p, char *buf, siz
 void ReadOnlyCacheFileSystemBaseImplementation::recurse(Path *root, function<void(Path *path, FileStat *stat)> cb)
 {
     fprintf(stderr, "recurse not implemented...\n");
+}
+
+RC ReadOnlyCacheFileSystemBaseImplementation::listFilesBelow(Path *p, std::vector<Path*> files, SortOrder so)
+{
+    // TODO
+    return RC::ERR;
+}
+
+RC ReadOnlyCacheFileSystemBaseImplementation::ctimeTouch(Path *p)
+{
+    return RC::ERR;
 }
 
 RC ReadOnlyCacheFileSystemBaseImplementation::loadVector(Path *p, size_t blocksize, std::vector<char> *buf)

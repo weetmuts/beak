@@ -284,9 +284,6 @@ struct CacheFS : ReadOnlyCacheFileSystemBaseImplementation
     CacheFS(ptr<FileSystem> cache_fs, Path *cache_dir, Storage *storage, System *sys) :
         ReadOnlyCacheFileSystemBaseImplementation("CacheFS", cache_fs, cache_dir, storage->storage_location->depth()),
         sys_(sys), storage_(storage) {
-
-
-
     }
 
     void refreshCache();
@@ -383,6 +380,8 @@ RC CacheFS::fetchFiles(vector<Path*> *files)
     switch (storage_->type) {
     case NoSuchStorage:
     case FileSystemStorage:
+        assert(0);
+        break;
     case RSyncStorage:
     {
         debug(CACHE,"Fetching %d files from %s.\n", files->size(), storage_->storage_location->c_str());

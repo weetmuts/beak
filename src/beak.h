@@ -48,13 +48,18 @@ struct Beak
     virtual void captureStartTime() = 0;
     virtual std::string argsToVector(int argc, char **argv, std::vector<std::string> *args) = 0;
     virtual Command parseCommandLine(int argc, char **argv, Settings *settings) = 0;
-    virtual std::vector<PointInTime> history() = 0;
 
-    virtual RC check(Settings *settings) = 0;
+    virtual RC store(Settings *settings) = 0;
+    virtual RC restore(Settings *settings) = 0;
+    virtual RC shell(Settings *settings) = 0;
+    virtual RC prune(Settings *settings) = 0;
+
+    virtual RC fsck(Settings *settings) = 0;
     virtual RC configure(Settings *settings) = 0;
+
+    virtual RC status(Settings *settings) = 0;
     virtual RC push(Settings *settings) = 0;
     virtual RC pull(Settings *settings) = 0;
-    virtual RC prune(Settings *settings) = 0;
 
     virtual RC umountDaemon(Settings *settings) = 0;
 
@@ -64,12 +69,6 @@ struct Beak
     virtual RC mountRestoreDaemon(Settings *settings) = 0;
     virtual RC mountRestore(Settings *settings) = 0;
     virtual RC umountRestore(Settings *settings) = 0;
-
-    virtual RC shell(Settings *settings) = 0;
-
-    virtual RC status(Settings *settings) = 0;
-    virtual RC store(Settings *settings) = 0;
-    virtual RC restore(Settings *settings) = 0;
 
     virtual void printHelp(Command cmd) = 0;
     virtual void printVersion() = 0;
@@ -103,21 +102,20 @@ enum ArgumentType
 // ArgORS will match ArgOrigin, ArgRule or ArgStorage.
 
 #define LIST_OF_COMMANDS \
-    X(check,"Check the integrity of an archive.",ArgStorage,ArgNone) \
+    X(bmount,"Mount your file system as a backup.",ArgOrigin,ArgDir) \
     X(config,"Configure backup rules.",ArgNone,ArgNone) \
     X(diff,"Show changes since last backup.",ArgORS,ArgORS) \
-    X(help,"Show help. Also: beak push help",ArgORS,ArgNone) \
+    X(fsck,"Check the integrity of your backup.",ArgStorage,ArgNone) \
     X(genautocomplete,"Output bash completion script for beak.",ArgFile,ArgNone) \
     X(genmounttrigger,"Output systemd rule to trigger backup when USB drive is mounted.",ArgFile,ArgNone) \
-    X(bmount,"Mount your file system as a backup.",ArgOrigin,ArgDir) \
-    X(history,"Mount all known storages for your backup.",ArgRule,ArgNone) \
+    X(help,"Show help. Also: beak push help",ArgORS,ArgNone) \
     X(prune,"Discard old backups according to the keep rule.",ArgStorage,ArgNone) \
+    X(mount,"Mount your backup as a file system.",ArgStorage,ArgDir) \
     X(pull,"Merge the most recent backup for the given rule.",ArgRule,ArgNone) \
     X(push,"Backup a rule to a storage location.",ArgRule,ArgNone) \
-    X(mount,"Mount your backup as a file system.",ArgStorage,ArgDir) \
     X(restore,"Restore from a backup into your file system.",ArgStorage,ArgOrigin) \
-    X(shell,"Mount your backup and spawn a shell. Exit the shell to unmount.",ArgStorage,ArgNone) \
-    X(status,"Show the status of your backups both locally and remotely.",ArgNORS,ArgNone) \
+    X(shell,"Mount your backup(s) and spawn a shell. Exit the shell to unmount.",ArgStorage,ArgNone) \
+    X(status,"Show the status of your backups of a rule.",ArgRule,ArgNone) \
     X(store,"Store your file system into a backup.",ArgOrigin,ArgStorage) \
     X(umount,"Unmount a virtual file system.",ArgDir,ArgNone) \
     X(version,"Show version.",ArgNone,ArgNone) \

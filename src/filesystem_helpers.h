@@ -62,6 +62,9 @@ struct StatOnlyFileSystem : ReadOnlyFileSystem
     bool readdir(Path *p, std::vector<Path*> *vec);
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
     void recurse(Path *root, std::function<void(Path *path, FileStat *stat)> cb);
+    RC listFilesBelow(Path *p, std::vector<Path*> files, SortOrder so);
+    RC ctimeTouch(Path *p);
+
     RC stat(Path *p, FileStat *fs);
     RC loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
     bool readLink(Path *file, std::string *target);
@@ -113,6 +116,9 @@ struct ReadOnlyCacheFileSystemBaseImplementation : ReadOnlyFileSystem
     bool readdir(Path *p, std::vector<Path*> *vec);
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
     void recurse(Path *root, std::function<void(Path *path, FileStat *stat)> cb);
+    RC listFilesBelow(Path *p, std::vector<Path*> files, SortOrder so);
+    RC ctimeTouch(Path *p);
+
     RC stat(Path *p, FileStat *fs);
     RC loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
     bool readLink(Path *file, std::string *target);

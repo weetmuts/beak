@@ -76,8 +76,8 @@ int run(int argc, char *argv[]) {
     // We now know the command the user intends to invoke.
     switch (cmd) {
 
-    case check_cmd:
-        rc = beak->check(&settings);
+    case bmount_cmd:
+        rc = beak->mountBackupDaemon(&settings);
         break;
 
     case config_cmd:
@@ -85,6 +85,10 @@ int run(int argc, char *argv[]) {
         break;
 
     case diff_cmd:
+        break;
+
+    case fsck_cmd:
+        rc = beak->fsck(&settings);
         break;
 
     case genautocomplete_cmd:
@@ -98,13 +102,6 @@ int run(int argc, char *argv[]) {
         break;
 
    case genmounttrigger_cmd:
-        break;
-
-    case history_cmd:
-        break;
-
-    case bmount_cmd:
-        rc = beak->mountBackupDaemon(&settings);
         break;
 
     case prune_cmd:
