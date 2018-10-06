@@ -50,55 +50,18 @@ Backup::Backup(ptr<FileSystem> origin_fs)
     origin_fs_ = origin_fs;
 }
 
-thread_local Backup *current_fs;
-
-static int addEntry(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf)
+RecurseOption Backup::addTarEntry(Path *abspath, FileStat *st)
 {
-    return current_fs->addTarEntry(fpath, sb);
-}
-
-int Backup::recurse()
-{
-    // Recurse into the root dir. Maximum 256 levels deep.
-    // Look at symbolic links (ie do not follow them) so that
-    // we can store the links in the tar file.
-    current_fs = this;
-
-    // Warning! nftw depth first is a standard depth first. I.e.
-    // alfa/x.cc is sorted before
-    // beta/gamma/y.cc
-    // because it walks in alphabetic order, then recurses.
-    //
-    // The depth first sort used by depthFirstSortPath for the files map and others
-    // will sort beta/gamma/y.cc before alfa/x.cc because it is deeper.
-    // Therefore, do not expect nftw to produce the files in the same order as
-    // the are later iterated after being stored in the maps.
-
-    // Thus the work done in addEntry simply records the file system entries.
-    // Relationships between the entries, like hard links, are calculated later,
-    // because they expect earlier entries to be deeper or equal depth.
-    int rc = nftw(root_dir.c_str(), addEntry, 256, FTW_PHYS|FTW_ACTIONRETVAL);
-
-    if (rc  == -1) {
-        error(BACKUP,"Error while scanning files: %s", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-    return 0;
-}
-
-int Backup::addTarEntry(const char *p, const struct stat *sb)
-{
-    Path *abspath = Path::lookup(p);
     Path *path = abspath->subpath(root_dir_path->depth());
     path = path->prepend(Path::lookup(""));
 
     #ifdef PLATFORM_POSIX
     // Sockets cannot be stored.
-    if(S_ISSOCK(sb->st_mode)) { return FTW_CONTINUE; }
+    if(S_ISSOCK(st->st_mode)) { return RecurseContinue; }
     #endif
 
     // Ignore any directory that has a subdir named .beak
-    if(S_ISDIR(sb->st_mode) && abspath->depth() > root_dir_path->depth())
+    if(S_ISDIR(st->st_mode) && abspath->depth() > root_dir_path->depth())
     {
         struct stat sb;
         char buf[abspath->c_str_len()+7];
@@ -109,20 +72,20 @@ int Backup::addTarEntry(const char *p, const struct stat *sb)
             // Oups found .beak subdir! This directory and children
             // must be ignored!
             info(BACKUP,"Skipping subbeak %s\n", abspath->c_str());
-            return FTW_SKIP_SUBTREE;
+            return RecurseSkipSubTree;
         }
     }
 
     // Ignore any directory named .beak, this is just the special
     // case for that we should not enter the .beak directory inside
     // the configured beak source dir that we are scanning.
-    if (abspath->name()->str() == ".beak") return FTW_SKIP_SUBTREE;
+    if (abspath->name()->str() == ".beak") return RecurseSkipSubTree;
 
     size_t len = strlen(path->c_str());
     char name[len+2];
     strcpy(name, path->c_str());
 
-    if(S_ISDIR(sb->st_mode)) {
+    if(S_ISDIR(st->st_mode)) {
         name[len] = '/';
         name[len+1] = 0;
     }
@@ -139,13 +102,13 @@ int Backup::addTarEntry(const char *p, const struct stat *sb)
     }
     if (name[1] != 0 && status) {
         debug(BACKUP, "Filter dropped \"%s\"\n", name);
-        return 0;
+        return RecurseContinue;
     } else {
         debug(BACKUP, "Filter NOT dropped \"%s\"\n", name);
     }
 
     // Creation and storage of entry.
-    TarEntry *te = new TarEntry(abspath, path, sb, tarheaderstyle_);
+    TarEntry *te = new TarEntry(abspath, path, st, tarheaderstyle_);
     files[te->path()] = te;
 
     if (te->isDirectory()) {
@@ -154,7 +117,7 @@ int Backup::addTarEntry(const char *p, const struct stat *sb)
         origin_fs_->addWatch(abspath);
         debug(BACKUP, "Added directory >%s< %p %p\n", te->path()->c_str(), te->path(), directories[te->path()]);
     }
-    return FTW_CONTINUE;
+    return RecurseContinue;
 }
 
 void Backup::findTarCollectionDirs() {
@@ -1033,7 +996,9 @@ RC Backup::scanFileSystem(Settings *settings)
 
     info(BACKUP, "Scanning %s\n", root_dir.c_str());
     uint64_t start = clockGetTime();
-    recurse();
+
+    origin_fs_->recurse(root_dir_path, [this](Path *p, FileStat *st) { return this->addTarEntry(p, st); });
+
     uint64_t stop = clockGetTime();
     uint64_t scan_time = stop - start;
     start = stop;
@@ -1081,7 +1046,7 @@ struct BeakFS : FileSystem
         return 0;
     }
 
-    void recurse(Path *root, std::function<void(Path *path, FileStat *stat)> cb)
+    RC recurse(Path *root, std::function<RecurseOption(Path *path, FileStat *stat)> cb)
     {
         for (auto& e : forw_->tar_storage_directories)
         {
@@ -1104,6 +1069,7 @@ struct BeakFS : FileSystem
             stat.setAsDirectory();
             cb(dir, &stat);
         }
+        return RC::OK;
     }
     RC listFilesBelow(Path *p, std::vector<Path*> files, SortOrder so)
     {

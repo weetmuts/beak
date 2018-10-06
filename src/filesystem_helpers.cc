@@ -62,7 +62,7 @@ RC ReadOnlyFileSystem::createFile(Path *file, std::vector<char> *buf)
 }
 
 bool ReadOnlyFileSystem::createFile(Path *path, FileStat *stat,
-                                                 std::function<size_t(off_t offset, char *buffer, size_t len)> cb)
+                                    std::function<size_t(off_t offset, char *buffer, size_t len)> cb)
 {
     return false;
 }
@@ -127,8 +127,9 @@ ssize_t StatOnlyFileSystem::pread(Path *p, char *buf, size_t size, off_t offset)
     return -4711;
 }
 
-void StatOnlyFileSystem::recurse(Path *root, std::function<void(Path *path, FileStat *stat)> cb)
+RC StatOnlyFileSystem::recurse(Path *root, std::function<RecurseOption(Path *path, FileStat *stat)> cb)
 {
+    return RC::ERR;
 }
 
 RC StatOnlyFileSystem::listFilesBelow(Path *p, std::vector<Path*> files, SortOrder so)
@@ -228,9 +229,10 @@ ssize_t ReadOnlyCacheFileSystemBaseImplementation::pread(Path *p, char *buf, siz
     return cache_fs_->pread(pp, buf, size, offset);
 }
 
-void ReadOnlyCacheFileSystemBaseImplementation::recurse(Path *root, function<void(Path *path, FileStat *stat)> cb)
+RC ReadOnlyCacheFileSystemBaseImplementation::recurse(Path *root, function<RecurseOption(Path *path, FileStat *stat)> cb)
 {
     fprintf(stderr, "recurse not implemented...\n");
+    return RC::OK;
 }
 
 RC ReadOnlyCacheFileSystemBaseImplementation::listFilesBelow(Path *p, std::vector<Path*> files, SortOrder so)

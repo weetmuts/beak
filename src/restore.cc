@@ -73,7 +73,7 @@ struct RestoreFileSystem : FileSystem
         }
     }
 
-    void recurse(Path *root, std::function<void(Path *path, FileStat *stat)> cb)
+    RC recurse(Path *root, std::function<RecurseOption(Path *path, FileStat *stat)> cb)
     {
         point_ = rev_->singlePointInTime();
         assert(point_);
@@ -81,6 +81,7 @@ struct RestoreFileSystem : FileSystem
         Entry *d = rev_->findEntry(point_, Path::lookupRoot());
         assert(d);
         recurseInto(d, cb);
+        return RC::OK;
     }
 
     RC listFilesBelow(Path *p, std::vector<Path*> files, SortOrder so)

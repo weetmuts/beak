@@ -45,7 +45,7 @@ struct TarEntry
 {
 
     TarEntry(size_t size, TarHeaderStyle ths);
-    TarEntry(Path *abspath, Path *path, const struct stat *b, TarHeaderStyle ths);
+    TarEntry(Path *abspath, Path *path, FileStat *st, TarHeaderStyle ths);
 
     Path *path()
     {

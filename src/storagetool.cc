@@ -189,6 +189,7 @@ RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backup,
     backup_fs->recurse(Path::lookupRoot(), [=,&files_to_backup]
                        (Path *path, FileStat *stat) {
                            add_backup_work(st, &files_to_backup, path, stat, settings, storage_fs);
+                           return RecurseContinue;
                        });
 
     debug(STORAGETOOL, "Work to be done: num_files=%ju num_dirs=%ju\n", st->stats.num_files, st->stats.num_dirs);
@@ -197,14 +198,16 @@ RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backup,
     case FileSystemStorage:
     {
         backup_fs->recurse(Path::lookupRoot(), [=]
-                           (Path *path, FileStat *stat) {store_local_backup_file(backup,
-                                                                                 backup_fs,
-                                                                                 origin_fs,
-                                                                                 storage_fs,
-                                                                                 path,
-                                                                                 stat,
-                                                                                 settings,
-                                                                                 st); });
+                           (Path *path, FileStat *stat) {
+                               store_local_backup_file(backup,
+                                                       backup_fs,
+                                                       origin_fs,
+                                                       storage_fs,
+                                                       path,
+                                                       stat,
+                                                       settings,
+                                                       st);
+                               return RecurseContinue; });
         break;
     }
     case RSyncStorage:

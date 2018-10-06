@@ -67,7 +67,7 @@ TarEntry::TarEntry(size_t size, TarHeaderStyle ths)
     debug(TARENTRY, "Regular File Entry added size %ju blocked size %ju!\n", fs_.st_size, blocked_size_);
 }
 
-TarEntry::TarEntry(Path *ap, Path *p, const struct stat *b, TarHeaderStyle ths) : fs_(b)
+TarEntry::TarEntry(Path *ap, Path *p, FileStat *st, TarHeaderStyle ths) : fs_(*st)
 {
     tar_header_style_ = ths;
     abspath_ = ap;

@@ -112,7 +112,7 @@ struct BeakImplementation : Beak {
 
     private:
 
-    unique_ptr<Restore> accessBackup(Settings *settings, PointInTime **point);
+    unique_ptr<Restore> accessBackup(Settings *settings);
     RC mountRestoreInternal(Settings *settings, bool daemon);
     bool hasPointsInTime(Path *path, FileSystem *fs);
 
@@ -671,7 +671,7 @@ RC BeakImplementation::store(Settings *settings)
     return rc;
 }
 
-unique_ptr<Restore> BeakImplementation::accessBackup(Settings *settings, PointInTime **point)
+unique_ptr<Restore> BeakImplementation::accessBackup(Settings *settings)
 {
     RC rc = RC::OK;
 
@@ -691,15 +691,13 @@ unique_ptr<Restore> BeakImplementation::accessBackup(Settings *settings, PointIn
         return NULL;
     }
 
-    *point = restore->setPointInTime("@0");
     if (settings->pointintime != "") {
-        *point = restore->setPointInTime(settings->pointintime);
+        auto point = restore->setPointInTime(settings->pointintime);
+        if (!point) {
+            error(STORE, "No such point in time!\n");
+            return NULL;
+        }
     }
-    if (!*point) {
-        error(STORE, "No such point in time!\n");
-        return NULL;
-    }
-    assert(restore->singlePointInTime());
 
     rc = restore->loadBeakFileSystem(settings);
     if (rc.isErr()) {
@@ -719,22 +717,30 @@ RC BeakImplementation::restore(Settings *settings)
     umask(0);
     RC rc = RC::OK;
 
-    PointInTime *point;
-    auto restore  = accessBackup(settings, &point);
+    // A restore must happen from a single point in time. Default to the most recent.
+    auto restore  = accessBackup(settings);
     if (!restore) {
         return RC::ERR;
     }
+    auto point = restore->singlePointInTime();
+    if (!point) {
+        // The settings did not specify a point in time, lets use the most recent for the restore.
+        point = restore->setPointInTime("@0");
+    }
+
     FileSystem *backup_fs = restore->backupFileSystem(); // Access the archive files storing content.
     FileSystem *backup_contents_fs = restore->asFileSystem(); // Acces the files inside archive files.
 
     backup_contents_fs->recurse(Path::lookupRoot(),
                                 [&restore,this,point,settings,&st]
-                                (Path *path, FileStat *stat) {origin_tool_->addRestoreWork(st.get(),
-                                                                                           path,
-                                                                                           stat,
-                                                                                           settings,
-                                                                                           restore.get(),
-                                                                                           point); });
+                                (Path *path, FileStat *stat) {
+                                    origin_tool_->addRestoreWork(st.get(),
+                                                                 path,
+                                                                 stat,
+                                                                 settings,
+                                                                 restore.get(),
+                                                                 point);
+                                    return RecurseContinue; });
 
     debug(STORE, "Work to be done: num_files=%ju num_hardlinks=%ju num_symlinks=%ju num_nodes=%ju num_dirs=%ju\n",
           st->stats.num_files, st->stats.num_hard_links, st->stats.num_symbolic_links,
@@ -824,8 +830,7 @@ RC BeakImplementation::fsck(Settings *settings)
 {
     RC rc = RC::OK;
 
-    PointInTime *point;
-    auto restore  = accessBackup(settings, &point);
+    auto restore  = accessBackup(settings);
     if (!restore) {
         return RC::ERR;
     }
@@ -1001,8 +1006,7 @@ RC BeakImplementation::mountRestore(Settings *settings)
 
 RC BeakImplementation::mountRestoreInternal(Settings *settings, bool daemon)
 {
-    PointInTime *point;
-    auto restore  = accessBackup(settings, &point);
+    auto restore  = accessBackup(settings);
     if (!restore) {
         return RC::ERR;
     }

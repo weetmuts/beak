@@ -78,7 +78,7 @@ struct Backup
     std::vector<Match> triggers;
 
     int recurse();
-    int addTarEntry(const char *fpath, const struct stat *sb);
+    RecurseOption addTarEntry(Path *abspath, FileStat *st);
     void findHardLinks();
     void findTarCollectionDirs();
     void recurseAddDir(Path *path, TarEntry *direntry);

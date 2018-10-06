@@ -31,7 +31,7 @@ struct FileSystemFuseAPIImplementation : FileSystem
 {
     bool readdir(Path *p, vector<Path*> *vec);
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
-    void recurse(Path *root, function<void(Path *path, FileStat *stat)> cb);
+    RC recurse(Path *root, function<RecurseOption(Path *path, FileStat *stat)> cb);
     RC listFilesBelow(Path *p, vector<Path*> files, SortOrder so);
     RC ctimeTouch(Path *p);
     RC stat(Path *p, FileStat *fs);
@@ -102,8 +102,9 @@ ssize_t FileSystemFuseAPIImplementation::pread(Path *p, char *buf, size_t size, 
     return 4712; // rc;
 }
 
-void FileSystemFuseAPIImplementation::recurse(Path *root, function<void(Path *path, FileStat *stat)> cb)
+RC FileSystemFuseAPIImplementation::recurse(Path *root, function<RecurseOption(Path *path, FileStat *stat)> cb)
 {
+    return RC::ERR;
 }
 
 RC FileSystemFuseAPIImplementation::listFilesBelow(Path *p, std::vector<Path*> files, SortOrder so)
