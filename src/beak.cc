@@ -35,12 +35,6 @@ const char *autocomplete =
 #include"generated_autocomplete.h"
     ;
 
-#ifdef FUSE_USE_VERSION
-#include <fuse/fuse.h>
-#else
-#include "nofuse.h"
-#endif
-
 #include <algorithm>
 #include <memory.h>
 #include <limits.h>
@@ -79,7 +73,6 @@ struct BeakImplementation : Beak {
     void printSettings();
 
     void captureStartTime() {  ::captureStartTime(); }
-    string argsToVector(int argc, char **argv, vector<string> *args);
     Command parseCommandLine(int argc, char **argv, Settings *settings);
 
     void printHelp(Command cmd);
@@ -112,11 +105,10 @@ struct BeakImplementation : Beak {
 
     private:
 
-    unique_ptr<Restore> accessBackup(Settings *settings);
-    RC mountRestoreInternal(Settings *settings, bool daemon);
-    bool hasPointsInTime(Path *path, FileSystem *fs);
-
-    fuse_operations restore_fuse_ops;
+    string argsToVector_(int argc, char **argv, vector<string> *args);
+    unique_ptr<Restore> accessBackup_(Settings *settings);
+    RC mountRestoreInternal_(Settings *settings, bool daemon);
+    bool hasPointsInTime_(Path *path, FileSystem *fs);
 
     map<string,CommandEntry*> commands_;
     map<string,OptionEntry*> short_options_;
@@ -311,7 +303,7 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
         Path *origin = Path::lookup(arg);
         Path *rp = origin->realpath();
         if (rp) {
-            if (hasPointsInTime(rp, origin_tool_->fs()) && !settings->yesorigin) {
+            if (hasPointsInTime_(rp, origin_tool_->fs()) && !settings->yesorigin) {
                 error(COMMANDLINE, "You passed a storage location as an origin. If this is what you want add --yes-origin\n");
             }
             argument.origin = rp;
@@ -398,7 +390,7 @@ void BeakImplementation::printSettings()
     }
 }
 
-string BeakImplementation::argsToVector(int argc, char **argv, vector<string> *args)
+string BeakImplementation::argsToVector_(int argc, char **argv, vector<string> *args)
 {
     args->resize(argc);
     // Skip the program name.
@@ -411,7 +403,7 @@ string BeakImplementation::argsToVector(int argc, char **argv, vector<string> *a
 Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *settings)
 {
     vector<string> args;
-    argsToVector(argc, argv, &args);
+    argsToVector_(argc, argv, &args);
 
     settings->help_me_on_this_cmd = nosuch_cmd;
     settings->fuse_args.push_back("beak"); // Application name
@@ -671,7 +663,7 @@ RC BeakImplementation::store(Settings *settings)
     return rc;
 }
 
-unique_ptr<Restore> BeakImplementation::accessBackup(Settings *settings)
+unique_ptr<Restore> BeakImplementation::accessBackup_(Settings *settings)
 {
     RC rc = RC::OK;
 
@@ -717,8 +709,7 @@ RC BeakImplementation::restore(Settings *settings)
     umask(0);
     RC rc = RC::OK;
 
-    // A restore must happen from a single point in time. Default to the most recent.
-    auto restore  = accessBackup(settings);
+    auto restore  = accessBackup_(settings);
     if (!restore) {
         return RC::ERR;
     }
@@ -830,7 +821,7 @@ RC BeakImplementation::fsck(Settings *settings)
 {
     RC rc = RC::OK;
 
-    auto restore  = accessBackup(settings);
+    auto restore  = accessBackup_(settings);
     if (!restore) {
         return RC::ERR;
     }
@@ -996,17 +987,17 @@ RC BeakImplementation::umountBackup(Settings *settings)
 
 RC BeakImplementation::mountRestoreDaemon(Settings *settings)
 {
-    return mountRestoreInternal(settings, true);
+    return mountRestoreInternal_(settings, true);
 }
 
 RC BeakImplementation::mountRestore(Settings *settings)
 {
-    return mountRestoreInternal(settings, false);
+    return mountRestoreInternal_(settings, false);
 }
 
-RC BeakImplementation::mountRestoreInternal(Settings *settings, bool daemon)
+RC BeakImplementation::mountRestoreInternal_(Settings *settings, bool daemon)
 {
-    auto restore  = accessBackup(settings);
+    auto restore  = accessBackup_(settings);
     if (!restore) {
         return RC::ERR;
     }
@@ -1062,7 +1053,6 @@ RC BeakImplementation::status(Settings *settings)
 
     return rc;
 }
-
 
 void BeakImplementation::printHelp(Command cmd)
 {
@@ -1120,7 +1110,7 @@ void BeakImplementation::genAutoComplete(string filename)
     fclose(f);
 }
 
-bool BeakImplementation::hasPointsInTime(Path *path, FileSystem *fs)
+bool BeakImplementation::hasPointsInTime_(Path *path, FileSystem *fs)
 {
     if (path == NULL) return false;
 

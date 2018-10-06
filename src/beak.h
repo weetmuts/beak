@@ -46,7 +46,6 @@ struct OriginTool;
 struct Beak
 {
     virtual void captureStartTime() = 0;
-    virtual std::string argsToVector(int argc, char **argv, std::vector<std::string> *args) = 0;
     virtual Command parseCommandLine(int argc, char **argv, Settings *settings) = 0;
 
     virtual RC store(Settings *settings) = 0;
