@@ -188,14 +188,20 @@ ssize_t FileSystemImplementationPosix::pread(Path *p, char *buf, size_t size, of
     return n;
 }
 
-thread_local function<int(Path *path, FileStat *stat)> recurse_cb1_;
+thread_local function<RecurseOption(Path *path, FileStat *stat)> recurse_cb1_;
 thread_local FileStat recurse_stat_;
 
 static int recurseCB1_(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf)
 {
     Path *p = Path::lookup(fpath);
     recurse_stat_.loadFrom(sb);
-    return recurse_cb1_(p, &recurse_stat_);
+    RecurseOption ro = recurse_cb1_(p, &recurse_stat_);
+    switch (ro) {
+    case RecurseContinue: return FTW_CONTINUE;
+    case RecurseSkipSubTree: return FTW_SKIP_SUBTREE;
+    case RecurseStop: return FTW_STOP;
+    }
+    assert(0);
 }
 
 RC FileSystemImplementationPosix::recurse(Path *p, function<RecurseOption(Path *path, FileStat *stat)> cb)
@@ -226,7 +232,7 @@ RC FileSystemImplementationPosix::recurse(Path *p, function<RecurseOption(Path *
     return RC::OK;
 }
 
-thread_local function<int(const char *path, const struct stat *sb)> recurse_cb2_;
+thread_local function<RecurseOption(const char *path, const struct stat *sb)> recurse_cb2_;
 
 static int recurseCB2_(const char *fpath, const struct stat *sb, int tflag, struct FTW *ftwbuf)
 {
