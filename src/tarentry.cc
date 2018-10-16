@@ -160,15 +160,15 @@ void TarEntry::calculateTarpath(Path *storage_dir) {
 }
 
 void TarEntry::createSmallTar(int i) {
-    small_tars_[i] = new TarFile(this, SMALL_FILES_TAR, i);
+    small_tars_[i] = new TarFile(SMALL_FILES_TAR);
     tars_.push_back(small_tars_[i]);
 }
 void TarEntry::createMediumTar(int i) {
-    medium_tars_[i] = new TarFile(this, MEDIUM_FILES_TAR, i);
+    medium_tars_[i] = new TarFile(MEDIUM_FILES_TAR);
     tars_.push_back(medium_tars_[i]);
 }
 void TarEntry::createLargeTar(uint32_t hash) {
-    large_tars_[hash] = new TarFile(this, SINGLE_LARGE_FILE_TAR, hash);
+    large_tars_[hash] = new TarFile(SINGLE_LARGE_FILE_TAR);
     tars_.push_back(large_tars_[hash]);
 }
 
@@ -369,12 +369,12 @@ void TarEntry::registerTarFile(TarFile *tf, size_t o) {
 }
 
 void TarEntry::registerTazFile() {
-    taz_file_ = new TarFile(this, DIR_TAR, 0);
+    taz_file_ = new TarFile(DIR_TAR);
     tars_.push_back(taz_file_);
 }
 
 void TarEntry::registerGzFile() {
-    gz_file_ = new TarFile(this, REG_FILE, 0);
+    gz_file_ = new TarFile(REG_FILE);
     tars_.push_back(gz_file_);
 }
 
@@ -406,6 +406,7 @@ void TarEntry::addDir(TarEntry *dir) {
 
 void TarEntry::addEntry(TarEntry *te) {
     entries_.push_back(te);
+    te->storage_dir_ = this;
 }
 
 void TarEntry::sortEntries() {
@@ -476,12 +477,19 @@ void cookEntry(string *listing, TarEntry *entry) {
         listing->append(" ");
     }
     listing->append(separator_string);
-    listing->append(entry->tarFile()->name());
+    char filename[256];
+    TarFileName tfn(entry->tarFile(), 0);
+    tfn.writeTarFileNameIntoBuffer(filename, sizeof(filename), NULL);
+    listing->append(filename);
     listing->append(separator_string);
     listing->append(to_string(entry->tarOffset()+entry->headerSize()));
     listing->append(separator_string);
-    listing->append("0"); // content hash not used
+
+    char nps[256];
+    snprintf(nps, sizeof(nps), "%u", entry->tarFile()->numParts());
+    listing->append(nps);
     listing->append(separator_string);
+
     listing->append(toHex(entry->hash()));
     listing->append("\n");
     listing->append(separator_string);

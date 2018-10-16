@@ -233,8 +233,8 @@ void Backup::addEntriesToTarCollectionDirs() {
             dir = directories[path];
             // dir is NULL for directories that are only stored inside tars.
         } while (dir == NULL || !dir->isStorageDir());
+        // Add this tar entry to the found storage dir and update te with dir.
         dir->addEntry(te);
-
         debug(BACKUP,"ADDED content %s            TO          \"%s\"\n",
               te->path()->c_str(), dir->path()->c_str());
     }
@@ -479,7 +479,6 @@ void Backup::fixHardLinks()
 void Backup::fixTarPaths() {
     for (auto & e : tar_storage_directories) {
         TarEntry *te = e.second;
-        vector<pair<TarEntry*,TarEntry*>> to_be_moved;
 
         for(auto & e : te->entries()) {
             TarEntry *entry = e;
@@ -564,10 +563,9 @@ size_t Backup::groupFilesIntoTars() {
             TarFile *tf = t.second;
             tf->fixSize();
             tf->calculateHash();
-            tf->fixName();
             if (tf->currentTarOffset() > 0) {
-                debug(BACKUP,"%s%s size became %zu\n", te->path()->c_str(), tf->name().c_str(), tf->size());
-                te->appendFileName(tf->name());
+                debug(BACKUP,"%s%s size became %zu\n", te->path()->c_str(), "NAMEHERE", tf->size());
+                te->appendFileName(tf);
                 te->largeHashTars()[tf->hash()] = tf;
             }
         }
@@ -575,10 +573,9 @@ size_t Backup::groupFilesIntoTars() {
             TarFile *tf = t.second;
             tf->fixSize();
             tf->calculateHash();
-            tf->fixName();
             if (tf->currentTarOffset() > 0) {
-                debug(BACKUP,"%s%s size became %zu\n", te->path()->c_str(), tf->name().c_str(), tf->size());
-                te->appendFileName(tf->name());
+                debug(BACKUP,"%s%s size became %zu\n", te->path()->c_str(), "NAMEHERE", tf->size());
+                te->appendFileName(tf);
                 te->mediumHashTars()[tf->hash()] = tf;
             }
         }
@@ -586,18 +583,15 @@ size_t Backup::groupFilesIntoTars() {
             TarFile *tf = t.second;
             tf->fixSize();
             tf->calculateHash();
-            tf->fixName();
             if (tf->currentTarOffset() > 0) {
-                debug(BACKUP,"%s%s size became %zu\n", te->path()->c_str(), tf->name().c_str(), tf->size());
-                te->appendFileName(tf->name());
+                debug(BACKUP,"%s%s size became %zu\n", te->path()->c_str(), "NAMEHERE", tf->size());
+                te->appendFileName(tf);
                 te->smallHashTars()[tf->hash()] = tf;
             }
         }
 
         te->tazFile()->fixSize();
         te->tazFile()->calculateHash();
-        te->tazFile()->fixName();
-
 
         set<uid_t> uids;
         set<gid_t> gids;
@@ -637,14 +631,14 @@ size_t Backup::groupFilesIntoTars() {
             entry->updateMtim(te->gzFile()->mtim());
         }
 
-        vector<TarFile*> tars;
+        vector<pair<TarFile*,TarEntry*>> tars;
         for (auto & st : tar_storage_directories) {
             TarEntry *ste = st.second;
             bool b = ste->path()->isBelowOrEqual(te->path());
             if (b) {
                 for (auto & tf : ste->tars()) {
                     if (tf->size() > 0 ) {
-                        tars.push_back(tf);
+                        tars.push_back({tf,ste});
                         // Make sure the gzfile timestamp is the latest
                         // of all subtars as well.
                         tf->updateMtim(te->gzFile()->mtim());
@@ -657,18 +651,25 @@ size_t Backup::groupFilesIntoTars() {
 
         // Hash the hashes of all the other tar and gz files.
         te->gzFile()->calculateHash(tars, gzfile_contents);
-        te->gzFile()->fixName();
 
         //gzfile_contents.append("#columns tar_path\n");
         gzfile_contents.append("#tars ");
         gzfile_contents.append(to_string(tars.size()));
         gzfile_contents.append("\n");
         gzfile_contents.append(separator_string);
-        for (auto & tf : tars) {
-            Path *p = tf->path()->subpath(te->path()->depth());
-            gzfile_contents.append(p->c_str());
-            gzfile_contents.append("\n");
-            gzfile_contents.append(separator_string);
+        for (auto & p : tars) {
+            char filename[1024];
+            for (uint i=0; i < p.first->numParts(); ++i) {
+                TarFileName tfn(p.first, i);
+                Path *path = p.second != NULL ? p.second->path() : NULL;
+                if (path) {
+                    path = path->subpath(te->path()->depth());
+                }
+                tfn.writeTarFileNameIntoBuffer(filename, sizeof(filename), path);
+                gzfile_contents.append(filename);
+                gzfile_contents.append("\n");
+                gzfile_contents.append(separator_string);
+            }
         }
 
         vector<char> compressed_gzfile_contents;
@@ -682,13 +683,13 @@ size_t Backup::groupFilesIntoTars() {
         if (te->tazFile()->size() > 0 ) {
 
             debug(BACKUP,"%s%s size became %zu\n", te->path()->c_str(),
-                  te->tazFile()->name().c_str(), te->tazFile()->size());
+                  "NAMEHERE", te->tazFile()->size());
 
-            te->appendFileName(te->tazFile()->name());
+            te->appendFileName(te->tazFile());
             te->enableTazFile();
             has_dir = 1;
         }
-        te->appendFileName(te->gzFile()->name());
+        te->appendFileName(te->gzFile());
         te->enableGzFile();
 
         num += has_dir+te->smallTars().size()+te->mediumTars().size()+te->largeTars().size();
@@ -759,9 +760,9 @@ TarFile *Backup::findTarFromPath(Path *path) {
     hex2bin(tfn.header_hash, &hash);
 
     debug(BACKUP, "Hash >%s< hash len %d >%s<\n", tfn.header_hash.c_str(), hash.size(), toHex(hash).c_str());
-    debug(BACKUP, "Type is %d suffix is %s \n", tfn.type, tfn.suffix.c_str());
+    debug(BACKUP, "Type is %d suffix is %s \n", tfn.type, "SUFFIXHERE");
 
-    if (tfn.type == REG_FILE && tfn.suffix == "gz") {
+    if (tfn.type == REG_FILE) {
         if (!te->hasGzFile()) {
             debug(BACKUP, "No such gz file >%s<\n", toHex(hash).c_str());
             return NULL;
@@ -893,8 +894,11 @@ struct BackupFuseAPI : FuseAPI
 
         for (auto & f : te->files()) {
             char filename[256];
-            snprintf(filename, 256, "%s", f.c_str());
-            filler(buf, filename, NULL, 0);
+            for (uint i=0; i < f->numParts(); ++i) {
+                TarFileName tfn(f, i);
+                tfn.writeTarFileNameIntoBuffer(filename, sizeof(filename), NULL);
+                filler(buf, filename, NULL, 0);
+            }
         }
 
         UNLOCK(&backup_->global);
@@ -1050,17 +1054,21 @@ struct BeakFS : FileSystem
     {
         for (auto& e : forw_->tar_storage_directories)
         {
-            for (auto& f : e.second->tars()) {
-                Path *file_name = f->path(); //->prepend(forw_root_dir_path;
-
-                FileStat stat;
-                stat.st_atim = *f->mtim();
-                stat.st_mtim = *f->mtim();
-                stat.st_size = f->size();
-                stat.st_mode = 0400;
-                stat.setAsRegularFile();
-                if (stat.st_size > 0) {
-                    cb(file_name, &stat);
+            for (auto& tf : e.second->tars()) {
+                char filename[256];
+                for (uint i=0; i < tf->numParts(); ++i) {
+                    TarFileName tfn(tf, i);
+                    tfn.writeTarFileNameIntoBuffer(filename, sizeof(filename), NULL);
+                    Path *fn = e.second->path()->appendName(Atom::lookup(filename));
+                    FileStat stat;
+                    stat.st_atim = *tf->mtim();
+                    stat.st_mtim = *tf->mtim();
+                    stat.st_size = tf->size();
+                    stat.st_mode = 0400;
+                    stat.setAsRegularFile();
+                    if (stat.st_size > 0) {
+                        cb(fn, &stat);
+                    }
                 }
             }
             Path *dir = e.second->path(); //->prepend(settings->dst);

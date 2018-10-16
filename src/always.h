@@ -29,6 +29,8 @@
 
 #define supportedVersion(x) (x==BEAK_VERSION_INT)
 
+typedef unsigned int uint;
+
 class ReturnCode
 {
 public:

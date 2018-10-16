@@ -32,6 +32,7 @@ static ComponentId TEST_GZIP = registerLogComponent("test_filesystem");
 static ComponentId TEST_KEEP = registerLogComponent("test_keep");
 static ComponentId TEST_FIT = registerLogComponent("test_fit");
 static ComponentId TEST_HUMANREADABLE = registerLogComponent("human_readable");
+static ComponentId TEST_HEXSTRING = registerLogComponent("hex_string");
 
 void testMatch(string pattern, const char *path, bool should_match)
     throw (string);
@@ -46,6 +47,7 @@ void testFileSystem();
 void testGzip();
 void testKeeps();
 void testHumanReadable();
+void testHexStrings();
 void testFit();
 void predictor(int argc, char **argv);
 
@@ -72,6 +74,7 @@ int main(int argc, char *argv[])
         testGzip();
         testKeeps();
         testHumanReadable();
+        testHexStrings();
         testFit();
 
         if (!err_found_) {
@@ -253,6 +256,26 @@ void testHumanReadable()
     testHR(1024*1024*1024*512.77, "512.77 GiB");
     testHR(1024*1024*1024*1023.99, "1023.99 GiB");
 #endif
+}
+
+void testHexString(size_t v, size_t mv, string expected) {
+    string s = toHex(v, mv);
+    if (s == expected) {
+        debug(TEST_HEXSTRING,"%ju = %s\n", v, s.c_str());
+    } else {
+        err_found_ = true;
+        debug(TEST_HEXSTRING,"%ju = %s but expected %s\n", v, s.c_str(), expected.c_str());
+    }
+}
+
+void testHexStrings()
+{
+    testHexString(2, 8, "64.00 KiB");
+    testHexString(32, 60, "64.00 KiB");
+    testHexString(53, 2160, "64.00 KiB");
+    testHexString(54, 65535, "64.00 KiB");
+    testHexString(192, 193, "64.00 KiB");
+    testHexString(1234567, 99999999, "64.00 KiB");
 }
 
 void testFit()

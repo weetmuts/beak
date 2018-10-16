@@ -691,8 +691,8 @@ RC Restore::lookForPointsInTime(PointInTimeFormat f, Path *path)
         if (ok && tfn.type == REG_FILE) {
 
             PointInTime p;
-            p.ts.tv_sec = tfn.secs;
-            p.ts.tv_nsec = tfn.nsecs;
+            p.ts.tv_sec = tfn.sec;
+            p.ts.tv_nsec = tfn.nsec;
             char datetime[20];
             memset(datetime, 0, sizeof(datetime));
             strftime(datetime, 20, "%Y-%m-%d_%H:%M", localtime(&p.ts.tv_sec));

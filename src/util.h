@@ -33,6 +33,7 @@ void strprintf(std::string &s, const char* fmt, ...);
 
 std::string humanReadable(size_t s);
 std::string humanReadableTwoDecimals(size_t s);
+std::string toHex(size_t value, size_t max_value);
 size_t roundoffHumanReadable(size_t s);
 RC parseHumanReadable(std::string s, size_t *out);
 std::string keepDigits(std::string &s);
@@ -41,7 +42,6 @@ bool parseLengthOfTime(std::string s, time_t *out);
 std::string getLengthOfTime(time_t t);
 time_t getTimeZoneOffset();
 std::string getTimeZoneOffsetAsString(time_t t);
-
 size_t basepos(std::string& s);
 std::wstring to_wstring(std::string const& s);
 std::string wto_string(std::wstring const& s);
@@ -89,5 +89,11 @@ std::string randomUpperCaseCharacterString(int len);
 } \
 
 void printContents(std::map<Path*,FileStat> &contents);
+
+// Extract the leading digits from buf and store into s.
+bool digitsOnly(char *buf, size_t len, std::string *s);
+
+// Extract the leading hex digits from buf and store into s.
+bool hexDigitsOnly(char *buf, size_t len, std::string *s);
 
 #endif

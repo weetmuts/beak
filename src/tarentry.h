@@ -95,6 +95,10 @@ struct TarEntry
     {
 	return parent_;
     }
+    TarEntry *storageDir()
+    {
+        return storage_dir_;
+    }
     size_t blockedSize()
     {
 	return blocked_size_;
@@ -169,7 +173,7 @@ struct TarEntry
     {
         return dirs_;
     }
-    std::vector<std::string>& files()
+    std::vector<TarFile*>& files()
     {
         return files_;
     }
@@ -253,9 +257,9 @@ struct TarEntry
     }
     void sortEntries();
 
-    void appendFileName(std::string name)
+    void appendFileName(TarFile *tf)
     {
-        files_.push_back(name);
+        files_.push_back(tf);
     }
 
     void calculateHash();
@@ -296,10 +300,13 @@ struct TarEntry
     // If this is a directory, then all children sizes are summed here.
     size_t children_size_;
     TarEntry *parent_;
-    //TarHeader tar_;
+
+    // This is where the tar was stored.
+    TarEntry *storage_dir_;
+
     bool is_tar_storage_dir_;
     std::vector<TarEntry*> dirs_; // Directories to be listed inside this TarEntry
-    std::vector<std::string> files_; // Files to be listed inside this TarEntry (ie the virtual tar files..)
+    std::vector<TarFile*> files_; // Files to be listed inside this TarEntry (ie the virtual tar files..)
     TarFile *taz_file_;
     bool taz_file_in_use_ = false;
     TarFile *gz_file_;

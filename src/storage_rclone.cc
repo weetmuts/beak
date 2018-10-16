@@ -56,7 +56,8 @@ RC rcloneListBeakFiles(Storage *storage,
         string file_name = eatTo(out, i, '\n', 4096, &eof, &err);
         if (err) break;
         TarFileName tfn;
-        bool ok = tfn.parseFileName(file_name);
+        string dir;
+        bool ok = tfn.parseFileName(file_name, &dir);
         // Only files that have proper beakfs names are included.
         if (ok) {
             // Check that the remote size equals the content. If there is a mismatch,
@@ -67,11 +68,11 @@ RC rcloneListBeakFiles(Storage *storage,
                  (tfn.type == REG_FILE && tfn.size == 0) )
             {
                 files->push_back(tfn);
-                Path *p = tfn.path->prepend(storage->storage_location);
+                Path *p = Path::lookup(dir)->prepend(storage->storage_location);
                 FileStat fs;
                 fs.st_size = (off_t)siz;
-                fs.st_mtim.tv_sec = tfn.secs;
-                fs.st_mtim.tv_nsec = tfn.nsecs;
+                fs.st_mtim.tv_sec = tfn.sec;
+                fs.st_mtim.tv_nsec = tfn.nsec;
                 fs.st_mode |= S_IRUSR;
                 fs.st_mode |= S_IFREG;
                 (*contents)[p] = fs;
@@ -147,10 +148,12 @@ void parse_rclone_verbose_output(StoreStatistics *st,
     }
     string file = storage->storage_location->str()+"/"+string(buf+from, to-from);
     TarFileName tfn;
-    if (tfn.parseFileName(file)) {
-        Path *path = tfn.path;
+    string dir;
+    if (tfn.parseFileName(file, &dir)) {
         size_t size = 0;
-
+        Path *dirp = Path::lookup(dir);
+        string file_path = tfn.asStringWithDir(dirp);
+        Path *path = Path::lookup(file_path);
         debug(RCLONE, "copied: %ju \"%s\"\n", st->stats.file_sizes.count(path), path->c_str());
 
         if (st->stats.file_sizes.count(path)) {
@@ -158,6 +161,8 @@ void parse_rclone_verbose_output(StoreStatistics *st,
             st->stats.size_files_stored += size;
             st->stats.num_files_stored++;
             st->updateProgress();
+        } else {
+            fprintf(stderr, "Error! No file size found for %s\n", path->c_str());
         }
     }
 }

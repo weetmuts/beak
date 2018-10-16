@@ -35,16 +35,15 @@ using namespace std;
 ComponentId TARFILE = registerLogComponent("tarfile");
 ComponentId HASHING = registerLogComponent("hashing");
 
-TarFile::TarFile(TarEntry *d, TarContents tc, int n)
+TarFile::TarFile(TarContents tc)
 {
     size_ = 0;
-    path_ = Path::lookupRoot();
-    in_directory_ = d;
-    tar_contents = tc;
+    tar_contents_ = tc;
     memset(&mtim_, 0, sizeof(mtim_));
     // This is a temporary name! It will be overwritten when the hash is finalized!
     name_ = "";
     disk_update = NoUpdate;
+    num_parts_ = 1;
 }
 
 void TarFile::addEntryLast(TarEntry *entry)
@@ -119,7 +118,7 @@ void TarFile::calculateHash()
     calculateSHA256Hash();
 }
 
-void TarFile::calculateHash(vector<TarFile*> &tars, string &content)
+void TarFile::calculateHash(vector<pair<TarFile*,TarEntry*>> &tars, string &content)
 {
     calculateSHA256Hash(tars, content);
 }
@@ -142,14 +141,15 @@ void TarFile::calculateSHA256Hash()
     SHA256_Final((unsigned char*)&sha256_hash_[0], &sha256ctx);
 }
 
-void TarFile::calculateSHA256Hash(vector<TarFile*> &tars, string &content)
+void TarFile::calculateSHA256Hash(vector<pair<TarFile*,TarEntry*>> &tars, string &content)
 {
     SHA256_CTX sha256ctx;
     SHA256_Init(&sha256ctx);
 
     // SHA256 all other tar and gz file hashes! This is the hash of this state!
-    for (auto & tf : tars)
+    for (auto & p : tars)
     {
+        TarFile *tf = p.first;
         if (tf == this) continue;
 
         SHA256_Update(&sha256ctx, &tf->hash()[0], tf->hash().size());
@@ -162,65 +162,10 @@ void TarFile::calculateSHA256Hash(vector<TarFile*> &tars, string &content)
     SHA256_Final((unsigned char*)&sha256_hash_[0], &sha256ctx);
 }
 
-void TarFile::fixName() {
-    char sizes[32];
-    memset(sizes, 0, sizeof(sizes));
-    snprintf(sizes, 32, "%zu", size());
-
-    char secs_and_nanos[32];
-    memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
-    snprintf(secs_and_nanos, 32, "%012" PRINTF_TIME_T "u.%09lu", mtim()->tv_sec, mtim()->tv_nsec);
-
-    char buffer[256];
-    char gztype[] = "gz";
-    char tartype[] = "tar";
-    char *type = tartype;
-    if (TarFileName::chartype(tar_contents) == 'z') {
-        type = gztype;
-    }
-    snprintf(buffer, sizeof(buffer), "%c01_%s_%s_%s_0.%s",
-             TarFileName::chartype(tar_contents), secs_and_nanos, sizes, toHex(hash()).c_str(), type);
-    name_ = buffer;
-    path_ = in_directory_->path()->appendName(Atom::lookup(name_));
-
-    debug(HASHING,"Fix name of tarfile to %s\n\n", name_.c_str());
-}
-
-void TarFile::setName(string s) {
-    name_ = s;
-    path_ = in_directory_->path()->appendName(Atom::lookup(name_));
-}
-
-string TarFile::line(Path *p)
-{
-    string s;
-
-    s.append(p->str());
-    s.append("/");
-    s.append(name());
-    s.append(separator_string);
-    s.append(to_string(size()));
-
-    char secs_and_nanos[32];
-    memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
-    snprintf(secs_and_nanos, 32, "%012" PRINTF_TIME_T "u.%09lu", mtim()->tv_sec, mtim()->tv_nsec);
-    s.append(separator_string);
-    s.append(secs_and_nanos);
-
-    char datetime[20];
-    memset(datetime, 0, sizeof(datetime));
-    strftime(datetime, 20, "%Y-%m-%d %H:%M.%S", localtime(&mtim()->tv_sec));
-    s.append(separator_string);
-    s.append(datetime);
-    s.append("\n");
-    s.append(separator_string);
-
-    return s;
-}
-
 void TarFile::updateMtim(struct timespec *mtim) {
     if (isInTheFuture(&mtim_)) {
-        fprintf(stderr, "Virtual tarfile %s has a future timestamp! Ignoring the timstamp.\n", path()->c_str());
+        fprintf(stderr, "Virtual tarfile %s has a future timestamp! Ignoring the timstamp.\n",
+                "PATHHERE");
     } else {
         if (mtim_.tv_sec > mtim->tv_sec ||
             (mtim_.tv_sec == mtim->tv_sec && mtim_.tv_nsec > mtim->tv_nsec)) {
@@ -229,27 +174,16 @@ void TarFile::updateMtim(struct timespec *mtim) {
     }
 }
 
-static bool digitsOnly(char *p, size_t len, string *s) {
-    while (len-- > 0) {
-        char c = *p++;
-        if (!c) return false;
-        if (!isdigit(c)) return false;
-        s->push_back(c);
-    }
-    return true;
-}
-
-static bool hexDigitsOnly(char *p, size_t len, string *s) {
-    while (len-- > 0) {
-        char c = *p++;
-        if (!c) return false;
-        bool is_hex = isdigit(c) ||
-            (c >= 'A' && c <= 'F') ||
-            (c >= 'a' && c <= 'f');
-        if (!is_hex) return false;
-        s->push_back(c);
-    }
-    return true;
+TarFileName::TarFileName(TarFile *tf, uint partnr)
+{
+    type = tf->type();
+    version = 1;
+    sec = tf->mtim()->tv_sec;
+    nsec = tf->mtim()->tv_nsec;
+    size = tf->size();
+    header_hash = toHex(tf->hash());
+    part_nr = partnr;
+    num_parts = tf->numParts();
 }
 
 bool TarFileName::isIndexFile(Path *p)
@@ -264,17 +198,20 @@ bool TarFileName::isIndexFile(Path *p)
     return 0==strncmp(s, "z01_", 3) && 0==strncmp(s+len-3, ".gz", 3);
 }
 
-bool TarFileName::parseFileName(string &name)
+bool TarFileName::parseFileName(string &name, string *dir)
 {
     bool k;
     // Example file name:
-    // foo/bar/dir/(r)01_(001501080787).(579054757)_(1119232)_(3b5e4ec7fe38d0f9846947207a0ea44c)_(0).(tar)
+    // foo/bar/dir/(l)01_(001501080787).(579054757)_(1119232)_(3b5e4ec7fe38d0f9846947207a0ea44c)_(0fe).(tar)
 
     if (name.size() == 0) return false;
 
     size_t p0 = name.rfind('/');
     if (p0 == string::npos) { p0=0; } else { p0++; }
 
+    if (dir) {
+        *dir = name.substr(0, p0);
+    }
     k = typeFromChar(name[p0], &type);
     if (!k) return false;
 
@@ -293,12 +230,12 @@ bool TarFileName::parseFileName(string &name)
     string secss;
     k = digitsOnly(&name[p1+1], p2-p1-1, &secss);
     if (!k) return false;
-    secs = atol(secss.c_str());
+    sec = atol(secss.c_str());
 
     string nsecss;
     k = digitsOnly(&name[p2+1], p3-p2-1, &nsecss);
     if (!k) return false;
-    nsecs = atol(nsecss.c_str());
+    nsec = atol(nsecss.c_str());
 
     string sizes;
     k = digitsOnly(&name[p3+1], p4-p3-1, &sizes);
@@ -308,13 +245,67 @@ bool TarFileName::parseFileName(string &name)
     k = hexDigitsOnly(&name[p4+1], p5-p4-1, &header_hash);
     if (!k) return false;
 
-    k = hexDigitsOnly(&name[p5+1], p6-p5-1, &content_hash);
+    string partnrs;
+    k = hexDigitsOnly(&name[p5+1], p6-p5-1, &partnrs);
     if (!k) return false;
+    part_nr = strtol(partnrs.c_str(), NULL, 16);
 
-    suffix = name.substr(p6+1);
+    string suffix = name.substr(p6+1);
+    if (suffixtype(type) != suffix) {
+        return false;
+    }
 
-    path = Path::lookup(name);
     return true;
+}
+
+void TarFileName::writeTarFileNameIntoBuffer(char *buf, size_t buf_len, Path *dir)
+{
+    // dirprefix/(l)01_(001501080787).(579054757)_(1119232)_(3b5e4ec7fe38d0f9846947207a0ea44c)_(07).(tar)
+    char sizes[32];
+    memset(sizes, 0, sizeof(sizes));
+    snprintf(sizes, 32, "%zu", size);
+
+    char secs_and_nanos[32];
+    memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
+    snprintf(secs_and_nanos, 32, "%012" PRINTF_TIME_T "u.%09lu", sec, nsec);
+
+    string partnr = toHex(part_nr, num_parts);
+
+    const char *suffix = suffixtype(type);
+
+    if (dir == NULL) {
+        snprintf(buf, buf_len, "%c01_%s_%s_%s_%s.%s",
+                 TarFileName::chartype(type),
+                 secs_and_nanos,
+                 sizes,
+                 header_hash.c_str(),
+                 partnr.c_str(),
+                 suffix);
+    } else {
+        snprintf(buf, buf_len, "%s/%c01_%s_%s_%s_%s.%s",
+                 dir->c_str(),
+                 TarFileName::chartype(type),
+                 secs_and_nanos,
+                 sizes,
+                 header_hash.c_str(),
+                 partnr.c_str(),
+                 suffix);
+    }
+
+    //path_ = in_directory_->path()->appendName(Atom::lookup(name_));
+}
+
+string TarFileName::asStringWithDir(Path *dir) {
+    char buf[1024];
+    writeTarFileNameIntoBuffer(buf, sizeof(buf), dir);
+    return buf;
+}
+
+Path *TarFileName::asPathWithDir(Path *dir)
+{
+    char buf[1024];
+    writeTarFileNameIntoBuffer(buf, sizeof(buf), dir);
+    return Path::lookup(buf);
 }
 
 size_t TarFile::copy(char *buf, size_t bufsiz, off_t offset, FileSystem *fs)

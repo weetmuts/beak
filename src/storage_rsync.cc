@@ -74,11 +74,11 @@ RC rsyncListBeakFiles(Storage *storage,
                  (tfn.type == REG_FILE && tfn.size == 0) )
             {
                 files->push_back(tfn);
-                Path *p = tfn.path->prepend(storage->storage_location);
+                Path *p = tfn.asPathWithDir(storage->storage_location);
                 FileStat fs;
                 fs.st_size = (off_t)siz;
-                fs.st_mtim.tv_sec = tfn.secs;
-                fs.st_mtim.tv_nsec = tfn.nsecs;
+                fs.st_mtim.tv_sec = tfn.sec;
+                fs.st_mtim.tv_nsec = tfn.nsec;
                 fs.st_mode |= S_IRUSR;
                 fs.st_mode |= S_IFREG;
                 (*contents)[p] = fs;
@@ -137,11 +137,12 @@ void parse_rsync_verbose_output_(StoreStatistics *st,
     // zlib-1.2.11-winapi/z01_001516784332.462127151_0_3393fb3d96b545ebf05ad9406fff9435eca8cd3eb97714883fa42d92d2fc8ded_0.gz
 
     string file = storage->storage_location->str()+"/"+string(buf, len);
+    string dir;
     while (file.back() == '\n') file.pop_back();
     TarFileName tfn;
-    if (tfn.parseFileName(file)) {
+    if (tfn.parseFileName(file, &dir)) {
         // This was a valid verbose output beak file name.
-        Path *path = tfn.path;
+        Path *path = tfn.asPathWithDir(Path::lookup(dir));
         size_t size = 0;
 
         debug(RSYNC, "copied: %ju \"%s\"\n", st->stats.file_sizes.count(path), path->c_str());

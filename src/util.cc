@@ -126,6 +126,24 @@ string humanReadableTwoDecimals(size_t s)
 #endif
 }
 
+std::string toHex(size_t value, size_t max_value)
+{
+    // The max_value is used to calculate the width of the string,
+    // since we left pad with zeroes here.
+    char format[16];
+    int n = 0;
+    while (max_value != 0) {
+        n++;
+        max_value >>= 4;
+    }
+    assert(n < 8);
+    snprintf(format, sizeof(format), "%%0%dx", n);
+
+    char buf[64];
+    snprintf(buf, sizeof(buf), format, value);
+    return buf;
+}
+
 size_t roundoffHumanReadable(size_t s)
 {
     if (s < KB)
@@ -755,4 +773,27 @@ void printContents(std::map<Path*,FileStat> &contents)
     for (auto& p : contents) {
         printf("%s\n", p.first->c_str());
     }
+}
+
+bool digitsOnly(char *p, size_t len, string *s) {
+    while (len-- > 0) {
+        char c = *p++;
+        if (!c) return false;
+        if (!isdigit(c)) return false;
+        s->push_back(c);
+    }
+    return true;
+}
+
+bool hexDigitsOnly(char *p, size_t len, string *s) {
+    while (len-- > 0) {
+        char c = *p++;
+        if (!c) return false;
+        bool is_hex = isdigit(c) ||
+            (c >= 'A' && c <= 'F') ||
+            (c >= 'a' && c <= 'f');
+        if (!is_hex) return false;
+        s->push_back(c);
+    }
+    return true;
 }

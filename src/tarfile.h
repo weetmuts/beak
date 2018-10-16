@@ -45,35 +45,41 @@ enum TarContents
 #define MEDIUM_FILES_TAR_CHAR 'm'
 #define SINGLE_LARGE_FILE_TAR_CHAR 'l'
 
+struct TarFile;
+
 struct TarFileName {
-    Path *path;
-    TarContents type;
-    int version;
-    time_t secs;
-    long nsecs;
-    size_t size;
-    std::string header_hash;
-    std::string content_hash;
-    std::string suffix;
+    TarContents type {};
+    int version {};
+    time_t sec {};
+    long nsec {};
+    size_t size {};
+    std::string header_hash {};
+    uint part_nr {};
+    uint num_parts {};
+
+    TarFileName() {};
+    TarFileName(TarFile *tf, uint partnr);
 
     bool equals(TarFileName *tfn) {
         return tfn->type == type &&
             tfn->version == version &&
-            tfn->secs == secs &&
-            tfn->nsecs == nsecs &&
+            tfn->sec == sec &&
+            tfn->nsec == nsec &&
             tfn->size == size &&
             tfn->header_hash == header_hash &&
-            tfn->content_hash == content_hash &&
-            tfn->suffix == suffix;
+            tfn->part_nr == part_nr;
     }
 
     bool isIndexFile() {
-        return type == REG_FILE && suffix == "gz";
+        return type == REG_FILE;
     }
 
     static bool isIndexFile(Path *);
 
-    bool parseFileName(std::string &name);
+    bool parseFileName(std::string &name, std::string *dir = NULL);
+    void writeTarFileNameIntoBuffer(char *buf, size_t buf_len, Path *dir);
+    std::string asStringWithDir(Path *dir);
+    Path *asPathWithDir(Path *dir);
 
     static char chartype(TarContents type) {
         switch (type) {
@@ -97,24 +103,35 @@ struct TarFileName {
         return false;
     }
 
+    static const char *suffixtype(TarContents type) {
+        switch (type) {
+        case REG_FILE: return "gz";
+        case DIR_TAR:
+        case SMALL_FILES_TAR:
+        case MEDIUM_FILES_TAR:
+        case SINGLE_LARGE_FILE_TAR: return "tar";
+        }
+        assert(0);
+        return "";
+    }
+
+
 };
 
 struct TarFile
 {
-    TarFile()
-    {
-    }
-    TarFile(TarEntry *d, TarContents tc, int n);
-    std::string name()
-    {
-        return name_;
-    }
-    Path* path() {
-        return path_;
-    }
+    TarFile() : num_parts_(1) { }
+    TarFile(TarContents tc);
+
+    TarContents type() { return tar_contents_; }
+
     size_t size()
     {
         return size_;
+    }
+    uint numParts()
+    {
+        return num_parts_;
     }
     void fixSize()
     {
@@ -127,11 +144,8 @@ struct TarFile
     std::pair<TarEntry*, size_t> findTarEntry(size_t offset);
 
     void calculateHash();
-    void calculateHash(std::vector<TarFile*> &tars, std::string &contents);
+    void calculateHash(std::vector<std::pair<TarFile*,TarEntry*>> &tars, std::string &contents);
     std::vector<char> &hash();
-
-    void fixName();
-    void setName(std::string s);
 
     size_t currentTarOffset()
     {
@@ -142,10 +156,6 @@ struct TarFile
         return &mtim_;
     }
     void updateMtim(struct timespec *mtim);
-
-    std::string line(Path *p);
-
-    static bool parseFileName(std::string &name, TarFileName *c);
 
     // Write size bytes of the contents of the tar file into buf,
     // start reading at offest in the tar file.
@@ -162,13 +172,11 @@ struct TarFile
 
 private:
 
-    TarEntry *in_directory_;
     // A virtual tar can contain small files, medium files or a single large file.
-    TarContents tar_contents = SMALL_FILES_TAR;
+    TarContents tar_contents_ = SMALL_FILES_TAR;
 
-    // Name of the tar, tar00000000.tar taz00000000.tar tal00000000.tar tam00000000.tar
+    // Part of filename without the part nr and tar.
     std::string name_;
-    Path *path_;
     uint32_t hash_;
     bool hash_initialized = false;
     size_t size_;
@@ -179,9 +187,10 @@ private:
     UpdateDisk disk_update;
 
     void calculateSHA256Hash();
-    void calculateSHA256Hash(std::vector<TarFile*> &tars, std::string &content);
+    void calculateSHA256Hash(std::vector<std::pair<TarFile*,TarEntry*>> &tars, std::string &content);
 
     std::vector<char> sha256_hash_;
+    uint num_parts_ {};
 };
 
 #endif
