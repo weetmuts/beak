@@ -69,13 +69,16 @@ RC rcloneListBeakFiles(Storage *storage,
             {
                 files->push_back(tfn);
                 Path *p = Path::lookup(dir)->prepend(storage->storage_location);
+                char filename[1024];
+                tfn.writeTarFileNameIntoBuffer(filename, sizeof(filename), p);
+                Path *file_path = Path::lookup(filename);
                 FileStat fs;
                 fs.st_size = (off_t)siz;
                 fs.st_mtim.tv_sec = tfn.sec;
                 fs.st_mtim.tv_nsec = tfn.nsec;
                 fs.st_mode |= S_IRUSR;
                 fs.st_mode |= S_IFREG;
-                (*contents)[p] = fs;
+                (*contents)[file_path] = fs;
             }
             else
             {
