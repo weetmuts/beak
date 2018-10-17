@@ -999,11 +999,11 @@ RC Backup::scanFileSystem(Settings *settings)
           tar_trigger_size);
 
     info(BACKUP, "Scanning %s\n", root_dir.c_str());
-    uint64_t start = clockGetTime();
+    uint64_t start = clockGetTimeMicroSeconds();
 
     origin_fs_->recurse(root_dir_path, [this](Path *p, FileStat *st) { return this->addTarEntry(p, st); });
 
-    uint64_t stop = clockGetTime();
+    uint64_t stop = clockGetTimeMicroSeconds();
     uint64_t scan_time = stop - start;
     start = stop;
 
@@ -1026,9 +1026,10 @@ RC Backup::scanFileSystem(Settings *settings)
     // Sort the entries in a tar friendly order.
     sortTarCollectionEntries();
 
-    stop = clockGetTime();
+    stop = clockGetTimeMicroSeconds();
     uint64_t group_time = stop - start;
-
+    string scant = humanReadableTimeTwoDecimals(scan_time);
+    string groupt = humanReadableTimeTwoDecimals(group_time);
     info(BACKUP, "Mounted %s with %zu virtual tars with %zu entries.\n"
             "Time to scan %jdms, time to group %jdms.\n",
             mount_dir.c_str(), num_tars, files.size(),

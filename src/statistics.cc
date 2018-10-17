@@ -49,7 +49,7 @@ private:
 
 void StoreStatisticsImplementation::startDisplayOfProgress()
 {
-    start_time = clockGetTime();
+    start_time = clockGetTimeMicroSeconds();
 
     regular_ = newRegularThreadCallback(1000, [this](){ return redrawLine();});
 }
@@ -68,7 +68,7 @@ void StoreStatisticsImplementation::updateProgress()
 bool StoreStatisticsImplementation::redrawLine()
 {
     if (copy.num_files == 0 || copy.num_files_to_store == 0) return true;
-    uint64_t now = clockGetTime();
+    uint64_t now = clockGetTimeMicroSeconds();
     double secs = ((double)((now-start_time)/1000))/1000.0;
     double bytes = (double)copy.size_files_stored;
     secsbytes.push_back({secs,bytes});

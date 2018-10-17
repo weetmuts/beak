@@ -33,6 +33,7 @@ void strprintf(std::string &s, const char* fmt, ...);
 
 std::string humanReadable(size_t s);
 std::string humanReadableTwoDecimals(size_t s);
+std::string humanReadableTimeTwoDecimals(uint64_t micros);
 std::string toHex(size_t value, size_t max_value);
 size_t roundoffHumanReadable(size_t s);
 RC parseHumanReadable(std::string s, size_t *out);
@@ -72,9 +73,9 @@ bool isInTheFuture(struct timespec *tm);
 std::string timeAgo(struct timespec *tm);
 
 // Seconds since 1970-01-01
-uint64_t clockGetUnixTime();
+uint64_t clockGetUnixTimeSeconds();
 // Microseconds since the computer was started.
-uint64_t clockGetTime();
+uint64_t clockGetTimeMicroSeconds();
 void captureStartTime();
 RC gzipit(std::string *from, std::vector<char> *to);
 RC gunzipit(std::vector<char> *from, std::vector<char> *to);

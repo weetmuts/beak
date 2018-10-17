@@ -689,7 +689,7 @@ unique_ptr<Restore> BeakImplementation::accessBackup_(Settings *settings)
 
 RC BeakImplementation::restore(Settings *settings)
 {
-    uint64_t start = clockGetTime();
+    uint64_t start = clockGetTimeMicroSeconds();
     auto st = newStoreStatistics();
     st->startDisplayOfProgress();
 
@@ -726,7 +726,7 @@ RC BeakImplementation::restore(Settings *settings)
 
     origin_tool_->restoreFileSystem(backup_fs, backup_contents_fs, restore.get(), point, settings, st.get());
 
-    uint64_t stop = clockGetTime();
+    uint64_t stop = clockGetTimeMicroSeconds();
     uint64_t store_time = stop - start;
 
     st->finishProgress();
@@ -1047,14 +1047,14 @@ RC BeakImplementation::status(Settings *settings)
 
     memset(&mtim_max, 0, sizeof(mtim_max));
     memset(&ctim_max, 0, sizeof(ctim_max));
-    uint64_t start = clockGetTime();
+    uint64_t start = clockGetTimeMicroSeconds();
     rc = origin_tool_->fs()->recurse(rule->origin_path,
                                      [=](const char *path, const struct stat *sb) {
                                          update_mctim_maxes(sb);
                                          return RecurseContinue;
                                      });
 
-    uint64_t stop = clockGetTime();
+    uint64_t stop = clockGetTimeMicroSeconds();
     uint64_t store_time = stop - start;
 
     info(COMMANDLINE, "in %jdms.\n", store_time / 1000);

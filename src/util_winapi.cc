@@ -43,14 +43,14 @@ void captureStartTime() {
     start_time_.tv_nsec = 0;
 }
 
-uint64_t clockGetUnixTime()
+uint64_t clockGetUnixTimeSeconds()
 {
     time_t t;
     time(&t);
     return t;
 }
 
-uint64_t clockGetTime()
+uint64_t clockGetTimeMicroSeconds()
 {
     uint64_t millis = GetTickCount64();
 

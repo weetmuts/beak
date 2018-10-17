@@ -30,13 +30,13 @@ using namespace std;
 extern struct timespec start_time_; // Inside util.cc
 
 // Seconds since 1970-01-01 Z timezone.
-uint64_t clockGetUnixTime()
+uint64_t clockGetUnixTimeSeconds()
 {
     return time(NULL);
 }
 
 // Return microseconds
-uint64_t clockGetTime()
+uint64_t clockGetTimeMicroSeconds()
 {
     timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);

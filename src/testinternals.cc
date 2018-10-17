@@ -245,6 +245,16 @@ void testHR(size_t v, string expected) {
     }
 }
 
+void testHRTime(size_t v, string expected) {
+    string s = humanReadableTimeTwoDecimals(v);
+    if (s == expected) {
+        debug(TEST_HUMANREADABLE,"%ju = %s\n", v, s.c_str());
+    } else {
+        err_found_ = true;
+        debug(TEST_HUMANREADABLE,"%ju = %s but expected %s\n", v, s.c_str(), expected.c_str());
+    }
+}
+
 void testHumanReadable()
 {
     testHR(65536, "64.00 KiB");
@@ -256,6 +266,10 @@ void testHumanReadable()
     testHR(1024*1024*1024*512.77, "512.77 GiB");
     testHR(1024*1024*1024*1023.99, "1023.99 GiB");
 #endif
+
+    testHRTime(123, "123us");
+    testHRTime(43232, "43.23ms");
+    testHRTime(970000000, "970.00ms");
 }
 
 void testHexString(size_t v, size_t mv, string expected) {

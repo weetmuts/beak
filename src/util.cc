@@ -126,6 +126,19 @@ string humanReadableTwoDecimals(size_t s)
 #endif
 }
 
+std::string humanReadableTimeTwoDecimals(uint64_t micros)
+{
+    if (micros < 1000)
+    {
+        return to_string(micros) + "us";
+    }
+    if (micros < 1000 * 1000)
+    {
+        return helper(1000, micros, "ms");
+    }
+    return helper(1000*1000, micros, "s");
+}
+
 std::string toHex(size_t value, size_t max_value)
 {
     // The max_value is used to calculate the width of the string,
@@ -573,8 +586,8 @@ struct Entropy {
     Entropy() {
         uint64_t a, b;
 
-        a = clockGetUnixTime();
-        b = clockGetTime();
+        a = clockGetUnixTimeSeconds();
+        b = clockGetTimeMicroSeconds();
         SHA256_Init(&sha256ctx);
         SHA256_Update(&sha256ctx, &a, sizeof(a));
         SHA256_Update(&sha256ctx, &b, sizeof(b));
@@ -594,7 +607,7 @@ struct Entropy {
             buf[i] = pool_[i]^pool_[i+SHA256_DIGEST_LENGTH/2];
         }
 
-        uint64_t c = clockGetTime();
+        uint64_t c = clockGetTimeMicroSeconds();
         SHA256_Update(&sha256ctx, &c, sizeof(c));
         SHA256_Update(&sha256ctx, &pool_[0], SHA256_DIGEST_LENGTH);
         SHA256_Final((unsigned char*)&sha256_hash_[0], &sha256ctx);
