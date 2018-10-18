@@ -553,6 +553,20 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
                 settings->triggersize_supplied = true;
             }
             break;
+            case splitsize_option:
+            {
+                size_t parsed_size;
+                RC rc = parseHumanReadable(value.c_str(), &parsed_size);
+                if (rc.isErr())
+                {
+                    error(COMMANDLINE,
+                          "Cannot set split size because \"%s\" is not a proper number (e.g. 1,2K,3M,4G,5T)\n",
+                          value.c_str());
+                }
+                settings->splitsize = parsed_size;
+                settings->splitsize_supplied = true;
+            }
+            break;
             case triggerglob_option:
                 settings->triggerglob.push_back(value);
                 break;

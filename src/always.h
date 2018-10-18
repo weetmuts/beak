@@ -24,11 +24,6 @@
 #include <assert.h>
 #include <memory>
 
-#define BEAK_VERSION 0.7
-#define BEAK_VERSION_INT 7
-
-#define supportedVersion(x) (x==BEAK_VERSION_INT)
-
 typedef unsigned int uint;
 
 class ReturnCode
@@ -54,10 +49,6 @@ typedef ReturnCode RC;
 
 #define XSTR(s) STR(s)
 #define STR(s) #s
-
-#define DEFAULT_TARGET_TAR_SIZE 10ull*1024*1024;
-#define DEFAULT_TAR_TRIGGER_SIZE 20ull*1024*1024;
-#define DEFAULT_SPLIT_TAR_SIZE 100ull*1024*1024;
 
 #if SIZEOF_TIME_T == 8
 #define PRINTF_TIME_T "z"

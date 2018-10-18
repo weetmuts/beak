@@ -147,6 +147,8 @@ LIST_OF_COMMANDS
       "                           Default is 10M.")    \
     X(tr,triggersize,size_t,true,"Trigger tar generation in dir at size. E.g. -tr 40M\n" \
       "                           Default is 20M.")    \
+    X(ts,splitsize,size_t,true,"Split large files into smaller chunks. E.g. -ts 40M\n" \
+      "                           Default is 50M.")    \
     X(tx,triggerglob,std::vector<std::string>,true,"Trigger tar generation in matching dirs.\n" \
       "                           E.g. -tx '/work/project_*'\n") \
     X(q,quite,bool,false,"Silence information output.")             \

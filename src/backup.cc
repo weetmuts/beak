@@ -338,8 +338,8 @@ void Backup::calculateNumTars(TarEntry *te,
     size_t large_files_size = 0;
     size_t num_large_files = 0;
 
-    size_t small_size = target_target_tar_size / 100; // Default 10M/100 = 100K
-    size_t medium_size = target_target_tar_size; // Default 10M
+    size_t small_size = tar_target_size / 100; // Default 10M/100 = 100K
+    size_t medium_size = tar_target_size; // Default 10M
 
     for(auto & entry : te->entries()) {
         if (entry->blockedSize() < small_size) {
@@ -357,10 +357,10 @@ void Backup::calculateNumTars(TarEntry *te,
         }
     }
 
-    *nst = findNumTarsFromSize(target_target_tar_size, small_files_size);
+    *nst = findNumTarsFromSize(tar_target_size, small_files_size);
     *sfs = small_files_size;
 
-    *nmt = findNumTarsFromSize(target_target_tar_size, medium_files_size);
+    *nmt = findNumTarsFromSize(tar_target_size, medium_files_size);
     *mfs = medium_files_size;
 
     *nlt = num_large_files;
@@ -369,8 +369,8 @@ void Backup::calculateNumTars(TarEntry *te,
     *sc = small_size;
     *mc = medium_size;
 
-    if (small_files_size <= target_target_tar_size ||
-        medium_files_size <= target_target_tar_size) {
+    if (small_files_size <= tar_target_size ||
+        medium_files_size <= tar_target_size) {
         // Either the small tar or the medium tar is not big enough.
         // Put them all in a single tar and hope that they together are as large as
         // the target tar size.
@@ -602,9 +602,9 @@ size_t Backup::groupFilesIntoTars() {
             }*/
 
         string gzfile_contents;
-        gzfile_contents.append("#beak " XSTR(BEAK_VERSION) "\n");
-        gzfile_contents.append("#message ");
-        gzfile_contents.append(message_);
+        gzfile_contents.append("#beak 0.7\n");
+        gzfile_contents.append("#config ");
+        gzfile_contents.append(config_);
         gzfile_contents.append("\n");
         gzfile_contents.append("#uids");
         for (auto & x : uids) {
@@ -945,6 +945,9 @@ RC Backup::scanFileSystem(Settings *settings)
     }
     root_dir = root_dir_path->str();
 
+    // Config stores the command line settings that affect the backup layout.
+    string config;
+
     for (auto &e : settings->include) {
         Match m;
         bool rc = m.use(e);
@@ -953,6 +956,7 @@ RC Backup::scanFileSystem(Settings *settings)
         }
         filters.push_back(pair<Filter,Match>(Filter(e.c_str(), INCLUDE), m));
         debug(COMMANDLINE, "Includes \"%s\"\n", e.c_str());
+        config += "-i '"+e+"' ";
     }
     for (auto &e : settings->exclude) {
         Match m;
@@ -962,10 +966,11 @@ RC Backup::scanFileSystem(Settings *settings)
         }
         filters.push_back(pair<Filter,Match>(Filter(e.c_str(), EXCLUDE), m));
         debug(COMMANDLINE, "Excludes \"%s\"\n", e.c_str());
+        config += "-e '"+e+"' ";
     }
 
     forced_tar_collection_dir_depth = settings->depth;
-
+    config += "-d "+to_string(settings->depth)+" ";
     if (settings->tarheader_supplied) {
         setTarHeaderStyle(settings->tarheader);
     } else {
@@ -974,15 +979,18 @@ RC Backup::scanFileSystem(Settings *settings)
 
     if (!settings->targetsize_supplied) {
         // Default settings
-        target_target_tar_size = 10*1024*1024;
+        tar_target_size = 10*1024*1024;
     } else {
-        target_target_tar_size = settings->targetsize;
+        tar_target_size = settings->targetsize;
     }
+    config += "-ta "+to_string(tar_target_size)+" ";
+
     if (!settings->triggersize_supplied) {
-        tar_trigger_size = target_target_tar_size * 2;
+        tar_trigger_size = tar_target_size * 2;
     } else {
         tar_trigger_size = settings->triggersize;
     }
+    config += "-tr "+to_string(tar_trigger_size)+" ";
 
     for (auto &e : settings->triggerglob) {
         Match m;
@@ -992,12 +1000,14 @@ RC Backup::scanFileSystem(Settings *settings)
         }
         triggers.push_back(m);
         debug(COMMANDLINE, "Triggers on \"%s\"\n", e.c_str());
+        config += "-tx '"+e+"' ";
     }
 
     debug(COMMANDLINE, "Target tar size \"%zu\" Target trigger size %zu\n",
-          target_target_tar_size,
+          tar_target_size,
           tar_trigger_size);
 
+    setConfig(config);
     info(BACKUP, "Scanning %s\n", root_dir.c_str());
     uint64_t start = clockGetTimeMicroSeconds();
 

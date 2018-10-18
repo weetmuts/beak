@@ -45,29 +45,33 @@ RC Index::loadIndex(vector<char> &v,
     vector<char> data(header.begin(), header.end());
     auto j = data.begin();
 
+    // The first line should be #beak 0.8
     string type = eatTo(data, j, '\n', 64, &eof, &err);
-    string msg = eatTo(data, j, '\n', 1024, &eof, &err); // Message can be 1024 bytes long
-    string uid = eatTo(data, j, '\n', 10 * 1024 * 1024, &eof, &err); // Accept up to a ~million uniq uids
-    string gid = eatTo(data, j, '\n', 10 * 1024 * 1024, &eof, &err); // Accept up to a ~million uniq gids
-    string files = eatTo(data, j, '\n', 64, &eof, &err);
 
+    int beak_version = 0;
+    string vers = type.substr(6);
     if (type.length() < 9 || type.substr(0, 6) != "#beak ") {
         failure(INDEX, "Not a proper \"#beak x.x\" header in index file. It was \"%s\"\n", type.c_str());
         return RC::ERR;
     }
-    string vers = type.substr(6);
-    string ver;
-    for (size_t i=0; i<vers.length(); ++i) {
-        if (vers[i]>='0' && vers[i]<='9') ver.push_back(vers[i]);
-    }
-    int beak_version = atoi(ver.c_str());
-    if (!supportedVersion(beak_version))
-    {
+    if (vers == "0.7") {
+        beak_version = 7;
+    } else if (vers == "0.8") {
+        beak_version = 8;
+    } else {
         failure(INDEX,
-                "Type was not \"#beak " XSTR(BEAK_VERSION) "\" as expected! It was \"%s\"\n",
+                "Version was \"%s\" which is not the support 0.7 or 0.8\n",
                 type.c_str());
         return RC::ERR;
     }
+
+    // Config are beak command line switches that affect the configuration of the backup.
+    // I.e. if these are changed, then the backup will be grouped differently.
+    string config = eatTo(data, j, '\n', 1024, &eof, &err); // Command line switches can be 1024 bytes long
+    string uid = eatTo(data, j, '\n', 10 * 1024 * 1024, &eof, &err); // Accept up to a ~million uniq uids
+    string gid = eatTo(data, j, '\n', 10 * 1024 * 1024, &eof, &err); // Accept up to a ~million uniq gids
+    string files = eatTo(data, j, '\n', 64, &eof, &err);
+
 
     int num_files = 0;
     int n = sscanf(files.c_str(), "#files %d", &num_files);
@@ -78,7 +82,7 @@ RC Index::loadIndex(vector<char> &v,
 
     const char *dtp = "";
     if (dir_to_prepend) dtp = dir_to_prepend->c_str();
-    debug(INDEX, "Loading gz for '%s' with >%s< and %d files.\n", dtp, msg.c_str(), num_files);
+    debug(INDEX, "Loading gz for '%s' with >%s< and %d files.\n", dtp, config.c_str(), num_files);
 
     eof = false;
     while (i != v.end() && !eof && num_files > 0)

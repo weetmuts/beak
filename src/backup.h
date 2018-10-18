@@ -59,9 +59,10 @@ struct Backup
     std::string mount_dir;
     Path *mount_dir_path;
 
-    size_t target_target_tar_size = DEFAULT_TARGET_TAR_SIZE;
-    size_t tar_trigger_size = DEFAULT_TAR_TRIGGER_SIZE;
-    size_t target_split_tar_size = DEFAULT_SPLIT_TAR_SIZE;
+    size_t tar_target_size = 10ull*1024*1024;
+    size_t tar_trigger_size = 20ull*1024*1024;
+    size_t tar_split_size = 50ull*1024*1024;
+
     // The default setting is to trigger tars in each subdirectory below the root.
     // Even if the subdir does not qualify with enough data to create a min tar file.
     // However setting this to 1 and setting trigger size to 0, puts all content in
@@ -96,7 +97,7 @@ struct Backup
     FileSystem *originFileSystem() { return origin_fs_; }
     FuseAPI *asFuseAPI();
 
-    void setMessage(std::string m) { message_ = m; }
+    void setConfig(std::string c) { config_ = c; }
     void setTarHeaderStyle(TarHeaderStyle ths) { tarheaderstyle_= ths; }
     Backup(ptr<FileSystem> origin_fs);
 
@@ -107,7 +108,7 @@ private:
     void calculateNumTars(TarEntry *te, size_t *nst, size_t *nmt, size_t *nlt,
                           size_t *sfs, size_t *mfs, size_t *lfs,
                           size_t *sc, size_t *mc);
-    std::string message_;
+    std::string config_;
     TarHeaderStyle tarheaderstyle_;
 
     FileSystem* origin_fs_;

@@ -500,8 +500,6 @@ bool eatEntry(int beak_version, vector<char> &v, vector<char>::iterator &i, Path
               string *link, bool *is_sym_link, bool *is_hard_link,
               bool *eof, bool *err)
 {
-    assert(beak_version == BEAK_VERSION_INT);
-
     string permission = eatTo(v, i, separator, 32, eof, err);
     if (*err || *eof) return false;
 
