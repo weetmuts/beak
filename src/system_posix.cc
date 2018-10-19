@@ -30,6 +30,7 @@
 using namespace std;
 
 static ComponentId SYSTEM = registerLogComponent("system");
+static ComponentId SYSTEMIO = registerLogComponent("systemio");
 
 struct ThreadCallbackImplementation : ThreadCallback
 {
@@ -264,10 +265,10 @@ RC SystemImplementation::invoke(string program,
                 if (n > 0) {
                     output->insert(output->end(), buf, buf+n);
                     if (cb) { cb(buf, n); }
-                    debug(SYSTEM, "Input: \"%*s\"\n", n, buf);
+                    debug(SYSTEMIO, "Input: \"%*s\"\n", n, buf);
                 } else {
                     // No more data to read.
-                    debug(SYSTEM, "Input: done\n");
+                    debug(SYSTEMIO, "Input: done\n");
                     break;
                 }
             }

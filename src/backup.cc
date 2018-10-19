@@ -998,7 +998,7 @@ RC Backup::scanFileSystem(Settings *settings)
     config += "-tr "+to_string(tar_trigger_size)+" ";
 
     if (!settings->splitsize_supplied) {
-        tar_split_size = tar_split_size;
+        tar_split_size = tar_target_size *5;
     } else {
         tar_split_size = settings->splitsize;
     }

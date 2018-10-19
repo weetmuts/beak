@@ -69,7 +69,7 @@ srcdir=$(realpath $2)
 destdir=$(realpath $3)
 
 # Find the tar files
-(find $srcdir -regextype grep -regex ".*/[smlzy]01_.*\.\(tar\|gz\)"  | sort) > "$dir/aa"
+(find $srcdir -regextype grep -regex ".*/[smlzy]0[12]_.*\.\(tar\|gz\)"  | sort) > "$dir/aa"
 
 while read from; do
     to="$destdir${from##$srcdir}"

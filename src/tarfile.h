@@ -58,7 +58,7 @@ struct TarFileName {
     uint part_nr {};
     uint num_parts {};
 
-    TarFileName() {};
+    TarFileName() : version(2) {};
     TarFileName(TarFile *tf, uint partnr);
 
     bool equals(TarFileName *tfn) {
@@ -121,7 +121,8 @@ private:
     bool parseFileNameVersion1_(std::string &name, size_t p0, size_t p1);
     bool parseFileNameVersion2_(std::string &name, size_t p0, size_t p1);
 
-
+    void writeTarFileNameIntoBufferVersion1_(char *buf, size_t buf_len, Path *dir);
+    void writeTarFileNameIntoBufferVersion2_(char *buf, size_t buf_len, Path *dir);
 };
 
 struct TarFile

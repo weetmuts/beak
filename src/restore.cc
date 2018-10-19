@@ -297,7 +297,7 @@ Path *Restore::loadDirContents(PointInTime *point, Path *path)
 {
     FileStat stat;
     Path *gz = point->gz_files_[path];
-    debug(RESTORE, "Looking for z01 gz file in dir >%s< (found %p)\n", path->c_str(), gz);
+    debug(RESTORE, "Looking for index file in dir >%s< (found %p)\n", path->c_str(), gz);
     if (gz != NULL) {
         gz = gz->prepend(rootDir());
         RC rc = backup_fs_->stat(gz, &stat);
@@ -701,6 +701,7 @@ RC Restore::lookForPointsInTime(PointInTimeFormat f, Path *path)
             p.datetime = datetime;
             p.filename = f->str();
             history_.push_back(p);
+            debug(RESTORE, "Found index file %s\n", f->c_str());
         }
     }
 
@@ -782,10 +783,10 @@ RC Restore::loadBeakFileSystem(Settings *settings)
             error(RESTORE, "Not a regular file %s\n", gz->c_str());
         }
 
-        // Populate the list of all tars from the root z01 gz file.
+        // Populate the list of all tars from the root index file.
         bool ok = loadGz(&point, gz, Path::lookupRoot());
         if (!ok) {
-            error(RESTORE, "Could not load root z01 file for backup %s!\n", point.ago.c_str());
+            error(RESTORE, "Could not load index file for backup %s!\n", point.ago.c_str());
         }
 
         // Populate the root directory with its contents.

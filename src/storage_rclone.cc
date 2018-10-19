@@ -108,6 +108,7 @@ RC rcloneFetchFiles(Storage *storage,
         Path *n = p->subpath(1);
         files_to_fetch.append(n->str());
         files_to_fetch.append("\n");
+        fprintf(stderr, "FETCHING \"%s\"\n", n->c_str());
     }
 
     Path *tmp = local_fs->mkTempFile("beak_fetching_", files_to_fetch);

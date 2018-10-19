@@ -24,6 +24,9 @@
 #include <assert.h>
 #include <memory>
 
+#define MAX_PATH_LENGTH 4096
+#define MAX_FILENAME_LENGTH 255
+
 typedef unsigned int uint;
 
 class ReturnCode

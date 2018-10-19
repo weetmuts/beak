@@ -707,8 +707,8 @@ function mtimeTestPart1 {
 
 function mtimeTestPart2 {
     (cd $mount; find . -exec ls -ld \{\} \; > $dest)
-    cat $org | sed 's/.01_00.*//' > ${org}.1
-    cat $dest | sed 's/.01_00.*//' > ${dest}.1
+    cat $org | sed 's/.02_.*//' > ${org}.1
+    cat $dest | sed 's/.02_.*//' > ${dest}.1
     rc=$(diff -d ${org}.1 ${dest}.1)
 
     if [ "$rc" != "" ]; then

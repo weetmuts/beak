@@ -179,7 +179,7 @@ void TarFile::updateMtim(struct timespec *mtim) {
 TarFileName::TarFileName(TarFile *tf, uint partnr)
 {
     type = tf->type();
-    version = 1;
+    version = 2;
     sec = tf->mtim()->tv_sec;
     nsec = tf->mtim()->tv_nsec;
     size = tf->size(partnr);
@@ -229,6 +229,9 @@ bool TarFileName::parseFileName(string &name, string *dir)
         return parseFileNameVersion1_(name, p0, p1);
     } else if (version == 2) {
         return parseFileNameVersion2_(name, p0, p1);
+    } else {
+        error(TARFILE, "Unsupported beak file version. %s\n", name.c_str());
+        assert(0);
     }
     return false;
 }
@@ -315,6 +318,52 @@ bool TarFileName::parseFileNameVersion2_(string &name, size_t p0, size_t p1)
 
 void TarFileName::writeTarFileNameIntoBuffer(char *buf, size_t buf_len, Path *dir)
 {
+    if (version == 1) {
+        writeTarFileNameIntoBufferVersion1_(buf, buf_len, dir);
+    } else if (version == 2) {
+        writeTarFileNameIntoBufferVersion2_(buf, buf_len, dir);
+    } else {
+        assert(0);
+    }
+}
+
+void TarFileName::writeTarFileNameIntoBufferVersion1_(char *buf, size_t buf_len, Path *dir)
+{
+    // dirprefix/(l)01_(1501080787).(579054757)_(1119232)_(3b5e4ec7fe38d0f9846947207a0ea44c)_(0).(tar)
+    char sizes[32];
+    memset(sizes, 0, sizeof(sizes));
+    snprintf(sizes, 32, "%zu", size);
+
+    char secs_and_nanos[32];
+    memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
+    snprintf(secs_and_nanos, 32, "%012" PRINTF_TIME_T "u.%09lu", sec, nsec);
+
+    string partnr = toHex(part_nr, num_parts);
+
+    const char *suffix = suffixtype(type);
+
+    if (dir == NULL) {
+        snprintf(buf, buf_len, "%c01_%s_%s_%s_%d.%s",
+                 TarFileName::chartype(type),
+                 secs_and_nanos,
+                 sizes,
+                 header_hash.c_str(),
+                 0, // version 1 cannot handle parts
+                 suffix);
+    } else {
+        snprintf(buf, buf_len, "%s/%c01_%s_%s_%s_%d.%s",
+                 dir->c_str(),
+                 TarFileName::chartype(type),
+                 secs_and_nanos,
+                 sizes,
+                 header_hash.c_str(),
+                 0, // version 1 cannot handle parts
+                 suffix);
+    }
+}
+
+void TarFileName::writeTarFileNameIntoBufferVersion2_(char *buf, size_t buf_len, Path *dir)
+{
     // dirprefix/(l)02_(1501080787).(579054757)_(3b5e4ec7fe38d0f9846947207a0ea44c)_(07)_(1119232).(tar)
     char sizes[32];
     memset(sizes, 0, sizeof(sizes));
@@ -371,7 +420,7 @@ size_t TarFile::copy(char *buf, size_t bufsize, off_t offset, FileSystem *fs, ui
 
     while (bufsize>0)
     {
-        fprintf(stderr, "partnr=%u buf=%p from=%zu bufsize=%zu headersize=%zu\n", partnr, buf, from, bufsize, header_size_);
+        //fprintf(stderr, "partnr=%u buf=%p from=%zu bufsize=%zu headersize=%zu\n", partnr, buf, from, bufsize, header_size_);
         if (partnr > 0 && from < header_size_)
         {
             debug(TARFILE, "Copying max %zu from %zu, now inside header (header size=%ju)\n",

@@ -117,28 +117,38 @@ void setLogLevel(LogLevel l) {
     }
 }
 
-void setLogComponents(const char *cs) {
+void addRemoveComponent_(const char *co)
+{
+    // You can do --log=all,-systemio,-lock to reduce the amount of logging.
+    if (!strncmp(co, "all", 3)) {
+        logAll();
+    } else {
+        if (co[0] == '-') {
+            int c = findComponent(co+1);
+            if (c == -1) error(0,"No such log component: \"%s\"\n", co+1);
+            log_components.erase(c);
+        } else {
+            int c = findComponent(co);
+            if (c == -1) error(0,"No such log component: \"%s\"\n", co);
+            log_components.insert(c);
+        }
+    }
+}
+
+void setLogComponents(const char *cs)
+{
     string components = cs;
-    int c;
     size_t p = 0, pp;
 
-    if (components == "all") {
-        logAll();
-        return;
-    }
     while (p < components.length()) {
         pp = components.find(',', p);
         if (pp == string::npos) {
             const char *co = components.substr(p).c_str();
-            c = findComponent(co);
-            if (c == -1) error(0,"No such log component: \"%s\"\n", co);
-            log_components.insert(c);
+            addRemoveComponent_(co);
             break;
         } else {
             const char *co = components.substr(p, pp-p).c_str();
-            c = findComponent(co);
-            if (c == -1) error(0,"No such log component: \"%s\"\n", co);
-            log_components.insert(c);
+            addRemoveComponent_(co);
         }
         p = pp+1;
     }
