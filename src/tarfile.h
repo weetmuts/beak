@@ -120,23 +120,36 @@ struct TarFileName {
 
 struct TarFile
 {
-    TarFile() : num_parts_(1) { }
+    TarFile() : num_parts_(1), part_size_(0) { }
     TarFile(TarContents tc);
 
     TarContents type() { return tar_contents_; }
 
-    size_t size()
-    {
+    size_t totalSize() {
         return size_;
+    }
+    size_t size(uint partnr)
+    {
+        assert(partnr < num_parts_);
+        if (num_parts_ == 1) {
+            return size_;
+        }
+        if (partnr == 0) {
+            // The first part has a HEADER that can be larger than 512....
+            return part_size_ + 512;
+        }
+        if (partnr == num_parts_-1) {
+            // The last part.
+            size_t remaining_part_size = part_size_*num_parts_ - size_;
+            return remaining_part_size+512; // HEADER SIZE, can be zero...
+        }
+        return part_size_; // HEADER SIZE, can be zero....
     }
     uint numParts()
     {
         return num_parts_;
     }
-    void fixSize()
-    {
-        size_ = current_tar_offset_;
-    }
+    void fixSize(size_t split_size);
     void addEntryLast(TarEntry *entry);
     void addEntryFirst(TarEntry *entry);
 
@@ -159,14 +172,14 @@ struct TarFile
 
     // Write size bytes of the contents of the tar file into buf,
     // start reading at offest in the tar file.
-    size_t copy(char *buf, size_t size, off_t offset, FileSystem *fs);
+    size_t copy(char *buf, size_t size, off_t offset, FileSystem *fs, uint partnr);
 
     // file: Write the tarfile contents into this file.
     // stat: With this size and permissions.
     // src_fs: Fetch the tarfile contents from this filesystem
     // dst_fs: Store into this filesystem
     // off: Start storing from this offset in the tar file.
-    bool createFile(Path *file, FileStat *stat,
+    bool createFile(Path *file, FileStat *stat, uint partnr,
                     FileSystem *src_fs, FileSystem *dst_fs, size_t off,
                     std::function<void(size_t)> update_progress);
 
@@ -174,7 +187,7 @@ private:
 
     // A virtual tar can contain small files, medium files or a single large file.
     TarContents tar_contents_ = SMALL_FILES_TAR;
-
+    bool has_header_ = true;
     // Part of filename without the part nr and tar.
     std::string name_;
     uint32_t hash_;
@@ -190,7 +203,10 @@ private:
     void calculateSHA256Hash(std::vector<std::pair<TarFile*,TarEntry*>> &tars, std::string &content);
 
     std::vector<char> sha256_hash_;
+    // Number of parts.
     uint num_parts_ {};
+    // The size of each part, except the last one, which could be smaller.
+    size_t part_size_ {};
 };
 
 #endif

@@ -257,7 +257,7 @@ struct TarEntry
     }
     void sortEntries();
 
-    void appendFileName(TarFile *tf)
+    void appendBeakFile(TarFile *tf)
     {
         files_.push_back(tf);
     }

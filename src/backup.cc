@@ -561,36 +561,36 @@ size_t Backup::groupFilesIntoTars() {
         // Finalize the tar files and add them to the contents listing.
         for (auto & t : te->largeTars()) {
             TarFile *tf = t.second;
-            tf->fixSize();
+            tf->fixSize(tar_split_size);
             tf->calculateHash();
             if (tf->currentTarOffset() > 0) {
-                debug(BACKUP,"%s%s size became %zu\n", te->path()->c_str(), "NAMEHERE", tf->size());
-                te->appendFileName(tf);
+                debug(BACKUP,"%s%s size became GURKA parts %zu\n", te->path()->c_str(), "NAMEHERE");
+                te->appendBeakFile(tf);
                 te->largeHashTars()[tf->hash()] = tf;
             }
         }
         for (auto & t : te->mediumTars()) {
             TarFile *tf = t.second;
-            tf->fixSize();
+            tf->fixSize(tar_split_size);
             tf->calculateHash();
             if (tf->currentTarOffset() > 0) {
-                debug(BACKUP,"%s%s size became %zu\n", te->path()->c_str(), "NAMEHERE", tf->size());
-                te->appendFileName(tf);
+                debug(BACKUP,"%s%s size became\n", te->path()->c_str(), "NAMEHERE");
+                te->appendBeakFile(tf);
                 te->mediumHashTars()[tf->hash()] = tf;
             }
         }
         for (auto & t : te->smallTars()) {
             TarFile *tf = t.second;
-            tf->fixSize();
+            tf->fixSize(tar_split_size);
             tf->calculateHash();
             if (tf->currentTarOffset() > 0) {
-                debug(BACKUP,"%s%s size became %zu\n", te->path()->c_str(), "NAMEHERE", tf->size());
-                te->appendFileName(tf);
+                debug(BACKUP,"%s%s size ecame GURKA\n", te->path()->c_str(), "NAMEHERE");
+                te->appendBeakFile(tf);
                 te->smallHashTars()[tf->hash()] = tf;
             }
         }
 
-        te->tazFile()->fixSize();
+        te->tazFile()->fixSize(tar_split_size);
         te->tazFile()->calculateHash();
 
         set<uid_t> uids;
@@ -618,7 +618,6 @@ size_t Backup::groupFilesIntoTars() {
             gzfile_contents.append(to_string(x));
         }
         gzfile_contents.append("\n");
-        //gzfile_contents.append("#columns permissions uid/gid mtime_readable mtime_secs.nanos atime_secs.nanos ctime_secs.nanos filename link_information tar_file_name offset_inside_tar content_hash header_hash\n");
         gzfile_contents.append("#files ");
         gzfile_contents.append(to_string(te->entries().size()));
         gzfile_contents.append("\n");
@@ -637,7 +636,7 @@ size_t Backup::groupFilesIntoTars() {
             bool b = ste->path()->isBelowOrEqual(te->path());
             if (b) {
                 for (auto & tf : ste->tars()) {
-                    if (tf->size() > 0 ) {
+                    if (tf->totalSize() > 0 ) {
                         tars.push_back({tf,ste});
                         // Make sure the gzfile timestamp is the latest
                         // of all subtars as well.
@@ -678,18 +677,18 @@ size_t Backup::groupFilesIntoTars() {
         TarEntry *dirs = new TarEntry(compressed_gzfile_contents.size(), tarheaderstyle_);
         dirs->setContent(compressed_gzfile_contents);
         te->gzFile()->addEntryLast(dirs);
-        te->gzFile()->fixSize();
+        te->gzFile()->fixSize(tar_split_size);
 
-        if (te->tazFile()->size() > 0 ) {
+        if (te->tazFile()->totalSize() > 0 ) {
 
             debug(BACKUP,"%s%s size became %zu\n", te->path()->c_str(),
-                  "NAMEHERE", te->tazFile()->size());
+                  "NAMEHERE", te->tazFile()->totalSize());
 
-            te->appendFileName(te->tazFile());
+            te->appendBeakFile(te->tazFile());
             te->enableTazFile();
             has_dir = 1;
         }
-        te->appendFileName(te->gzFile());
+        te->appendBeakFile(te->gzFile());
         te->enableGzFile();
 
         num += has_dir+te->smallTars().size()+te->mediumTars().size()+te->largeTars().size();
@@ -737,13 +736,13 @@ TarEntry *Backup::findNearestStorageDirectory(Path *a, Path *b) {
     return te;
 }
 
-TarFile *Backup::findTarFromPath(Path *path) {
+TarFile *Backup::findTarFromPath(Path *path, uint *partnr) {
     bool ok;
     string n = path->name()->str();
     string d = path->parent()->name()->str();
 
     // File names:
-    // (s)01_(001501080787).(579054757)_(1119232)_(3b5e4ec7fe38d0f9846947207a0ea44c)_(0).(tar)
+    // (s)01_(001501080787).(579054757)_(1119232)_(3b5e4ec7fe38d0f9846947207a0ea44c)_(13).(tar)
 
     TarEntry *te = directories[path->parent()];
     if (!te) {
@@ -756,6 +755,8 @@ TarFile *Backup::findTarFromPath(Path *path) {
         debug(BACKUP,"Not a proper file name: \"%s\"\n", n.c_str());
         return NULL;
     }
+    *partnr = tfn.part_nr;
+
     vector<char> hash;
     hex2bin(tfn.header_hash, &hash);
 
@@ -830,17 +831,18 @@ struct BackupFuseAPI : FuseAPI
                 goto ok;
             }
 
-            TarFile *tar = backup_->findTarFromPath(path);
+            uint partnr = 0;
+            TarFile *tar = backup_->findTarFromPath(path, &partnr);
             if (tar) {
                 stbuf->st_uid = geteuid();
                 stbuf->st_gid = getegid();
                 stbuf->st_mode = S_IFREG | 0500;
                 stbuf->st_nlink = 1;
-                stbuf->st_size = tar->size();
+                stbuf->st_size = tar->size(partnr);
 #ifdef PLATFORM_POSIX
                 stbuf->st_blksize = 512;
-                if (tar->size() > 0) {
-                    stbuf->st_blocks = 1+(tar->size()/512);
+                if (tar->totalSize() > 0) {
+                    stbuf->st_blocks = 1+(tar->size(partnr)/512);
                 } else {
                     stbuf->st_blocks = 0;
                 }
@@ -913,12 +915,13 @@ struct BackupFuseAPI : FuseAPI
         string path_string = path_char_string;
         Path *path = Path::lookup(path_string);
 
-        TarFile *tar = backup_->findTarFromPath(path);
+        uint partnr;
+        TarFile *tar = backup_->findTarFromPath(path, &partnr);
         if (!tar) {
             goto err;
         }
 
-        n = tar->copy(buf, size, offset, backup_->originFileSystem());
+        n = tar->copy(buf, size, offset, backup_->originFileSystem(), partnr);
 
         UNLOCK(&backup_->global);
         return n;
@@ -992,6 +995,13 @@ RC Backup::scanFileSystem(Settings *settings)
     }
     config += "-tr "+to_string(tar_trigger_size)+" ";
 
+    if (!settings->splitsize_supplied) {
+        tar_split_size = tar_split_size * 2;
+    } else {
+        tar_split_size = settings->splitsize;
+    }
+    config += "-ts "+to_string(tar_split_size)+" ";
+
     for (auto &e : settings->triggerglob) {
         Match m;
         bool rc = m.use(e);
@@ -1003,9 +1013,10 @@ RC Backup::scanFileSystem(Settings *settings)
         config += "-tx '"+e+"' ";
     }
 
-    debug(COMMANDLINE, "Target tar size \"%zu\" Target trigger size %zu\n",
+    debug(COMMANDLINE, "Target tar size \"%zu\", trigger size %zu, split size %zu\n",
           tar_target_size,
-          tar_trigger_size);
+          tar_trigger_size,
+          tar_split_size);
 
     setConfig(config);
     info(BACKUP, "Scanning %s\n", root_dir.c_str());
@@ -1074,7 +1085,7 @@ struct BeakFS : FileSystem
                     FileStat stat;
                     stat.st_atim = *tf->mtim();
                     stat.st_mtim = *tf->mtim();
-                    stat.st_size = tf->size();
+                    stat.st_size = tf->size(i);
                     stat.st_mode = 0400;
                     stat.setAsRegularFile();
                     if (stat.st_size > 0) {

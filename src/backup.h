@@ -92,7 +92,7 @@ struct Backup
     void sortTarCollectionEntries();
     TarEntry *findNearestStorageDirectory(Path *a, Path *b);
 
-    TarFile *findTarFromPath(Path *path);
+    TarFile *findTarFromPath(Path *path, uint *partnr);
     FileSystem *asFileSystem();
     FileSystem *originFileSystem() { return origin_fs_; }
     FuseAPI *asFuseAPI();

@@ -180,7 +180,7 @@ TarFileName::TarFileName(TarFile *tf, uint partnr)
     version = 1;
     sec = tf->mtim()->tv_sec;
     nsec = tf->mtim()->tv_nsec;
-    size = tf->size();
+    size = tf->size(partnr);
     header_hash = toHex(tf->hash());
     part_nr = partnr;
     num_parts = tf->numParts();
@@ -308,12 +308,12 @@ Path *TarFileName::asPathWithDir(Path *dir)
     return Path::lookup(buf);
 }
 
-size_t TarFile::copy(char *buf, size_t bufsiz, off_t offset, FileSystem *fs)
+size_t TarFile::copy(char *buf, size_t bufsiz, off_t offset, FileSystem *fs, uint partnr)
 {
     size_t org_size = bufsiz;
 
     if (offset < 0) return 0;
-    if ((size_t)offset >= size()) return 0;
+    if ((size_t)offset >= size(partnr)) return 0;
 
     while (bufsiz>0) {
         pair<TarEntry*,size_t> r = findTarEntry(offset);
@@ -343,16 +343,29 @@ size_t TarFile::copy(char *buf, size_t bufsiz, off_t offset, FileSystem *fs)
     return org_size-bufsiz;
 }
 
-bool TarFile::createFile(Path *file, FileStat *stat,
+bool TarFile::createFile(Path *file, FileStat *stat, uint partnr,
                          FileSystem *src_fs, FileSystem *dst_fs, size_t off,
                          function<void(size_t)> update_progress)
 {
-    dst_fs->createFile(file, stat, [this,file,src_fs,off,update_progress] (off_t offset, char *buffer, size_t len) {
+    dst_fs->createFile(file, stat, [this,file,src_fs,off,update_progress,partnr] (off_t offset, char *buffer, size_t len) {
             debug(TARFILE,"Write %ju bytes to file %s\n", len, file->c_str());
-            size_t n = copy(buffer, len, off+offset, src_fs);
+            size_t n = copy(buffer, len, off+offset, src_fs, partnr);
             debug(TARFILE, "Wrote %ju bytes from %ju to %ju.\n", n, off+offset, offset);
             update_progress(n);
             return n;
         });
     return true;
+}
+
+void TarFile::fixSize(size_t split_size)
+{
+    size_ = current_tar_offset_;
+    if (size_ > split_size) {
+        num_parts_ = 1 + (size_ / split_size);
+        part_size_ = split_size;
+        debug(TARFILE, "Splitting file into %u parts.\n", num_parts_);
+    } else {
+        num_parts_ = 1;
+        part_size_ = size_;
+    }
 }

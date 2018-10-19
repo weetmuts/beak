@@ -115,7 +115,8 @@ void store_local_backup_file(Backup *backup,
 {
     if (!stat->isRegularFile()) return;
 
-    TarFile *tar = backup->findTarFromPath(path);
+    uint partnr;
+    TarFile *tar = backup->findTarFromPath(path, &partnr);
     assert(tar);
 
     debug(STORAGETOOL, "PATH %s\n", path->c_str());
@@ -135,7 +136,7 @@ void store_local_backup_file(Backup *backup,
         }
         // The size gets incrementally update while the tar file is written!
         auto func = [&st](size_t n){ st->stats.size_files_stored += n; };
-        tar->createFile(file_name, stat, origin_fs, storage_fs, 0, func);
+        tar->createFile(file_name, stat, partnr, origin_fs, storage_fs, 0, func);
 
         storage_fs->utime(file_name, stat);
         st->stats.num_files_stored++;
