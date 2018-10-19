@@ -718,8 +718,8 @@ function mtimeTestPart2 {
         exit
     fi
 
-    cat $org  | egrep -o z01_[[:digit:]]+\.[[:digit:]]+ | sed 's/1234/1235/' > ${org}.2
-    cat $dest | egrep -o z01_[[:digit:]]+\.[[:digit:]]+  > ${dest}.2
+    cat $org  | egrep -o z02_[[:digit:]]+\.[[:digit:]]+ | sed 's/1234/1235/' > ${org}.2
+    cat $dest | egrep -o z02_[[:digit:]]+\.[[:digit:]]+  > ${dest}.2
     rc=$(diff -d ${org}.2 ${dest}.2)
 
     if [ "$rc" != "" ]; then
@@ -917,7 +917,7 @@ if [ $do_test ]; then
 fi
 
 function txTriggerTest {
-    if [ ! -f $mount/Alfa/snapshot_2016-12-30/z01_*.gz ]; then
+    if [ ! -f $mount/Alfa/snapshot_2016-12-30/z02_*.gz ]; then
         echo Expected the snapshot dir to be tarred! Check in $dir for more information.
         exit
     fi
@@ -999,9 +999,9 @@ function expectOneBigR01Tar {
     untar "$mount"
     checkdiff
     checklsld_no_nanos
-    num=$(find $mount -name "s01*.tar" | wc --lines)
+    num=$(find $mount -name "s02*.tar" | wc --lines)
     if [ "$num" != "1" ]; then
-        echo Expected a single big s01 tar! Check in $dir for more information.
+        echo Expected a single big s02 tar! Check in $dir for more information.
         exit
     fi
     stopMount
@@ -1018,9 +1018,9 @@ function expect8R01Tar {
     untar "$mount"
     checkdiff
     checklsld_no_nanos
-    num=$(find $mount -name "s01*.tar" | wc --lines)
+    num=$(find $mount -name "s02*.tar" | wc --lines)
     if [ "$num" != "8" ]; then
-        echo Expected 8 s01 tar! Check in $dir for more information.
+        echo Expected 8 s02 tar! Check in $dir for more information.
         exit
     fi
     stopMount

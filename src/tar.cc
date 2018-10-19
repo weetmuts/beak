@@ -35,7 +35,8 @@
 
 #define GNU_LONGNAME_TYPE	'L'
 #define GNU_LONGLINK_TYPE	'K'
-#define GNU_VOLHDR_TYPE	        'V'
+#define GNU_VOLHDR_TYPE	    'V'
+#define GNU_MULTIVOL_TYPE    'M'
 
 #define TSUID    04000
 #define TSGID    02000
@@ -137,6 +138,13 @@ void TarHeader::setLongPathType(TarHeader *file)
     snprintf(content.members.mtime_, 12, "%011zo", (size_t)0);
     content.members.typeflag_ = GNU_LONGNAME_TYPE;
     strcpy(content.members.name_, "././@LongLink");
+}
+
+void TarHeader::setMultivolType(const char *file_name, size_t offset)
+{
+    snprintf(content.members.offset, 12, "%011zo", offset);
+    content.members.typeflag_ = GNU_MULTIVOL_TYPE;
+    strncpy(content.members.name_, file_name, sizeof(content.members.name_));
 }
 
 void TarHeader::setSize(size_t s)

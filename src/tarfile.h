@@ -20,6 +20,7 @@
 
 #include "always.h"
 #include "filesystem.h"
+#include "tar.h"
 #include "util.h"
 
 #include <stddef.h>
@@ -115,47 +116,40 @@ struct TarFileName {
         return "";
     }
 
+private:
+
+    bool parseFileNameVersion1_(std::string &name, size_t p0, size_t p1);
+    bool parseFileNameVersion2_(std::string &name, size_t p0, size_t p1);
+
 
 };
 
 struct TarFile
 {
     TarFile() : num_parts_(1), part_size_(0) { }
-    TarFile(TarContents tc);
+    TarFile(TarContents tc, TarEntry *te);
 
     TarContents type() { return tar_contents_; }
 
     size_t totalSize() {
         return size_;
     }
-    size_t size(uint partnr)
-    {
-        assert(partnr < num_parts_);
-        if (num_parts_ == 1) {
-            return size_;
-        }
-        if (partnr == 0) {
-            // The first part has a HEADER that can be larger than 512....
-            return part_size_ + 512;
-        }
-        if (partnr == num_parts_-1) {
-            // The last part.
-            size_t remaining_part_size = part_size_*num_parts_ - size_;
-            return remaining_part_size+512; // HEADER SIZE, can be zero...
-        }
-        return part_size_; // HEADER SIZE, can be zero....
-    }
+    size_t size(uint partnr);
+    // Given an offset into a multivol part, find the offset into
+    // the original tarfile that includes a header.
+    size_t calculateOriginTarOffset(uint partnr, size_t offset);
+
     uint numParts()
     {
         return num_parts_;
     }
-    void fixSize(size_t split_size);
+    void fixSize(size_t split_size, TarHeaderStyle ths);
     void addEntryLast(TarEntry *entry);
     void addEntryFirst(TarEntry *entry);
 
     void finishHash();
     std::pair<TarEntry*, size_t> findTarEntry(size_t offset);
-
+    TarEntry *tarEntry() { return tar_entry_; }
     void calculateHash();
     void calculateHash(std::vector<std::pair<TarFile*,TarEntry*>> &tars, std::string &contents);
     std::vector<char> &hash();
@@ -187,7 +181,7 @@ private:
 
     // A virtual tar can contain small files, medium files or a single large file.
     TarContents tar_contents_ = SMALL_FILES_TAR;
-    bool has_header_ = true;
+    TarEntry *tar_entry_ {};
     // Part of filename without the part nr and tar.
     std::string name_;
     uint32_t hash_;
@@ -207,6 +201,10 @@ private:
     uint num_parts_ {};
     // The size of each part, except the last one, which could be smaller.
     size_t part_size_ {};
+    // The last part can be smaller.
+    size_t last_part_size_ {};
+    // A tar parts file by itself can have a tar continutation header.
+    size_t header_size_ {};
 };
 
 #endif

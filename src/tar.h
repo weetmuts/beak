@@ -23,6 +23,14 @@
 #include<string>
 #include<sys/stat.h>
 
+enum TarHeaderStyle : short {
+    None, // Tar headers are not inserted into the archive file. Tar cannot be used to extract data.
+    Simple, // Simple headers, uid/guid set to 1000/1000 name is beak/beak, atime=ctime set to mtime.
+    Full // Full headers, sometimes useful if you expect to use tar to extract the data.
+    // Full extraction is always available using beak itself since the x01_.....gz files always
+    // store all meta data.
+};
+
 #define T_BLOCKSIZE		512
 
 struct sparse
@@ -84,6 +92,7 @@ struct TarHeader
     char type() { return content.members.typeflag_; }
     void setLongLinkType(TarHeader *file);
     void setLongPathType(TarHeader *file);
+    void setMultivolType(const char *file_name, size_t offset);
     void setSize(size_t s);
 
     void calculateChecksum();

@@ -33,14 +33,6 @@ struct Atom;
 struct Path;
 struct TarFile;
 
-enum TarHeaderStyle : short {
-    None, // Tar headers are not inserted into the archive file. Tar cannot be used to extract data.
-    Simple, // Simple headers, uid/guid set to 1000/1000 name is beak/beak, atime=ctime set to mtime.
-    Full // Full headers, sometimes useful if you expect to use tar to extract the data.
-    // Full extraction is always available using beak itself since the x01_.....gz files always
-    // store all meta data.
-};
-
 struct TarEntry
 {
 
@@ -180,7 +172,7 @@ struct TarEntry
 
     void createSmallTar(int i);
     void createMediumTar(int i);
-    void createLargeTar(uint32_t hash);
+    void createLargeTar(uint32_t hash, TarEntry *te);
 
     std::vector<TarFile*> &tars() { return tars_; }
     TarFile *smallTar(int i)

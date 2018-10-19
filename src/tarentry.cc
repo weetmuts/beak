@@ -64,7 +64,7 @@ TarEntry::TarEntry(size_t size, TarHeaderStyle ths)
     // Round size to nearest 512 byte boundary
     children_size_ = blocked_size_ = (size%T_BLOCKSIZE==0)?size:(size+T_BLOCKSIZE-(size%T_BLOCKSIZE));
 
-    debug(TARENTRY, "Regular File Entry added size %ju blocked size %ju!\n", fs_.st_size, blocked_size_);
+    debug(TARENTRY, "Index file entry added size %ju blocked size %ju!\n", fs_.st_size, blocked_size_);
 }
 
 TarEntry::TarEntry(Path *ap, Path *p, FileStat *st, TarHeaderStyle ths) : fs_(*st)
@@ -145,7 +145,8 @@ TarEntry::TarEntry(Path *ap, Path *p, FileStat *st, TarHeaderStyle ths) : fs_(*s
         */
         tv_line_right = s;
     }
-    debug(TARENTRY, "Entry %s added\n", path_->c_str());
+
+    debug(TARENTRY, "Entry %s added size %ju blocked size %ju!\n", path_->c_str(), fs_.st_size, blocked_size_);
 }
 
 void TarEntry::calculateTarpath(Path *storage_dir) {
@@ -160,15 +161,15 @@ void TarEntry::calculateTarpath(Path *storage_dir) {
 }
 
 void TarEntry::createSmallTar(int i) {
-    small_tars_[i] = new TarFile(SMALL_FILES_TAR);
+    small_tars_[i] = new TarFile(SMALL_FILES_TAR, NULL);
     tars_.push_back(small_tars_[i]);
 }
 void TarEntry::createMediumTar(int i) {
-    medium_tars_[i] = new TarFile(MEDIUM_FILES_TAR);
+    medium_tars_[i] = new TarFile(MEDIUM_FILES_TAR, NULL);
     tars_.push_back(medium_tars_[i]);
 }
-void TarEntry::createLargeTar(uint32_t hash) {
-    large_tars_[hash] = new TarFile(SINGLE_LARGE_FILE_TAR);
+void TarEntry::createLargeTar(uint32_t hash, TarEntry *te) {
+    large_tars_[hash] = new TarFile(SINGLE_LARGE_FILE_TAR, te);
     tars_.push_back(large_tars_[hash]);
 }
 
@@ -186,29 +187,29 @@ size_t TarEntry::copy(char *buf, size_t size, size_t from, FileSystem *fs)
         memset(tmp, 0, header_size_);
         int p = 0;
 
-	TarHeader th(&fs_, tarpath_, link_, is_hard_linked_, tar_header_style_ == TarHeaderStyle::Full);
+        TarHeader th(&fs_, tarpath_, link_, is_hard_linked_, tar_header_style_ == TarHeaderStyle::Full);
 
         if (th.numLongLinkBlocks() > 0)
-	{
-	    TarHeader llh;
+        {
+            TarHeader llh;
             llh.setLongLinkType(&th);
-	    llh.setSize(link_->c_str_len());
+            llh.setSize(link_->c_str_len());
             llh.calculateChecksum();
 
-	    memcpy(tmp+p, llh.buf(), T_BLOCKSIZE);
+            memcpy(tmp+p, llh.buf(), T_BLOCKSIZE);
             memcpy(tmp+p+T_BLOCKSIZE, link_->c_str(), link_->c_str_len());
             p += th.numLongLinkBlocks()*T_BLOCKSIZE;
             debug(TARENTRY, "Wrote long link header for %s\n", link_->c_str());
         }
 
         if (th.numLongPathBlocks() > 0)
-	{
-	    TarHeader lph;
+        {
+            TarHeader lph;
             lph.setLongPathType(&th);
-	    lph.setSize(tarpath_->c_str_len()+1);
+            lph.setSize(tarpath_->c_str_len()+1);
             lph.calculateChecksum();
 
-	    memcpy(tmp+p, lph.buf(), T_BLOCKSIZE);
+            memcpy(tmp+p, lph.buf(), T_BLOCKSIZE);
             memcpy(tmp+p+T_BLOCKSIZE, tarpath_->c_str(), tarpath_->c_str_len());
             p += th.numLongPathBlocks()*T_BLOCKSIZE;
             debug(TARENTRY, "Wrote long path header for %s\n", tarpath_->c_str());
@@ -369,12 +370,12 @@ void TarEntry::registerTarFile(TarFile *tf, size_t o) {
 }
 
 void TarEntry::registerTazFile() {
-    taz_file_ = new TarFile(DIR_TAR);
+    taz_file_ = new TarFile(DIR_TAR, NULL);
     tars_.push_back(taz_file_);
 }
 
 void TarEntry::registerGzFile() {
-    gz_file_ = new TarFile(REG_FILE);
+    gz_file_ = new TarFile(REG_FILE, NULL);
     tars_.push_back(gz_file_);
 }
 

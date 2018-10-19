@@ -547,7 +547,7 @@ size_t Backup::groupFilesIntoTars() {
                     } else {
                         // Create the large files tar here.
                         if (!te->hasLargeTar(entry->tarpathHash())) {
-                            te->createLargeTar(entry->tarpathHash());
+                            te->createLargeTar(entry->tarpathHash(), entry);
                             curr = te->largeTar(entry->tarpathHash());
                         } else {
                             curr = te->largeTar(entry->tarpathHash());
@@ -561,7 +561,7 @@ size_t Backup::groupFilesIntoTars() {
         // Finalize the tar files and add them to the contents listing.
         for (auto & t : te->largeTars()) {
             TarFile *tf = t.second;
-            tf->fixSize(tar_split_size);
+            tf->fixSize(tar_split_size, tarheaderstyle_);
             tf->calculateHash();
             if (tf->currentTarOffset() > 0) {
                 debug(BACKUP,"%s%s size became GURKA parts %zu\n", te->path()->c_str(), "NAMEHERE");
@@ -571,7 +571,7 @@ size_t Backup::groupFilesIntoTars() {
         }
         for (auto & t : te->mediumTars()) {
             TarFile *tf = t.second;
-            tf->fixSize(tar_split_size);
+            tf->fixSize(tar_split_size, tarheaderstyle_);
             tf->calculateHash();
             if (tf->currentTarOffset() > 0) {
                 debug(BACKUP,"%s%s size became\n", te->path()->c_str(), "NAMEHERE");
@@ -581,7 +581,7 @@ size_t Backup::groupFilesIntoTars() {
         }
         for (auto & t : te->smallTars()) {
             TarFile *tf = t.second;
-            tf->fixSize(tar_split_size);
+            tf->fixSize(tar_split_size, tarheaderstyle_);
             tf->calculateHash();
             if (tf->currentTarOffset() > 0) {
                 debug(BACKUP,"%s%s size ecame GURKA\n", te->path()->c_str(), "NAMEHERE");
@@ -590,7 +590,7 @@ size_t Backup::groupFilesIntoTars() {
             }
         }
 
-        te->tazFile()->fixSize(tar_split_size);
+        te->tazFile()->fixSize(tar_split_size, tarheaderstyle_);
         te->tazFile()->calculateHash();
 
         set<uid_t> uids;
@@ -677,7 +677,7 @@ size_t Backup::groupFilesIntoTars() {
         TarEntry *dirs = new TarEntry(compressed_gzfile_contents.size(), tarheaderstyle_);
         dirs->setContent(compressed_gzfile_contents);
         te->gzFile()->addEntryLast(dirs);
-        te->gzFile()->fixSize(tar_split_size);
+        te->gzFile()->fixSize(tar_split_size, tarheaderstyle_);
 
         if (te->tazFile()->totalSize() > 0 ) {
 
@@ -920,7 +920,7 @@ struct BackupFuseAPI : FuseAPI
         if (!tar) {
             goto err;
         }
-
+        debug(FUSE,"readCB partnr >%u<\n", partnr);
         n = tar->copy(buf, size, offset, backup_->originFileSystem(), partnr);
 
         UNLOCK(&backup_->global);
@@ -974,8 +974,10 @@ RC Backup::scanFileSystem(Settings *settings)
 
     forced_tar_collection_dir_depth = settings->depth;
     config += "-d "+to_string(settings->depth)+" ";
+
     if (settings->tarheader_supplied) {
         setTarHeaderStyle(settings->tarheader);
+        config += "--tarheader="+to_string(settings->tarheader)+" ";
     } else {
         setTarHeaderStyle(TarHeaderStyle::Simple);
     }
@@ -996,9 +998,12 @@ RC Backup::scanFileSystem(Settings *settings)
     config += "-tr "+to_string(tar_trigger_size)+" ";
 
     if (!settings->splitsize_supplied) {
-        tar_split_size = tar_split_size * 2;
+        tar_split_size = tar_split_size;
     } else {
         tar_split_size = settings->splitsize;
+    }
+    if (tar_split_size < tar_target_size*2) {
+        error(COMMANDLINE, "The split size must be at least twice the target size.\n");
     }
     config += "-ts "+to_string(tar_split_size)+" ";
 
