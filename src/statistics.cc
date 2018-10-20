@@ -29,8 +29,10 @@ static ComponentId STATISTICS = registerLogComponent("statistics");
 
 using namespace std;
 
-struct StoreStatisticsImplementation : StoreStatistics
+struct ProgressStatisticsImplementation : ProgressStatistics
 {
+    ProgressStatisticsImplementation(ProgressDisplayType t) : display_type_(t) {}
+
 private:
 
     Stats copy;
@@ -41,13 +43,15 @@ private:
 
     unique_ptr<ThreadCallback> regular_;
 
+    ProgressDisplayType display_type_;
+
     bool redrawLine();
     void startDisplayOfProgress();
     void updateProgress();
     void finishProgress();
 };
 
-void StoreStatisticsImplementation::startDisplayOfProgress()
+void ProgressStatisticsImplementation::startDisplayOfProgress()
 {
     start_time = clockGetTimeMicroSeconds();
 
@@ -57,7 +61,7 @@ void StoreStatisticsImplementation::startDisplayOfProgress()
 //Tar emot objekt: 100% (814178/814178), 669.29 MiB | 6.71 MiB/s, klart.
 //Analyserar delta: 100% (690618/690618), klart.
 
-void StoreStatisticsImplementation::updateProgress()
+void ProgressStatisticsImplementation::updateProgress()
 {
     // Take a snapshot of the stats structure.
     // The snapshot is taken while the regular callback is blocked.
@@ -65,7 +69,7 @@ void StoreStatisticsImplementation::updateProgress()
 }
 
 // Draw the progress line based on the snapshotted contents in the copy struct.
-bool StoreStatisticsImplementation::redrawLine()
+bool ProgressStatisticsImplementation::redrawLine()
 {
     if (copy.num_files == 0 || copy.num_files_to_store == 0) return true;
     uint64_t now = clockGetTimeMicroSeconds();
@@ -110,7 +114,7 @@ bool StoreStatisticsImplementation::redrawLine()
     return true;
 }
 
-void StoreStatisticsImplementation::finishProgress()
+void ProgressStatisticsImplementation::finishProgress()
 {
     if (stats.num_files == 0 || stats.num_files_to_store == 0) return;
     regular_->stop();
@@ -119,7 +123,7 @@ void StoreStatisticsImplementation::finishProgress()
     UI::output(", done.\n");
 }
 
-unique_ptr<StoreStatistics> newStoreStatistics()
+unique_ptr<ProgressStatistics> newProgressStatistics(ProgressDisplayType t)
 {
-    return unique_ptr<StoreStatisticsImplementation>(new StoreStatisticsImplementation());
+    return unique_ptr<ProgressStatisticsImplementation>(new ProgressStatisticsImplementation(t));
 }

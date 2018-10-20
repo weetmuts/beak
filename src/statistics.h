@@ -49,7 +49,7 @@ struct Stats
     std::map<Path*,size_t> file_sizes;
 };
 
-struct StoreStatistics
+struct ProgressStatistics
 {
     Stats stats;
 
@@ -58,6 +58,14 @@ struct StoreStatistics
     virtual void finishProgress() = 0;
 };
 
-std::unique_ptr<StoreStatistics> newStoreStatistics();
+enum ProgressDisplayType
+{
+    ProgressDisplayNone,          // No progress at all
+    ProgressDisplayTerminal,      // Print on terminal
+    ProgressDisplayTerminalAnsi,  // Use ansi to move the cursor
+    ProgressDisplayNotification   // Use the OS notification system
+};
+
+std::unique_ptr<ProgressStatistics> newProgressStatistics(ProgressDisplayType t);
 
 #endif

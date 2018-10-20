@@ -263,10 +263,10 @@ RC SystemImplementation::invoke(string program,
                 if (n > 0) {
                     output->insert(output->end(), buf, buf+n);
                     if (cb) { cb(buf, n); }
-                    debug(SYSTEMIO, "Input: \"%*s\"\n", n, buf);
+                    debug(SYSTEMIO, "%s: \"%*s\"\n", program.c_str(), n, buf);
                 } else {
                     // No more data to read.
-                    debug(SYSTEMIO, "Input: done\n");
+                    debug(SYSTEMIO, "%s: done\n", program.c_str());
                     break;
                 }
             }
@@ -277,7 +277,7 @@ RC SystemImplementation::invoke(string program,
         if (WIFEXITED(status)) {
             // Child exited properly.
             int rc = WEXITSTATUS(status);
-            debug(SYSTEM,"Return code %d\n", rc);
+            debug(SYSTEM,"%s: return code %d\n", program.c_str(), rc);
             if (rc != 0) {
                 warning(SYSTEM,"%s exited with non-zero return code: %d\n", program.c_str(), rc);
                 return RC::ERR;

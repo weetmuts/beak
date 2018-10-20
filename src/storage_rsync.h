@@ -31,17 +31,19 @@ RC rsyncListBeakFiles(Storage *storage,
                       std::vector<TarFileName> *bad_files,
                       std::vector<std::string> *other_files,
                       std::map<Path*,FileStat> *contents,
-                      ptr<System> sys);
+                      ptr<System> sys,
+                      ProgressStatistics *progress);
 
 RC rsyncFetchFiles(Storage *storage,
                    std::vector<Path*> *files,
                    Path *dir,
                    System *sys,
-                   FileSystem *local_fs);
+                   FileSystem *local_fs,
+                   ProgressStatistics *progress);
 
 RC rsyncSendFiles(Storage *storage,
                   std::vector<Path*> *files,
                   Path *dir,
-                  StoreStatistics *st,
                   FileSystem *local_fs,
-                  ptr<System> sys);
+                  ptr<System> sys,
+                  ProgressStatistics *progress);

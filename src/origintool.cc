@@ -28,7 +28,7 @@ struct OriginToolImplementation : public OriginTool
 {
     OriginToolImplementation(ptr<System> sys, ptr<FileSystem> origin_fs);
 
-    void addRestoreWork(StoreStatistics *st,
+    void addRestoreWork(ProgressStatistics *st,
                         Path *path,
                         FileStat *stat,
                         Settings *settings,
@@ -40,46 +40,46 @@ struct OriginToolImplementation : public OriginTool
                            Restore *restore,
                            PointInTime *point,
                            Settings *settings,
-                           StoreStatistics *st);
+                           ProgressStatistics *st);
 
     ptr<FileSystem> fs() { return origin_fs_; }
 
     bool extractHardLink(Path *target,
                          Path *dst_root, Path *file_to_extract, FileStat *stat,
-                         ptr<StoreStatistics> statistics);
+                         ptr<ProgressStatistics> statistics);
     RecurseOption handleHardLinks(Path *path, FileStat *stat,
                                   Restore *restore, PointInTime *point,
-                                  Settings *settings, ptr<StoreStatistics> st);
+                                  Settings *settings, ptr<ProgressStatistics> st);
     bool extractFileFromBackup(Entry *entry,
                                FileSystem *backup_fs, Path *tar_file, off_t tar_file_offset,
                                Path *file_to_extract, FileStat *stat,
-                               ptr<StoreStatistics> statistics);
+                               ptr<ProgressStatistics> statistics);
     RecurseOption handleRegularFiles(Path *path, FileStat *stat,
                                      Restore *restore, PointInTime *point,
-                                     Settings *settings, ptr<StoreStatistics> st,
+                                     Settings *settings, ptr<ProgressStatistics> st,
                                      FileSystem *storage_fs);
 
     bool extractSymbolicLink(string target,
                              Path *file_to_extract, FileStat *stat,
-                             ptr<StoreStatistics> statistics);
+                             ptr<ProgressStatistics> statistics);
 
     bool extractNode(Path *file_to_extract, FileStat *stat,
-                     ptr<StoreStatistics> statistics);
+                     ptr<ProgressStatistics> statistics);
 
     bool chmodDirectory(Path *file_to_extract, FileStat *stat,
-                        ptr<StoreStatistics> statistics);
+                        ptr<ProgressStatistics> statistics);
 
     RecurseOption handleNodes(Path *path, FileStat *stat,
                               Restore *restore, PointInTime *point,
-                              Settings *settings, ptr<StoreStatistics> st);
+                              Settings *settings, ptr<ProgressStatistics> st);
 
     RecurseOption handleSymbolicLinks(Path *path, FileStat *stat,
                                       Restore *restore, PointInTime *point,
-                                      Settings *settings, ptr<StoreStatistics> st);
+                                      Settings *settings, ptr<ProgressStatistics> st);
 
     RecurseOption handleDirs(Path *path, FileStat *stat,
                              Restore *restore, PointInTime *point,
-                             Settings *settings, ptr<StoreStatistics> st);
+                             Settings *settings, ptr<ProgressStatistics> st);
 
     ptr<System> sys_;
     ptr<FileSystem> origin_fs_;
@@ -97,7 +97,7 @@ OriginToolImplementation::OriginToolImplementation(ptr<System>sys,
 {
 }
 
-void OriginToolImplementation::addRestoreWork(StoreStatistics *st,
+void OriginToolImplementation::addRestoreWork(ProgressStatistics *st,
                                               Path *path,
                                               FileStat *stat,
                                               Settings *settings,
@@ -123,7 +123,7 @@ void OriginToolImplementation::addRestoreWork(StoreStatistics *st,
 
 bool OriginToolImplementation::extractHardLink(Path *target,
                                                Path *dst_root, Path *file_to_extract, FileStat *stat,
-                                               ptr<StoreStatistics> statistics)
+                                               ptr<ProgressStatistics> statistics)
 {
     target = target->prepend(dst_root);
     FileStat target_stat;
@@ -165,7 +165,7 @@ bool OriginToolImplementation::extractHardLink(Path *target,
 bool OriginToolImplementation::extractFileFromBackup(Entry *entry,
                                                      FileSystem *backup_fs, Path *tar_file, off_t tar_file_offset,
                                                      Path *file_to_extract, FileStat *stat,
-                                                     ptr<StoreStatistics> statistics)
+                                                     ptr<ProgressStatistics> statistics)
 {
     if (stat->disk_update == NoUpdate) {
         debug(ORIGINTOOL, "Skipping file \"%s\"\n", file_to_extract->c_str());
@@ -203,7 +203,7 @@ bool OriginToolImplementation::extractFileFromBackup(Entry *entry,
 
 bool OriginToolImplementation::extractSymbolicLink(string target,
                                                    Path *file_to_extract, FileStat *stat,
-                                                   ptr<StoreStatistics> statistics)
+                                                   ptr<ProgressStatistics> statistics)
 {
     string old_target;
     FileStat old_stat;
@@ -237,7 +237,7 @@ bool OriginToolImplementation::extractSymbolicLink(string target,
 }
 
 bool OriginToolImplementation::extractNode(Path *file_to_extract, FileStat *stat,
-                                           ptr<StoreStatistics> statistics)
+                                           ptr<ProgressStatistics> statistics)
 {
     FileStat old_stat;
     RC rc = origin_fs_->stat(file_to_extract, &old_stat);
@@ -262,7 +262,7 @@ bool OriginToolImplementation::extractNode(Path *file_to_extract, FileStat *stat
 }
 
 bool OriginToolImplementation::chmodDirectory(Path *dir_to_extract, FileStat *stat,
-                                              ptr<StoreStatistics> statistics)
+                                              ptr<ProgressStatistics> statistics)
 {
     FileStat old_stat;
     RC rc = origin_fs_->stat(dir_to_extract, &old_stat);
@@ -290,7 +290,7 @@ bool OriginToolImplementation::chmodDirectory(Path *dir_to_extract, FileStat *st
 
 RecurseOption OriginToolImplementation::handleHardLinks(Path *path, FileStat *stat,
                                                         Restore *restore, PointInTime *point,
-                                                        Settings *settings, ptr<StoreStatistics> st)
+                                                        Settings *settings, ptr<ProgressStatistics> st)
 {
     auto entry = restore->findEntry(point, path);
 
@@ -306,7 +306,7 @@ RecurseOption OriginToolImplementation::handleHardLinks(Path *path, FileStat *st
 
 RecurseOption OriginToolImplementation::handleRegularFiles(Path *path, FileStat *stat,
                                                            Restore *restore, PointInTime *point,
-                                                           Settings *settings, ptr<StoreStatistics> st,
+                                                           Settings *settings, ptr<ProgressStatistics> st,
                                                            FileSystem *backup_fs)
 {
     auto entry = restore->findEntry(point, path);
@@ -325,7 +325,7 @@ RecurseOption OriginToolImplementation::handleRegularFiles(Path *path, FileStat 
 
 RecurseOption OriginToolImplementation::handleNodes(Path *path, FileStat *stat,
                                                     Restore *restore, PointInTime *point,
-                                                    Settings *settings, ptr<StoreStatistics> st)
+                                                    Settings *settings, ptr<ProgressStatistics> st)
 {
     auto entry = restore->findEntry(point, path);
     auto file_to_extract = path->prepend(settings->to.origin);
@@ -338,7 +338,7 @@ RecurseOption OriginToolImplementation::handleNodes(Path *path, FileStat *stat,
 
 RecurseOption OriginToolImplementation::handleSymbolicLinks(Path *path, FileStat *stat,
                                                             Restore *restore, PointInTime *point,
-                                                            Settings *settings, ptr<StoreStatistics> st)
+                                                            Settings *settings, ptr<ProgressStatistics> st)
 {
     auto entry = restore->findEntry(point, path);
     auto file_to_extract = path->prepend(settings->to.origin);
@@ -351,7 +351,7 @@ RecurseOption OriginToolImplementation::handleSymbolicLinks(Path *path, FileStat
 
 RecurseOption OriginToolImplementation::handleDirs(Path *path, FileStat *stat,
                                                    Restore *restore, PointInTime *point,
-                                                   Settings *settings, ptr<StoreStatistics> st)
+                                                   Settings *settings, ptr<ProgressStatistics> st)
 {
     auto file_to_extract = path->prepend(settings->to.origin);
 
@@ -366,7 +366,7 @@ void OriginToolImplementation::restoreFileSystem(FileSystem *backup_fs,
                                                  Restore *restore,
                                                  PointInTime *point,
                                                  Settings *settings,
-                                                 StoreStatistics *st)
+                                                 ProgressStatistics *st)
 {
     // First restore the files,nodes and symlinks and their contents, set the utimes properly for the files.
     Path *r = Path::lookupRoot();

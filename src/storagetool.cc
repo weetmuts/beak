@@ -20,6 +20,7 @@
 #include "backup.h"
 #include "filesystem_helpers.h"
 #include "log.h"
+#include "statistics.h"
 #include "system.h"
 #include "storage_rclone.h"
 #include "storage_rsync.h"
@@ -37,12 +38,14 @@ struct StorageToolImplementation : public StorageTool
 
     RC storeBackupIntoStorage(Backup *backup,
                               Storage *storage,
-                              StoreStatistics *st,
-                              Settings *settings);
+                              Settings *settings,
+                              ProgressStatistics *st);
 
-    RC listPointsInTime(Storage *storage, vector<pair<Path*,struct timespec>> *v);
+    RC listPointsInTime(Storage *storage, vector<pair<Path*,struct timespec>> *v,
+                        ProgressStatistics *st);
 
-    FileSystem *asCachedReadOnlyFS(Storage *storage);
+    FileSystem *asCachedReadOnlyFS(Storage *storage,
+                                   ProgressStatistics *progress);
 
     System *sys_;
     FileSystem *local_fs_;
@@ -61,7 +64,7 @@ StorageToolImplementation::StorageToolImplementation(ptr<System>sys,
 
 }
 
-void add_backup_work(ptr<StoreStatistics> st,
+void add_backup_work(ptr<ProgressStatistics> st,
                      vector<Path*> *files_to_backup,
                      Path *path, FileStat *stat,
                      Settings *settings,
@@ -111,7 +114,7 @@ void store_local_backup_file(Backup *backup,
                              Path *path,
                              FileStat *stat,
                              Settings *settings,
-                             ptr<StoreStatistics> st)
+                             ptr<ProgressStatistics> st)
 {
     if (!stat->isRegularFile()) return;
 
@@ -149,10 +152,10 @@ void store_local_backup_file(Backup *backup,
 
 RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backup,
                                                      Storage *storage,
-                                                     StoreStatistics *st,
-                                                     Settings *settings)
+                                                     Settings *settings,
+                                                     ProgressStatistics *progress)
 {
-    st->startDisplayOfProgress();
+    progress->startDisplayOfProgress();
 
     // The backup archive files (.tar .gz) are found here.
     FileSystem *backup_fs = backup->asFileSystem();
@@ -173,9 +176,9 @@ RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backup,
         vector<string> other_files;
         RC rc = RC::OK;
         if (storage->type == RCloneStorage) {
-            rc = rcloneListBeakFiles(storage, &files, &bad_files, &other_files, &contents, sys_);
+            rc = rcloneListBeakFiles(storage, &files, &bad_files, &other_files, &contents, sys_, progress);
         } else {
-            rc = rsyncListBeakFiles(storage, &files, &bad_files, &other_files, &contents, sys_);
+            rc = rsyncListBeakFiles(storage, &files, &bad_files, &other_files, &contents, sys_, progress);
         }
         if (rc.isErr()) {
             error(STORAGETOOL, "Could not list files in rclone storage %s\n", storage->storage_location->c_str());
@@ -189,11 +192,11 @@ RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backup,
     }
     backup_fs->recurse(Path::lookupRoot(), [=,&files_to_backup]
                        (Path *path, FileStat *stat) {
-                           add_backup_work(st, &files_to_backup, path, stat, settings, storage_fs);
+                           add_backup_work(progress, &files_to_backup, path, stat, settings, storage_fs);
                            return RecurseContinue;
                        });
 
-    debug(STORAGETOOL, "Work to be done: num_files=%ju num_dirs=%ju\n", st->stats.num_files, st->stats.num_dirs);
+    debug(STORAGETOOL, "Work to be done: num_files=%ju num_dirs=%ju\n", progress->stats.num_files, progress->stats.num_dirs);
 
     switch (storage->type) {
     case FileSystemStorage:
@@ -207,7 +210,7 @@ RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backup,
                                                        path,
                                                        stat,
                                                        settings,
-                                                       st);
+                                                       progress);
                                return RecurseContinue; });
         break;
     }
@@ -226,16 +229,14 @@ RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backup,
             rc = rcloneSendFiles(storage,
                                  &files_to_backup,
                                  mount,
-                                 st,
                                  local_fs_,
-                                 sys_);
+                                 sys_, progress);
         } else {
             rc = rsyncSendFiles(storage,
                                 &files_to_backup,
                                 mount,
-                                st,
                                 local_fs_,
-                                sys_);
+                                sys_, progress);
         }
 
         if (rc.isErr()) {
@@ -255,13 +256,14 @@ RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backup,
         assert(0);
     }
 
-    st->finishProgress();
+    progress->finishProgress();
 
     return RC::OK;
 }
 
 
-RC StorageToolImplementation::listPointsInTime(Storage *storage, vector<pair<Path*,struct timespec>> *v)
+RC StorageToolImplementation::listPointsInTime(Storage *storage, vector<pair<Path*,struct timespec>> *v,
+                                               ProgressStatistics *st)
 {
     switch (storage->type) {
     case FileSystemStorage:
@@ -285,8 +287,8 @@ RC StorageToolImplementation::listPointsInTime(Storage *storage, vector<pair<Pat
 
 struct CacheFS : ReadOnlyCacheFileSystemBaseImplementation
 {
-    CacheFS(ptr<FileSystem> cache_fs, Path *cache_dir, Storage *storage, System *sys) :
-        ReadOnlyCacheFileSystemBaseImplementation("CacheFS", cache_fs, cache_dir, storage->storage_location->depth()),
+    CacheFS(ptr<FileSystem> cache_fs, Path *cache_dir, Storage *storage, System *sys, ProgressStatistics *progress) :
+        ReadOnlyCacheFileSystemBaseImplementation("CacheFS", cache_fs, cache_dir, storage->storage_location->depth(), progress),
         sys_(sys), storage_(storage) {
     }
 
@@ -322,9 +324,9 @@ RC CacheFS::loadDirectoryStructure(map<Path*,CacheEntry> *entries)
     case RCloneStorage:
         RC rc = RC::OK;
         if (storage_->type == RCloneStorage) {
-            rc = rcloneListBeakFiles(storage_, &files, &bad_files, &other_files, &contents, sys_);
+            rc = rcloneListBeakFiles(storage_, &files, &bad_files, &other_files, &contents, sys_, progress_);
         } else {
-            rc = rsyncListBeakFiles(storage_, &files, &bad_files, &other_files, &contents, sys_);
+            rc = rsyncListBeakFiles(storage_, &files, &bad_files, &other_files, &contents, sys_, progress_);
         }
         if (rc.isErr()) return RC::ERR;
     }
@@ -389,22 +391,22 @@ RC CacheFS::fetchFiles(vector<Path*> *files)
     case RSyncStorage:
     {
         debug(CACHE,"Fetching %d files from %s.\n", files->size(), storage_->storage_location->c_str());
-        return rsyncFetchFiles(storage_, files, cache_dir_, sys_, cache_fs_);
+        return rsyncFetchFiles(storage_, files, cache_dir_, sys_, cache_fs_, progress_);
     }
     case RCloneStorage:
     {
         debug(CACHE,"Fetching %d files from %s.\n", files->size(), storage_->storage_location->c_str());
-        return rcloneFetchFiles(storage_, files, cache_dir_, sys_, cache_fs_);
+        return rcloneFetchFiles(storage_, files, cache_dir_, sys_, cache_fs_, progress_);
     }
     }
     return RC::ERR;
 }
 
-FileSystem *StorageToolImplementation::asCachedReadOnlyFS(Storage *storage)
+FileSystem *StorageToolImplementation::asCachedReadOnlyFS(Storage *storage, ProgressStatistics *progress)
 {
     Path *cache_dir = cacheDir();
     local_fs_->mkDirpWriteable(cache_dir);
-    CacheFS *fs = new CacheFS(local_fs_, cache_dir, storage, sys_);
+    CacheFS *fs = new CacheFS(local_fs_, cache_dir, storage, sys_, progress);
     fs->refreshCache();
     return fs;
 }

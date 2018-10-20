@@ -24,11 +24,12 @@ using namespace std;
 static ComponentId RSYNC = registerLogComponent("rsync");
 
 RC rsyncListBeakFiles(Storage *storage,
-                       vector<TarFileName> *files,
-                       vector<TarFileName> *bad_files,
-                       vector<string> *other_files,
-                       map<Path*,FileStat> *contents,
-                       ptr<System> sys)
+                      vector<TarFileName> *files,
+                      vector<TarFileName> *bad_files,
+                      vector<string> *other_files,
+                      map<Path*,FileStat> *contents,
+                      ptr<System> sys,
+                      ProgressStatistics *progress)
 {
     assert(storage->type == RSyncStorage);
 
@@ -98,10 +99,11 @@ RC rsyncListBeakFiles(Storage *storage,
 
 
 RC rsyncFetchFiles(Storage *storage,
-                    vector<Path*> *files,
-                    Path *dir,
-                    System *sys,
-                    FileSystem *local_fs)
+                   vector<Path*> *files,
+                   Path *dir,
+                   System *sys,
+                   FileSystem *local_fs,
+                   ProgressStatistics *progress)
 {
     Path *target_dir = storage->storage_location->prepend(dir);
     string files_to_fetch;
@@ -109,6 +111,7 @@ RC rsyncFetchFiles(Storage *storage,
         Path *n = p->subpath(storage->storage_location->depth());
         files_to_fetch.append(n->str());
         files_to_fetch.append("\n");
+        debug(RSYNC, "fetch \"%s\"\n", n->c_str());
     }
 
     Path *tmp = local_fs->mkTempFile("beak_fetching_", files_to_fetch);
@@ -128,7 +131,7 @@ RC rsyncFetchFiles(Storage *storage,
     return rc;
 }
 
-void parse_rsync_verbose_output_(StoreStatistics *st,
+void parse_rsync_verbose_output_(ProgressStatistics *st,
                                  Storage *storage,
                                  char *buf,
                                  size_t len)
@@ -159,9 +162,9 @@ void parse_rsync_verbose_output_(StoreStatistics *st,
 RC rsyncSendFiles(Storage *storage,
                   vector<Path*> *files,
                   Path *dir,
-                  StoreStatistics *st,
                   FileSystem *local_fs,
-                  ptr<System> sys)
+                  ptr<System> sys,
+                  ProgressStatistics *progress)
 {
     string files_to_fetch;
     for (auto& p : *files) {
@@ -182,8 +185,8 @@ RC rsyncSendFiles(Storage *storage,
     args.push_back(storage->storage_location->str());
     vector<char> output;
     RC rc = sys->invoke("rsync", args, &output, CaptureBoth,
-                        [&st, storage](char *buf, size_t len) {
-                            parse_rsync_verbose_output_(st,
+                        [&progress, storage](char *buf, size_t len) {
+                            parse_rsync_verbose_output_(progress,
                                                         storage,
                                                         buf,
                                                         len);

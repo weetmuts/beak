@@ -29,7 +29,8 @@ RC rcloneListBeakFiles(Storage *storage,
                        vector<TarFileName> *bad_files,
                        vector<string> *other_files,
                        map<Path*,FileStat> *contents,
-                       ptr<System> sys)
+                       ptr<System> sys,
+                       ProgressStatistics *st)
 {
     assert(storage->type == RCloneStorage);
 
@@ -98,7 +99,8 @@ RC rcloneFetchFiles(Storage *storage,
                     vector<Path*> *files,
                     Path *dir,
                     System *sys,
-                    FileSystem *local_fs)
+                    FileSystem *local_fs,
+                    ProgressStatistics *st)
 {
     Path *target_dir = storage->storage_location->prepend(dir);
 
@@ -108,27 +110,34 @@ RC rcloneFetchFiles(Storage *storage,
         Path *n = p->subpath(1);
         files_to_fetch.append(n->str());
         files_to_fetch.append("\n");
-        fprintf(stderr, "FETCHING \"%s\"\n", n->c_str());
+        debug(RCLONE, "fetch \"%s\"\n", n->c_str());
     }
 
     Path *tmp = local_fs->mkTempFile("beak_fetching_", files_to_fetch);
 
     RC rc = RC::OK;
-    vector<char> out;
     vector<string> args;
     args.push_back("copy");
     args.push_back("--include-from");
     args.push_back(tmp->c_str());
     args.push_back(storage->storage_location->c_str());
     args.push_back(target_dir->c_str());
-    rc = sys->invoke("rclone", args, &out);
-
+    vector<char> output;
+    /*
+    RC rc = sys->invoke("rclone", args, &output, CaptureBoth,
+                        [&st, storage](char *buf, size_t len) {
+                            parse_rclone_verbose_output(st,
+                                                        storage,
+                                                        buf,
+                                                        len);
+                        });
+    */
     local_fs->deleteFile(tmp);
 
     return rc;
 }
 
-void parse_rclone_verbose_output(StoreStatistics *st,
+void parse_rclone_verbose_output(ProgressStatistics *st,
                                  Storage *storage,
                                  char *buf,
                                  size_t len)
@@ -174,9 +183,9 @@ void parse_rclone_verbose_output(StoreStatistics *st,
 RC rcloneSendFiles(Storage *storage,
                    vector<Path*> *files,
                    Path *dir,
-                   StoreStatistics *st,
                    FileSystem *local_fs,
-                   ptr<System> sys)
+                   ptr<System> sys,
+                   ProgressStatistics *st)
 {
     string files_to_fetch;
     for (auto& p : *files) {

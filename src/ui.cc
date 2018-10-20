@@ -55,6 +55,8 @@ void UI::clearLine()
 void UI::redrawLineOutput(const char *fmt, ...)
 {
     if (logLevel() <= INFO) {
+        // Move to top left corner: \x1B[1;1H
+        //fprintf(stdout, "\x1B[s\x1B[1000D");
         fprintf(stdout, "\x1B[2K\r");
     }
 
@@ -62,11 +64,13 @@ void UI::redrawLineOutput(const char *fmt, ...)
     va_start(args, fmt);
     vfprintf(stdout, fmt, args);
     va_end(args);
-    fflush(stdout);
 
-    if (logLevel() > INFO) {
+    if (logLevel() <= INFO) {
+        //fprintf(stdout, "\x1B[u");
+    } else {
         fprintf(stdout, "\n");
     }
+    fflush(stdout);
 
 }
 

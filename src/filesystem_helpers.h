@@ -98,7 +98,11 @@ struct CacheEntry
 
 struct ReadOnlyCacheFileSystemBaseImplementation : ReadOnlyFileSystem
 {
-    ReadOnlyCacheFileSystemBaseImplementation(const char *name, ptr<FileSystem> cache_fs, Path *cache_dir, int depth) :
+    ReadOnlyCacheFileSystemBaseImplementation(const char *name,
+                                              ptr<FileSystem> cache_fs,
+                                              Path *cache_dir,
+                                              int depth,
+                                              ProgressStatistics *progress) :
     ReadOnlyFileSystem(name), cache_fs_(cache_fs), cache_dir_(cache_dir),drop_prefix_depth_(depth) {}
 
     virtual void refreshCache() = 0;
@@ -133,6 +137,7 @@ struct ReadOnlyCacheFileSystemBaseImplementation : ReadOnlyFileSystem
     int drop_prefix_depth_ {};
     bool fileCached(Path *p);
     CacheEntry *cacheEntry(Path *p);
+    ProgressStatistics *progress_ {};
 };
 
 

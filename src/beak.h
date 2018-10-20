@@ -21,6 +21,7 @@
 #include "always.h"
 #include "configuration.h"
 #include "filesystem.h"
+#include "statistics.h"
 #include "util.h"
 
 #include<memory>
@@ -63,10 +64,10 @@ struct Beak
     virtual RC umountDaemon(Settings *settings) = 0;
 
     virtual RC mountBackupDaemon(Settings *settings) = 0;
-    virtual RC mountBackup(Settings *settings) = 0;
+    virtual RC mountBackup(Settings *settings, ProgressStatistics *progress = NULL) = 0;
     virtual RC umountBackup(Settings *settings) = 0;
     virtual RC mountRestoreDaemon(Settings *settings) = 0;
-    virtual RC mountRestore(Settings *settings) = 0;
+    virtual RC mountRestore(Settings *settings, ProgressStatistics *progress = NULL) = 0;
     virtual RC umountRestore(Settings *settings) = 0;
 
     virtual void printHelp(Command cmd) = 0;
@@ -141,6 +142,8 @@ LIST_OF_COMMANDS
       "                           You can also suffix @1 to the storage directory." )        \
     X(pf,pointintimeformat,PointInTimeFormat,true,"How to present the point in time.\n" \
       "                           E.g. absolute,relative or both. Default is both.")    \
+    X(pr,progress,ProgressDisplayType,true,"How to present the progress of the backup or restore.\n" \
+      "                           E.g. none,plain,ansi,os. Default is ansi.") \
     X(,tarheader,TarHeaderStyle,true,"Style of tar headers used. E.g. --tarheader=simple\n"   \
       "                           Alternatives are: none,simple,full Default is simple.")    \
     X(ta,targetsize,size_t,true,"Tar target size. E.g. --targetsize=20M\n" \

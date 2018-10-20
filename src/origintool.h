@@ -41,9 +41,9 @@ struct OriginTool
                                    Restore *restore,
                                    PointInTime *point,
                                    Settings *settings,
-                                   StoreStatistics *st) = 0;
+                                   ProgressStatistics *st) = 0;
 
-    virtual void addRestoreWork(StoreStatistics *st,
+    virtual void addRestoreWork(ProgressStatistics *st,
                                 Path *path,
                                 FileStat *stat,
                                 Settings *settings,

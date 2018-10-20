@@ -34,12 +34,15 @@ struct StorageTool
 {
     virtual RC storeBackupIntoStorage(Backup *backup,
                                       Storage *storage,
-                                      StoreStatistics *st,
-                                      Settings *settings) = 0;
+                                      Settings *settings,
+                                      ProgressStatistics *progress) = 0;
 
-    virtual RC listPointsInTime(Storage *storage, std::vector<std::pair<Path*,struct timespec>> *v) = 0;
+    virtual RC listPointsInTime(Storage *storage,
+                                std::vector<std::pair<Path*,struct timespec>> *v,
+                                ProgressStatistics *progress) = 0;
 
-    virtual FileSystem *asCachedReadOnlyFS(Storage *storage) = 0;
+    virtual FileSystem *asCachedReadOnlyFS(Storage *storage,
+                                           ProgressStatistics *progress) = 0;
 };
 
 std::unique_ptr<StorageTool> newStorageTool(ptr<System> sys,
