@@ -1168,11 +1168,14 @@ void Settings::updateFuseArgsArray()
     fuse_argc = fuse_args.size();
     fuse_argv = new char*[fuse_argc+1];
     int j = 0;
-    debug(FUSE, "Fuse args %d:", fuse_argc);
-    for (auto &s : fuse_args) {
-        fuse_argv[j] = (char*)s.c_str();
-        debug(FUSE, "\"%s\"", fuse_argv[j]);
-        j++;
+    if (fuse_args.size() > 0)
+    {
+        debug(FUSE, "call fuse:\n", fuse_argc);
+        for (auto &s : fuse_args) {
+            fuse_argv[j] = (char*)s.c_str();
+            debug(FUSE, "arg \"%s\"\n", fuse_argv[j]);
+            j++;
+        }
     }
     fuse_argv[j] = 0;
 }

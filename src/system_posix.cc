@@ -214,15 +214,13 @@ RC SystemImplementation::invoke(string program,
     const char **argv = new const char*[args.size()+2];
     argv[0] = program.c_str();
     int i = 1;
-    debug(SYSTEM, "Invoking: \"%s\"\n", program.c_str());
+    debug(SYSTEM, "exec \"%s\"\n", program.c_str());
     for (auto &a : args) {
         argv[i] = a.c_str();
         i++;
-        debug(SYSTEM, "\"%s\"\n ", a.c_str());
+        debug(SYSTEM, "arg \"%s\"\n", a.c_str());
     }
     argv[i] = NULL;
-
-    debug(SYSTEM, "\n");
 
     if (output) {
         if (pipe(link) == -1) {
