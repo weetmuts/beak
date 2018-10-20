@@ -23,6 +23,34 @@ using namespace std;
 
 static ComponentId RSYNC = registerLogComponent("rsync");
 
+void parse_rsync_verbose_output_(ProgressStatistics *st,
+                                 Storage *storage,
+                                 char *buf,
+                                 size_t len)
+{
+    // Parse verbose output and look for:
+    // zlib-1.2.11-winapi/z01_001516784332.462127151_0_3393fb3d96b545ebf05ad9406fff9435eca8cd3eb97714883fa42d92d2fc8ded_0.gz
+
+    string file = storage->storage_location->str()+"/"+string(buf, len);
+    string dir;
+    while (file.back() == '\n') file.pop_back();
+    TarFileName tfn;
+    if (tfn.parseFileName(file, &dir)) {
+        // This was a valid verbose output beak file name.
+        Path *path = tfn.asPathWithDir(Path::lookup(dir));
+        size_t size = 0;
+
+        debug(RSYNC, "copied: %ju \"%s\"\n", st->stats.file_sizes.count(path), path->c_str());
+
+        if (st->stats.file_sizes.count(path)) {
+            size = st->stats.file_sizes[path];
+            st->stats.size_files_stored += size;
+            st->stats.num_files_stored++;
+            st->updateProgress();
+        }
+    }
+}
+
 RC rsyncListBeakFiles(Storage *storage,
                       vector<TarFileName> *files,
                       vector<TarFileName> *bad_files,
@@ -97,68 +125,6 @@ RC rsyncListBeakFiles(Storage *storage,
     return RC::OK;
 }
 
-
-RC rsyncFetchFiles(Storage *storage,
-                   vector<Path*> *files,
-                   Path *dir,
-                   System *sys,
-                   FileSystem *local_fs,
-                   ProgressStatistics *progress)
-{
-    Path *target_dir = storage->storage_location->prepend(dir);
-    string files_to_fetch;
-    for (auto& p : *files) {
-        Path *n = p->subpath(storage->storage_location->depth());
-        files_to_fetch.append(n->str());
-        files_to_fetch.append("\n");
-        debug(RSYNC, "fetch \"%s\"\n", n->c_str());
-    }
-
-    Path *tmp = local_fs->mkTempFile("beak_fetching_", files_to_fetch);
-
-    RC rc = RC::OK;
-    vector<char> out;
-    vector<string> args;
-    args.push_back("-a");
-    args.push_back("--files-from");
-    args.push_back(tmp->c_str());
-    args.push_back(storage->storage_location->c_str());
-    args.push_back(target_dir->c_str());
-    rc = sys->invoke("rsync", args, &out);
-
-    local_fs->deleteFile(tmp);
-
-    return rc;
-}
-
-void parse_rsync_verbose_output_(ProgressStatistics *st,
-                                 Storage *storage,
-                                 char *buf,
-                                 size_t len)
-{
-    // Parse verbose output and look for:
-    // zlib-1.2.11-winapi/z01_001516784332.462127151_0_3393fb3d96b545ebf05ad9406fff9435eca8cd3eb97714883fa42d92d2fc8ded_0.gz
-
-    string file = storage->storage_location->str()+"/"+string(buf, len);
-    string dir;
-    while (file.back() == '\n') file.pop_back();
-    TarFileName tfn;
-    if (tfn.parseFileName(file, &dir)) {
-        // This was a valid verbose output beak file name.
-        Path *path = tfn.asPathWithDir(Path::lookup(dir));
-        size_t size = 0;
-
-        debug(RSYNC, "copied: %ju \"%s\"\n", st->stats.file_sizes.count(path), path->c_str());
-
-        if (st->stats.file_sizes.count(path)) {
-            size = st->stats.file_sizes[path];
-            st->stats.size_files_stored += size;
-            st->stats.num_files_stored++;
-            st->updateProgress();
-        }
-    }
-}
-
 RC rsyncSendFiles(Storage *storage,
                   vector<Path*> *files,
                   Path *dir,
@@ -185,6 +151,46 @@ RC rsyncSendFiles(Storage *storage,
     args.push_back(storage->storage_location->str());
     vector<char> output;
     RC rc = sys->invoke("rsync", args, &output, CaptureBoth,
+                        [&progress, storage](char *buf, size_t len) {
+                            parse_rsync_verbose_output_(progress,
+                                                        storage,
+                                                        buf,
+                                                        len);
+                        });
+
+    local_fs->deleteFile(tmp);
+
+    return rc;
+}
+
+RC rsyncFetchFiles(Storage *storage,
+                   vector<Path*> *files,
+                   Path *dir,
+                   System *sys,
+                   FileSystem *local_fs,
+                   ProgressStatistics *progress)
+{
+    Path *target_dir = storage->storage_location->prepend(dir);
+    string files_to_fetch;
+    for (auto& p : *files) {
+        Path *n = p->subpath(storage->storage_location->depth());
+        files_to_fetch.append(n->str());
+        files_to_fetch.append("\n");
+        debug(RSYNC, "fetch \"%s\"\n", n->c_str());
+    }
+
+    Path *tmp = local_fs->mkTempFile("beak_fetching_", files_to_fetch);
+
+    RC rc = RC::OK;
+    vector<string> args;
+    args.push_back("-a");
+    args.push_back("-v");
+    args.push_back("--files-from");
+    args.push_back(tmp->c_str());
+    args.push_back(storage->storage_location->c_str());
+    args.push_back(target_dir->c_str());
+    vector<char> output;
+    rc = sys->invoke("rsync", args, &output, CaptureBoth,
                         [&progress, storage](char *buf, size_t len) {
                             parse_rsync_verbose_output_(progress,
                                                         storage,

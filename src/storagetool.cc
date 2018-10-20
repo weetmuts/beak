@@ -74,8 +74,8 @@ void add_backup_work(ptr<ProgressStatistics> st,
 
     // The backup fs has already wrapped any non-regular files inside tars.
     // Thus we only want to send those to the cloud storage site.
-    if (stat->isRegularFile()) {
-
+    if (stat->isRegularFile())
+    {
         // Remember the size of this file. This is necessary to
         // know how many bytes has been transferred when
         // rclone/rsync later reports that a file has been successfully sent.
@@ -122,7 +122,6 @@ void store_local_backup_file(Backup *backup,
     TarFile *tar = backup->findTarFromPath(path, &partnr);
     assert(tar);
 
-    debug(STORAGETOOL, "PATH %s\n", path->c_str());
     Path *file_name = path->prepend(settings->to.storage->storage_location);
     storage_fs->mkDirpWriteable(file_name->parent());
     FileStat old_stat;
@@ -132,7 +131,7 @@ void store_local_backup_file(Backup *backup,
         stat->sameSize(&old_stat) &&
         stat->sameMTime(&old_stat)) {
 
-        debug(STORAGETOOL, "Skipping %s\n", file_name->c_str());
+        debug(STORAGETOOL, "skipping %s\n", file_name->c_str());
     } else {
         if (rc.isOk()) {
             storage_fs->deleteFile(file_name);
@@ -143,7 +142,7 @@ void store_local_backup_file(Backup *backup,
 
         storage_fs->utime(file_name, stat);
         st->stats.num_files_stored++;
-        verbose(STORAGETOOL, "Stored %s\n", file_name->c_str());
+        verbose(STORAGETOOL, "stored %s\n", file_name->c_str());
     }
 //    st->num_files_handled++;
 //    st->size_files_handled += stat->st_size;
@@ -196,7 +195,7 @@ RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backup,
                            return RecurseContinue;
                        });
 
-    debug(STORAGETOOL, "Work to be done: num_files=%ju num_dirs=%ju\n", progress->stats.num_files, progress->stats.num_dirs);
+    debug(STORAGETOOL, "work to be done: num_files=%ju num_dirs=%ju\n", progress->stats.num_files, progress->stats.num_dirs);
 
     switch (storage->type) {
     case FileSystemStorage:
@@ -358,7 +357,7 @@ RC CacheFS::loadDirectoryStructure(map<Path*,CacheEntry> *entries)
         if (TarFileName::isIndexFile(p.first) && !ce->isCached(cache_fs_, cache_dir_, p.first))
         {
             index_files.push_back(p.first);
-            debug(CACHE, "Needs index %s\n", p.first->c_str());
+            debug(CACHE, "needs index %s\n", p.first->c_str());
 
         }
         // Add this file to its directory.
@@ -383,6 +382,9 @@ RC CacheFS::fetchFile(Path *file)
 
 RC CacheFS::fetchFiles(vector<Path*> *files)
 {
+    for (auto p : *files) {
+        debug(CACHE, "fetch %s\n", p->c_str());
+    }
     switch (storage_->type) {
     case NoSuchStorage:
     case FileSystemStorage:
@@ -390,12 +392,12 @@ RC CacheFS::fetchFiles(vector<Path*> *files)
         break;
     case RSyncStorage:
     {
-        debug(CACHE,"Fetching %d files from %s.\n", files->size(), storage_->storage_location->c_str());
+        debug(CACHE, "fetching %d files from rsync %s\n", files->size(), storage_->storage_location->c_str());
         return rsyncFetchFiles(storage_, files, cache_dir_, sys_, cache_fs_, progress_);
     }
     case RCloneStorage:
     {
-        debug(CACHE,"Fetching %d files from %s.\n", files->size(), storage_->storage_location->c_str());
+        debug(CACHE, "fetching %d files from rclone %s\n", files->size(), storage_->storage_location->c_str());
         return rcloneFetchFiles(storage_, files, cache_dir_, sys_, cache_fs_, progress_);
     }
     }

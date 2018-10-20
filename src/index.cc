@@ -82,7 +82,7 @@ RC Index::loadIndex(vector<char> &v,
 
     const char *dtp = "";
     if (dir_to_prepend) dtp = dir_to_prepend->c_str();
-    debug(INDEX, "Loading gz for '%s' with >%s< and %d files.\n", dtp, config.c_str(), num_files);
+    debug(INDEX, "loading gz for %s with %s and %d files.\n", dtp, config.c_str(), num_files);
 
     eof = false;
     while (i != v.end() && !eof && num_files > 0)
@@ -133,9 +133,9 @@ RC Index::loadIndex(vector<char> &v,
         //name.insert(0, "/");
         Path *p = Path::lookup(name);
         if (p->parent()) {
-            debug(INDEX,"  found tar %s in dir %s\n", p->name()->c_str(), p->parent()->c_str());
+            debug(INDEX,"found tar %s in dir %s\n", p->name()->c_str(), p->parent()->c_str());
         } else {
-            debug(INDEX,"  found tar %s\n", p->name()->c_str());
+            debug(INDEX,"found tar %s\n", p->name()->c_str());
         }
 
         it->path = p;

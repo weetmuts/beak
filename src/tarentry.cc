@@ -64,7 +64,7 @@ TarEntry::TarEntry(size_t size, TarHeaderStyle ths)
     // Round size to nearest 512 byte boundary
     children_size_ = blocked_size_ = (size%T_BLOCKSIZE==0)?size:(size+T_BLOCKSIZE-(size%T_BLOCKSIZE));
 
-    debug(TARENTRY, "Index file entry added size %ju blocked size %ju!\n", fs_.st_size, blocked_size_);
+    debug(TARENTRY, "index file entry added size %ju blocked size %ju!\n", fs_.st_size, blocked_size_);
 }
 
 TarEntry::TarEntry(Path *ap, Path *p, FileStat *st, TarHeaderStyle ths) : fs_(*st)
@@ -95,7 +95,7 @@ TarEntry::TarEntry(Path *ap, Path *p, FileStat *st, TarHeaderStyle ths) : fs_(*s
         }
         destination[l] = '\0';
         link_ = Path::lookup(destination);
-        debug(TARENTRY, "Found link from %s to %s\n", abspath_->c_str(), destination);
+        debug(TARENTRY, "found link from %s to %s\n", abspath_->c_str(), destination);
     }
 
     updateSizes();
@@ -146,7 +146,7 @@ TarEntry::TarEntry(Path *ap, Path *p, FileStat *st, TarHeaderStyle ths) : fs_(*s
         tv_line_right = s;
     }
 
-    debug(TARENTRY, "Entry %s added size %ju blocked size %ju!\n", path_->c_str(), fs_.st_size, blocked_size_);
+    debug(TARENTRY, "entry %s added size %ju blocked size %ju!\n", path_->c_str(), fs_.st_size, blocked_size_);
 }
 
 void TarEntry::calculateTarpath(Path *storage_dir) {
@@ -156,7 +156,7 @@ void TarEntry::calculateTarpath(Path *storage_dir) {
 
     updateSizes();
     if (header_size_ < old_header_size) {
-        debug(TARENTRY,"Avoided long path block!\n");
+        debug(TARENTRY,"avoided long path block!\n");
     }
 }
 
@@ -176,11 +176,11 @@ void TarEntry::createLargeTar(uint32_t hash, TarEntry *te) {
 size_t TarEntry::copy(char *buf, size_t size, size_t from, FileSystem *fs)
 {
     size_t copied = 0;
-    debug(TARENTRY, "Copying from %s\n", name_->c_str());
+    debug(TARENTRY, "copying from %s\n", name_->c_str());
 
     if (size > 0 && from < header_size_)
     {
-        debug(TARENTRY, "Copying max %zu from %zu, now inside header (header size=%ju)\n", size, from,
+        debug(TARENTRY, "copying max %zu from %zu, now inside header (header size=%ju)\n", size, from,
               header_size_);
 
         char tmp[header_size_];
@@ -199,7 +199,7 @@ size_t TarEntry::copy(char *buf, size_t size, size_t from, FileSystem *fs)
             memcpy(tmp+p, llh.buf(), T_BLOCKSIZE);
             memcpy(tmp+p+T_BLOCKSIZE, link_->c_str(), link_->c_str_len());
             p += th.numLongLinkBlocks()*T_BLOCKSIZE;
-            debug(TARENTRY, "Wrote long link header for %s\n", link_->c_str());
+            debug(TARENTRY, "wrote long link header for %s\n", link_->c_str());
         }
 
         if (th.numLongPathBlocks() > 0)
@@ -212,7 +212,7 @@ size_t TarEntry::copy(char *buf, size_t size, size_t from, FileSystem *fs)
             memcpy(tmp+p, lph.buf(), T_BLOCKSIZE);
             memcpy(tmp+p+T_BLOCKSIZE, tarpath_->c_str(), tarpath_->c_str_len());
             p += th.numLongPathBlocks()*T_BLOCKSIZE;
-            debug(TARENTRY, "Wrote long path header for %s\n", tarpath_->c_str());
+            debug(TARENTRY, "wrote long path header for %s\n", tarpath_->c_str());
         }
 
         memcpy(tmp+p, th.buf(), T_BLOCKSIZE);
@@ -222,7 +222,7 @@ size_t TarEntry::copy(char *buf, size_t size, size_t from, FileSystem *fs)
         if (len > size) {
             len = size;
         }
-        debug(TARENTRY, "    header out from %s %zu size=%zu\n", path_->c_str(), from, len);
+        debug(TARENTRY, "header out from %s %zu size=%zu\n", path_->c_str(), from, len);
         assert(from+len <= header_size_);
         memcpy(buf, tmp+from, len);
         size -= len;
@@ -232,11 +232,11 @@ size_t TarEntry::copy(char *buf, size_t size, size_t from, FileSystem *fs)
     }
 
     if (size > 0 && copied < blocked_size_ && from >= header_size_ && from < blocked_size_) {
-        debug(TARENTRY, "Copying max %zu from %zu from content %s\n"
+        debug(TARENTRY, "copying max %zu from %zu from content %s\n"
 	      "with blocked_size=%zu header_size=%zu hard?=%d\n", size, from, tarpath_->c_str(), blocked_size_, header_size_,
 	    is_hard_linked_);
         if (virtual_file_) {
-            debug(TARENTRY, "Reading from virtual file size=%ju copied=%ju blocked_size=%ju from=%ju header_size=%ju\n",
+            debug(TARENTRY, "reading from virtual file size=%ju copied=%ju blocked_size=%ju from=%ju header_size=%ju\n",
                   size, copied, blocked_size_, from, header_size_);
             size_t off = from - header_size_;
             size_t len = content.size()-off;
@@ -248,9 +248,9 @@ size_t TarEntry::copy(char *buf, size_t size, size_t from, FileSystem *fs)
             buf += len;
             copied += len;
         } else {
-            debug(TARENTRY, "Reading from file size=%ju copied=%ju blocked_size=%ju from=%ju header_size=%ju\n",
+            debug(TARENTRY, "reading from file size=%ju copied=%ju blocked_size=%ju from=%ju header_size=%ju\n",
                   size, copied, blocked_size_, from, header_size_);
-            debug(TARENTRY, "    contents out from %s %zu size=%zu\n", path_->c_str(), from-header_size_, size);
+            debug(TARENTRY, "        contents out from %s %zu size=%zu\n", path_->c_str(), from-header_size_, size);
             ssize_t l = fs->pread(abspath_, buf, size, from-header_size_);
             if (l==-1) {
                 failure(TARENTRY, "Could not open file \"%s\"\n", abspath_->c_str());
@@ -268,7 +268,7 @@ size_t TarEntry::copy(char *buf, size_t size, size_t from, FileSystem *fs)
     }
     memset(buf, 0, remainder);
     copied += remainder;
-    debug(TARENTRY, "Copied %zu bytes\n", copied);
+    debug(TARENTRY, "copied %zu bytes\n", copied);
     return copied;
 }
 
@@ -330,7 +330,7 @@ void TarEntry::rewriteIntoHardLink(TarEntry *target) {
 bool TarEntry::calculateHardLink(Path *storage_dir)
 {
     Path *new_link = link_->subpath(storage_dir->depth());
-    debug(HARDLINKS, "Removed prefix from >%s< to >%s<\n", link_->c_str(), new_link->c_str());
+    debug(HARDLINKS, "removed prefix from >%s< to >%s<\n", link_->c_str(), new_link->c_str());
     link_ = new_link;
     updateSizes();
     return true;

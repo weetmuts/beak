@@ -112,7 +112,7 @@ bool Match::use(string pattern)
             error(MATCH,"Invalid pattern \"%s\"", pattern.c_str());
         }
     }
-    debug(MATCH,"Pattern \"%s\" rooted=%d suffix_doublestar=%d "
+    debug(MATCH,"pattern \"%s\" rooted=%d suffix_doublestar=%d "
           "suffix_singlestar=%d prefix_singlestar=%d\n",
           pattern_.c_str(), rooted_, suffix_doublestar_, suffix_singlestar_, prefix_singlestar_);
     return true;
@@ -124,7 +124,7 @@ bool Match::match(const char *path) {
 
 bool Match::match(const char *path, size_t len)
 {
-    debug(MATCH,"Does path  \"%s\" match filter \"%s\" ?\n", path, pattern_.c_str());
+    debug(MATCH,"does path '%s' match filter '%s' ?\n", path, pattern_.c_str());
     if (rooted_) {
         // Match from the beginning.
         if (suffix_doublestar_) {
@@ -136,11 +136,11 @@ bool Match::match(const char *path, size_t len)
                 m = (path[pattern_.length()] == 0 ||
                      path[pattern_.length()] == '/');
             }
-            debug(MATCH,"Rooted double star match %d\n", m);
+            debug(MATCH,"rooted double star match %d\n", m);
             return m;
         }
         bool m = 0 == strcmp(pattern_.c_str(), path);
-        debug(MATCH,"Rooted exact match %d\n", m);
+        debug(MATCH,"rooted exact match %d\n", m);
         return m;
     }
 
@@ -155,14 +155,14 @@ bool Match::match(const char *path, size_t len)
             p++;
             p = strstr(p, pattern_.c_str());
         }
-        debug(MATCH,"Double star match %d\n", m);
+        debug(MATCH,"double star match %d\n", m);
         return m;
     }
 
     const char *p = strrchr(path, '/');
     if (p == NULL) p = path; else p++;
     size_t slen = strlen(p);
-    debug(MATCH,"Last element in path \"%s\"\n", p);
+    debug(MATCH,"last element in path \"%s\"\n", p);
 
     if (prefix_singlestar_) {
         bool m = false;
@@ -175,13 +175,13 @@ bool Match::match(const char *path, size_t len)
                      p[pattern_.length()] == '/');
             }
         }
-        debug(MATCH,"Prefix single star %d\n", m);
+        debug(MATCH,"prefix single star %d\n", m);
         return m;
     }
 
     if (suffix_singlestar_) {
         bool m = (0 == strncmp(p, pattern_.c_str(), pattern_.length()));
-        debug(MATCH,"Single star last %d\n", m);
+        debug(MATCH,"single star last %d\n", m);
         return m;
     }
     return 0 == strcmp(p, pattern_.c_str());

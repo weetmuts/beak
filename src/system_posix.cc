@@ -81,9 +81,9 @@ void *regularThread(void *data)
             int rc = usleep(1000000);
             if (rc == -1) {
                 if (errno == EINTR) {
-                    debug(SYSTEM, "Regular thread callback awaken by signal.\n");
+                    debug(SYSTEM, "regular thread callback awaken by signal.\n");
                 } else {
-                    error(SYSTEM, "Could not sleep.\n");
+                    error(SYSTEM, "could not sleep.\n");
                 }
             }
         }
@@ -271,7 +271,7 @@ RC SystemImplementation::invoke(string program,
                 }
             }
         }
-        debug(SYSTEM,"Waiting for child %d.\n", pid);
+        debug(SYSTEM,"waiting for child %d.\n", pid);
         // Wait for the child to finish!
         waitpid(pid, &status, 0);
         if (WIFEXITED(status)) {
@@ -294,7 +294,7 @@ RC SystemImplementation::invokeShell(Path *init_file)
     argv[1] = "--init-file";
     argv[2] = init_file->c_str();
     argv[3] = NULL;
-    debug(SYSTEM, "Invoking shell: \"%s --init-file %s\"\n", argv[0], argv[2]);
+    debug(SYSTEM, "invoking shell: \"%s --init-file %s\"\n", argv[0], argv[2]);
 
     int pid = fork();
 

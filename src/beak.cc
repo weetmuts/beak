@@ -241,7 +241,7 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
             error(COMMANDLINE, "A point in time must only be suffixed to a storage.\n");
         }
         argument.point_in_time = point;
-        debug(COMMANDLINE, "Found point in time (%s) after storage %s\n", point.c_str(), arg.c_str());
+        debug(COMMANDLINE, "found point in time (%s) after storage %s\n", point.c_str(), arg.c_str());
     }
 
     if (expected_type == ArgDir) {
@@ -253,7 +253,7 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
         }
         argument.dir = rp;
         argument.type = ArgDir;
-        debug(COMMANDLINE, "Found directory arg \"%s\", as expected.\n", dir->c_str());
+        debug(COMMANDLINE, "found directory arg \"%s\", as expected.\n", dir->c_str());
         return argument;
     }
 
@@ -266,12 +266,12 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
             argument.storage = storage;
 
             switch (storage->type) {
-            case FileSystemStorage: debug(COMMANDLINE, "Storage \"%s\" parsed as directory.\n", arg.c_str()); break;
-            case RCloneStorage: debug(COMMANDLINE, "Storage \"%s\" parsed as rclone.\n", arg.c_str()); break;
-            case RSyncStorage: debug(COMMANDLINE, "Storage \"%s\" parsed as rsync.\n", arg.c_str()); break;
+            case FileSystemStorage: debug(COMMANDLINE, "storage \"%s\" parsed as directory.\n", arg.c_str()); break;
+            case RCloneStorage: debug(COMMANDLINE, "storage \"%s\" parsed as rclone.\n", arg.c_str()); break;
+            case RSyncStorage: debug(COMMANDLINE, "storage \"%s\" parsed as rsync.\n", arg.c_str()); break;
             case NoSuchStorage: break;
             }
-            debug(COMMANDLINE, "Found storage arg \"%s\", as expected.\n", storage_location->c_str());
+            debug(COMMANDLINE, "found storage arg \"%s\", as expected.\n", storage_location->c_str());
             return argument;
         }
 
@@ -289,7 +289,7 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
             argument.rule = rule;
             argument.origin = argument.rule->origin_path;
             argument.type = ArgRule;
-            debug(COMMANDLINE, "Found rule arg %s pointing to origin %s\n",
+            debug(COMMANDLINE, "found rule arg %s pointing to origin %s\n",
                   arg.c_str(), argument.rule->origin_path->c_str());
             return argument;
         }
@@ -308,7 +308,7 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
             }
             argument.origin = rp;
             argument.type = ArgOrigin;
-            debug(COMMANDLINE, "Found origin arg \"%s\".\n", origin->c_str());
+            debug(COMMANDLINE, "found origin arg \"%s\".\n", origin->c_str());
             return argument;
         }
 
@@ -744,7 +744,7 @@ RC BeakImplementation::restore(Settings *settings)
                                                                  point);
                                     return RecurseContinue; });
 
-    debug(STORE, "Work to be done: num_files=%ju num_hardlinks=%ju num_symlinks=%ju num_nodes=%ju num_dirs=%ju\n",
+    debug(STORE, "work to be done: num_files=%ju num_hardlinks=%ju num_symlinks=%ju num_nodes=%ju num_dirs=%ju\n",
           progress->stats.num_files, progress->stats.num_hard_links, progress->stats.num_symbolic_links,
           progress->stats.num_nodes, progress->stats.num_dirs);
 

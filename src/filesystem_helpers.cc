@@ -193,7 +193,7 @@ bool ReadOnlyCacheFileSystemBaseImplementation::fileCached(Path *p)
 {
     if (entries_.count(p) == 0) {
         // No such file found!
-        debug(CACHE, "No such file found in cache index: %s\n", p->c_str());
+        debug(CACHE, "no such file found in cache index: %s\n", p->c_str());
         return false;
     }
     CacheEntry *e = &entries_[p];
@@ -205,7 +205,7 @@ bool ReadOnlyCacheFileSystemBaseImplementation::fileCached(Path *p)
         return true;
     }
 
-    debug(CACHE, "Fetching file: %s\n", p->c_str());
+    debug(CACHE, "needs: %s\n", p->c_str());
     RC rc = fetchFile(p);
 
     if (rc.isErr()) {

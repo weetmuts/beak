@@ -71,7 +71,6 @@ void UI::redrawLineOutput(const char *fmt, ...)
         fprintf(stdout, "\n");
     }
     fflush(stdout);
-
 }
 
 void UI::outputPrompt(const char *msg)

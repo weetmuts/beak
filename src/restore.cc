@@ -226,7 +226,7 @@ bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
     gunzipit(&buf, &contents);
     auto i = contents.begin();
 
-    debug(RESTORE, "Parsing %s for files in %s\n", gz->c_str(), dir_to_prepend->c_str());
+    debug(RESTORE, "parsing %s for files in %s\n", gz->c_str(), dir_to_prepend->c_str());
     struct IndexEntry index_entry;
     struct IndexTar index_tar;
 
@@ -236,11 +236,11 @@ bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
     rc = Index::loadIndex(contents, i, &index_entry, &index_tar, dir_to_prepend,
              [this,point,&es,dir_to_prepend](IndexEntry *ie){
                          if (point->entries_.count(ie->path) == 0) {
-                             debug(RESTORE, "Adding entry for >%s< %p\n", ie->path->c_str());
+                             debug(RESTORE, "adding entry for >%s< %p\n", ie->path->c_str());
                              // Trigger storage of entry.
                              point->entries_[ie->path];
                          } else {
-                             debug(RESTORE, "Using existing entry for >%s< %p\n", ie->path->c_str());
+                             debug(RESTORE, "using existing entry for >%s< %p\n", ie->path->c_str());
                          }
                          Entry *e = &(point->entries_)[ie->path];
                          assert(e->path = ie->path);
@@ -283,12 +283,12 @@ bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
         if (c == 0) {
             d->path = pp;
         }
-        debug(RESTORE, "Added %s %p to dir >%s< %p\n", i->path->c_str(), i, pp->c_str(), d);
+        debug(RESTORE, "added %s %p to dir >%s< %p\n", i->path->c_str(), i, pp->c_str(), d);
         d->dir.push_back(i);
         d->loaded = true;
     }
 
-    debug(RESTORE, "Found proper gz file! %s\n", gz->c_str());
+    debug(RESTORE, "found proper index file! %s\n", gz->c_str());
 
     return true;
 }
@@ -297,7 +297,7 @@ Path *Restore::loadDirContents(PointInTime *point, Path *path)
 {
     FileStat stat;
     Path *gz = point->gz_files_[path];
-    debug(RESTORE, "Looking for index file in dir >%s< (found %p)\n", path->c_str(), gz);
+    debug(RESTORE, "looking for index file in dir >%s< (found %p)\n", path->c_str(), gz);
     if (gz != NULL) {
         gz = gz->prepend(rootDir());
         RC rc = backup_fs_->stat(gz, &stat);
@@ -321,25 +321,25 @@ void Restore::loadCache(PointInTime *point, Path *path)
         }
     }
 
-    debug(RESTORE, "Load cache for >%s<\n", path->c_str());
+    debug(RESTORE, "load cache for '%s'\n", path->c_str());
     // Walk up in the directory structure until a gz file is found.
     for (;;)
     {
         Path *gz = loadDirContents(point, path);
         if (point->entries_.count(path) == 1) {
             // Success
-            debug(RESTORE, "Found %s in gz %s\n", path->c_str(), gz->c_str());
+            debug(RESTORE, "found '%s' in index '%s'\n", path->c_str(), gz->c_str());
             return;
         }
         if (path != opath) {
             // The file, if it exists should have been found here. Therefore we
             // conclude that the file does not exist.
-            debug(RESTORE, "NOT found %s in gz %s\n", path->c_str(), gz->c_str());
+            debug(RESTORE, "NOT found %s in index %s\n", path->c_str(), gz->c_str());
             return;
         }
         if (path->isRoot()) {
             // No gz file found anywhere! This filesystem should not have been mounted!
-            debug(RESTORE, "No gz found anywhere!\n");
+            debug(RESTORE, "no index file found anywhere!\n");
             return;
         }
         // Move up in the directory tree.
@@ -356,7 +356,7 @@ Entry *Restore::findEntry(PointInTime *point, Path *path)
         loadCache(point, path);
         if (point->entries_.count(path) == 0)
         {
-            debug(RESTORE, "Not found %s!\n", path->c_str());
+            debug(RESTORE, "not found '%s'\n", path->c_str());
             return NULL;
         }
     }
@@ -373,7 +373,7 @@ struct RestoreFuseAPI : FuseAPI
 
     int getattrCB(const char *path_char_string, struct stat *stbuf)
     {
-        debug(RESTORE, "getattrCB >%s<\n", path_char_string);
+        debug(RESTORE, "getattr '%s'\n", path_char_string);
 
         LOCK(&restore_->global);
 
@@ -507,7 +507,7 @@ struct RestoreFuseAPI : FuseAPI
     int readdirCB(const char *path_char_string, void *buf,
                   fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
     {
-        debug(RESTORE, "readdirCB >%s<\n", path_char_string);
+        debug(RESTORE, "readdir '%s'\n", path_char_string);
 
         LOCK(&restore_->global);
 
@@ -543,7 +543,7 @@ struct RestoreFuseAPI : FuseAPI
         if (!e->fs.isDirectory()) goto err;
 
         if (!e->loaded) {
-            debug(RESTORE,"Not loaded %s\n", e->path->c_str());
+            debug(RESTORE,"not loaded %s\n", e->path->c_str());
             restore_->loadCache(point, e->path);
         }
         filler(buf, ".", NULL, 0);
@@ -571,7 +571,7 @@ struct RestoreFuseAPI : FuseAPI
 
     int readlinkCB(const char *path_char_string, char *buf, size_t s)
     {
-        debug(RESTORE, "readlinkCB >%s<\n", path_char_string);
+        debug(RESTORE, "readlink %s\n", path_char_string);
 
         LOCK(&restore_->global);
 
@@ -594,7 +594,7 @@ struct RestoreFuseAPI : FuseAPI
 
         memcpy(buf, e->symlink.c_str(), c);
         buf[c] = 0;
-        debug(RESTORE, "readlinkCB >%s< bufsiz=%ju returns buf=>%s<\n", path, s, buf);
+        debug(RESTORE, "readlink %s bufsiz=%ju returns buf=>%s<\n", path, s, buf);
 
         goto ok;
 
@@ -612,7 +612,7 @@ struct RestoreFuseAPI : FuseAPI
     int readCB(const char *path_char_string, char *buf,
                size_t size, off_t offset_, struct fuse_file_info *fi)
     {
-        debug(RESTORE, "readCB >%s< offset=%ju size=%ju\n", path_char_string, offset_, size);
+        debug(RESTORE, "read '%s' offset=%ju size=%ju\n", path_char_string, offset_, size);
 
         LOCK(&restore_->global);
 
@@ -653,7 +653,7 @@ struct RestoreFuseAPI : FuseAPI
         // Offset into tar file.
         offset += e->offset;
 
-        debug(RESTORE, "Reading %ju bytes from offset %ju in file %s\n", size, offset, tar->c_str());
+        debug(RESTORE, "reading %ju bytes from offset %ju in file %s\n", size, offset, tar->c_str());
         rc = restore_->backupFileSystem()->pread(tar, buf, size, offset);
         if (rc == -1)
         {
@@ -701,7 +701,7 @@ RC Restore::lookForPointsInTime(PointInTimeFormat f, Path *path)
             p.datetime = datetime;
             p.filename = f->str();
             history_.push_back(p);
-            debug(RESTORE, "Found index file %s\n", f->c_str());
+            debug(RESTORE, "found index file %s\n", f->c_str());
         }
     }
 
@@ -771,7 +771,7 @@ RC Restore::loadBeakFileSystem(Settings *settings)
 
     for (auto &point : history()) {
         string name = point.filename;
-        debug(RESTORE,"Found backup for %s filename %s\n", point.ago.c_str(), name.c_str());
+        debug(RESTORE,"found backup for %s filename %s\n", point.ago.c_str(), name.c_str());
 
         // Check that it is a proper file.
         FileStat stat;

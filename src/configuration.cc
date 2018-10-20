@@ -197,7 +197,7 @@ bool ConfigurationImplementation::parseRow(string key, string value,
 {
     RuleKeyWord rkw;
     bool ok;
-    debug(CONFIGURATION,"Loading %s:%s for rule %s\n", key.c_str(), value.c_str(), current_rule->name.c_str());
+    debug(CONFIGURATION,"loading %s:%s for rule %s\n", key.c_str(), value.c_str(), current_rule->name.c_str());
     lookupType(key,RuleKeyWord,rule_keywords_,rkw,ok);
     if (ok) {
         switch (rkw) {
@@ -323,7 +323,7 @@ bool ConfigurationImplementation::load()
                 rules_[name] = Rule();
                 current_rule = &rules_[name];
                 current_rule->name = name;
-                debug(CONFIGURATION,"Loading configuration for rule [%s]\n", name.c_str());
+                debug(CONFIGURATION,"loading configuration for rule [%s]\n", name.c_str());
             } else {
                 vector<char> line(block.begin(), block.end());
                 // Like in bash, a backslash at the end of the line means

@@ -89,7 +89,7 @@ size_t calculate_header_size_(FileStat *fs, Path *tarpath, Path *link,
         // bytes will need a third block etc
         *num_long_path_blocks = 2 + tarpath->c_str_len()/T_BLOCKSIZE;
         *num_header_blocks += *num_long_path_blocks;
-        debug(TAR, "Added %ju blocks for long path header for %s\n", *num_long_path_blocks, tarpath->c_str());
+        debug(TAR, "added %ju blocks for long path header for %s\n", *num_long_path_blocks, tarpath->c_str());
     }
 
     bool link_fits = true;
@@ -102,7 +102,7 @@ size_t calculate_header_size_(FileStat *fs, Path *tarpath, Path *link,
             // bytes will need a third block etc
             *num_long_link_blocks = 2 + link->c_str_len()/T_BLOCKSIZE;
             *num_header_blocks += *num_long_link_blocks;
-            debug(TAR, "Added %ju blocks for long link header for %s\n", *num_long_link_blocks, link->c_str());
+            debug(TAR, "added %ju blocks for long link header for %s\n", *num_long_link_blocks, link->c_str());
 	}
     }
 

@@ -28,16 +28,16 @@ ComponentId LOCK = registerLogComponent("lock");
 
 void lockMutex(pthread_mutex_t *lock, const char *func, const char *file, int line)
 {
-    debug(LOCK, "Taking lock %p %s %s:%d\n", &lock, func, file, line);
+    debug(LOCK, "taking %p %s %s:%d\n", &lock, func, file, line);
     pthread_mutex_lock(lock);
-    debug(LOCK, "Lock taken  %p %s %s:%d\n", &lock, func, file, line);
+    debug(LOCK, "taken  %p %s %s:%d\n", &lock, func, file, line);
 }
 
 void unlockMutex(pthread_mutex_t *lock, const char *func, const char *file, int line)
 {
-    debug(LOCK, "Returning lock %p %s %s:%d\n", &lock, func, file, line);
+    debug(LOCK, "returning %p %s %s:%d\n", &lock, func, file, line);
     pthread_mutex_unlock(lock);
-    debug(LOCK, "Lock returned  %p %s %s:%d\n", &lock, func, file, line);
+    debug(LOCK, "returned  %p %s %s:%d\n", &lock, func, file, line);
 }
 
 #endif

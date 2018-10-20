@@ -456,7 +456,7 @@ bool FileSystemImplementationPosix::createFile(Path *file,
         }
     }
 
-    debug(FILESYSTEM,"Writing %ju bytes to file %s\n", remaining, file->c_str());
+    debug(FILESYSTEM,"writing %ju bytes to file %s\n", remaining, file->c_str());
 
     while (remaining > 0) {
         size_t read = (remaining > sizeof(buf)) ? sizeof(buf) : remaining;

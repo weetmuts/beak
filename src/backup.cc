@@ -101,10 +101,10 @@ RecurseOption Backup::addTarEntry(Path *abspath, FileStat *st)
         }
     }
     if (name[1] != 0 && status) {
-        debug(BACKUP, "Filter dropped \"%s\"\n", name);
+        debug(BACKUP, "filter dropped \"%s\"\n", name);
         return RecurseContinue;
     } else {
-        debug(BACKUP, "Filter NOT dropped \"%s\"\n", name);
+        debug(BACKUP, "filter NOT dropped \"%s\"\n", name);
     }
 
     // Creation and storage of entry.
@@ -115,7 +115,7 @@ RecurseOption Backup::addTarEntry(Path *abspath, FileStat *st)
         // Storing the path in the lookup
         directories[te->path()] = te;
         origin_fs_->addWatch(abspath);
-        debug(BACKUP, "Added directory >%s< %p %p\n", te->path()->c_str(), te->path(), directories[te->path()]);
+        debug(BACKUP, "added dir >%s< %p %p\n", te->path()->c_str(), te->path(), directories[te->path()]);
     }
     return RecurseContinue;
 }
@@ -138,13 +138,10 @@ void Backup::findTarCollectionDirs() {
     for(auto & e : files) {
         TarEntry *te = e.second;
 
-        debug(BACKUP, "ISDIR >%s< %d\n", te->path()->c_str(), te->isDirectory());
-
         if (te->isDirectory()) {
             bool must_generate_tars = (te->path()->depth() <= 1 ||
                                  te->path()->depth() == forced_tar_collection_dir_depth);
 
-            debug(BACKUP, "TARS >%s< %d gentars? %d\n", te->path()->c_str(), te->path()->depth(), must_generate_tars);
             for (auto &g : triggers) {
                 bool match = g.match(te->path()->c_str());
                 if (match) {
@@ -158,8 +155,7 @@ void Backup::findTarCollectionDirs() {
             if (must_generate_tars || ought_to_generate_tars) {
                 te->setAsStorageDir();
                 tar_storage_directories[te->path()] = te;
-                string hs = humanReadable(te->childrenSize());
-                //verbose(BACKUP, "Collapsed %s\n", te->path()->c_str(), hs.c_str());
+                debug(BACKUP, "storage dir selected %s\n", te->path()->c_str());
                 TarEntry *i = te;
                 while (i->parent() != NULL) {
                     i->parent()->addChildrenSize(-te->childrenSize());
