@@ -572,6 +572,11 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
                           "Cannot set split size because \"%s\" is not a proper number (e.g. 1,2K,3M,4G,5T)\n",
                           value.c_str());
                 }
+                // Mask the lowest 9 bits to make the split size a multiple of 512.
+                size_t masked_size = parsed_size & ~((size_t)0x1ff);
+                if (masked_size != parsed_size) {
+                    fprintf(stderr, " FROM %zu to %zu\n", parsed_size, masked_size);
+                }
                 settings->splitsize = parsed_size;
                 settings->splitsize_supplied = true;
             }

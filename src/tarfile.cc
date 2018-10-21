@@ -55,7 +55,7 @@ void TarFile::addEntryLast(TarEntry *entry)
     entry->registerTarFile(this, current_tar_offset_);
     contents_[current_tar_offset_] = entry;
     offsets.push_back(current_tar_offset_);
-    debug(TARFILE, "    %s    Added %s at %zu\n", name_.c_str(),
+    debug(TARFILE, "%s: added %s at %zu\n", name_.c_str(),
           entry->path()->c_str(), current_tar_offset_);
     current_tar_offset_ += entry->blockedSize();
 }
@@ -452,7 +452,10 @@ size_t TarFile::copy(char *buf, size_t bufsize, off_t offset, FileSystem *fs, ui
             size_t file_offset = calculateOriginTarOffset(partnr, header_size_);
             assert(file_offset > tar_entry_->headerSize());
             file_offset -= tar_entry_->headerSize();
-            th.setMultivolType("Hoolabandoola", file_offset);
+
+            assert(tar_entry_->tarpath()->str().length() < 100);
+
+            th.setMultivolType(tar_entry_->tarpath()->c_str(), file_offset);
             th.setSize(tar_entry_->stat()->st_size-file_offset);
             th.calculateChecksum();
 
