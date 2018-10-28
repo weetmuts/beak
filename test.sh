@@ -441,8 +441,24 @@ fi
 
 setup splitparts "Split large file into multiple small parts"
 if [ $do_test ]; then
-    dd if=/dev/urandom of=$root'/largefile' count=71 bs=1023
+    dd if=/dev/urandom of=$root'/largefile' count=71 bs=1023 > /dev/null 2>&1
     performStore "-ta 25K -ts 66K"
+    standardStoreUntarTest
+    echo OK
+fi
+
+setup splitmoreparts "Split larger file into multiple small parts"
+if [ $do_test ]; then
+    dd if=/dev/urandom of=$root'/largefile' count=3271 bs=1023 > /dev/null 2>&1
+    performStore "-ta 100K -ts 213K"
+    standardStoreUntarTest
+    echo OK
+fi
+
+setup splitmanymoreparts "Split larger file into many many small parts"
+if [ $do_test ]; then
+    dd if=/dev/urandom of=$root'/largefile' count=8192 bs=2048 > /dev/null 2>&1
+    performStore "-ta 15K -ts 37K"
     standardStoreUntarTest
     echo OK
 fi

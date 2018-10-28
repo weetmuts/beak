@@ -226,11 +226,11 @@ while IFS='' read tar_file; do
     else
 
         # Multi part V2 file!
-        prefix=$(echo "$tar_file" | sed "s/\(.*_\)[0-9a-b]\+-.*/\1/")
+        prefix=$(echo "$tar_file" | sed "s/\(.*_\)[0-9a-f]\+-.*/\1/")
         suffix=".tar"
-        first=$(echo "$tar_file" | sed "s/.*_\([0-9a-b]\+\)-.*/\1/")
+        first=$(echo "$tar_file" | sed "s/.*_\([0-9a-f]\+\)-.*/\1/")
         first=$((0x$first))
-        numx=$(echo "$tar_file" | sed "s/.*-\([0-9a-b]\+\)_.*/\1/")
+        numx=$(echo "$tar_file" | sed "s/.*-\([0-9a-f]\+\)_.*/\1/")
         num=$((0x$numx))
         size=$(echo "$tar_file" | sed "s/.*_\([0-9]\+\)\.tar/\1/")
         partnrwidth=$(echo -n $numx | wc --c)
@@ -238,9 +238,9 @@ while IFS='' read tar_file; do
         read last_part
         if [ "$(echo "$last_part" | grep -o "$prefix")" = "$prefix" ]
         then
-            last=$(echo "$last_part" | sed "s/.*_\([0-9a-b]\+\)-.*/\1/")
+            last=$(echo "$last_part" | sed "s/.*_\([0-9a-f]\+\)-.*/\1/")
             last=$((0x$last))
-            nummx=$(echo "$last_part" | sed "s/.*-\([0-9a-b]\+\)_.*/\1/")
+            nummx=$(echo "$last_part" | sed "s/.*-\([0-9a-f]\+\)_.*/\1/")
             numm=$((0x$nummx))
             lastsize=$(echo "$last_part" | sed "s/.*_\([0-9]\+\)\.tar/\1/")
 
@@ -249,26 +249,25 @@ while IFS='' read tar_file; do
             cat > ${newvolumescript} <<EOF
 #!/bin/bash
 
-format="$(printf "%%s%%0%dx-%s_%%s%%s" ${partnrwidth} ${numx})"
-
-if [ "\$TAR_VOLUME" = "$num" ]
-then
-    # Last part
-    partsize="$lastsize"
-else
-    partsize="$size"
-fi
 part=\$((TAR_VOLUME - 1))
 
-foo=\$(printf "\${format}" "${root}/${prefix}" "\${part}" "\${partsize}" "${suffix}")
-
-echo "\${foo}" >&\$TAR_FD
-
-if [ "\$TAR_VOLUME" = "$num" ]
+if [ "\$part" = "$num" ]
 then
     exit 1
 fi
 
+format="$(printf "%%s%%0%dx-%s_%%s%%s" ${partnrwidth} ${numx})"
+
+if [ "\$TAR_VOLUME" = "$num" ]
+then
+    partsize="$lastsize"
+else
+    partsize="$size"
+fi
+
+foo=\$(printf "\${format}" "${root}/${prefix}" "\${part}" "\${partsize}" "${suffix}")
+
+echo "\${foo}" >&\$TAR_FD
 
 EOF
 
