@@ -19,6 +19,7 @@
 #include "fit.h"
 #include "log.h"
 #include "match.h"
+#include "tar.h"
 #include "util.h"
 
 #include <assert.h>
@@ -33,6 +34,7 @@ static ComponentId TEST_KEEP = registerLogComponent("test_keep");
 static ComponentId TEST_FIT = registerLogComponent("test_fit");
 static ComponentId TEST_HUMANREADABLE = registerLogComponent("human_readable");
 static ComponentId TEST_HEXSTRING = registerLogComponent("hex_string");
+static ComponentId TEST_SPLIT = registerLogComponent("split");
 
 void testMatch(string pattern, const char *path, bool should_match)
     throw (string);
@@ -49,6 +51,7 @@ void testKeeps();
 void testHumanReadable();
 void testHexStrings();
 void testFit();
+void testSplitLogic();
 void predictor(int argc, char **argv);
 
 int main(int argc, char *argv[])
@@ -67,7 +70,7 @@ int main(int argc, char *argv[])
     }
     try {
         fs = newDefaultFileSystem();
-
+        /*
         testMatching();
         testRandom();
         testFileSystem();
@@ -75,7 +78,8 @@ int main(int argc, char *argv[])
         testKeeps();
         testHumanReadable();
         testHexStrings();
-        testFit();
+        testFit();*/
+        testSplitLogic();
 
         if (!err_found_) {
             printf("OK\n");
@@ -392,4 +396,65 @@ void predictor(int argc, char **argv)
     } catch (string e) {
         fprintf(stderr, "ERR: %s\n", e.c_str());
     }
+}
+
+extern void splitParts_(size_t file_size,
+                        size_t split_size,
+                        TarHeaderStyle ths,
+                        uint *num_parts,
+                        size_t *part_size,
+                        size_t *last_part_size,
+                        size_t *mv_header_size);
+
+void testSplitLogic()
+{
+    uint num_parts = 0;
+    size_t part_size = 0;
+    size_t last_part_size = 0;
+    size_t mv_header_size = 0;
+
+    size_t file_size = 700*1024*1024;
+    size_t split_size = 50*1024*1024;
+    splitParts_(file_size, split_size, Simple, &num_parts, &part_size, &last_part_size, &mv_header_size);
+
+    verbose(TEST_SPLIT, "Simple header %zu %zu np=%u ps=%zu lps=%zu mhs=%zu\n",
+            file_size, split_size, num_parts, part_size, last_part_size, mv_header_size);
+
+    if (num_parts != 15 || part_size != split_size || last_part_size != 7168 || mv_header_size != 512)
+    {
+        error(TEST_FIT,"Split calculated the wrong values.\n");
+    }
+
+    splitParts_(file_size, split_size, None, &num_parts, &part_size, &last_part_size, &mv_header_size);
+
+    verbose(TEST_SPLIT, "No header %zu %zu np=%u ps=%zu lps=%zu mhs=%zu\n",
+            file_size, split_size, num_parts, part_size, last_part_size, mv_header_size);
+
+    if (num_parts != 14 || part_size != split_size || last_part_size != split_size || mv_header_size != 0)
+    {
+        error(TEST_FIT,"Split calculated the wrong values.\n");
+    }
+
+    file_size = 32768;
+    split_size = 1024;
+    splitParts_(file_size, split_size, None, &num_parts, &part_size, &last_part_size, &mv_header_size);
+
+    verbose(TEST_SPLIT, "Tiny parts no headers %zu %zu np=%u ps=%zu lps=%zu mhs=%zu\n",
+            file_size, split_size, num_parts, part_size, last_part_size, mv_header_size);
+
+    if (num_parts != 32 || part_size != split_size || last_part_size != split_size || mv_header_size != 0)
+    {
+        error(TEST_FIT,"Split calculated the wrong values.\n");
+    }
+
+    splitParts_(file_size, split_size, Simple, &num_parts, &part_size, &last_part_size, &mv_header_size);
+
+    verbose(TEST_SPLIT, "Tiny parts no headers %zu %zu np=%u ps=%zu lps=%zu mhs=%zu\n",
+            file_size, split_size, num_parts, part_size, last_part_size, mv_header_size);
+
+    if (num_parts != 63 || part_size != split_size || last_part_size != split_size || mv_header_size != 512)
+    {
+        error(TEST_FIT,"Split calculated the wrong values.\n");
+    }
+
 }

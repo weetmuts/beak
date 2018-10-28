@@ -123,6 +123,8 @@ private:
 
     void writeTarFileNameIntoBufferVersion1_(char *buf, size_t buf_len, Path *dir);
     void writeTarFileNameIntoBufferVersion2_(char *buf, size_t buf_len, Path *dir);
+
+    size_t num_long_path_blocks_ {};
 };
 
 struct TarFile
@@ -183,8 +185,6 @@ private:
     // A virtual tar can contain small files, medium files or a single large file.
     TarContents tar_contents_ = SMALL_FILES_TAR;
     TarEntry *tar_entry_ {};
-    // Part of filename without the part nr and tar.
-    std::string name_;
     uint32_t hash_;
     bool hash_initialized = false;
     size_t size_;
@@ -206,6 +206,8 @@ private:
     size_t last_part_size_ {};
     // A tar parts file by itself can have a tar continutation header.
     size_t header_size_ {};
+    // How many extra 512 byte blocks are need if the file name exceeds 100 chars?
+    size_t num_long_path_blocks_;
 };
 
 #endif

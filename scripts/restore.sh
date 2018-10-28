@@ -22,6 +22,10 @@ function finish {
     if [ "$debug" == "" ]
     then
         rm -rf $dir
+        if [ -r "$newvolumescript" ]
+        then
+            rm "$newvolumescript"
+        fi
     else
         echo Not removing $dir
     fi
@@ -120,11 +124,6 @@ if [ "$cmd" = "" ] || [ "$2" = "" ]; then
     Help
 fi
 
-extract_this=""
-if [ "$3" != "" ]; then
-    extract_this="$3"
-fi
-
 root="$(realpath $2)"
 
 numgzs=$(ls "$root"/z02*.gz | sort -r | wc | tr -s ' ' | cut -f 2 -d ' ')
@@ -172,27 +171,15 @@ paste "$dir/bb" "$dir/aa" | LC_COLLATE=en_US.UTF8 sort | cut -f 2- > "$dir/cc"
 # Iterate over the tar files and extract them
 # in the corresponding directory. Read store a line at a time from $dir/cc into $tar_file
 while IFS='' read tar_file; do
+
     # Extract directory in which the tar file resides.
     tar_dir="$(dirname "$tar_file")"
+
     # Rename the top directory . into the empty string.
     tar_dir_prefix="${tar_dir#.}"
     if [ "$tar_dir_prefix" != "" ]; then
         # Make sure prefix ends with a slash.
         tar_dir_prefix="$tar_dir_prefix"/
-    fi
-    try_tar='true'
-    if [ "$extract_this" != "" ]; then
-        if [[ "$extract_this" =~ ${tar_dir_prefix}.* ]]
-        then
-            # If something should be extracted, then remove the tar_dir_prefix from its path.
-            ex="${extract_this##$tar_dir_prefix}"
-            try_tar='true'
-            # Also ignore not found errors from tar
-            ignore_errs="2> /dev/null"
-        else
-            try_tar='false'
-            ex=''
-        fi
     fi
 
     file=$(echo "$root/$tar_file"*)
@@ -201,9 +188,12 @@ while IFS='' read tar_file; do
         exit
     fi
 
-    if [ "$verbose" = "true" ]; then
-        CMD="tar ${cmd}f \"$file\" \"$ex\" $ignore_errs"
-        if [ "$try_tar" == "true" ]; then
+    # Test for multi part
+    if [ "$(echo "$file" | grep -o -)" = "" ] || [ "$(echo "$file" | grep -o _0-1_)" = "_0-1_" ]
+    then
+        # V1 file or single part V2 file.
+        if [ "$verbose" = "true" ]; then
+            CMD="tar ${cmd}f \"$file\" \"$ex\" $ignore_errs"
             pushDir
             if [ "$debug" == "true" ]; then echo "$CMD"; fi
             eval $CMD > $dir/tmplist
@@ -220,12 +210,9 @@ while IFS='' read tar_file; do
                 awk '{p=match($0," [0-9][0-9]:[0-9][0-9] "); print substr($0,0,p+6)"'" $tar_dir_prefix"'"substr($0,p+7)}' $dir/tmplist
             fi
             rm $dir/tmplist
-        else
-            if [ "$debug" == "true" ]; then echo Skipping "$file"; fi
-        fi
 
-    else
-        if [ "$try_tar" == "true" ]; then
+        else
+
             CMD="tar ${cmd}f \"$file\" \"$ex\" $ignore_errs"
             pushDir
             if [ "$debug" == "true" ]; then echo "$CMD"; fi
@@ -235,8 +222,58 @@ while IFS='' read tar_file; do
                 echo Failed when executing: tar ${cmd}f \"$file\"
                 exit
             fi
-        else
-            if [ "$debug" == "true" ]; then echo Skipping "$root/$tar_file"; fi
+        fi
+    else
+
+        # Multi part V2 file!
+        prefix=$(echo "$tar_file" | sed "s/\(.*_\)[0-9a-b]\+-.*/\1/")
+        suffix=".tar"
+        first=$(echo "$tar_file" | sed "s/.*_\([0-9a-b]\+\)-.*/\1/")
+        first=$((0x$first))
+        numx=$(echo "$tar_file" | sed "s/.*-\([0-9a-b]\+\)_.*/\1/")
+        num=$((0x$numx))
+        size=$(echo "$tar_file" | sed "s/.*_\([0-9]\+\)\.tar/\1/")
+        partnrwidth=$(echo -n $numx | wc --c)
+
+        read last_part
+        if [ "$(echo "$last_part" | grep -o "$prefix")" = "$prefix" ]
+        then
+            last=$(echo "$last_part" | sed "s/.*_\([0-9a-b]\+\)-.*/\1/")
+            last=$((0x$last))
+            nummx=$(echo "$last_part" | sed "s/.*-\([0-9a-b]\+\)_.*/\1/")
+            numm=$((0x$nummx))
+            lastsize=$(echo "$last_part" | sed "s/.*_\([0-9]\+\)\.tar/\1/")
+
+            newvolumescript=$(mktemp /tmp/beak_tarvolchangeXXXXXXXX.sh)
+
+            cat > ${newvolumescript} <<EOF
+#!/bin/bash
+
+format="$(printf "%%s%%0%dx-%s_%%s%%s" ${partnrwidth} ${numx})"
+
+if [ "\$TAR_VOLUME" = "$num" ]
+then
+    # Last part
+    partsize="$lastsize"
+else
+    partsize="$size"
+fi
+part=\$((TAR_VOLUME - 1))
+
+foo=\$(printf "\${format}" "${root}/${prefix}" "\${part}" "\${partsize}" "${suffix}")
+
+echo "\${foo}" >&\$TAR_FD
+
+if [ "\$TAR_VOLUME" = "$num" ]
+then
+    exit 1
+fi
+
+
+EOF
+
+            chmod a+x ${newvolumescript}
+            tar xvMf "${root}/${tar_file}" -F ${newvolumescript} 2> /dev/null
         fi
     fi
 

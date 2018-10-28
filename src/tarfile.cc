@@ -42,8 +42,6 @@ TarFile::TarFile(TarContents tc, TarEntry *te)
     tar_contents_ = tc;
     tar_entry_ = te;
     memset(&mtim_, 0, sizeof(mtim_));
-    // This is a temporary name! It will be overwritten when the hash is finalized!
-    name_ = "";
     disk_update = NoUpdate;
     num_parts_ = 1;
 }
@@ -55,7 +53,7 @@ void TarFile::addEntryLast(TarEntry *entry)
     entry->registerTarFile(this, current_tar_offset_);
     contents_[current_tar_offset_] = entry;
     offsets.push_back(current_tar_offset_);
-    debug(TARFILE, "%s: added %s at %zu\n", name_.c_str(),
+    debug(TARFILE, "%s: added %s at %zu\n", "GURKA",
           entry->path()->c_str(), current_tar_offset_);
     current_tar_offset_ += entry->blockedSize();
 }
@@ -83,7 +81,7 @@ void TarFile::addEntryFirst(TarEntry *entry)
     offsets = newo;
 
     debug(TARFILE, "    %s    Added FIRST %s at %zu with blocked size %zu\n",
-          name_.c_str(), entry->path()->c_str(), current_tar_offset_,
+          "GURKA", entry->path()->c_str(), current_tar_offset_,
           entry->blockedSize());
     current_tar_offset_ += entry->blockedSize();
 }
@@ -206,7 +204,7 @@ bool TarFileName::parseFileName(string &name, string *dir)
     // Example file name:
     // foo/bar/dir/(l)01_(001501080787).(579054757)_(1119232)_(3b5e4ec7fe38d0f9846947207a0ea44c)_(0fe).(tar)
     // or
-    // foo/bar/dir/(l)02_(001501080787).(579054757)_(3b5e4ec7fe38d0f9846947207a0ea44c)_(0fe)_(1119232).(tar)
+    // foo/bar/dir/(l)02_(001501080787).(579054757)_(3b5e4ec7fe38d0f9846947207a0ea44c)_(0fe-1ff)_(1119232).(tar)
 
     if (name.size() == 0) return false;
 
@@ -278,12 +276,14 @@ bool TarFileName::parseFileNameVersion1_(string &name, size_t p0, size_t p1)
 
 bool TarFileName::parseFileNameVersion2_(string &name, size_t p0, size_t p1)
 {
+    // foo/bar/dir/(l)02_(001501080787).(579054757)_(3b5e4ec7fe38d0f9846947207a0ea44c)_(0fe-1ff)_(1119232).(tar)
     bool k;
     size_t p2 = name.find('.', p1+1); if (p2 == string::npos) return false;
     size_t p3 = name.find('_', p2+1); if (p3 == string::npos) return false;
     size_t p4 = name.find('_', p3+1); if (p4 == string::npos) return false;
-    size_t p5 = name.find('_', p4+1); if (p5 == string::npos) return false;
-    size_t p6 = name.find('.', p5+1); if (p6 == string::npos) return false;
+    size_t p5 = name.find('-', p4+1); if (p5 == string::npos) return false;
+    size_t p6 = name.find('_', p5+1); if (p6 == string::npos) return false;
+    size_t p7 = name.find('.', p6+1); if (p7 == string::npos) return false;
 
     string secss;
     k = digitsOnly(&name[p1+1], p2-p1-1, &secss);
@@ -303,12 +303,17 @@ bool TarFileName::parseFileNameVersion2_(string &name, size_t p0, size_t p1)
     if (!k) return false;
     part_nr = strtol(partnrs.c_str(), NULL, 16);
 
+    string numparts;
+    k = hexDigitsOnly(&name[p4+1], p6-p5-1, &numparts);
+    if (!k) return false;
+    num_parts = strtol(numparts.c_str(), NULL, 16);
+
     string sizes;
-    k = digitsOnly(&name[p5+1], p6-p5-1, &sizes);
+    k = digitsOnly(&name[p6+1], p7-p6-1, &sizes);
     if (!k) return false;
     size = atol(sizes.c_str());
 
-    string suffix = name.substr(p6+1);
+    string suffix = name.substr(p7+1);
     if (suffixtype(type) != suffix) {
         return false;
     }
@@ -337,8 +342,6 @@ void TarFileName::writeTarFileNameIntoBufferVersion1_(char *buf, size_t buf_len,
     char secs_and_nanos[32];
     memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
     snprintf(secs_and_nanos, 32, "%012" PRINTF_TIME_T "u.%09lu", sec, nsec);
-
-    string partnr = toHex(part_nr, num_parts);
 
     const char *suffix = suffixtype(type);
 
@@ -374,24 +377,25 @@ void TarFileName::writeTarFileNameIntoBufferVersion2_(char *buf, size_t buf_len,
     snprintf(secs_and_nanos, 32, "%" PRINTF_TIME_T "u.%09lu", sec, nsec);
 
     string partnr = toHex(part_nr, num_parts);
-
     const char *suffix = suffixtype(type);
 
     if (dir == NULL) {
-        snprintf(buf, buf_len, "%c02_%s_%s_%s_%s.%s",
+        snprintf(buf, buf_len, "%c02_%s_%s_%s-%x_%s.%s",
                  TarFileName::chartype(type),
                  secs_and_nanos,
                  header_hash.c_str(),
                  partnr.c_str(),
+                 num_parts,
                  sizes,
                  suffix);
     } else {
-        snprintf(buf, buf_len, "%s/%c02_%s_%s_%s_%s.%s",
+        snprintf(buf, buf_len, "%s/%c02_%s_%s_%s-%x_%s.%s",
                  dir->c_str(),
                  TarFileName::chartype(type),
                  secs_and_nanos,
                  header_hash.c_str(),
                  partnr.c_str(),
+                 num_parts,
                  sizes,
                  suffix);
     }
@@ -432,8 +436,9 @@ size_t TarFile::copy(char *buf, size_t bufsize, off_t offset, FileSystem *fs, ui
             int p = 0;
             TarHeader th;
 
-            /* Deal with very long path names.
-               if (th.numLongPathBlocks() > 0)
+            // Deal with very long path names.
+            /*
+            if (th.numLongPathBlocks() > 0)
                {
                TarHeader lph;
                lph.setLongPathType(&th);
@@ -508,26 +513,23 @@ bool TarFile::createFile(Path *file, FileStat *stat, uint partnr,
     return true;
 }
 
-void TarFile::fixSize(size_t split_size, TarHeaderStyle ths)
+void splitParts_(size_t file_size,
+                 size_t split_size,
+                 TarHeaderStyle ths,
+                 uint *num_parts,
+                 size_t *part_size,
+                 size_t *last_part_size,
+                 size_t *mv_header_size)
 {
-    size_ = current_tar_offset_;
-    if (size_ <= split_size) {
-        // No splitting needed.
-        num_parts_ = 1;
-        part_size_ = size_;
-        header_size_ = 0;
-        return;
-    }
-
     // The size_ is already rounded up to the nearest 512 byte block.
-    part_size_ = split_size;
+    *part_size = split_size;
     if (ths == None) {
-        header_size_ = 0;
+        *mv_header_size = 0;
     } else {
         // Multivol header size
-        header_size_ = 512;
+        *mv_header_size = 512;
     }
-    assert(part_size_ > header_size_);
+    assert(*part_size > *mv_header_size);
     // To make the multivol parts the exact same size (except the last)
     // take into account that there is no multivol header in the first
     // part, therefore the space for the multivol header in the first part
@@ -545,32 +547,50 @@ void TarFile::fixSize(size_t split_size, TarHeaderStyle ths)
     // 3 = (14-1)/(5-1) = 13/4 = 3 but 5+(3-1)*(5-1) == 13 => not equals 14
     // we need another multivol part, which will have size 1+14-13
 
-    num_parts_ = (size_ - header_size_) / (part_size_-header_size_);
-    size_t stores = part_size_ + (num_parts_-1)*(part_size_-header_size_);
-    if (stores == size_)
+    *num_parts = (file_size - *mv_header_size) / (*part_size - *mv_header_size);
+    size_t stores = *part_size + (*num_parts -1)*(*part_size - *mv_header_size);
+    if (stores == file_size)
     {
-        last_part_size_ = part_size_;
+        *last_part_size = *part_size;
         debug(TARFILE, "Splitting file into same sized parts %u parts partsize=%zu lastpartsize=%zu\n",
-              num_parts_, part_size_, last_part_size_);
+              *num_parts, *part_size, *last_part_size);
     }
     else
     {
         // The size was not a multiple of what can be stored in the parts.
         // We need an extra final part.
-        num_parts_++;
-        last_part_size_ = header_size_ + size_ - stores;
-        size_t stored_in_first_part = part_size_;
-        size_t stored_in_middle_parts = part_size_-header_size_;
-        size_t stored_in_last_part = size_ - stored_in_first_part - (num_parts_-2)*(stored_in_middle_parts);
-        assert(last_part_size_ == stored_in_last_part+header_size_);
-        debug(TARFILE, "Splitting file with file size %zu tar size %zu (first header %zu) into %u parts partsize=%zu lastpartsize=%zu "
+        (*num_parts)++;
+        *last_part_size = *mv_header_size + file_size - stores;
+        size_t stored_in_first_part = *part_size;
+        size_t stored_in_middle_parts = *part_size - *mv_header_size;
+        size_t stored_in_last_part = file_size - stored_in_first_part - (*num_parts-2)*(stored_in_middle_parts);
+        assert(*last_part_size == stored_in_last_part+*mv_header_size);
+        debug(TARFILE, "Splitting file with tarentry size %zu into %u parts partsize=%zu lastpartsize=%zu "
               "with first=%zu middles=%zu last=%zu.\n",
-              tar_entry_->stat()->st_size,
-              size_,
-              tar_entry_->headerSize(),
-              num_parts_, part_size_, last_part_size_,
+              file_size,
+              *num_parts, *part_size, *last_part_size,
               stored_in_first_part, stored_in_middle_parts, stored_in_last_part);
     }
+}
+
+void TarFile::fixSize(size_t split_size, TarHeaderStyle ths)
+{
+    size_ = current_tar_offset_;
+    if (size_ <= split_size) {
+        // No splitting needed.
+        num_parts_ = 1;
+        part_size_ = size_;
+        header_size_ = 0;
+        return;
+    }
+
+    splitParts_(size_,
+                split_size,
+                ths,
+                &num_parts_,
+                &part_size_,
+                &last_part_size_,
+                &header_size_);
 }
 size_t TarFile::size(uint partnr)
 {

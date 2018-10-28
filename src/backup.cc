@@ -654,13 +654,22 @@ size_t Backup::groupFilesIntoTars() {
         gzfile_contents.append(separator_string);
         for (auto & p : tars) {
             char filename[1024];
-            for (uint i=0; i < p.first->numParts(); ++i) {
-                TarFileName tfn(p.first, i);
-                Path *path = p.second != NULL ? p.second->path() : NULL;
-                if (path) {
-                    path = path->subpath(te->path()->depth());
-                }
-                tfn.writeTarFileNameIntoBuffer(filename, sizeof(filename), path);
+            TarFileName tfn(p.first, 0);
+            Path *path = p.second != NULL ? p.second->path() : NULL;
+            if (path) {
+                path = path->subpath(te->path()->depth());
+            }
+            tfn.writeTarFileNameIntoBuffer(filename, sizeof(filename), path);
+            debug(BACKUP, "Added filename %s\n", filename);
+            gzfile_contents.append(filename);
+            gzfile_contents.append("\n");
+            gzfile_contents.append(separator_string);
+
+            if (p.first->numParts() > 1)
+            {
+                TarFileName tfnn(p.first, p.first->numParts()-1);
+                tfnn.writeTarFileNameIntoBuffer(filename, sizeof(filename), path);
+                debug(BACKUP, "Added last multipart filename %s\n", filename);
                 gzfile_contents.append(filename);
                 gzfile_contents.append("\n");
                 gzfile_contents.append(separator_string);

@@ -439,6 +439,14 @@ if [ $do_test ]; then
     echo OK
 fi
 
+setup splitparts "Split large file into multiple small parts"
+if [ $do_test ]; then
+    dd if=/dev/urandom of=$root'/largefile' count=71 bs=1023
+    performStore "-ta 25K -ts 66K"
+    standardStoreUntarTest
+    echo OK
+fi
+
 setup symlink "Symbolic link"
 if [ $do_test ]; then
     echo HEJSAN > $root/test

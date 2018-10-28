@@ -65,10 +65,9 @@ void UI::redrawLineOutput(const char *fmt, ...)
     vfprintf(stdout, fmt, args);
     va_end(args);
 
-    if (logLevel() <= INFO) {
-        //fprintf(stdout, "\x1B[u");
-    } else {
+    if (logLevel() > INFO) {
         fprintf(stdout, "\n");
+        //fprintf(stdout, "\x1B[u");
     }
     fflush(stdout);
 }
