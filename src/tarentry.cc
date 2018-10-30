@@ -102,41 +102,6 @@ TarEntry::TarEntry(Path *ap, Path *p, FileStat *st, TarHeaderStyle ths) : fs_(*s
 
     if (tar_header_style_ != TarHeaderStyle::None) {
 
-        string s = "";
-        if (isRegularFile()) {
-            s = to_string(fs_.st_size);
-        } else if (isCharacterDevice() || isBlockDevice()) {
-            s = to_string(MajorDev(fs_.st_rdev)) + "," + to_string(MinorDev(fs_.st_rdev));
-        } else {
-            s = to_string(0);
-        }
-        tv_line_size = s;
-
-        s = "";
-        char datetime[20];
-        memset(datetime, 0, sizeof(datetime));
-        strftime(datetime, 20, "%Y-%m-%d %H:%M.%S", localtime(&fs_.st_mtim.tv_sec));
-        s.append(datetime);
-        s.append(separator_string);
-
-        char secs_and_nanos[32];
-        memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
-        snprintf(secs_and_nanos, 32, "%012" PRINTF_TIME_T "u.%09lu", fs_.st_mtim.tv_sec, fs_.st_mtim.tv_nsec);
-        s.append(secs_and_nanos);
-
-        /*
-        s.append(separator_string);
-
-        memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
-        snprintf(secs_and_nanos, 32, "%012ju.%09ju", fs_.st_atim.tv_sec, fs_.st_atim.tv_nsec);
-        s.append(secs_and_nanos);
-        s.append(separator_string);
-
-        memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
-        snprintf(secs_and_nanos, 32, "%012ju.%09ju", fs_.st_ctim.tv_sec, fs_.st_ctim.tv_nsec);
-        s.append(secs_and_nanos);
-        */
-        tv_line_right = s;
     }
 
     debug(TARENTRY, "entry %s added size %ju blocked size %ju!\n", path_->c_str(), fs_.st_size, blocked_size_);
@@ -459,10 +424,39 @@ void cookEntry(string *listing, TarEntry *entry) {
     listing->append(to_string(entry->fs_.st_gid));
     listing->append(separator_string);
 
-    listing->append(entry->tv_line_size);
+    if (entry->isRegularFile()) {
+        listing->append(to_string(entry->fs_.st_size));
+    } else if (entry->isCharacterDevice() || entry->isBlockDevice()) {
+        listing->append(to_string(MajorDev(entry->fs_.st_rdev)) + "," + to_string(MinorDev(entry->fs_.st_rdev)));
+    } else {
+        listing->append("0");
+    }
     listing->append(separator_string);
-    listing->append(entry->tv_line_right);
+
+    char datetime[20];
+    memset(datetime, 0, sizeof(datetime));
+    strftime(datetime, 20, "%Y-%m-%d %H:%M.%S", localtime(&entry->fs_.st_mtim.tv_sec));
+    listing->append(datetime);
     listing->append(separator_string);
+
+    char secs_and_nanos[32];
+    memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
+    snprintf(secs_and_nanos, 32, "%012" PRINTF_TIME_T "u.%09lu",
+             entry->fs_.st_mtim.tv_sec, entry->fs_.st_mtim.tv_nsec);
+    listing->append(secs_and_nanos);
+    listing->append(separator_string);
+
+    /*
+      memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
+      snprintf(secs_and_nanos, 32, "%012ju.%09ju", fs_.st_atim.tv_sec, fs_.st_atim.tv_nsec);
+      s.append(secs_and_nanos);
+      s.append(separator_string);
+
+      memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
+      snprintf(secs_and_nanos, 32, "%012ju.%09ju", fs_.st_ctim.tv_sec, fs_.st_ctim.tv_nsec);
+      s.append(secs_and_nanos);
+    */
+
     listing->append(entry->tarpath()->str());
     listing->append(separator_string);
     if (entry->link() != NULL) {

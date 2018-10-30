@@ -257,12 +257,6 @@ struct TarEntry
     void calculateHash();
     std::vector<char> &hash();
 
-    // This is a re-construction of how the entry would be listed by "tar tv"
-    // tv_line_left is accessbits, ownership
-    // tv_line_size is the size, to be left padded with space
-    // tv_line_right is the last modification time
-    std::string tv_line_left, tv_line_size, tv_line_right;
-
     private:
 
     size_t header_size_;
