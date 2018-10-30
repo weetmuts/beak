@@ -54,11 +54,20 @@ struct TarFileName {
     time_t sec {};
     long nsec {};
     size_t size {};
+    size_t last_size {};
     std::string header_hash {};
     uint part_nr {};
     uint num_parts {};
 
     TarFileName() : version(2) {};
+    TarFileName(const TarFileName&tfn) : type(tfn.type),
+        version(tfn.version),
+        sec(tfn.sec), nsec(tfn.nsec),
+        size(tfn.size),
+        last_size(tfn.last_size),
+        header_hash(tfn.header_hash),
+        part_nr(tfn.part_nr),
+        num_parts(tfn.num_parts) {};
     TarFileName(TarFile *tf, uint partnr);
 
     bool equals(TarFileName *tfn) {

@@ -591,11 +591,11 @@ size_t Backup::groupFilesIntoTars() {
 
         set<uid_t> uids;
         set<gid_t> gids;
-        /*
+
         for(auto & entry : te->entries()) {
             uids.insert(entry->stat()->st_uid);
             gids.insert(entry->stat()->st_gid);
-            }*/
+        }
 
         string gzfile_contents;
         gzfile_contents.append("#beak 0.7\n");

@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2016 Fredrik Öhrström
+ Copyright (C) 2016-2018 Fredrik Öhrström
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -50,12 +50,13 @@ struct RestoreFileSystem : FileSystem
     {
         return false;
     }
+
     ssize_t pread(Path *p, char *buf, size_t size, off_t offset)
     {
         return 0;
     }
 
-    void recurseInto(Entry *d, std::function<void(Path*,FileStat*)> cb)
+    void recurseInto(RestoreEntry *d, std::function<void(Path*,FileStat*)> cb)
     {
         rev_->loadDirContents(point_, d->path);
 
@@ -78,7 +79,7 @@ struct RestoreFileSystem : FileSystem
         point_ = rev_->singlePointInTime();
         assert(point_);
 
-        Entry *d = rev_->findEntry(point_, Path::lookupRoot());
+        RestoreEntry *d = rev_->findEntry(point_, Path::lookupRoot());
         assert(d);
         recurseInto(d, cb);
         return RC::OK;
@@ -108,34 +109,42 @@ struct RestoreFileSystem : FileSystem
     {
         return RC::ERR;
     }
+
     RC chmod(Path *p, FileStat *fs)
     {
         return RC::ERR;
     }
+
     RC utime(Path *p, FileStat *fs)
     {
         return RC::ERR;
     }
+
     Path *mkTempFile(std::string prefix, std::string content)
     {
         return NULL;
     }
+
     Path *mkTempDir(std::string prefix)
     {
         return NULL;
     }
+
     Path *mkDir(Path *p, std::string name)
     {
         return NULL;
     }
+
     RC rmDir(Path *p)
     {
         return RC::ERR;
     }
+
     RC loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
     {
         return RC::OK;
     }
+
     RC createFile(Path *file, std::vector<char> *buf)
     {
         return RC::ERR;
@@ -145,22 +154,27 @@ struct RestoreFileSystem : FileSystem
     {
         return false;
     }
+
     bool createSymbolicLink(Path *file, FileStat *stat, string target)
     {
         return false;
     }
+
     bool createHardLink(Path *file, FileStat *stat, Path *target)
     {
         return false;
     }
+
     bool createFIFO(Path *file, FileStat *stat)
     {
         return false;
     }
+
     bool readLink(Path *file, string *target)
     {
         return false;
     }
+
     bool deleteFile(Path *file)
     {
         return false;
@@ -170,6 +184,7 @@ struct RestoreFileSystem : FileSystem
     {
         return RC::ERR;
     }
+
     unique_ptr<FuseMount> mount(Path *dir, FuseAPI *fuseapi, bool debug=false)
     {
         return NULL;
@@ -230,7 +245,7 @@ bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
     struct IndexEntry index_entry;
     struct IndexTar index_tar;
 
-    vector<Entry*> es;
+    vector<RestoreEntry*> es;
     bool parsed_tars_already = point->gz_files_.size() != 0;
 
     rc = Index::loadIndex(contents, i, &index_entry, &index_tar, dir_to_prepend,
@@ -242,7 +257,7 @@ bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
                          } else {
                              debug(RESTORE, "using existing entry for >%s< %p\n", ie->path->c_str());
                          }
-                         Entry *e = &(point->entries_)[ie->path];
+                         RestoreEntry *e = &(point->entries_)[ie->path];
                          assert(e->path = ie->path);
                          e->fs = ie->fs;
                          e->offset = ie->offset;
@@ -279,7 +294,7 @@ bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
         if (!p->parent()) continue;
         Path *pp = p->parent();
         int c = point->entries_.count(pp);
-        Entry *d = &(point->entries_)[pp];
+        RestoreEntry *d = &(point->entries_)[pp];
         if (c == 0) {
             d->path = pp;
         }
@@ -315,7 +330,7 @@ void Restore::loadCache(PointInTime *point, Path *path)
     Path *opath = path;
 
     if (point->entries_.count(path) == 1) {
-        Entry *e = &(point->entries_)[path];
+        RestoreEntry *e = &(point->entries_)[path];
         if (e->loaded) {
             return;
         }
@@ -348,8 +363,7 @@ void Restore::loadCache(PointInTime *point, Path *path)
     assert(0);
 }
 
-
-Entry *Restore::findEntry(PointInTime *point, Path *path)
+RestoreEntry *Restore::findEntry(PointInTime *point, Path *path)
 {
     if (point->entries_.count(path) == 0)
     {
@@ -370,7 +384,6 @@ struct RestoreFuseAPI : FuseAPI
 
     RestoreFuseAPI(Restore *r) : restore_(r) {}
 
-
     int getattrCB(const char *path_char_string, struct stat *stbuf)
     {
         debug(RESTORE, "getattr '%s'\n", path_char_string);
@@ -379,7 +392,7 @@ struct RestoreFuseAPI : FuseAPI
 
         string path_string = path_char_string;
         Path *path = Path::lookup(path_string);
-        Entry *e;
+        RestoreEntry *e;
         PointInTime *point;
 
         if (path->depth() == 1)
@@ -513,7 +526,7 @@ struct RestoreFuseAPI : FuseAPI
 
         string path_string = path_char_string;
         Path *path = Path::lookup(path_string);
-        Entry *e;
+        RestoreEntry *e;
         PointInTime *point = restore_->singlePointInTime();
 
         if (!point) {
@@ -578,7 +591,7 @@ struct RestoreFuseAPI : FuseAPI
         string path_string = path_char_string;
         Path *path = Path::lookup(path_string);
         size_t c;
-        Entry *e;
+        RestoreEntry *e;
         PointInTime *point = restore_->singlePointInTime();
         if (!point) {
             Path *pnt_dir = path->subpath(1,1);
@@ -621,7 +634,7 @@ struct RestoreFuseAPI : FuseAPI
         string path_string = path_char_string;
         Path *path = Path::lookup(path_string);
 
-        Entry *e;
+        RestoreEntry *e;
         Path *tar;
 
         PointInTime *point = restore_->singlePointInTime();
@@ -733,7 +746,7 @@ RC Restore::lookForPointsInTime(PointInTimeFormat f, Path *path)
         points_in_time_[j.direntry] = &j;
         FileStat fs;
         fs.st_mode = S_IFDIR | S_IRUSR | S_IXUSR;
-        j.entries_[Path::lookupRoot()] = Entry(fs, 0, Path::lookupRoot());
+        j.entries_[Path::lookupRoot()] = RestoreEntry(fs, 0, Path::lookupRoot());
     }
 
     if (i > 0) {
@@ -792,7 +805,7 @@ RC Restore::loadBeakFileSystem(Settings *settings)
         // Populate the root directory with its contents.
         loadCache(&point, Path::lookupRoot());
 
-        Entry *e = findEntry(&point, Path::lookupRoot());
+        RestoreEntry *e = findEntry(&point, Path::lookupRoot());
         assert(e != NULL);
 
         // Look for the youngest timestamp inside root to

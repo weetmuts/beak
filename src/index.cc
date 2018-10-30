@@ -23,7 +23,6 @@
 #include "filesystem.h"
 #include "log.h"
 #include "tarentry.h"
-#include "tarfile.h"
 #include "util.h"
 
 using namespace std;

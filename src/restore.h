@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2016 Fredrik Öhrström
+ Copyright (C) 2016-2018 Fredrik Öhrström
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -38,15 +38,16 @@
 #include <vector>
 
 #include "tar.h"
+#include "tarfile.h"
 #include "util.h"
 
-struct Entry
+struct RestoreEntry
 {
     FileStat fs;
     size_t offset;
     Path *path;
     Path *tar;
-    std::vector<Entry*> dir;
+    std::vector<RestoreEntry*> dir;
     bool is_sym_link;
     // A symbolic link can be anything! Must not point to a real file.
     std::string symlink;
@@ -56,9 +57,9 @@ struct Entry
     bool loaded;
     UpdateDisk disk_update;
 
-    Entry() : offset(0), path(0), tar(0), is_sym_link(false), is_hard_link(false),
+    RestoreEntry() : offset(0), path(0), is_sym_link(false), is_hard_link(false),
         hard_link(0), loaded(false), disk_update(NoUpdate) { }
-    Entry(FileStat s, size_t o, Path *p) : fs(s), offset(o), path(p),
+    RestoreEntry(FileStat s, size_t o, Path *p) : fs(s), offset(o), path(p),
         is_sym_link(false), is_hard_link(false), loaded(false),
         disk_update(NoUpdate) { }
 
@@ -79,7 +80,7 @@ struct PointInTime {
     std::string direntry;
     std::string filename;
 
-    std::map<Path*,Entry,depthFirstSortPath> entries_;
+    std::map<Path*,RestoreEntry,depthFirstSortPath> entries_;
     std::map<Path*,Path*> gz_files_;
     std::set<Path*> loaded_gz_files_;
 };
@@ -91,7 +92,7 @@ struct Restore
     pthread_mutex_t global;
     pthread_mutexattr_t global_attr;
 
-    Entry *findEntry(PointInTime *point, Path *path);
+    RestoreEntry *findEntry(PointInTime *point, Path *path);
 
     int getattrCB(const char *path, struct stat *stbuf);
     int readdirCB(const char *path, void *buf, fuse_fill_dir_t filler,

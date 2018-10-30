@@ -19,6 +19,7 @@
 #define INDEX_H
 
 #include "util.h"
+#include "tarfile.h"
 
 #include <functional>
 #include <set>

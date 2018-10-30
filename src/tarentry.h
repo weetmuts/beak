@@ -319,6 +319,8 @@ struct TarEntry
     void calculateSHA256Hash();
 
     std::vector<char> sha256_hash_;
+
+    friend void cookEntry(std::string *listing, TarEntry *entry);
 };
 
 void cookEntry(std::string *listing, TarEntry *entry);

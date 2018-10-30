@@ -50,7 +50,7 @@ struct OriginToolImplementation : public OriginTool
     RecurseOption handleHardLinks(Path *path, FileStat *stat,
                                   Restore *restore, PointInTime *point,
                                   Settings *settings, ptr<ProgressStatistics> st);
-    bool extractFileFromBackup(Entry *entry,
+    bool extractFileFromBackup(RestoreEntry *entry,
                                FileSystem *backup_fs, Path *tar_file, off_t tar_file_offset,
                                Path *file_to_extract, FileStat *stat,
                                ptr<ProgressStatistics> statistics);
@@ -104,7 +104,7 @@ void OriginToolImplementation::addRestoreWork(ProgressStatistics *st,
                                               Restore *restore,
                                               PointInTime *point)
 {
-    Entry *entry = restore->findEntry(point, path);
+    RestoreEntry *entry = restore->findEntry(point, path);
     Path *file_to_extract = path->prepend(settings->to.origin);
     if (entry->is_hard_link) st->stats.num_hard_links++;
     else if (stat->isRegularFile()) {
@@ -162,7 +162,7 @@ bool OriginToolImplementation::extractHardLink(Path *target,
     return true;
 }
 
-bool OriginToolImplementation::extractFileFromBackup(Entry *entry,
+bool OriginToolImplementation::extractFileFromBackup(RestoreEntry *entry,
                                                      FileSystem *backup_fs, Path *tar_file, off_t tar_file_offset,
                                                      Path *file_to_extract, FileStat *stat,
                                                      ptr<ProgressStatistics> statistics)

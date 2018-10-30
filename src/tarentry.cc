@@ -101,15 +101,8 @@ TarEntry::TarEntry(Path *ap, Path *p, FileStat *st, TarHeaderStyle ths) : fs_(*s
     updateSizes();
 
     if (tar_header_style_ != TarHeaderStyle::None) {
-        string s;
-        s.append(permissionString(&fs_));
-        s.append(separator_string);
-        s.append(to_string(fs_.st_uid));
-        s.append("/");
-        s.append(to_string(fs_.st_gid));
-        tv_line_left = s;
 
-        s = "";
+        string s = "";
         if (isRegularFile()) {
             s = to_string(fs_.st_size);
         } else if (isCharacterDevice() || isBlockDevice()) {
@@ -459,8 +452,13 @@ void cookEntry(string *listing, TarEntry *entry) {
     // -r-------- fredrik/fredrik 745 1970-01-01 01:00 testing
     // drwxrwxr-x fredrik/fredrik   0 2016-11-25 00:52 autoconf/
     // -r-------- fredrik/fredrik   0 2016-11-25 11:23 libtar.so -> libtar.so.0.1
-    listing->append(entry->tv_line_left);
+    listing->append(permissionString(&entry->fs_));
     listing->append(separator_string);
+    listing->append(to_string(entry->fs_.st_uid));
+    listing->append("/");
+    listing->append(to_string(entry->fs_.st_gid));
+    listing->append(separator_string);
+
     listing->append(entry->tv_line_size);
     listing->append(separator_string);
     listing->append(entry->tv_line_right);
@@ -499,6 +497,7 @@ void cookEntry(string *listing, TarEntry *entry) {
 bool eatEntry(int beak_version, vector<char> &v, vector<char>::iterator &i, Path *dir_to_prepend,
               FileStat *fs, size_t *offset, string *tar, Path **path,
               string *link, bool *is_sym_link, bool *is_hard_link,
+
               bool *eof, bool *err)
 {
     string permission = eatTo(v, i, separator, 32, eof, err);
