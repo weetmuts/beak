@@ -135,7 +135,7 @@ void TarFile::calculateSHA256Hash()
     for (auto & a : contents_)
     {
         TarEntry *te = a.second;
-        SHA256_Update(&sha256ctx, &te->hash()[0], te->hash().size());
+        SHA256_Update(&sha256ctx, &te->metaHash()[0], te->metaHash().size());
     }
     sha256_hash_.resize(SHA256_DIGEST_LENGTH);
     SHA256_Final((unsigned char*)&sha256_hash_[0], &sha256ctx);
@@ -276,7 +276,7 @@ bool TarFileName::parseFileNameVersion1_(string &name, size_t p0, size_t p1)
 
 bool TarFileName::parseFileNameVersion2_(string &name, size_t p0, size_t p1)
 {
-    // foo/bar/dir/(l)02_(001501080787).(579054757)_(3b5e4ec7fe38d0f9846947207a0ea44c)_(0fe-1ff)_(1119232).(tar)
+    // foo/bar/dir/(l)02_(001501080787).(579054757)_(3b5e4...44c)_(0fe-1ff)_(1119232).(tar)
     bool k;
     size_t p2 = name.find('.', p1+1); if (p2 == string::npos) return false;
     size_t p3 = name.find('_', p2+1); if (p3 == string::npos) return false;

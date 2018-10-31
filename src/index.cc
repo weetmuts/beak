@@ -59,7 +59,7 @@ RC Index::loadIndex(vector<char> &v,
         beak_version = 8;
     } else {
         failure(INDEX,
-                "Version was \"%s\" which is not the support 0.7 or 0.8\n",
+                "Version was \"%s\" which is not the supported 0.7 or 0.8\n",
                 type.c_str());
         return RC::ERR;
     }
@@ -70,7 +70,7 @@ RC Index::loadIndex(vector<char> &v,
     string uid = eatTo(data, j, '\n', 10 * 1024 * 1024, &eof, &err); // Accept up to a ~million uniq uids
     string gid = eatTo(data, j, '\n', 10 * 1024 * 1024, &eof, &err); // Accept up to a ~million uniq gids
     string files = eatTo(data, j, '\n', 64, &eof, &err);
-
+    string columns = eatTo(data, j, '\n', 256, &eof, &err);
 
     int num_files = 0;
     int n = sscanf(files.c_str(), "#files %d", &num_files);
@@ -92,7 +92,7 @@ RC Index::loadIndex(vector<char> &v,
                                   &ie->is_sym_link, &ie->is_hard_link,
                                   &eof, &err);
         if (err) {
-            failure(INDEX, "Could not parse tarredfs-contents file in >%s<\n>%s<\n",
+            failure(INDEX, "Could not parse index file in >%s<\n>%s<\n",
                     dtp, ii);
             break;
         }

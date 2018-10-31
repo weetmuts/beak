@@ -273,7 +273,9 @@ EOF
 
             chmod a+x ${newvolumescript}
             tar xvMf "${root}/${tar_file}" -F ${newvolumescript} 2> /dev/null
+        else
+            echo Broken multipart listing in index file, prefix not found.
         fi
-    fi
+     fi
 
 done <"$dir/cc"

@@ -67,7 +67,7 @@ TarEntry::TarEntry(size_t size, TarHeaderStyle ths)
     debug(TARENTRY, "index file entry added size %ju blocked size %ju!\n", fs_.st_size, blocked_size_);
 }
 
-TarEntry::TarEntry(Path *ap, Path *p, FileStat *st, TarHeaderStyle ths) : fs_(*st)
+TarEntry::TarEntry(Path *ap, Path *p, FileStat *st, TarHeaderStyle ths, bool should_hash) : fs_(*st)
 {
     tar_header_style_ = ths;
     abspath_ = ap;
@@ -80,6 +80,7 @@ TarEntry::TarEntry(Path *ap, Path *p, FileStat *st, TarHeaderStyle ths) : fs_(*s
     is_tar_storage_dir_ = false;
     tarpath_ = path_;
     name_ = p->name();
+    should_hash_content_ = should_hash;
 
     if (isSymbolicLink())
     {
@@ -104,7 +105,8 @@ TarEntry::TarEntry(Path *ap, Path *p, FileStat *st, TarHeaderStyle ths) : fs_(*s
 
     }
 
-    debug(TARENTRY, "entry %s added size %ju blocked size %ju!\n", path_->c_str(), fs_.st_size, blocked_size_);
+    debug(TARENTRY, "entry %s added size %ju blocked size %ju %s\n", path_->c_str(), fs_.st_size, blocked_size_,
+          should_hash_content_?"HASH":"");
 }
 
 void TarEntry::calculateTarpath(Path *storage_dir) {
@@ -347,13 +349,6 @@ void TarEntry::secsAndNanos(char *buf, size_t len)
     snprintf(buf, len, "%012" PRINTF_TIME_T "u.%09lu", fs_.st_mtim.tv_sec, fs_.st_mtim.tv_nsec);
 }
 
-void TarEntry::injectHash(const char *buf, size_t len)
-{
-    assert(len<90);
-    //memcpy(tar_->th_buf.name+9, buf, len);
-    //tar_.calculateChecksum();
-}
-
 void TarEntry::addChildrenSize(size_t s)
 {
     children_size_ += s;
@@ -379,8 +374,12 @@ void TarEntry::calculateHash() {
     calculateSHA256Hash();
 }
 
-vector<char> &TarEntry::hash() {
-    return sha256_hash_;
+vector<char> &TarEntry::metaHash() {
+    return meta_sha256_hash_;
+}
+
+vector<char> &TarEntry::contentHash() {
+    return content_sha256_hash_;
 }
 
 void TarEntry::calculateSHA256Hash()
@@ -398,7 +397,6 @@ void TarEntry::calculateSHA256Hash()
     } else {
         filesize = 0;
     }
-
     SHA256_Update(&sha256ctx, &filesize, sizeof(filesize));
 
     // Hash the last modification time in seconds and nanoseconds.
@@ -408,8 +406,28 @@ void TarEntry::calculateSHA256Hash()
     SHA256_Update(&sha256ctx, &secs, sizeof(secs));
     SHA256_Update(&sha256ctx, &nanos, sizeof(nanos));
 
-    sha256_hash_.resize(SHA256_DIGEST_LENGTH);
-    SHA256_Final((unsigned char*)&sha256_hash_[0], &sha256ctx);
+    meta_sha256_hash_.resize(SHA256_DIGEST_LENGTH);
+    SHA256_Final((unsigned char*)&meta_sha256_hash_[0], &sha256ctx);
+}
+
+string cookColumns()
+{
+    int i = 0;
+    string s;
+
+    s += "permissions "; i++;
+    s += "uid/gid "; i++;
+    s += "size "; i++;
+    s += "ctime "; i++;
+    s += "path "; i++;
+    s += "link "; i++;
+    s += "tarprefix "; i++;
+    s += "offset "; i++;
+    s += "multipart(num,partoffset,size,last_size) "; i++; // eg 2,512,65536,238
+    s += "path_size_ctime_hash "; i++;
+    s += "content_hash "; i++;
+
+    return to_string(i)+": "+s;
 }
 
 void cookEntry(string *listing, TarEntry *entry) {
@@ -433,12 +451,13 @@ void cookEntry(string *listing, TarEntry *entry) {
     }
     listing->append(separator_string);
 
+    /*
     char datetime[20];
     memset(datetime, 0, sizeof(datetime));
     strftime(datetime, 20, "%Y-%m-%d %H:%M.%S", localtime(&entry->fs_.st_mtim.tv_sec));
     listing->append(datetime);
     listing->append(separator_string);
-
+    */
     char secs_and_nanos[32];
     memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
     snprintf(secs_and_nanos, 32, "%012" PRINTF_TIME_T "u.%09lu",
@@ -466,8 +485,6 @@ void cookEntry(string *listing, TarEntry *entry) {
             listing->append(" link to ");
         }
         listing->append(entry->link()->str());
-    } else {
-        listing->append(" ");
     }
     listing->append(separator_string);
     char filename[256];
@@ -478,12 +495,25 @@ void cookEntry(string *listing, TarEntry *entry) {
     listing->append(to_string(entry->tarOffset()+entry->headerSize()));
     listing->append(separator_string);
 
-    char nps[256];
-    snprintf(nps, sizeof(nps), "%u", entry->tarFile()->numParts());
-    listing->append(nps);
+    if (entry->tarFile()->numParts() == 1)
+    {
+        listing->append("1");
+    }
+    else
+    {
+        // Multipart num,offset,size,last_size
+        char nps[256];
+        TarFile *tf = entry->tarFile();
+        uint np = tf->numParts();
+        snprintf(nps, sizeof(nps), "%u,%d,%zu,%zu", np, 0, tf->size(0), tf->size(np-1));
+        listing->append(nps);
+    }
     listing->append(separator_string);
 
-    listing->append(toHex(entry->hash()));
+    listing->append(toHex(entry->metaHash()));
+    listing->append(separator_string);
+
+    listing->append(toHex(entry->contentHash()));
     listing->append("\n");
     listing->append(separator_string);
 }
@@ -519,8 +549,8 @@ bool eatEntry(int beak_version, vector<char> &v, vector<char>::iterator &i, Path
         fs->st_size = atol(si.c_str());
     }
 
-    string datetime = eatTo(v, i, separator, 32, eof, err);
-    if (*err || *eof) return false;
+/*    string datetime = eatTo(v, i, separator, 32, eof, err);
+      if (*err || *eof) return false;*/
 
     string secs_and_nanos = eatTo(v, i, separator, 64, eof, err);
     if (*err || *eof) return false;
@@ -604,13 +634,20 @@ bool eatEntry(int beak_version, vector<char> &v, vector<char>::iterator &i, Path
         *tar = eatTo(v, i, separator, 1024, eof, err);
     }
     if (*err || *eof) return false;
+
     string off = eatTo(v, i, separator, 32, eof, err);
     *offset = atol(off.c_str());
     if (*err || *eof) return false;
-    string content_hash = eatTo(v, i, separator, 65, eof, err);
+
+    string multipart = eatTo(v, i, separator, 128, eof, err);
     if (*err || *eof) return false;
-    string header_hash = eatTo(v, i, separator, 65, eof, err);
-    header_hash.pop_back(); // Remove the newline
+
+    string meta_hash = eatTo(v, i, separator, 65, eof, err);
+    if (*err || *eof) return false;
+
+    string content_hash = eatTo(v, i, separator, 65, eof, err);
+    content_hash.pop_back(); // Last column in line has the newline
     if (*err) return false; // Accept eof here!
+
     return true;
 }

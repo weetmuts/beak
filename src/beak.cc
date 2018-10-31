@@ -346,18 +346,35 @@ void BeakImplementation::printCommands()
     }
 }
 
+
+bool isExperimental(OptionEntry &e)
+{
+    const char *exp = "Experimental!";
+    size_t len = strlen(e.info);
+    size_t explen = strlen(exp);
+
+    if (len > strlen(exp)) {
+        return 0 == strncmp(exp, e.info+len-explen, explen);
+    }
+    return false;
+}
+
 void BeakImplementation::printSettings()
 {
     fprintf(stdout, "Settings:\n");
 
     size_t max = 0;
-    for (auto &e : option_entries_) {
+    for (auto &e : option_entries_)
+    {
+        if (isExperimental(e)) continue;
         size_t l = strlen(e.name);
         if (l > max) max = l;
     }
 
-    for (auto &e : option_entries_) {
+    for (auto &e : option_entries_)
+    {
         if (e.option == nosuch_option) continue;
+        if (isExperimental(e)) continue;
 
         string sn = e.shortname;
         size_t sl = strlen(e.shortname);
@@ -368,10 +385,13 @@ void BeakImplementation::printSettings()
 
         string n = e.name;
         size_t l = strlen(e.name);
-        if (n[n.length()-1] == '_') {
+        if (n[n.length()-1] == '_')
+        {
             n = "";
             l = 0;
-        } else {
+        }
+        else
+        {
             n = string("--")+e.name;
             l += 2;
         }
@@ -487,6 +507,9 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
                 break;
             case fusedebug_option:
                 settings->fusedebug = true;
+                break;
+            case hash_option:
+                settings->hash.push_back(value);
                 break;
             case include_option:
                 settings->include.push_back(value);

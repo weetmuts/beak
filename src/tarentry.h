@@ -37,7 +37,7 @@ struct TarEntry
 {
 
     TarEntry(size_t size, TarHeaderStyle ths);
-    TarEntry(Path *abspath, Path *path, FileStat *st, TarHeaderStyle ths);
+    TarEntry(Path *abspath, Path *path, FileStat *st, TarHeaderStyle ths, bool should_hash);
 
     Path *path()
     {
@@ -45,39 +45,39 @@ struct TarEntry
     }
     Path *tarpath()
     {
-	return tarpath_;
+        return tarpath_;
     }
     uint32_t tarpathHash()
     {
-	return tarpath_hash_;
+        return tarpath_hash_;
     }
     Path *link()
     {
-	return link_;
+        return link_;
     }
     bool isRegularFile()
     {
-	return fs_.isRegularFile();
+        return fs_.isRegularFile();
     }
     bool isDirectory()
     {
-	return fs_.isDirectory();
+        return fs_.isDirectory();
     }
     bool isSymbolicLink()
     {
-	return fs_.isSymbolicLink();
+        return fs_.isSymbolicLink();
     }
     bool isCharacterDevice()
     {
-	return fs_.isCharacterDevice();
+        return fs_.isCharacterDevice();
     }
     bool isBlockDevice()
     {
-	return fs_.isBlockDevice();
+        return fs_.isBlockDevice();
     }
     bool isHardLink()
     {
-	return is_hard_linked_;
+        return is_hard_linked_;
     }
     FileStat *stat()
     {
@@ -85,7 +85,7 @@ struct TarEntry
     }
     TarEntry *parent()
     {
-	return parent_;
+        return parent_;
     }
     TarEntry *storageDir()
     {
@@ -93,27 +93,23 @@ struct TarEntry
     }
     size_t blockedSize()
     {
-	return blocked_size_;
+        return blocked_size_;
     }
     size_t headerSize()
     {
-	return header_size_;
+        return header_size_;
     }
     size_t childrenSize()
     {
-	return children_size_;
-    }/*
-    struct stat *stat()
-    {
-	return &sb_;
-        }*/
+        return children_size_;
+    }
     bool isStorageDir()
     {
-	return is_tar_storage_dir_;
+        return is_tar_storage_dir_;
     }
     bool isAddedToDir()
     {
-	return is_added_to_directory_;
+        return is_added_to_directory_;
     }
 
     void calculateTarpath(Path *storage_dir);
@@ -232,7 +228,6 @@ struct TarEntry
     void addChildrenSize(size_t s);
 
     void secsAndNanos(char *buf, size_t len);
-    void injectHash(const char *buf, size_t len);
     void setAsStorageDir()
     {
         is_tar_storage_dir_ = true;
@@ -255,7 +250,8 @@ struct TarEntry
     }
 
     void calculateHash();
-    std::vector<char> &hash();
+    std::vector<char> &metaHash();
+    std::vector<char> &contentHash();
 
     private:
 
@@ -312,12 +308,16 @@ struct TarEntry
 
     void calculateSHA256Hash();
 
-    std::vector<char> sha256_hash_;
+    std::vector<char> meta_sha256_hash_;
+    std::vector<char> content_sha256_hash_;
+
+    bool should_hash_content_;
 
     friend void cookEntry(std::string *listing, TarEntry *entry);
 };
 
 void cookEntry(std::string *listing, TarEntry *entry);
+std::string cookColumns();
 
 bool eatEntry(int beak_version, std::vector<char> &v, std::vector<char>::iterator &i, Path *dir_to_prepend,
               FileStat *fs, size_t *offset, std::string *tar, Path **path,

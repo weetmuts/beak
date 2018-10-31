@@ -133,9 +133,10 @@ LIST_OF_COMMANDS
       "                           1 is the root, 2 is the first subdir. The default is 2.")    \
     X(f,foreground,bool,false,"When mounting do not spawn a daemon.")   \
     X(fd,fusedebug,bool,false,"Enable fuse debug mode, this also triggers foreground.") \
+    X(h,hash,std::vector<std::string>,true,"Hash contents of matching files E.g. -h '*.vdi' Experimental!") \
     X(i,include,std::vector<std::string>,true,"Only matching paths are inluded. E.g. -i '*.c'") \
     X(,license,bool,false,"Show copyright holders,licenses and notices for the program.") \
-    X(l,log,std::string,true,"Log debug messages for these parts. E.g. --log=reverse,hashing") \
+    X(l,log,std::string,true,"Log debug messages for these parts. E.g. --log=backup,hashing --log=all,-lock") \
     X(ll,listlog,bool,false,"List all log parts available.") \
     X(p,pointintime,std::string,true,"When mounting an archive pick this point in time only.\n" \
       "                           -p @0 is always the most recent. -p @1 the second most recent.\n" \

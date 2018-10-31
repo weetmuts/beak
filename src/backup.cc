@@ -107,8 +107,20 @@ RecurseOption Backup::addTarEntry(Path *abspath, FileStat *st)
         debug(BACKUP, "filter NOT dropped \"%s\"\n", name);
     }
 
+    bool should_hash = false;
+    for (auto & p : hashes) {
+        bool match  = p.match(name);
+        if (match) {
+            should_hash = true;
+            break;
+        }
+    }
+    if (name[1] != 0 && should_hash) {
+        debug(BACKUP, "should hash \"%s\"\n", name);
+    }
+
     // Creation and storage of entry.
-    TarEntry *te = new TarEntry(abspath, path, st, tarheaderstyle_);
+    TarEntry *te = new TarEntry(abspath, path, st, tarheaderstyle_, should_hash);
     files[te->path()] = te;
 
     if (te->isDirectory()) {
@@ -598,7 +610,7 @@ size_t Backup::groupFilesIntoTars() {
         }
 
         string gzfile_contents;
-        gzfile_contents.append("#beak 0.7\n");
+        gzfile_contents.append("#beak 0.8\n");
         gzfile_contents.append("#config ");
         gzfile_contents.append(config_);
         gzfile_contents.append("\n");
@@ -616,6 +628,9 @@ size_t Backup::groupFilesIntoTars() {
         gzfile_contents.append("\n");
         gzfile_contents.append("#files ");
         gzfile_contents.append(to_string(te->entries().size()));
+        gzfile_contents.append("\n");
+        gzfile_contents.append("#columns ");
+        gzfile_contents.append(cookColumns());
         gzfile_contents.append("\n");
         gzfile_contents.append(separator_string);
 
@@ -1021,6 +1036,17 @@ RC Backup::scanFileSystem(Settings *settings)
         triggers.push_back(m);
         debug(COMMANDLINE, "Triggers on \"%s\"\n", e.c_str());
         config += "-tx '"+e+"' ";
+    }
+
+    for (auto &e : settings->hash) {
+        Match m;
+        bool rc = m.use(e);
+        if (!rc) {
+            error(COMMANDLINE, "Not a valid glob \"%s\"\n", e.c_str());
+        }
+        hashes.push_back(m);
+        debug(COMMANDLINE, "Hashes \"%s\"\n", e.c_str());
+        config += "-h '"+e+"' ";
     }
 
     debug(COMMANDLINE, "Target tar size \"%zu\", trigger size %zu, split size %zu\n",
