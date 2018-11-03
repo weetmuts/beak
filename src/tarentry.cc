@@ -263,8 +263,9 @@ void TarEntry::setContent(vector<char> &c) {
     assert((size_t)fs_.st_size == c.size());
 }
 
-void TarEntry::updateSizes() {
-    size_t size = header_size_ = TarHeader::calculateSize(&fs_, tarpath_, link_, is_hard_linked_);
+void TarEntry::updateSizes()
+{
+    size_t size = header_size_ = TarHeader::calculateHeaderSize(tarpath_, link_, is_hard_linked_);
 
     if (tar_header_style_ == TarHeaderStyle::None) {
         size = header_size_ = 0;
@@ -425,7 +426,6 @@ string cookColumns()
     s += "offset "; i++;
     s += "multipart(num,partoffset,size,last_size) "; i++; // eg 2,512,65536,238
     s += "path_size_ctime_hash "; i++;
-    s += "content_hash "; i++;
 
     return to_string(i)+": "+s;
 }
@@ -511,9 +511,6 @@ void cookEntry(string *listing, TarEntry *entry) {
     listing->append(separator_string);
 
     listing->append(toHex(entry->metaHash()));
-    listing->append(separator_string);
-
-    listing->append(toHex(entry->contentHash()));
     listing->append("\n");
     listing->append(separator_string);
 }
@@ -643,10 +640,7 @@ bool eatEntry(int beak_version, vector<char> &v, vector<char>::iterator &i, Path
     if (*err || *eof) return false;
 
     string meta_hash = eatTo(v, i, separator, 65, eof, err);
-    if (*err || *eof) return false;
-
-    string content_hash = eatTo(v, i, separator, 65, eof, err);
-    content_hash.pop_back(); // Last column in line has the newline
+    meta_hash.pop_back(); // Last column in line has the newline
     if (*err) return false; // Accept eof here!
 
     return true;

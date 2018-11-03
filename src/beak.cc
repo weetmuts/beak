@@ -508,9 +508,6 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
             case fusedebug_option:
                 settings->fusedebug = true;
                 break;
-            case hash_option:
-                settings->hash.push_back(value);
-                break;
             case include_option:
                 settings->include.push_back(value);
                 break;

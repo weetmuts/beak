@@ -1038,17 +1038,6 @@ RC Backup::scanFileSystem(Settings *settings)
         config += "-tx '"+e+"' ";
     }
 
-    for (auto &e : settings->hash) {
-        Match m;
-        bool rc = m.use(e);
-        if (!rc) {
-            error(COMMANDLINE, "Not a valid glob \"%s\"\n", e.c_str());
-        }
-        hashes.push_back(m);
-        debug(COMMANDLINE, "Hashes \"%s\"\n", e.c_str());
-        config += "-h '"+e+"' ";
-    }
-
     debug(COMMANDLINE, "Target tar size \"%zu\", trigger size %zu, split size %zu\n",
           tar_target_size,
           tar_trigger_size,

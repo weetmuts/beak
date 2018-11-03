@@ -63,25 +63,25 @@ bool store_path_(Path *path, char *name_str, size_t nlen) {
 
     if (path_len <= nlen)
     {
-	// Entire path can be stored in name.
-	if (name_str) strncpy(name_str, tp, nlen);
-	return true;
+        // Entire path can be stored in name.
+        if (name_str) strncpy(name_str, tp, nlen);
+        return true;
     }
 
     return false;
 }
 
-size_t calculate_header_size_(FileStat *fs, Path *tarpath, Path *link,
-		       char *name_str, char *link_str,
-		       size_t *num_long_path_blocks,
-		       size_t *num_long_link_blocks,
-		       size_t *num_header_blocks)
+size_t calculate_header_size_(Path *tarpath, Path *link,
+                              char *name_str_out, char *link_str_out,
+                              size_t *num_long_path_blocks,
+                              size_t *num_long_link_blocks,
+                              size_t *num_header_blocks)
 {
     *num_long_path_blocks = 0;
     *num_long_link_blocks = 0;
     *num_header_blocks = 1;
 
-    bool name_fits = store_path_(tarpath, name_str, T_NAMELEN);
+    bool name_fits = store_path_(tarpath, name_str_out, T_NAMELEN);
 
     if (!name_fits) {
         // We needed to use gnu long names, aka an extra header block
@@ -94,34 +94,35 @@ size_t calculate_header_size_(FileStat *fs, Path *tarpath, Path *link,
 
     bool link_fits = true;
     if (link) {
-	// We have a link to store, does it fit in the first header block?
-	link_fits = store_path_(link, link_str, T_LINKLEN);
-	if (!link_fits) {
+        // We have a link to store, does it fit in the first header block?
+        link_fits = store_path_(link, link_str_out, T_LINKLEN);
+        if (!link_fits) {
             // We needed to use gnu long links, aka an extra header block
             // plus at least one block for the file name. A link target path longer than 512
             // bytes will need a third block etc
             *num_long_link_blocks = 2 + link->c_str_len()/T_BLOCKSIZE;
             *num_header_blocks += *num_long_link_blocks;
             debug(TAR, "added %ju blocks for long link header for %s\n", *num_long_link_blocks, link->c_str());
-	}
+        }
     }
 
     return (*num_header_blocks)*T_BLOCKSIZE;
 }
 
-size_t TarHeader::calculateSize(FileStat *fs, Path *tarpath, Path *link, bool is_hard_link)
+size_t TarHeader::calculateHeaderSize(Path *tarpath, Path *link, bool is_hard_link)
 {
     size_t num_long_path_blocks;
     size_t num_long_link_blocks;
     size_t num_header_blocks;
-    if (link && is_hard_link) {
-	link = link->unRoot();
+    if (link && is_hard_link)
+    {
+        link = link->unRoot();
     }
-    return calculate_header_size_(fs, tarpath, link,
-				  NULL, NULL,
-				  &num_long_path_blocks,
-				  &num_long_link_blocks,
-				  &num_header_blocks);
+    return calculate_header_size_(tarpath, link,
+                                  NULL, NULL,
+                                  &num_long_path_blocks,
+                                  &num_long_link_blocks,
+                                  &num_header_blocks);
 }
 
 void TarHeader::setLongLinkType(TarHeader *file)
@@ -140,11 +141,11 @@ void TarHeader::setLongPathType(TarHeader *file)
     strcpy(content.members.name_, "././@LongLink");
 }
 
-void TarHeader::setMultivolType(const char *file_name, size_t offset)
+void TarHeader::setMultivolType(Path *file, size_t offset)
 {
     snprintf(content.members.offset, 12, "%011zo", offset);
     content.members.typeflag_ = GNU_MULTIVOL_TYPE;
-    strncpy(content.members.name_, file_name, sizeof(content.members.name_));
+    strncpy(content.members.name_, file->c_str(), sizeof(content.members.name_));
 }
 
 void TarHeader::setSize(size_t s)
@@ -217,24 +218,28 @@ TarHeader::TarHeader(FileStat *fs, Path *tarpath, Path *link, bool is_hard_link,
 {
     memset(&content.members, 0, sizeof(content.members));
 
-    if (link && is_hard_link) {
-	link = link->unRoot();
+    if (link && is_hard_link)
+    {
+        link = link->unRoot();
     }
-    calculate_header_size_(fs, tarpath, link,
-			   content.members.name_,
-			   content.members.linkname_,
-			   &num_long_path_blocks_,
-			   &num_long_link_blocks_,
-			   &num_header_blocks_);
+    calculate_header_size_(tarpath, link,
+                           content.members.name_,
+                           content.members.linkname_,
+                           &num_long_path_blocks_,
+                           &num_long_link_blocks_,
+                           &num_header_blocks_);
 
     // Mode
     writeModeFlagFrom(fs, content.members.mode_, full);
 
     // uid gid
-    if (!full) {
+    if (!full)
+    {
         memcpy(content.members.uid_, "0000000", 8);
         memcpy(content.members.gid_, "0000000", 8);
-    } else {
+    }
+    else
+    {
         snprintf(content.members.uid_, 8, "%07o", fs->st_uid);
         snprintf(content.members.gid_, 8, "%07o", fs->st_gid);
     }
@@ -275,6 +280,20 @@ TarHeader::TarHeader(FileStat *fs, Path *tarpath, Path *link, bool is_hard_link,
         snprintf(content.members.devmajor_, 8, "%07o", MajorDev(fs->st_rdev));
         snprintf(content.members.devminor_, 8, "%07o", MinorDev(fs->st_rdev));
     }
+
+    calculateChecksum();
+}
+
+TarHeader::TarHeader(Path *tarpath)
+{
+    memset(&content.members, 0, sizeof(content.members));
+
+    calculate_header_size_(tarpath, NULL,
+                           content.members.name_,
+                           content.members.linkname_,
+                           &num_long_path_blocks_,
+                           &num_long_link_blocks_,
+                           &num_header_blocks_);
 
     calculateChecksum();
 }

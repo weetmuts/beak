@@ -398,7 +398,8 @@ void predictor(int argc, char **argv)
     }
 }
 
-extern void splitParts_(size_t file_size,
+extern void splitParts_(Path *tarpath,
+                        size_t file_size,
                         size_t split_size,
                         TarHeaderStyle ths,
                         uint *num_parts,
@@ -415,7 +416,9 @@ void testSplitLogic()
 
     size_t file_size = 700*1024*1024;
     size_t split_size = 50*1024*1024;
-    splitParts_(file_size, split_size, Simple, &num_parts, &part_size, &last_part_size, &mv_header_size);
+
+    Path *tarpath = Path::lookup("/alfa/beta/gamma.txt");
+    splitParts_(tarpath, file_size, split_size, Simple, &num_parts, &part_size, &last_part_size, &mv_header_size);
 
     verbose(TEST_SPLIT, "Simple header %zu %zu np=%u ps=%zu lps=%zu mhs=%zu\n",
             file_size, split_size, num_parts, part_size, last_part_size, mv_header_size);
@@ -425,7 +428,18 @@ void testSplitLogic()
         error(TEST_FIT,"Split calculated the wrong values.\n");
     }
 
-    splitParts_(file_size, split_size, None, &num_parts, &part_size, &last_part_size, &mv_header_size);
+    tarpath = Path::lookup("/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxalfa/yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyybeta/gggggggggggggggggggggggggggggggggggggggamma.txt");
+    splitParts_(tarpath, file_size, split_size, Simple, &num_parts, &part_size, &last_part_size, &mv_header_size);
+
+    verbose(TEST_SPLIT, "Simple header long path %zu %zu np=%u ps=%zu lps=%zu mhs=%zu\n",
+            file_size, split_size, num_parts, part_size, last_part_size, mv_header_size);
+
+    if (num_parts != 15 || part_size != split_size || last_part_size != 21504 || mv_header_size != 1536)
+    {
+        error(TEST_FIT,"Split calculated the wrong values.\n");
+    }
+
+    splitParts_(tarpath, file_size, split_size, None, &num_parts, &part_size, &last_part_size, &mv_header_size);
 
     verbose(TEST_SPLIT, "No header %zu %zu np=%u ps=%zu lps=%zu mhs=%zu\n",
             file_size, split_size, num_parts, part_size, last_part_size, mv_header_size);
@@ -437,7 +451,7 @@ void testSplitLogic()
 
     file_size = 32768;
     split_size = 1024;
-    splitParts_(file_size, split_size, None, &num_parts, &part_size, &last_part_size, &mv_header_size);
+    splitParts_(tarpath, file_size, split_size, None, &num_parts, &part_size, &last_part_size, &mv_header_size);
 
     verbose(TEST_SPLIT, "Tiny parts no headers %zu %zu np=%u ps=%zu lps=%zu mhs=%zu\n",
             file_size, split_size, num_parts, part_size, last_part_size, mv_header_size);
@@ -447,7 +461,7 @@ void testSplitLogic()
         error(TEST_FIT,"Split calculated the wrong values.\n");
     }
 
-    splitParts_(file_size, split_size, Simple, &num_parts, &part_size, &last_part_size, &mv_header_size);
+    splitParts_(tarpath, file_size, split_size, Simple, &num_parts, &part_size, &last_part_size, &mv_header_size);
 
     verbose(TEST_SPLIT, "Tiny parts no headers %zu %zu np=%u ps=%zu lps=%zu mhs=%zu\n",
             file_size, split_size, num_parts, part_size, last_part_size, mv_header_size);

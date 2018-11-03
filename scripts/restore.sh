@@ -124,7 +124,7 @@ if [ "$cmd" = "" ] || [ "$2" = "" ]; then
     Help
 fi
 
-root="$(realpath $2)"
+root="$(realpath "$2")"
 
 numgzs=$(ls "$root"/z02*.gz | sort -r | wc | tr -s ' ' | cut -f 2 -d ' ')
 
@@ -193,7 +193,7 @@ while IFS='' read tar_file; do
     then
         # V1 file or single part V2 file.
         if [ "$verbose" = "true" ]; then
-            CMD="tar ${cmd}f \"$file\" \"$ex\" $ignore_errs"
+            CMD="tar ${cmd}f \"$file\" \"$ex\""
             pushDir
             if [ "$debug" == "true" ]; then echo "$CMD"; fi
             eval $CMD > $dir/tmplist
@@ -213,14 +213,13 @@ while IFS='' read tar_file; do
 
         else
 
-            CMD="tar ${cmd}f \"$file\" \"$ex\" $ignore_errs"
+            CMD="tar ${cmd}f \"$file\" \"$ex\""
             pushDir
             if [ "$debug" == "true" ]; then echo "$CMD"; fi
             eval $CMD
             popDir
-            if [ "$?" != "0" ] && [ "$ignore_errs" == "" ]; then
-                echo Failed when executing: tar ${cmd}f \"$file\"
-                exit
+            if [ "$?" != "0" ]; then
+                echo Failed: tar ${cmd}f \"$file\"
             fi
         fi
     else
@@ -272,7 +271,12 @@ echo "\${foo}" >&\$TAR_FD
 EOF
 
             chmod a+x ${newvolumescript}
-            tar xvMf "${root}/${tar_file}" -F ${newvolumescript} 2> /dev/null
+            pushDir
+            # Gnu tar prints unnecessary warnings when extracting multivol files
+            # with long path names. Also there is always an error when the last
+            # multivol part has been extract.
+            tar ${cmd}Mf "${root}/${tar_file}" -F ${newvolumescript} 2> /dev/null
+            popDir
         else
             echo Broken multipart listing in index file, prefix not found.
         fi

@@ -169,14 +169,17 @@ struct Path
             ( (s[0]>='A' && s[0]<='Z') || (s[0]>='a' && s[0]<='z'));
     }
     #endif
-    Path *unRoot() {
-	if (isRoot()) return NULL;
-	if (c_str()[0] != '/') {
-	    return this;
-	}
-	return subpath(1);
+    Path *unRoot()
+    {
+        if (isRoot()) return NULL;
+        if (c_str()[0] != '/')
+        {
+            return this;
+        }
+        return subpath(1);
     }
-    bool isBelowOrEqual(Path *p) {
+    bool isBelowOrEqual(Path *p)
+    {
         if (depth_ < p->depth_) return false;
         Path *t = this;
         while (t != NULL && t != p) { t = t->parent_; }

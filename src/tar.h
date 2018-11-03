@@ -84,15 +84,16 @@ struct TarHeader
 
     public:
 
-    static size_t calculateSize(FileStat *fs, Path *tarpath, Path *link, bool is_hard_link);
+    static size_t calculateHeaderSize(Path *tarpath, Path *link = NULL, bool is_hard_link = false);
     TarHeader();
-    TarHeader(FileStat *fs, Path *tar, Path *link, bool is_hard_link, bool full);
+    TarHeader(Path *tarpath);
+    TarHeader(FileStat *fs, Path *tarpath, Path *link, bool is_hard_link, bool full);
 
     char *buf() { return content.members.name_; }
     char type() { return content.members.typeflag_; }
     void setLongLinkType(TarHeader *file);
     void setLongPathType(TarHeader *file);
-    void setMultivolType(const char *file_name, size_t offset);
+    void setMultivolType(Path *file, size_t offset);
     void setSize(size_t s);
 
     void calculateChecksum();

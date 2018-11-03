@@ -447,6 +447,17 @@ if [ $do_test ]; then
     echo OK
 fi
 
+setup splitpartslongname "Split large file with long file name into multiple small parts"
+if [ $do_test ]; then
+    dir=$root/'aaaa/bbbb/cccc/dddd/eeee/ffff/gggg/hhhh/iiii/jjjj/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'
+    filename="${dir}/0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345.txt"
+    mkdir -p "$dir"
+    dd if=/dev/urandom of=$filename count=71 bs=1023 > /dev/null 2>&1
+    performStore "-ta 25K -ts 66K"
+    standardStoreUntarTest
+    echo OK
+fi
+
 setup splitmoreparts "Split larger file into multiple small parts"
 if [ $do_test ]; then
     dd if=/dev/urandom of=$root'/largefile' count=3271 bs=1023 > /dev/null 2>&1

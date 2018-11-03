@@ -433,39 +433,18 @@ size_t TarFile::copy(char *buf, size_t bufsize, off_t offset, FileSystem *fs, ui
 
             char tmp[header_size_];
             memset(tmp, 0, header_size_);
-            int p = 0;
             TarHeader th;
-
-            // Deal with very long path names.
-            /*
-            if (th.numLongPathBlocks() > 0)
-               {
-               TarHeader lph;
-               lph.setLongPathType(&th);
-               lph.setSize(tarpath_->c_str_len()+1);
-               lph.calculateChecksum();
-
-               memcpy(tmp+p, lph.buf(), T_BLOCKSIZE);
-               memcpy(tmp+p+T_BLOCKSIZE, tarpath_->c_str(), tarpath_->c_str_len());
-               p += th.numLongPathBlocks()*T_BLOCKSIZE;
-               debug(TARENTRY, "Wrote long path header for %s\n", tarpath_->c_str());
-               }
-            */
 
             assert(tar_entry_ != NULL);
 
             size_t file_offset = calculateOriginTarOffset(partnr, header_size_);
             assert(file_offset > tar_entry_->headerSize());
             file_offset -= tar_entry_->headerSize();
-
-            assert(tar_entry_->tarpath()->str().length() < 100);
-
-            th.setMultivolType(tar_entry_->tarpath()->c_str(), file_offset);
+            th.setMultivolType(tar_entry_->tarpath(), file_offset);
             th.setSize(tar_entry_->stat()->st_size-file_offset);
             th.calculateChecksum();
 
-            memcpy(tmp+p, th.buf(), T_BLOCKSIZE);
-
+            memcpy(tmp, th.buf(), T_BLOCKSIZE);
 
             // Copy the header out
             size_t len = header_size_-from;
@@ -513,7 +492,8 @@ bool TarFile::createFile(Path *file, FileStat *stat, uint partnr,
     return true;
 }
 
-void splitParts_(size_t file_size,
+void splitParts_(Path *tarpath,
+                 size_t file_size,
                  size_t split_size,
                  TarHeaderStyle ths,
                  uint *num_parts,
@@ -527,7 +507,7 @@ void splitParts_(size_t file_size,
         *mv_header_size = 0;
     } else {
         // Multivol header size
-        *mv_header_size = 512;
+        *mv_header_size = 512; // TarHeader::calculateHeaderSize(tarpath);
     }
     assert(*part_size > *mv_header_size);
     // To make the multivol parts the exact same size (except the last)
@@ -584,7 +564,8 @@ void TarFile::fixSize(size_t split_size, TarHeaderStyle ths)
         return;
     }
 
-    splitParts_(size_,
+    splitParts_(tar_entry_->tarpath(),
+                size_,
                 split_size,
                 ths,
                 &num_parts_,
