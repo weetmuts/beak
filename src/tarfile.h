@@ -139,7 +139,7 @@ private:
 struct TarFile
 {
     TarFile() : num_parts_(1), part_size_(0) { }
-    TarFile(TarContents tc, TarEntry *te);
+    TarFile(TarContents tc);
 
     TarContents type() { return tar_contents_; }
 
@@ -147,6 +147,10 @@ struct TarFile
         return size_;
     }
     size_t size(uint partnr);
+    size_t headerSize()
+    {
+        return header_size_;
+    }
     // Given an offset into a multivol part, find the offset into
     // the original tarfile that includes a header.
     size_t calculateOriginTarOffset(uint partnr, size_t offset);
@@ -161,7 +165,6 @@ struct TarFile
 
     void finishHash();
     std::pair<TarEntry*, size_t> findTarEntry(size_t offset);
-    TarEntry *tarEntry() { return tar_entry_; }
     void calculateHash();
     void calculateHash(std::vector<std::pair<TarFile*,TarEntry*>> &tars, std::string &contents);
     std::vector<char> &hash();
@@ -193,7 +196,6 @@ private:
 
     // A virtual tar can contain small files, medium files or a single large file.
     TarContents tar_contents_ = SMALL_FILES_TAR;
-    TarEntry *tar_entry_ {};
     uint32_t hash_;
     bool hash_initialized = false;
     size_t size_;

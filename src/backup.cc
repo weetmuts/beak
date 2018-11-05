@@ -41,6 +41,7 @@ static ComponentId COMMANDLINE = registerLogComponent("commandline");
 static ComponentId BACKUP = registerLogComponent("backup");
 static ComponentId HARDLINKS = registerLogComponent("hardlinks");
 static ComponentId FUSE = registerLogComponent("fuse");
+//static ComponentId TIMING = registerLogComponent("timing");
 
 Backup::Backup(ptr<FileSystem> origin_fs)
 {
@@ -555,7 +556,8 @@ size_t Backup::groupFilesIntoTars() {
                     } else {
                         // Create the large files tar here.
                         if (!te->hasLargeTar(entry->tarpathHash())) {
-                            te->createLargeTar(entry->tarpathHash(), entry);
+                            assert(entry != NULL);
+                            te->createLargeTar(entry->tarpathHash());
                             curr = te->largeTar(entry->tarpathHash());
                         } else {
                             curr = te->largeTar(entry->tarpathHash());
@@ -662,7 +664,6 @@ size_t Backup::groupFilesIntoTars() {
         // Hash the hashes of all the other tar and gz files.
         te->gzFile()->calculateHash(tars, gzfile_contents);
 
-        //gzfile_contents.append("#columns tar_path\n");
         gzfile_contents.append("#tars ");
         gzfile_contents.append(to_string(tars.size()));
         gzfile_contents.append("\n");
@@ -675,7 +676,7 @@ size_t Backup::groupFilesIntoTars() {
                 path = path->subpath(te->path()->depth());
             }
             tfn.writeTarFileNameIntoBuffer(filename, sizeof(filename), path);
-            debug(BACKUP, "Added filename %s\n", filename);
+            debug(BACKUP, "Added tar filename %s\n", filename);
             gzfile_contents.append(filename);
             gzfile_contents.append("\n");
             gzfile_contents.append(separator_string);
@@ -684,12 +685,17 @@ size_t Backup::groupFilesIntoTars() {
             {
                 TarFileName tfnn(p.first, p.first->numParts()-1);
                 tfnn.writeTarFileNameIntoBuffer(filename, sizeof(filename), path);
-                debug(BACKUP, "Added last multipart filename %s\n", filename);
+                debug(BACKUP, "Added last multipart tar filename %s\n", filename);
                 gzfile_contents.append(filename);
                 gzfile_contents.append("\n");
                 gzfile_contents.append(separator_string);
             }
         }
+
+        //gzfile_contents.append("#parts\n");
+        // filename num_parts sha256 len sha256 len
+        // filename321 ^@ ffee61283761237182fabcdb123132 ^@ fb13cb ^@
+        //gzfile_contents.append(separator_string);
 
         vector<char> compressed_gzfile_contents;
         gzipit(&gzfile_contents, &compressed_gzfile_contents);

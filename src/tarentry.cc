@@ -121,15 +121,15 @@ void TarEntry::calculateTarpath(Path *storage_dir) {
 }
 
 void TarEntry::createSmallTar(int i) {
-    small_tars_[i] = new TarFile(SMALL_FILES_TAR, NULL);
+    small_tars_[i] = new TarFile(SMALL_FILES_TAR);
     tars_.push_back(small_tars_[i]);
 }
 void TarEntry::createMediumTar(int i) {
-    medium_tars_[i] = new TarFile(MEDIUM_FILES_TAR, NULL);
+    medium_tars_[i] = new TarFile(MEDIUM_FILES_TAR);
     tars_.push_back(medium_tars_[i]);
 }
-void TarEntry::createLargeTar(uint32_t hash, TarEntry *te) {
-    large_tars_[hash] = new TarFile(SINGLE_LARGE_FILE_TAR, te);
+void TarEntry::createLargeTar(uint32_t hash) {
+    large_tars_[hash] = new TarFile(SINGLE_LARGE_FILE_TAR);
     tars_.push_back(large_tars_[hash]);
 }
 
@@ -331,12 +331,12 @@ void TarEntry::registerTarFile(TarFile *tf, size_t o) {
 }
 
 void TarEntry::registerTazFile() {
-    taz_file_ = new TarFile(DIR_TAR, NULL);
+    taz_file_ = new TarFile(DIR_TAR);
     tars_.push_back(taz_file_);
 }
 
 void TarEntry::registerGzFile() {
-    gz_file_ = new TarFile(REG_FILE, NULL);
+    gz_file_ = new TarFile(REG_FILE);
     tars_.push_back(gz_file_);
 }
 
@@ -505,7 +505,7 @@ void cookEntry(string *listing, TarEntry *entry) {
         char nps[256];
         TarFile *tf = entry->tarFile();
         uint np = tf->numParts();
-        snprintf(nps, sizeof(nps), "%u,%d,%zu,%zu", np, 0, tf->size(0), tf->size(np-1));
+        snprintf(nps, sizeof(nps), "%u,%zu,%zu,%zu", np, tf->headerSize(), tf->size(0), tf->size(np-1));
         listing->append(nps);
     }
     listing->append(separator_string);
@@ -518,7 +518,6 @@ void cookEntry(string *listing, TarEntry *entry) {
 bool eatEntry(int beak_version, vector<char> &v, vector<char>::iterator &i, Path *dir_to_prepend,
               FileStat *fs, size_t *offset, string *tar, Path **path,
               string *link, bool *is_sym_link, bool *is_hard_link,
-
               bool *eof, bool *err)
 {
     string permission = eatTo(v, i, separator, 32, eof, err);

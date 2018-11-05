@@ -168,7 +168,7 @@ struct TarEntry
 
     void createSmallTar(int i);
     void createMediumTar(int i);
-    void createLargeTar(uint32_t hash, TarEntry *te);
+    void createLargeTar(uint32_t hash);
 
     std::vector<TarFile*> &tars() { return tars_; }
     TarFile *smallTar(int i)

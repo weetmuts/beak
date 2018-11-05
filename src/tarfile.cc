@@ -36,11 +36,10 @@ using namespace std;
 ComponentId TARFILE = registerLogComponent("tarfile");
 ComponentId HASHING = registerLogComponent("hashing");
 
-TarFile::TarFile(TarContents tc, TarEntry *te)
+TarFile::TarFile(TarContents tc)
 {
     size_ = 0;
     tar_contents_ = tc;
-    tar_entry_ = te;
     memset(&mtim_, 0, sizeof(mtim_));
     disk_update = NoUpdate;
     num_parts_ = 1;
@@ -435,13 +434,14 @@ size_t TarFile::copy(char *buf, size_t bufsize, off_t offset, FileSystem *fs, ui
             memset(tmp, 0, header_size_);
             TarHeader th;
 
-            assert(tar_entry_ != NULL);
+            TarEntry *te = contents_.begin()->second;
+            assert(te != NULL);
 
             size_t file_offset = calculateOriginTarOffset(partnr, header_size_);
-            assert(file_offset > tar_entry_->headerSize());
-            file_offset -= tar_entry_->headerSize();
-            th.setMultivolType(tar_entry_->tarpath(), file_offset);
-            th.setSize(tar_entry_->stat()->st_size-file_offset);
+            assert(file_offset > te->headerSize());
+            file_offset -= te->headerSize();
+            th.setMultivolType(te->tarpath(), file_offset);
+            th.setSize(te->stat()->st_size-file_offset);
             th.calculateChecksum();
 
             memcpy(tmp, th.buf(), T_BLOCKSIZE);
@@ -492,8 +492,7 @@ bool TarFile::createFile(Path *file, FileStat *stat, uint partnr,
     return true;
 }
 
-void splitParts_(Path *tarpath,
-                 size_t file_size,
+void splitParts_(size_t file_size,
                  size_t split_size,
                  TarHeaderStyle ths,
                  uint *num_parts,
@@ -506,8 +505,9 @@ void splitParts_(Path *tarpath,
     if (ths == None) {
         *mv_header_size = 0;
     } else {
-        // Multivol header size
-        *mv_header_size = 512; // TarHeader::calculateHeaderSize(tarpath);
+        // Multivol header size, is actually fixed 512 bytes.
+        // No need for long link headers. Just truncate the file name.
+        *mv_header_size = 512;
     }
     assert(*part_size > *mv_header_size);
     // To make the multivol parts the exact same size (except the last)
@@ -556,7 +556,7 @@ void splitParts_(Path *tarpath,
 void TarFile::fixSize(size_t split_size, TarHeaderStyle ths)
 {
     size_ = current_tar_offset_;
-    if (size_ <= split_size) {
+    if (size_ <= split_size || tar_contents_ != SINGLE_LARGE_FILE_TAR) {
         // No splitting needed.
         num_parts_ = 1;
         part_size_ = size_;
@@ -564,8 +564,7 @@ void TarFile::fixSize(size_t split_size, TarHeaderStyle ths)
         return;
     }
 
-    splitParts_(tar_entry_->tarpath(),
-                size_,
+    splitParts_(size_,
                 split_size,
                 ths,
                 &num_parts_,
@@ -573,6 +572,7 @@ void TarFile::fixSize(size_t split_size, TarHeaderStyle ths)
                 &last_part_size_,
                 &header_size_);
 }
+
 size_t TarFile::size(uint partnr)
 {
     assert(partnr < num_parts_);
