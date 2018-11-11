@@ -36,8 +36,7 @@ static ComponentId TEST_HUMANREADABLE = registerLogComponent("human_readable");
 static ComponentId TEST_HEXSTRING = registerLogComponent("hex_string");
 static ComponentId TEST_SPLIT = registerLogComponent("split");
 
-void testMatch(string pattern, const char *path, bool should_match)
-    throw (string);
+void testMatch(string pattern, const char *path, bool should_match);
 
 bool verbose_ = false;
 bool err_found_ = false;
@@ -114,7 +113,6 @@ void testMatching()
 }
 
 void testMatch(string pattern, const char *path, bool should_match)
-    throw (string)
 {
     if (should_match) {
         verbose(TEST_MATCH,"\"%s\" matches pattern \"%s\" ", path, pattern.c_str());

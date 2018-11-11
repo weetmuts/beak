@@ -186,7 +186,7 @@ if test "x${have_st_mtime}" = "xyes"; then
     AC_DEFINE(HAS_ST_MTIME,1,Stat structure has st_mtime)
 fi
 
-CXXFLAGS="-DPLATFORM_${PLATFORM} -Wall -Werror -fmessage-length=0 -std=c++11 -Wno-unused-function"
+CXXFLAGS="-DPLATFORM_${PLATFORM} -Wall -Werror -fmessage-length=0 -std=c++11 -Wno-maybe-uninitialized -Wno-unused-function"
 
 CXXFLAGS_debug="-O0 -g"
 CXXFLAGS_release="-Os"
