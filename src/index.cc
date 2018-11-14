@@ -119,22 +119,24 @@ RC Index::loadIndex(vector<char> &v,
         failure(INDEX, "File format error gz file. [%d]\n", __LINE__);
         return RC::ERR;
     }
+    debug(INDEX,"found num tars %d\n", num_tars);
 
+    string name;
     eof = false;
     while (i != v.end() && !eof && num_tars > 0) {
-        string name = eatTo(v, i, separator, 4096, &eof, &err); // Max path names 4096 bytes
+        name = eatTo(v, i, separator, 4096, &eof, &err); // Max path names 4096 bytes
         if (err) {
             failure(INDEX, "Could not parse tarredfs-tars file!\n");
             break;
         }
         // Remove the newline at the end.
         name.pop_back();
-        //name.insert(0, "/");
+        if (name.length()==0) continue;
         Path *p = Path::lookup(name);
         if (p->parent()) {
-            debug(INDEX,"found tar %s in dir %s\n", p->name()->c_str(), p->parent()->c_str());
+            debug(INDEX, "found tar %d %s in dir %s\n", num_tars,  p->name()->c_str(), p->parent()->c_str());
         } else {
-            debug(INDEX,"found tar %s\n", p->name()->c_str());
+            debug(INDEX, "found tar %d %s\n", num_tars, p->name()->c_str());
         }
 
         it->path = p;
@@ -143,6 +145,36 @@ RC Index::loadIndex(vector<char> &v,
     }
 
     if (num_tars != 0) {
+        failure(INDEX, "File format error gz file. [%d]\n", __LINE__);
+        return RC::ERR;
+    }
+
+    string parts = eatTo(v, i, separator, 4096, &eof, &err); // Max path names 4096 bytes
+    if (err) {
+        failure(INDEX, "Could not parse tarredfs-tars file!\n");
+        return RC::ERR;
+    }
+
+    int num_parts = 0;
+    n = sscanf(parts.c_str(), "#parts %d", &num_parts);
+    if (n != 1) {
+        failure(INDEX, "File format error gz file.\"%s\"[%d]\n", parts.c_str(), __LINE__);
+        return RC::ERR;
+    }
+    debug(INDEX,"found num parts %d\n", num_parts);
+    eof = false;
+    while (i != v.end() && !eof && num_parts > 0) {
+        string name = eatTo(v, i, separator, 4096, &eof, &err); // Max path names 4096 bytes
+        if (err) {
+            failure(INDEX, "Could not parse tarredfs-tars file!\n");
+            break;
+        }
+        // Remove the newline at the end.
+        name.pop_back();
+        num_parts--;
+    }
+
+    if (num_parts != 0) {
         failure(INDEX, "File format error gz file. [%d]\n", __LINE__);
         return RC::ERR;
     }

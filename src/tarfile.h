@@ -37,7 +37,13 @@ struct TarEntry;
 
 enum TarContents
 {
-    REG_FILE, DIR_TAR, SMALL_FILES_TAR, MEDIUM_FILES_TAR, SINGLE_LARGE_FILE_TAR
+    REG_FILE,
+    DIR_TAR,
+    SMALL_FILES_TAR,
+    MEDIUM_FILES_TAR,
+    SINGLE_LARGE_FILE_TAR,
+    SPLIT_LARGE_FILE_TAR,
+    CONTENT_SPLIT_LARGE_FILE_TAR
 };
 
 #define REG_FILE_CHAR 'z'
@@ -45,6 +51,8 @@ enum TarContents
 #define SMALL_FILES_TAR_CHAR 's'
 #define MEDIUM_FILES_TAR_CHAR 'm'
 #define SINGLE_LARGE_FILE_TAR_CHAR 'l'
+#define SPLIT_LARGE_FILE_TAR_CHAR 'i'
+#define CONTENT_SPLIT_LARGE_FILE_TAR_CHAR 'c'
 
 struct TarFile;
 
@@ -98,6 +106,8 @@ struct TarFileName {
         case SMALL_FILES_TAR: return SMALL_FILES_TAR_CHAR;
         case MEDIUM_FILES_TAR: return MEDIUM_FILES_TAR_CHAR;
         case SINGLE_LARGE_FILE_TAR: return SINGLE_LARGE_FILE_TAR_CHAR;
+        case SPLIT_LARGE_FILE_TAR: return SPLIT_LARGE_FILE_TAR_CHAR;
+        case CONTENT_SPLIT_LARGE_FILE_TAR: return CONTENT_SPLIT_LARGE_FILE_TAR_CHAR;
         }
         return 0;
     }
@@ -109,6 +119,8 @@ struct TarFileName {
         case SMALL_FILES_TAR_CHAR: *tc = SMALL_FILES_TAR; return true;
         case MEDIUM_FILES_TAR_CHAR: *tc = MEDIUM_FILES_TAR; return true;
         case SINGLE_LARGE_FILE_TAR_CHAR: *tc = SINGLE_LARGE_FILE_TAR; return true;
+        case SPLIT_LARGE_FILE_TAR_CHAR: *tc = SPLIT_LARGE_FILE_TAR; return true;
+        case CONTENT_SPLIT_LARGE_FILE_TAR_CHAR: *tc = CONTENT_SPLIT_LARGE_FILE_TAR; return true;
         }
         return false;
     }
@@ -119,7 +131,9 @@ struct TarFileName {
         case DIR_TAR:
         case SMALL_FILES_TAR:
         case MEDIUM_FILES_TAR:
-        case SINGLE_LARGE_FILE_TAR: return "tar";
+        case SINGLE_LARGE_FILE_TAR:
+        case SPLIT_LARGE_FILE_TAR: return "tar";
+        case CONTENT_SPLIT_LARGE_FILE_TAR: return "bin";
         }
         assert(0);
         return "";
@@ -191,6 +205,10 @@ struct TarFile
     bool createFile(Path *file, FileStat *stat, uint partnr,
                     FileSystem *src_fs, FileSystem *dst_fs, size_t off,
                     std::function<void(size_t)> update_progress);
+
+    TarEntry *singleContent() {
+        return contents_.begin()->second;
+    }
 
 private:
 

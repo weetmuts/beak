@@ -495,6 +495,9 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
             case cache_option:
                 settings->cache = value;
                 break;
+            case contentsplit_option:
+                settings->contentsplit.push_back(value);
+                break;
             case depth_option:
                 settings->depth = atoi(value.c_str());
                 if (settings->depth < 1) {

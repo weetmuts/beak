@@ -388,8 +388,10 @@ void TarFileName::writeTarFileNameIntoBufferVersion2_(char *buf, size_t buf_len,
                  sizes,
                  suffix);
     } else {
-        snprintf(buf, buf_len, "%s/%c02_%s_%s_%s-%x_%s.%s",
+        const char *slashornot = dir->str().length() > 0 ? "/" : "";
+        snprintf(buf, buf_len, "%s%s%c02_%s_%s_%s-%x_%s.%s",
                  dir->c_str(),
+                 slashornot,
                  TarFileName::chartype(type),
                  secs_and_nanos,
                  header_hash.c_str(),
@@ -571,6 +573,10 @@ void TarFile::fixSize(size_t split_size, TarHeaderStyle ths)
                 &part_size_,
                 &last_part_size_,
                 &header_size_);
+
+    if (num_parts_ > 1) {
+        tar_contents_ = SPLIT_LARGE_FILE_TAR;
+    }
 }
 
 size_t TarFile::size(uint partnr)

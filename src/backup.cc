@@ -108,20 +108,20 @@ RecurseOption Backup::addTarEntry(Path *abspath, FileStat *st)
         debug(BACKUP, "filter NOT dropped \"%s\"\n", name);
     }
 
-    bool should_hash = false;
-    for (auto & p : hashes) {
+    bool should_content_split = false;
+    for (auto & p : contentsplits) {
         bool match  = p.match(name);
         if (match) {
-            should_hash = true;
+            should_content_split = true;
             break;
         }
     }
-    if (name[1] != 0 && should_hash) {
-        debug(BACKUP, "should hash \"%s\"\n", name);
+    if (name[1] != 0 && should_content_split) {
+        debug(BACKUP, "should content split \"%s\"\n", name);
     }
 
     // Creation and storage of entry.
-    TarEntry *te = new TarEntry(abspath, path, st, tarheaderstyle_, should_hash);
+    TarEntry *te = new TarEntry(abspath, path, st, tarheaderstyle_, should_content_split);
     files[te->path()] = te;
 
     if (te->isDirectory()) {
@@ -678,24 +678,42 @@ size_t Backup::groupFilesIntoTars() {
             tfn.writeTarFileNameIntoBuffer(filename, sizeof(filename), path);
             debug(BACKUP, "Added tar filename %s\n", filename);
             gzfile_contents.append(filename);
-            gzfile_contents.append("\n");
-            gzfile_contents.append(separator_string);
-
             if (p.first->numParts() > 1)
             {
                 TarFileName tfnn(p.first, p.first->numParts()-1);
                 tfnn.writeTarFileNameIntoBuffer(filename, sizeof(filename), path);
-                debug(BACKUP, "Added last multipart tar filename %s\n", filename);
+                debug(BACKUP, "Appended last multipart tar filename %s\n", filename);
+                gzfile_contents.append(" ... ");
                 gzfile_contents.append(filename);
+            }
+            gzfile_contents.append("\n");
+            gzfile_contents.append(separator_string);
+        }
+
+        uint num_content_splits = 0;
+        for (auto & t : tars) {
+            TarFile *tf = t.first;
+            if (tf->type() == CONTENT_SPLIT_LARGE_FILE_TAR) {
+                num_content_splits++;
+            }
+        }
+        gzfile_contents.append("#parts ");
+        gzfile_contents.append(to_string(num_content_splits));
+        gzfile_contents.append("\n");
+        gzfile_contents.append(separator_string);
+        // filename num_parts sha256 len sha256 len \n
+        for (auto & t : tars) {
+            TarFile *tf = t.first;
+            if (tf->type() == CONTENT_SPLIT_LARGE_FILE_TAR)
+            {
+                TarEntry *te = t.first->singleContent();
+                gzfile_contents.append(te->tarpath()->str());
+                gzfile_contents.append(separator_string);
+                gzfile_contents.append(to_string(t.first->numParts()));
                 gzfile_contents.append("\n");
                 gzfile_contents.append(separator_string);
             }
         }
-
-        //gzfile_contents.append("#parts\n");
-        // filename num_parts sha256 len sha256 len
-        // filename321 ^@ ffee61283761237182fabcdb123132 ^@ fb13cb ^@
-        //gzfile_contents.append(separator_string);
 
         vector<char> compressed_gzfile_contents;
         gzipit(&gzfile_contents, &compressed_gzfile_contents);
@@ -789,39 +807,44 @@ TarFile *Backup::findTarFromPath(Path *path, uint *partnr) {
     debug(BACKUP, "Hash >%s< hash len %d >%s<\n", tfn.header_hash.c_str(), hash.size(), toHex(hash).c_str());
     debug(BACKUP, "Type is %d suffix is %s \n", tfn.type, "SUFFIXHERE");
 
-    if (tfn.type == REG_FILE) {
+    switch (tfn.type) {
+    case REG_FILE:
         if (!te->hasGzFile()) {
             debug(BACKUP, "No such gz file >%s<\n", toHex(hash).c_str());
             return NULL;
         }
         return te->gzFile();
-    } else
-    if (tfn.type == SINGLE_LARGE_FILE_TAR) {
+    case SINGLE_LARGE_FILE_TAR:
+    case SPLIT_LARGE_FILE_TAR:
         if (te->largeHashTars().count(hash) == 0) {
             debug(BACKUP, "No such large tar >%s<\n", toHex(hash).c_str());
             return NULL;
         }
         return te->largeHashTar(hash);
-    } else
-    if (tfn.type == MEDIUM_FILES_TAR) {
+    case MEDIUM_FILES_TAR:
         if (te->mediumHashTars().count(hash) == 0) {
             debug(BACKUP, "No such medium tar >%s<\n", toHex(hash).c_str());
             return NULL;
         }
         return te->mediumHashTar(hash);
-    } else
-    if (tfn.type == SMALL_FILES_TAR) {
+    case SMALL_FILES_TAR:
         if (te->smallHashTars().count(hash) == 0) {
             debug(BACKUP, "No such small tar >%s<\n", toHex(hash).c_str());
             return NULL;
         }
         return te->smallHashTar(hash);
-    } else if (tfn.type == DIR_TAR) {
+    case DIR_TAR:
         if (!te->hasTazFile()) {
             debug(BACKUP, "No such dir tar >%s<\n", toHex(hash).c_str());
             return NULL;
         }
         return te->tazFile();
+    case CONTENT_SPLIT_LARGE_FILE_TAR:
+        if (te->contentHashTars().count(hash) == 0) {
+            debug(BACKUP, "No such content hash tar >%s<\n", toHex(hash).c_str());
+            return NULL;
+        }
+        return te->contentHashTar(hash);
     }
     // Should not get here.
     assert(0);
@@ -977,6 +1000,16 @@ RC Backup::scanFileSystem(Settings *settings)
     // Config stores the command line settings that affect the backup layout.
     string config;
 
+    for (auto &e : settings->contentsplit) {
+        Match m;
+        bool rc = m.use(e);
+        if (!rc) {
+            error(COMMANDLINE, "Not a valid glob \"%s\"\n", e.c_str());
+        }
+        contentsplits.push_back(m);
+        debug(COMMANDLINE, "Contentsplit on \"%s\"\n", e.c_str());
+        config += "--contentsplit '"+e+"' ";
+    }
     for (auto &e : settings->include) {
         Match m;
         bool rc = m.use(e);

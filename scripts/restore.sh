@@ -161,7 +161,7 @@ else
 fi
 
 # Extract the list of tar files from the index file.
-gunzip -c "$generation" | tr -d '\0' | grep -A1000000 -m1 \#tars | grep -v z02 | grep -v \#tars | sed 's/^\///'  > "$dir/aa"
+gunzip -c "$generation" | tr -d '\0' | grep -A1000000 -m1 \#tars | grep -B1000000 -m1 \#parts | grep -v z02 | grep -v \#tars | grep -v \#parts | sed 's/^\///'  > "$dir/aa"
 cat "$dir/aa" | tr -c -d '/\n' | tr / a > "$dir/bb"
 # Sort them on the number of slashes, ie handle the
 # deepest directories first, finish with the root
@@ -171,6 +171,15 @@ paste "$dir/bb" "$dir/aa" | LC_COLLATE=en_US.UTF8 sort | cut -f 2- > "$dir/cc"
 # Iterate over the tar files and extract them
 # in the corresponding directory. Read store a line at a time from $dir/cc into $tar_file
 while IFS='' read tar_file; do
+
+    last_file=""
+    # Test for split tar i02_123123123.tar ... i02_123123122.tar
+    if [ "$(echo "$tar_file" | grep -o " \\.\\.\\. ")" = " ... " ]
+    then
+        tmp="$tar_file"
+        tar_file="$(echo "$tar_file" | sed 's/\(.*\)\ \.\.\.\ .*/\1/')"
+        last_file="$(echo "$tmp" | sed 's/.*\ \.\.\.\ \(.*\)/\1/')"
+    fi
 
     # Extract directory in which the tar file resides.
     tar_dir="$(dirname "$tar_file")"
@@ -188,8 +197,8 @@ while IFS='' read tar_file; do
         exit
     fi
 
-    # Test for multi part
-    if [ "$(echo "$file" | grep -o -)" = "" ] || [ "$(echo "$file" | grep -o _0-1_)" = "_0-1_" ]
+    # Test if single tar file.
+    if [ "$(echo "$file" | grep -o -)" = "" ] || [ "$last_file" = "" ]
     then
         # V1 file or single part V2 file.
         if [ "$verbose" = "true" ]; then
@@ -234,17 +243,15 @@ while IFS='' read tar_file; do
         size=$(echo "$tar_file" | sed "s/.*_\([0-9]\+\)\.tar/\1/")
         partnrwidth=$(echo -n $numx | wc --c)
 
-        read last_part
-        if [ "$(echo "$last_part" | grep -o "$prefix")" = "$prefix" ]
+        if [ "$(echo "$last_file" | grep -o "$prefix")" = "$prefix" ]
         then
-            last=$(echo "$last_part" | sed "s/.*_\([0-9a-f]\+\)-.*/\1/")
+            last=$(echo "$last_file" | sed "s/.*_\([0-9a-f]\+\)-.*/\1/")
             last=$((0x$last))
-            nummx=$(echo "$last_part" | sed "s/.*-\([0-9a-f]\+\)_.*/\1/")
+            nummx=$(echo "$last_file" | sed "s/.*-\([0-9a-f]\+\)_.*/\1/")
             numm=$((0x$nummx))
-            lastsize=$(echo "$last_part" | sed "s/.*_\([0-9]\+\)\.tar/\1/")
+            lastsize=$(echo "$last_file" | sed "s/.*_\([0-9]\+\)\.tar/\1/")
 
             newvolumescript=$(mktemp /tmp/beak_tarvolchangeXXXXXXXX.sh)
-
             cat > ${newvolumescript} <<EOF
 #!/bin/bash
 
@@ -274,8 +281,8 @@ EOF
             pushDir
             # Gnu tar prints unnecessary warnings when extracting multivol files
             # with long path names. Also there is always an error when the last
-            # multivol part has been extract.
-            tar ${cmd}Mf "${root}/${tar_file}" -F ${newvolumescript} 2> /dev/null
+            # multivol part has been extract. Hide this with pipe to null.
+            tar ${cmd}Mf "${root}/${tar_file}" -F ${newvolumescript} > /dev/null 2>&1
             popDir
         else
             echo Broken multipart listing in index file, prefix not found.

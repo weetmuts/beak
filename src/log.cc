@@ -38,11 +38,12 @@ using namespace std;
 bool use_syslog = false;
 LogLevel log_level = INFO;
 
-static set<int> log_components;
+static set<int> log_components_;
+static set<int> trace_components_;
 
-static int num_components = 0;
+static int num_components_ = 0;
 #define MAX_NUM_COMPONENTS 64
-static const char *all_components[MAX_NUM_COMPONENTS];
+static const char *all_components_[MAX_NUM_COMPONENTS];
 
 bool debug_logging_ = false;
 bool verbose_logging_ = false;
@@ -56,17 +57,17 @@ void vsyslog(int l, const char* fmt, ...) { }
 #endif
 
 static int findComponent(const char *c) {
-    for (int i=0; i<num_components; ++i) {
-        if (!strcmp(c, all_components[i])) {
+    for (int i=0; i<num_components_; ++i) {
+        if (!strcmp(c, all_components_[i])) {
             return i;
         }
     }
     return -1;
 }
 
-static void logAll() {
-    for (int i=0; i<num_components; ++i) {
-        log_components.insert(i);
+static void logAll(set<int> *components) {
+    for (int i=0; i<num_components_; ++i) {
+        components->insert(i);
     }
 }
 
@@ -76,9 +77,9 @@ ComponentId registerLogComponent(const char *component)
     if (c >= 0) {
         return c;
     }
-    c = num_components;
-    all_components[num_components] = component;
-    assert(num_components < MAX_NUM_COMPONENTS);
+    c = num_components_;
+    all_components_[num_components_] = component;
+    assert(num_components_ < MAX_NUM_COMPONENTS);
 
     // Check if the log component is enabled through an env variable.
     // Instead of the command line.
@@ -87,18 +88,28 @@ ComponentId registerLogComponent(const char *component)
     strcat(name, component);
     char *val = getenv(name);
     if (val != NULL) {
-        log_components.insert(c);
+        log_components_.insert(c);
         setLogLevel(DEBUG);
     }
 
-    return num_components++;
+    // Check if the trace component is enabled through an env variable.
+    // Instead of the command line.
+    strcpy(name, "BEAK_TRACE_");
+    strcat(name, component);
+    val = getenv(name);
+    if (val != NULL) {
+        trace_components_.insert(c);
+        setLogLevel(TRACE);
+    }
+
+    return num_components_++;
 }
 
 void listLogComponents()
 {
     vector<string> c;
-    for (int i=0; i<num_components; ++i) {
-        c.push_back(all_components[i]);
+    for (int i=0; i<num_components_; ++i) {
+        c.push_back(all_components_[i]);
     }
     sort(c.begin(), c.end());
     for (auto & s : c) {
@@ -117,41 +128,51 @@ void setLogLevel(LogLevel l) {
     }
 }
 
-void addRemoveComponent_(const char *co)
+void addRemoveComponent_(const char *co, set<int> *components)
 {
     // You can do --log=all,-systemio,-lock to reduce the amount of logging.
     if (!strncmp(co, "all", 3)) {
-        logAll();
+        logAll(components);
     } else {
         if (co[0] == '-') {
             int c = findComponent(co+1);
             if (c == -1) error(0,"No such log component: \"%s\"\n", co+1);
-            log_components.erase(c);
+            components->erase(c);
         } else {
             int c = findComponent(co);
             if (c == -1) error(0,"No such log component: \"%s\"\n", co);
-            log_components.insert(c);
+            components->insert(c);
         }
+    }
+}
+
+void setLogOrTraceComponents_(const char *cs, set<int> *components)
+{
+    string clist = cs;
+    size_t p = 0, pp;
+
+    while (p < clist.length()) {
+        pp = clist.find(',', p);
+        if (pp == string::npos) {
+            const char *co = clist.substr(p).c_str();
+            addRemoveComponent_(co, components);
+            break;
+        } else {
+            const char *co = clist.substr(p, pp-p).c_str();
+            addRemoveComponent_(co, components);
+        }
+        p = pp+1;
     }
 }
 
 void setLogComponents(const char *cs)
 {
-    string components = cs;
-    size_t p = 0, pp;
+    setLogOrTraceComponents_(cs, &log_components_);
+}
 
-    while (p < components.length()) {
-        pp = components.find(',', p);
-        if (pp == string::npos) {
-            const char *co = components.substr(p).c_str();
-            addRemoveComponent_(co);
-            break;
-        } else {
-            const char *co = components.substr(p, pp-p).c_str();
-            addRemoveComponent_(co);
-        }
-        p = pp+1;
-    }
+void setTraceComponents(const char *cs)
+{
+    setLogOrTraceComponents_(cs, &trace_components_);
 }
 
 LogLevel logLevel() {
@@ -166,12 +187,12 @@ void error(ComponentId ci, const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
     if (use_syslog) {
-        syslog(LOG_ERR, "Fatal error in %s: ", all_components[ci]);
+        syslog(LOG_ERR, "Fatal error in %s: ", all_components_[ci]);
         vsyslog(LOG_ERR, fmt, args);
     }
     va_end(args);
     va_start(args, fmt);
-    fprintf(stderr, "Fatal error in %s: ", all_components[ci]);
+    fprintf(stderr, "Fatal error in %s: ", all_components_[ci]);
     vfprintf(stderr, fmt, args);
     va_end(args);
     exit(1);
@@ -210,15 +231,32 @@ void logSystem(ComponentId ci, const char* fmt, ...) {
 
 void logDebug(ComponentId ci, const char* fmt, ...) {
     if (log_level == DEBUG &&
-    		(log_components.size()==0 ||
-    		 log_components.count(ci) == 1)) {
+    		(log_components_.size()==0 ||
+    		 log_components_.count(ci) == 1)) {
         va_list args;
         va_start(args, fmt);
         if (use_syslog) {
-	    syslog(LOG_INFO, "%s: ", all_components[ci]);
+	    syslog(LOG_INFO, "%s: ", all_components_[ci]);
             vsyslog(LOG_DEBUG, fmt, args);
         } else {
-	    fprintf(stdout, "%s: ", all_components[ci]);
+	    fprintf(stdout, "%s: ", all_components_[ci]);
+            vfprintf(stdout, fmt, args);
+        }
+        va_end(args);
+    }
+}
+
+void logTrace(ComponentId ci, const char* fmt, ...) {
+    if (log_level == TRACE &&
+        (trace_components_.size()==0 ||
+         trace_components_.count(ci) == 1)) {
+        va_list args;
+        va_start(args, fmt);
+        if (use_syslog) {
+	    syslog(LOG_INFO, "%s: ", all_components_[ci]);
+            vsyslog(LOG_DEBUG, fmt, args);
+        } else {
+	    fprintf(stdout, "%s: ", all_components_[ci]);
             vfprintf(stdout, fmt, args);
         }
         va_end(args);
@@ -227,8 +265,8 @@ void logDebug(ComponentId ci, const char* fmt, ...) {
 
 void logVerbose(ComponentId ci, const char* fmt, ...) {
     if (log_level >= VERBOSE &&
-    		(log_components.size()==0 ||
-    		 log_components.count(ci) == 1)) {
+        (log_components_.size()==0 ||
+         log_components_.count(ci) == 1)) {
         va_list args;
         if (use_syslog) {
 	    va_start(args, fmt);

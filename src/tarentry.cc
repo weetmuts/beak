@@ -67,7 +67,7 @@ TarEntry::TarEntry(size_t size, TarHeaderStyle ths)
     debug(TARENTRY, "index file entry added size %ju blocked size %ju!\n", fs_.st_size, blocked_size_);
 }
 
-TarEntry::TarEntry(Path *ap, Path *p, FileStat *st, TarHeaderStyle ths, bool should_hash) : fs_(*st)
+TarEntry::TarEntry(Path *ap, Path *p, FileStat *st, TarHeaderStyle ths, bool should_content_split) : fs_(*st)
 {
     tar_header_style_ = ths;
     abspath_ = ap;
@@ -80,7 +80,7 @@ TarEntry::TarEntry(Path *ap, Path *p, FileStat *st, TarHeaderStyle ths, bool sho
     is_tar_storage_dir_ = false;
     tarpath_ = path_;
     name_ = p->name();
-    should_hash_content_ = should_hash;
+    should_content_split_ = should_content_split;
 
     if (isSymbolicLink())
     {
@@ -106,7 +106,7 @@ TarEntry::TarEntry(Path *ap, Path *p, FileStat *st, TarHeaderStyle ths, bool sho
     }
 
     debug(TARENTRY, "entry %s added size %ju blocked size %ju %s\n", path_->c_str(), fs_.st_size, blocked_size_,
-          should_hash_content_?"HASH":"");
+          should_content_split?"CSPLIT":"");
 }
 
 void TarEntry::calculateTarpath(Path *storage_dir) {
@@ -377,10 +377,6 @@ void TarEntry::calculateHash() {
 
 vector<char> &TarEntry::metaHash() {
     return meta_sha256_hash_;
-}
-
-vector<char> &TarEntry::contentHash() {
-    return content_sha256_hash_;
 }
 
 void TarEntry::calculateSHA256Hash()

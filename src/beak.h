@@ -129,6 +129,7 @@ LIST_OF_COMMANDS
 
 #define LIST_OF_OPTIONS \
     X(c,cache,std::string,true,"Directory to store cached files when mounting a remote storage.") \
+    X(,contentsplit,std::vector<std::string>,true,"Split matching files based on content. E.g. -cs '*.vdi'") \
     X(d,depth,int,true,"Force all dirs at this depth to contain tars.\n" \
       "                           1 is the root, 2 is the first subdir. The default is 2.")    \
     X(f,foreground,bool,false,"When mounting do not spawn a daemon.")   \

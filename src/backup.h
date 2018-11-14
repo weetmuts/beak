@@ -77,7 +77,7 @@ struct Backup
 
     std::vector<std::pair<Filter,Match>> filters;
     std::vector<Match> triggers;
-    std::vector<Match> hashes;
+    std::vector<Match> contentsplits;
 
     int recurse();
     RecurseOption addTarEntry(Path *abspath, FileStat *st);

@@ -26,7 +26,8 @@ enum LogLevel
     QUITE,      // No info but display warnings, failures and of course stop on errors.
     INFO,       // Normal mode
     VERBOSE,    // Verbose information
-    DEBUG       // Debug information
+    DEBUG,      // Debug information
+    TRACE       // Trace level information
 };
 typedef int ComponentId;
 
@@ -57,11 +58,18 @@ void logSystem(ComponentId ci, const char* fmt, ...);
 extern bool debug_logging_;
 
 // Debug logging
-// Enabled with: -v -v
 #define debug(args...) {if(debug_logging_){logDebug(args);}}
 void logDebug(ComponentId ci, const char* fmt, ...);
 // The macro is used to avoid evaluating complex argument fed to the debug printout,
 // when not running with debug enabled.
+
+extern bool trace_logging_;
+
+// Trace logging
+#define trace(args...) {if(trace_logging_){logTrace(args);}}
+void logTrace(ComponentId ci, const char* fmt, ...);
+// The macro is used to avoid evaluating complex argument fed to the trace printout,
+// when not running with trace enabled.
 
 extern bool verbose_logging_;
 

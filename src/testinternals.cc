@@ -21,6 +21,7 @@
 #include "match.h"
 #include "tar.h"
 #include "util.h"
+#include "contentsplit.h"
 
 #include <assert.h>
 
@@ -35,6 +36,7 @@ static ComponentId TEST_FIT = registerLogComponent("test_fit");
 static ComponentId TEST_HUMANREADABLE = registerLogComponent("human_readable");
 static ComponentId TEST_HEXSTRING = registerLogComponent("hex_string");
 static ComponentId TEST_SPLIT = registerLogComponent("split");
+static ComponentId TEST_CONTENTSPLIT = registerLogComponent("contentsplit");
 
 void testMatch(string pattern, const char *path, bool should_match);
 
@@ -51,6 +53,7 @@ void testHumanReadable();
 void testHexStrings();
 void testFit();
 void testSplitLogic();
+void testContentSplit();
 void predictor(int argc, char **argv);
 
 int main(int argc, char *argv[])
@@ -69,16 +72,16 @@ int main(int argc, char *argv[])
     }
     try {
         fs = newDefaultFileSystem();
-        /*
-        testMatching();
+        /*testMatching();
         testRandom();
         testFileSystem();
         testGzip();
         testKeeps();
         testHumanReadable();
         testHexStrings();
-        testFit();*/
-        testSplitLogic();
+        testFit();
+        testSplitLogic(); */
+        testContentSplit();
 
         if (!err_found_) {
             printf("OK\n");
@@ -465,5 +468,16 @@ void testSplitLogic()
     {
         error(TEST_FIT,"Split calculated the wrong values.\n");
     }
+
+}
+
+void testContentSplit()
+{
+    vector<ContentChunk> chunks;
+    splitContent(Path::lookup("gurka"), &chunks, ((size_t)100));
+
+
+
+    error(TEST_CONTENTSPLIT,"Content split calculated the wrong values.\n");
 
 }

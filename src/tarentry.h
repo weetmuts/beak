@@ -37,7 +37,7 @@ struct TarEntry
 {
 
     TarEntry(size_t size, TarHeaderStyle ths);
-    TarEntry(Path *abspath, Path *path, FileStat *st, TarHeaderStyle ths, bool should_hash);
+    TarEntry(Path *abspath, Path *path, FileStat *st, TarHeaderStyle ths, bool should_content_split);
 
     Path *path()
     {
@@ -199,6 +199,10 @@ struct TarEntry
     {
         return large_hash_tars_[i];
     }
+    TarFile *contentHashTar(std::vector<char> i)
+    {
+        return content_hash_tars_[i];
+    }
     std::map<size_t, TarFile*>& smallTars()
     {
         return small_tars_;
@@ -222,6 +226,10 @@ struct TarEntry
     std::map<std::vector<char>, TarFile*>& largeHashTars()
     {
         return large_hash_tars_;
+    }
+    std::map<std::vector<char>, TarFile*>& contentHashTars()
+    {
+        return content_hash_tars_;
     }
 
     void registerParent(TarEntry *p);
@@ -251,7 +259,6 @@ struct TarEntry
 
     void calculateHash();
     std::vector<char> &metaHash();
-    std::vector<char> &contentHash();
 
     private:
 
@@ -300,6 +307,7 @@ struct TarEntry
     std::map<std::vector<char>,TarFile*> small_hash_tars_;
     std::map<std::vector<char>,TarFile*> medium_hash_tars_;
     std::map<std::vector<char>,TarFile*> large_hash_tars_;
+    std::map<std::vector<char>,TarFile*> content_hash_tars_;
     std::vector<TarEntry*> entries_; // The contents stored in the tar files.
 
     bool is_added_to_directory_ = false;
@@ -309,9 +317,8 @@ struct TarEntry
     void calculateSHA256Hash();
 
     std::vector<char> meta_sha256_hash_;
-    std::vector<char> content_sha256_hash_;
 
-    bool should_hash_content_;
+    bool should_content_split_;
 
     friend void cookEntry(std::string *listing, TarEntry *entry);
 };
