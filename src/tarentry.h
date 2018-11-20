@@ -329,6 +329,7 @@ std::string cookColumns();
 bool eatEntry(int beak_version, std::vector<char> &v, std::vector<char>::iterator &i, Path *dir_to_prepend,
               FileStat *fs, size_t *offset, std::string *tar, Path **path,
               std::string *link, bool *is_sym_link, bool *is_hard_link,
+              uint *num_parts, size_t *part_offset, size_t *part_size, size_t *last_part_size,
               bool *eof, bool *err);
 
 

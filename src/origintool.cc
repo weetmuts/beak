@@ -189,6 +189,7 @@ bool OriginToolImplementation::extractFileFromBackup(RestoreEntry *entry,
             ssize_t n = backup_fs->pread(tar_file, buffer, len, tar_file_offset + offset);
             debug(ORIGINTOOL, "Extracted %ju bytes from %ju to %ju.\n", n,
                   tar_file_offset+offset, offset);
+            assert(n > 0);
             return n;
         });
 

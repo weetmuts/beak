@@ -474,7 +474,7 @@ if [ $do_test ]; then
     echo OK
 fi
 
-setup splitmanymoreparts "Split large file based on content"
+setup splitbasedoncontent "Split large file based on content"
 if [ $do_test ]; then
     dd if=/dev/urandom of=$root'/largefile.vdi' count=8192 bs=2048 > /dev/null 2>&1
     performStore "-ta 40K -ts 100K --contentsplit '*.vdi'"

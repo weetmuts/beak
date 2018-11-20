@@ -33,6 +33,10 @@ struct IndexEntry {
     std::string link;
     bool is_sym_link;
     bool is_hard_link;
+    uint num_parts;
+    size_t part_offset;
+    size_t part_size;
+    size_t last_part_size;
 };
 
 struct IndexTar {

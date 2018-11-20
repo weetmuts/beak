@@ -514,6 +514,7 @@ void cookEntry(string *listing, TarEntry *entry) {
 bool eatEntry(int beak_version, vector<char> &v, vector<char>::iterator &i, Path *dir_to_prepend,
               FileStat *fs, size_t *offset, string *tar, Path **path,
               string *link, bool *is_sym_link, bool *is_hard_link,
+              uint *num_parts, size_t *part_offset, size_t *part_size, size_t *last_part_size,
               bool *eof, bool *err)
 {
     string permission = eatTo(v, i, separator, 32, eof, err);
@@ -628,12 +629,34 @@ bool eatEntry(int beak_version, vector<char> &v, vector<char>::iterator &i, Path
     if (*err || *eof) return false;
 
     string off = eatTo(v, i, separator, 32, eof, err);
-    *offset = atol(off.c_str());
     if (*err || *eof) return false;
+    *offset = atol(off.c_str());
 
     string multipart = eatTo(v, i, separator, 128, eof, err);
     if (*err || *eof) return false;
 
+    vector<char> multip(multipart.begin(), multipart.end());
+    auto j = multip.begin();
+    if (multipart == "1") {
+        *num_parts = 1;
+        *part_size = 0;
+        *last_part_size = 0;
+    }
+    else
+    {
+        string num_parts_s = eatTo(multip, j, ',', 64, eof, err);
+        if (*err || *eof) return false;
+        string offset_s = eatTo(multip, j, ',', 64, eof, err);
+        if (*err || *eof) return false;
+        string part_size_s = eatTo(multip, j, ',', 64, eof, err);
+        if (*err || *eof) return false;
+        string last_part_size_s = eatTo(multip, j, -1, 64, eof, err);
+        if (*err) return false;
+        *num_parts = atol(num_parts_s.c_str());
+        *part_offset = atol(offset_s.c_str());
+        *part_size = atol(part_size_s.c_str());
+        *last_part_size = atol(last_part_size_s.c_str());
+    }
     string meta_hash = eatTo(v, i, separator, 65, eof, err);
     meta_hash.pop_back(); // Last column in line has the newline
     if (*err) return false; // Accept eof here!

@@ -90,10 +90,11 @@ RC Index::loadIndex(vector<char> &v,
         bool got_entry = eatEntry(beak_version, v, i, dir_to_prepend, &ie->fs, &ie->offset,
                                   &ie->tar, &ie->path, &ie->link,
                                   &ie->is_sym_link, &ie->is_hard_link,
+                                  &ie->num_parts, &ie->part_offset,
+                                  &ie->part_size, &ie->last_part_size,
                                   &eof, &err);
         if (err) {
-            failure(INDEX, "Could not parse index file in >%s<\n>%s<\n",
-                    dtp, ii);
+            failure(INDEX, "Could not parse index file in >%s<\n>%s<\n", dtp, ii);
             break;
         }
         if (!got_entry) break;

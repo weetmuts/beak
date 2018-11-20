@@ -56,7 +56,8 @@ enum TarContents
 
 struct TarFile;
 
-struct TarFileName {
+struct TarFileName
+{
     TarContents type {};
     int version {};
     time_t sec {};

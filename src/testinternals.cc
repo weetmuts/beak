@@ -54,6 +54,7 @@ void testHexStrings();
 void testFit();
 void testSplitLogic();
 void testContentSplit();
+void testReadSplitLogic();
 void predictor(int argc, char **argv);
 
 int main(int argc, char *argv[])
@@ -72,7 +73,7 @@ int main(int argc, char *argv[])
     }
     try {
         fs = newDefaultFileSystem();
-        /*testMatching();
+        testMatching();
         testRandom();
         testFileSystem();
         testGzip();
@@ -80,7 +81,8 @@ int main(int argc, char *argv[])
         testHumanReadable();
         testHexStrings();
         testFit();
-        testSplitLogic(); */
+        testSplitLogic();
+        testReadSplitLogic();
         testContentSplit();
 
         if (!err_found_) {
@@ -468,6 +470,22 @@ void testSplitLogic()
     {
         error(TEST_FIT,"Split calculated the wrong values.\n");
     }
+}
+
+void testReadSplitLogic()
+{
+    uint num_parts = 0;
+    size_t part_size = 0;
+    size_t last_part_size = 0;
+    size_t mv_header_size = 0;
+
+    size_t file_size = 700*1024*1024;
+    size_t split_size = 50*1024*1024;
+
+    splitParts_(file_size, split_size, Simple, &num_parts, &part_size, &last_part_size, &mv_header_size);
+
+    verbose(TEST_SPLIT, "Simple header %zu %zu np=%u ps=%zu lps=%zu mhs=%zu\n",
+            file_size, split_size, num_parts, part_size, last_part_size, mv_header_size);
 
 }
 

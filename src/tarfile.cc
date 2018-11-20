@@ -369,8 +369,11 @@ void TarFileName::writeTarFileNameIntoBufferVersion2_(char *buf, size_t buf_len,
     // dirprefix/(l)02_(1501080787).(579054757)_(3b5e4ec7fe38d0f9846947207a0ea44c)_(07)_(1119232).(tar)
     char sizes[32];
     memset(sizes, 0, sizeof(sizes));
-    snprintf(sizes, 32, "%zu", size);
-
+    if (part_nr == num_parts-1) {
+        snprintf(sizes, 32, "%zu", last_size);
+    } else {
+        snprintf(sizes, 32, "%zu", size);
+    }
     char secs_and_nanos[32];
     memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
     snprintf(secs_and_nanos, 32, "%" PRINTF_TIME_T "u.%09lu", sec, nsec);

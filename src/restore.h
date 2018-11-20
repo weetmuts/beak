@@ -37,6 +37,7 @@
 #include <utility>
 #include <vector>
 
+#include "index.h"
 #include "tar.h"
 #include "tarfile.h"
 #include "util.h"
@@ -44,26 +45,28 @@
 struct RestoreEntry
 {
     FileStat fs;
-    size_t offset;
-    Path *path;
-    Path *tar;
+    size_t offset {};
+    Path *path {};
+    Path *tar {};
     std::vector<RestoreEntry*> dir;
-    bool is_sym_link;
+    bool is_sym_link {};
     // A symbolic link can be anything! Must not point to a real file.
     std::string symlink;
-    bool is_hard_link;
+    bool is_hard_link {};
     // A hard link always points a real file stored in the same directory or in a subdirectory.
-    Path *hard_link;
-    bool loaded;
-    UpdateDisk disk_update;
+    Path *hard_link {};
+    uint num_parts {};
+    size_t part_offset {};
+    size_t part_size {};
+    size_t last_part_size {};
+    bool loaded {};
+    UpdateDisk disk_update {};
 
-    RestoreEntry() : offset(0), path(0), is_sym_link(false), is_hard_link(false),
-        hard_link(0), loaded(false), disk_update(NoUpdate) { }
-    RestoreEntry(FileStat s, size_t o, Path *p) : fs(s), offset(o), path(p),
-        is_sym_link(false), is_hard_link(false), loaded(false),
-        disk_update(NoUpdate) { }
-
-    void checkStat(FileSystem *dst, Path *target); // Compare with stat of target and set disk_update properly.
+    RestoreEntry() {}
+    RestoreEntry(FileStat s, size_t o, Path *p) : fs(s), offset(o), path(p) {}
+    void loadFromIndex(IndexEntry *ie);
+    bool findPartContainingOffset(off_t file_offset, uint *partnr, off_t *offset_inside_part);
+    size_t lengthOfPart(uint partnr);
 };
 
 enum PointInTimeFormat : short {
