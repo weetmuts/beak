@@ -83,6 +83,22 @@ struct PointInTime {
     std::string direntry;
     std::string filename;
 
+    bool hasPath(Path *p) { return entries_.count(p) == 1; }
+    RestoreEntry *getPath(Path *p) { if (hasPath(p)) { return &entries_[p]; } else { return NULL; } }
+    RestoreEntry *addPath(Path *p) {
+        assert(entries_.count(p) == 0);
+        entries_[p] = RestoreEntry();
+        return &entries_[p];
+    }
+
+    bool hasLoadedGzFile(Path *gz) { return loaded_gz_files_.count(gz) == 1; }
+    void addLoadedGzFile(Path *gz) { loaded_gz_files_.insert(gz); }
+    bool hasGzFiles() { return gz_files_.size() != 0; }
+    void addGzFile(Path *parent, Path *p) { gz_files_[parent] = p; }
+    Path *getGzFile(Path *p) { if (gz_files_.count(p) == 1) { return gz_files_[p]; } else { return NULL; } }
+
+private:
+
     std::map<Path*,RestoreEntry,depthFirstSortPath> entries_;
     std::map<Path*,Path*> gz_files_;
     std::set<Path*> loaded_gz_files_;

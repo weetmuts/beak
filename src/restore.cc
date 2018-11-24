@@ -227,11 +227,11 @@ Restore::Restore(FileSystem *backup_fs)
 bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
 {
     RC rc = RC::OK;
-    if (point->loaded_gz_files_.count(gz) == 1)
+    if (point->hasLoadedGzFile(gz))
     {
         return true;
     }
-    point->loaded_gz_files_.insert(gz);
+    point->addLoadedGzFile(gz);
 
     vector<char> buf;
     rc = backup_fs_->loadVector(gz, T_BLOCKSIZE, &buf);
@@ -246,18 +246,18 @@ bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
     struct IndexTar index_tar;
 
     vector<RestoreEntry*> es;
-    bool parsed_tars_already = point->gz_files_.size() != 0;
+    bool parsed_tars_already = point->hasGzFiles();
 
     rc = Index::loadIndex(contents, i, &index_entry, &index_tar, dir_to_prepend,
              [this,point,&es,dir_to_prepend](IndexEntry *ie){
-                         if (point->entries_.count(ie->path) == 0) {
+                         if (!point->hasPath(ie->path)) {
                              debug(RESTORE, "adding entry for >%s< %p\n", ie->path->c_str());
                              // Trigger storage of entry.
-                             point->entries_[ie->path];
+                             point->addPath(ie->path);
                          } else {
                              debug(RESTORE, "using existing entry for >%s< %p\n", ie->path->c_str());
                          }
-                         RestoreEntry *e = &(point->entries_)[ie->path];
+                         RestoreEntry *e = point->getPath(ie->path);
                          assert(e->path = ie->path);
                          e->loadFromIndex(ie);
                          if (e->is_hard_link) {
@@ -267,29 +267,35 @@ bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
                          }
                          es.push_back(e);
                      },
-                     [this,point,parsed_tars_already](IndexTar *it){
-                         if (!parsed_tars_already) {
-                             Path *p = it->path->prepend(Path::lookupRoot());
-                             if (p->name()->c_str()[0] == REG_FILE_CHAR) {
-                                 point->gz_files_[p->parent()] = p;
-                             }
-                         }
-                     });
+                     [this,point,parsed_tars_already](IndexTar *it)
+                          {
+                              if (!parsed_tars_already)
+                              {
+                                  Path *p = it->path->prepend(Path::lookupRoot());
+                                  if (p->name()->c_str()[0] == REG_FILE_CHAR)
+                                  {
+                                      point->addGzFile(p->parent(), p);
+                                  }
+                              }
+                          });
 
-    if (rc.isErr()) {
+    if (rc.isErr())
+    {
         failure(RESTORE, "Could not parse the index file %s\n", gz->c_str());
         return false;
     }
 
-    for (auto i : es) {
+    for (auto i : es)
+    {
         // Now iterate over the files found.
         // Some of them might be in subdirectories.
         Path *p = i->path;
         if (!p->parent()) continue;
         Path *pp = p->parent();
-        int c = point->entries_.count(pp);
-        RestoreEntry *d = &(point->entries_)[pp];
-        if (c == 0) {
+        RestoreEntry *d = point->getPath(pp);
+        if (d == NULL)
+        {
+            d = point->addPath(pp);
             d->path = pp;
         }
         debug(RESTORE, "added %s %p to dir >%s< %p\n", i->path->c_str(), i, pp->c_str(), d);
@@ -305,17 +311,24 @@ bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
 Path *Restore::loadDirContents(PointInTime *point, Path *path)
 {
     FileStat stat;
-    Path *gz = point->gz_files_[path];
+    Path *gz = point->getGzFile(path);
     debug(RESTORE, "looking for index file in dir >%s< (found %p)\n", path->c_str(), gz);
-    if (gz != NULL) {
+    if (gz != NULL)
+    {
         gz = gz->prepend(rootDir());
         RC rc = backup_fs_->stat(gz, &stat);
         debug(RESTORE, "%s --- rc=%d %d\n", gz->c_str(), rc.toInteger(), stat.isRegularFile());
         if (rc.isOk() && stat.isRegularFile()) {
             // Found a gz file!
+            debug(RESTORE, "found a gz file %s for %s\n", gz->c_str(), path->c_str());
             loadGz(point, gz, path);
         }
     }
+    else
+    {
+        debug(RESTORE, "no gz file found %s\n", path->c_str());
+    }
+
     return gz;
 }
 
@@ -323,11 +336,10 @@ void Restore::loadCache(PointInTime *point, Path *path)
 {
     Path *opath = path;
 
-    if (point->entries_.count(path) == 1) {
-        RestoreEntry *e = &(point->entries_)[path];
-        if (e->loaded) {
-            return;
-        }
+    RestoreEntry *e = point->getPath(path);
+    if (e != NULL && e->loaded)
+    {
+        return;
     }
 
     debug(RESTORE, "load cache for '%s'\n", path->c_str());
@@ -335,12 +347,19 @@ void Restore::loadCache(PointInTime *point, Path *path)
     for (;;)
     {
         Path *gz = loadDirContents(point, path);
-        if (point->entries_.count(path) == 1) {
+        if (point->hasPath(path))
+        {
+            if (path == Path::lookupRoot())
+            {
+                debug(RESTORE, "reached root\n");
+                return;
+            }
             // Success
             debug(RESTORE, "found '%s' in index '%s'\n", path->c_str(), gz->c_str());
             return;
         }
-        if (path != opath) {
+        if (path != opath)
+        {
             // The file, if it exists should have been found here. Therefore we
             // conclude that the file does not exist.
             debug(RESTORE, "NOT found %s in index %s\n", path->c_str(), gz->c_str());
@@ -359,17 +378,19 @@ void Restore::loadCache(PointInTime *point, Path *path)
 
 RestoreEntry *Restore::findEntry(PointInTime *point, Path *path)
 {
-    if (point->entries_.count(path) == 0)
+    if (!point->hasPath(path))
     {
+        // No cache index loaded for this path, try to load.
         loadCache(point, path);
-        if (point->entries_.count(path) == 0)
+        if (!point->hasPath(path))
         {
+            // Still no index loaded for the path, ie it does not exist.
             debug(RESTORE, "not found '%s'\n", path->c_str());
             return NULL;
         }
     }
 
-    return &(point->entries_)[path];
+    return point->getPath(path);
 }
 
 struct RestoreFuseAPI : FuseAPI
@@ -665,9 +686,7 @@ struct RestoreFuseAPI : FuseAPI
         if (e->num_parts == 1)
         {
             // Offset into tar file.
-            fprintf(stderr, "off before %zu\n", offset);
             offset += e->offset;
-            fprintf(stderr, "off after %zu\n", offset);
             debug(RESTORE, "reading %ju bytes from offset %ju in file %s\n", size, offset, tar->c_str());
             rc = restore_->backupFileSystem()->pread(tar, buf, size, offset);
             if (rc == -1)
@@ -770,23 +789,25 @@ RC Restore::lookForPointsInTime(PointInTimeFormat f, Path *path)
 
     most_recent_point_in_time_ = &history_[0];
     int i = 0;
-    for (auto &j : history_) {
-        j.key = i;
+    for (auto &point : history_) {
+        point.key = i;
         string de = string("@")+to_string(i)+" ";
         i++;
         if (f == absolute_point) {
             // Drop the relative @ prefix here.
-            de = j.datetime;
+            de = point.datetime;
         } else if (f == relative_point) {
-            de += j.ago;
+            de += point.ago;
         } else {
-            de += j.datetime+" "+j.ago;
+            de += point.datetime+" "+point.ago;
         }
-        j.direntry = de;
-        points_in_time_[j.direntry] = &j;
+        point.direntry = de;
+        points_in_time_[point.direntry] = &point;
         FileStat fs;
         fs.st_mode = S_IFDIR | S_IRUSR | S_IXUSR;
-        j.entries_[Path::lookupRoot()] = RestoreEntry(fs, 0, Path::lookupRoot());
+        point.addPath(Path::lookupRoot());
+        RestoreEntry *re = point.getPath(Path::lookupRoot());
+        *re = RestoreEntry(fs, 0, Path::lookupRoot());
     }
 
     if (i > 0) {
