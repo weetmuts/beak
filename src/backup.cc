@@ -497,15 +497,18 @@ void Backup::fixTarPaths() {
     }
 }
 
-size_t Backup::groupFilesIntoTars() {
+size_t Backup::groupFilesIntoTars()
+{
     size_t num = 0;
 
-    for (auto & e : files) {
+    for (auto & e : files)
+    {
         TarEntry *te = e.second;
         te->calculateHash();
     }
 
-    for (auto & e : tar_storage_directories) {
+    for (auto & e : tar_storage_directories)
+    {
         TarEntry *te = e.second;
 
         debug(BACKUP, "TAR COLLECTION DIR >%s< >%s<\n", e.first->c_str(), te->path()->c_str());
@@ -525,41 +528,58 @@ size_t Backup::groupFilesIntoTars() {
         // Order of creation: l m r z
         TarFile *curr = NULL;
         // Create the small files tars
-        for (size_t i=0; i<nst; ++i) {
+        for (size_t i=0; i<nst; ++i)
+        {
             te->createSmallTar(i);
         }
         // Create the medium files tars
-        for (size_t i=0; i<nmt; ++i) {
+        for (size_t i=0; i<nmt; ++i)
+        {
             te->createMediumTar(i);
         }
 
         // Add the tar entries to the tar files.
-        for(auto & entry : te->entries()) {
+        for(auto & entry : te->entries())
+        {
             // The entries must be files inside the tar collection directory,
             // or subdirectories inside the tar collection subdirectory!
             assert(entry->path()->depth() > te->path()->depth());
 
-            if (entry->isDirectory()) {
+            if (entry->isDirectory())
+            {
                 te->tazFile()->addEntryLast(entry);
-            } else if (entry->isHardLink()) {
+            }
+            else if (entry->isHardLink())
+            {
             	te->tazFile()->addEntryFirst(entry);
-            } else {
+            }
+            else
+            {
                 bool skip = false;
 
-                if (!skip) {
-                    if (entry->blockedSize() < smallcomp) {
+                if (!skip)
+                {
+                    if (entry->blockedSize() < smallcomp)
+                    {
                         size_t o = entry->tarpathHash() % nst;
                         curr = te->smallTar(o);
-                    } else if (entry->blockedSize() < mediumcomp) {
+                    }
+                    else if (entry->blockedSize() < mediumcomp)
+                    {
                         size_t o = entry->tarpathHash() % nmt;
                         curr = te->mediumTar(o);
-                    } else {
+                    }
+                    else
+                    {
                         // Create the large files tar here.
-                        if (!te->hasLargeTar(entry->tarpathHash())) {
+                        if (!te->hasLargeTar(entry->tarpathHash()))
+                        {
                             assert(entry != NULL);
                             te->createLargeTar(entry->tarpathHash());
                             curr = te->largeTar(entry->tarpathHash());
-                        } else {
+                        }
+                        else
+                        {
                             curr = te->largeTar(entry->tarpathHash());
                         }
                     }
@@ -569,21 +589,25 @@ size_t Backup::groupFilesIntoTars() {
         }
 
         // Finalize the tar files and add them to the contents listing.
-        for (auto & t : te->largeTars()) {
+        for (auto & t : te->largeTars())
+        {
             TarFile *tf = t.second;
             tf->fixSize(tar_split_size, tarheaderstyle_);
             tf->calculateHash();
-            if (tf->currentTarOffset() > 0) {
+            if (tf->currentTarOffset() > 0)
+            {
                 debug(BACKUP,"%s%s size became GURKA parts %zu\n", te->path()->c_str(), "NAMEHERE");
                 te->appendBeakFile(tf);
                 te->largeHashTars()[tf->hash()] = tf;
             }
         }
-        for (auto & t : te->mediumTars()) {
+        for (auto & t : te->mediumTars())
+        {
             TarFile *tf = t.second;
             tf->fixSize(tar_split_size, tarheaderstyle_);
             tf->calculateHash();
-            if (tf->currentTarOffset() > 0) {
+            if (tf->currentTarOffset() > 0)
+            {
                 debug(BACKUP,"%s%s size became\n", te->path()->c_str(), "NAMEHERE");
                 te->appendBeakFile(tf);
                 te->mediumHashTars()[tf->hash()] = tf;
@@ -970,7 +994,7 @@ struct BackupFuseAPI : FuseAPI
             goto err;
         }
         debug(FUSE,"readCB partnr >%u<\n", partnr);
-        n = tar->copy(buf, size, offset, backup_->originFileSystem(), partnr);
+        n = tar->readVirtualTar(buf, size, offset, backup_->originFileSystem(), partnr);
 
         UNLOCK(&backup_->global);
         return n;

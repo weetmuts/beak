@@ -194,9 +194,10 @@ struct TarFile
     }
     void updateMtim(struct timespec *mtim);
 
+    // readVirtualTar is used to present the backup filesystem
     // Write size bytes of the contents of the tar file into buf,
     // start reading at offest in the tar file.
-    size_t copy(char *buf, size_t size, off_t offset, FileSystem *fs, uint partnr);
+    size_t readVirtualTar(char *buf, size_t size, off_t offset, FileSystem *fs, uint partnr);
 
     // file: Write the tarfile contents into this file.
     // stat: With this size and permissions.

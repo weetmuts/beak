@@ -179,7 +179,9 @@ TarFileName::TarFileName(TarFile *tf, uint partnr)
     version = 2;
     sec = tf->mtim()->tv_sec;
     nsec = tf->mtim()->tv_nsec;
-    size = tf->size(partnr);
+    size = tf->size(0);
+    last_size = tf->size(tf->numParts()-1);
+    assert(tf->numParts() <= 1 || last_size != 0);
     header_hash = toHex(tf->hash());
     part_nr = partnr;
     num_parts = tf->numParts();
@@ -418,7 +420,7 @@ Path *TarFileName::asPathWithDir(Path *dir)
     return Path::lookup(buf);
 }
 
-size_t TarFile::copy(char *buf, size_t bufsize, off_t offset, FileSystem *fs, uint partnr)
+size_t TarFile::readVirtualTar(char *buf, size_t bufsize, off_t offset, FileSystem *fs, uint partnr)
 {
     size_t copied = 0;
 
@@ -489,7 +491,7 @@ bool TarFile::createFile(Path *file, FileStat *stat, uint partnr,
 {
     dst_fs->createFile(file, stat, [this,file,src_fs,off,update_progress,partnr] (off_t offset, char *buffer, size_t len) {
             debug(TARFILE,"Write %ju bytes to file %s\n", len, file->c_str());
-            size_t n = copy(buffer, len, off+offset, src_fs, partnr);
+            size_t n = readVirtualTar(buffer, len, off+offset, src_fs, partnr);
             debug(TARFILE, "Wrote %ju bytes from %ju to %ju.\n", n, off+offset, offset);
             update_progress(n);
             return n;
