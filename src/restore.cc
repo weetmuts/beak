@@ -716,7 +716,8 @@ struct RestoreFuseAPI : FuseAPI
                 tfn.last_size = e->last_part_size;
                 tfn.part_nr = partnr;
                 tfn.num_parts = e->num_parts;
-                tfn.writeTarFileNameIntoBuffer(name, sizeof(name), restore_->rootDir());
+                Path *dir = e->path->parent()->prepend(restore_->rootDir());
+                tfn.writeTarFileNameIntoBuffer(name, sizeof(name), dir);
                 Path *tarf = Path::lookup(name);
                 assert(length_to_read > 0);
                 debug(RESTORE, "reading %ju bytes from offset %ju in tar part %s\n",
