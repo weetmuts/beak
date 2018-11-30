@@ -312,7 +312,7 @@ RecurseOption OriginToolImplementation::handleRegularFiles(Path *path, FileStat 
 {
     auto entry = restore->findEntry(point, path);
     auto tar_file = entry->tar->prepend(settings->from.storage->storage_location);
-    auto tar_file_offset = entry->offset;
+    auto tar_file_offset = entry->offset_;
     auto file_to_extract = path->prepend(settings->to.origin);
 
     if (!entry->is_hard_link && stat->isRegularFile()) {

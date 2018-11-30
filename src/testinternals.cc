@@ -15,13 +15,14 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "contentsplit.h"
 #include "filesystem.h"
 #include "fit.h"
 #include "log.h"
 #include "match.h"
+#include "restore.h"
 #include "tar.h"
 #include "util.h"
-#include "contentsplit.h"
 
 #include <assert.h>
 
@@ -36,6 +37,7 @@ static ComponentId TEST_FIT = registerLogComponent("test_fit");
 static ComponentId TEST_HUMANREADABLE = registerLogComponent("human_readable");
 static ComponentId TEST_HEXSTRING = registerLogComponent("hex_string");
 static ComponentId TEST_SPLIT = registerLogComponent("split");
+static ComponentId TEST_READSPLIT = registerLogComponent("readsplit");
 static ComponentId TEST_CONTENTSPLIT = registerLogComponent("contentsplit");
 
 void testMatch(string pattern, const char *path, bool should_match);
@@ -73,7 +75,7 @@ int main(int argc, char *argv[])
     }
     try {
         fs = newDefaultFileSystem();
-        testMatching();
+/*        testMatching();
         testRandom();
         testFileSystem();
         testGzip();
@@ -81,9 +83,9 @@ int main(int argc, char *argv[])
         testHumanReadable();
         testHexStrings();
         testFit();
-        testSplitLogic();
+        testSplitLogic();*/
         testReadSplitLogic();
-        testContentSplit();
+//        testContentSplit();
 
         if (!err_found_) {
             printf("OK\n");
@@ -401,13 +403,13 @@ void predictor(int argc, char **argv)
     }
 }
 
-extern void splitParts_(size_t file_size,
+extern void splitParts_(size_t tar_file_size, // Includes the tar headers for the file.
                         size_t split_size,
                         TarHeaderStyle ths,
                         uint *num_parts,
                         size_t *part_size,
                         size_t *last_part_size,
-                        size_t *mv_header_size);
+                        size_t *part_header_size);
 
 void testSplitLogic()
 {
@@ -468,25 +470,47 @@ void testSplitLogic()
 
     if (num_parts != 63 || part_size != split_size || last_part_size != split_size || mv_header_size != 512)
     {
-        error(TEST_FIT,"Split calculated the wrong values.\n");
+        error(TEST_SPLIT,"Split calculated the wrong values.\n");
     }
 }
 
 void testReadSplitLogic()
 {
-    uint num_parts = 0;
-    size_t part_size = 0;
-    size_t last_part_size = 0;
-    size_t mv_header_size = 0;
+    size_t file_size = 3*1000*1000;
+    size_t split_size = 500*1000;
+    size_t header_size = 512*3;
+    size_t total_size = file_size+header_size;
+    char *from = new char[total_size];
+    char *to = new char[total_size];
+    char *p = from;
+    for (size_t i=0; i<header_size; ++i) {
+        *p = 255;
+        p++;
+    }
+    for (size_t i=0; i<file_size; ++i) {
+        *p = i%256;
+        p++;
+    }
+    RestoreEntry re;
+    re.offset_ = header_size;
+    splitParts_(file_size+header_size, split_size, Simple, &re.num_parts,
+                &re.part_size, &re.last_part_size, &re.part_offset);
 
-    size_t file_size = 700*1024*1024;
-    size_t split_size = 50*1024*1024;
+    verbose(TEST_READSPLIT, "File with no tar-headers: file_size=%zu split_size=%zu => "
+            "num_parts=%zu part_size=%zu last_part_size=%zu part_offset=%zu\n",
+            file_size, split_size, re.num_parts, re.part_size, re.last_part_size, re.part_offset);
 
-    splitParts_(file_size, split_size, Simple, &num_parts, &part_size, &last_part_size, &mv_header_size);
+    size_t sum = 0;
+    re.readParts(0, to, 3*1000*1000,
+                 [&](uint partnr, off_t offset_inside_part, char *buffer, size_t length) {
+                     sum+=length;
+                     verbose(TEST_READSPLIT, "Reading part=%u offset_inside_part=%zd len=%zu sum=%zu\n",
+                             partnr, offset_inside_part, length, sum);
+                     return (ssize_t)0;
+                 });
 
-    verbose(TEST_SPLIT, "Simple header %zu %zu np=%u ps=%zu lps=%zu mhs=%zu\n",
-            file_size, split_size, num_parts, part_size, last_part_size, mv_header_size);
-
+    delete [] from;
+    delete [] to;
 }
 
 void testContentSplit()

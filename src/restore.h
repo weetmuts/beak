@@ -45,7 +45,6 @@
 struct RestoreEntry
 {
     FileStat fs;
-    size_t offset {};
     Path *path {};
     Path *tar {};
     std::vector<RestoreEntry*> dir;
@@ -55,6 +54,7 @@ struct RestoreEntry
     bool is_hard_link {};
     // A hard link always points a real file stored in the same directory or in a subdirectory.
     Path *hard_link {};
+    size_t offset_ {};
     uint num_parts {};
     size_t part_offset {};
     size_t part_size {};
@@ -63,10 +63,13 @@ struct RestoreEntry
     UpdateDisk disk_update {};
 
     RestoreEntry() {}
-    RestoreEntry(FileStat s, size_t o, Path *p) : fs(s), offset(o), path(p) {}
+    RestoreEntry(FileStat s, size_t o, Path *p) : fs(s), path(p), offset_(o) {}
     void loadFromIndex(IndexEntry *ie);
-    bool findPartContainingOffset(off_t file_offset, uint *partnr, off_t *offset_inside_part);
+    bool findPartContainingOffset(size_t file_offset, uint *partnr, size_t *offset_inside_part);
     size_t lengthOfPart(uint partnr);
+    ssize_t readParts(off_t file_offset, char *buffer, size_t length,
+                   std::function<ssize_t(uint partnr, off_t offset_inside_part, char *buffer, size_t length)> cb);
+
 };
 
 enum PointInTimeFormat : short {

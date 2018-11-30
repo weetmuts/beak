@@ -644,8 +644,8 @@ struct RestoreFuseAPI : FuseAPI
 
         LOCK(&restore_->global);
 
-        off_t offset = offset_;
-        int rc = 0;
+        int n = 0;
+        off_t file_offset = offset_;
         string path_string = path_char_string;
         Path *path = Path::lookup(path_string);
 
@@ -670,26 +670,25 @@ struct RestoreFuseAPI : FuseAPI
             goto err;
         }
 
-        if (offset > e->fs.st_size)
+        if (file_offset > e->fs.st_size)
         {
             // Read outside of file size
-            rc = 0;
             goto ok;
         }
 
-        if (offset + (off_t)size > e->fs.st_size)
+        if (file_offset + (off_t)size > e->fs.st_size)
         {
             // Shrink actual read to fit file.
-            size = e->fs.st_size - offset;
+            size = e->fs.st_size - file_offset;
         }
 
         if (e->num_parts == 1)
         {
-            // Offset into tar file.
-            offset += e->offset;
-            debug(RESTORE, "reading %ju bytes from offset %ju in file %s\n", size, offset, tar->c_str());
-            rc = restore_->backupFileSystem()->pread(tar, buf, size, offset);
-            if (rc == -1)
+            // Offset into a single tar file.
+            file_offset += e->offset_;
+            debug(RESTORE, "reading %ju bytes from offset %ju in file %s\n", size, file_offset, tar->c_str());
+            n = restore_->backupFileSystem()->pread(tar, buf, size, file_offset);
+            if (n == -1)
             {
                 failure(RESTORE,
                         "Could not read from file >%s< in underlying filesystem err %d",
@@ -700,45 +699,35 @@ struct RestoreFuseAPI : FuseAPI
         else
         {
             // There is more than one part
-            while (size > 0)
-            {
-                uint partnr;
-                off_t offset_inside_part;
-                e->findPartContainingOffset(offset, &partnr, &offset_inside_part);
-                size_t length_of_part = e->lengthOfPart(partnr);
-                size_t length_to_read = size;
-                if (length_to_read+offset_inside_part > length_of_part)
-                {
-                    length_to_read = length_of_part-offset_inside_part;
-                }
-                char name[4096];
-                tfn.size = e->part_size;
-                tfn.last_size = e->last_part_size;
-                tfn.part_nr = partnr;
-                tfn.num_parts = e->num_parts;
-                Path *dir = e->path->parent()->prepend(restore_->rootDir());
-                tfn.writeTarFileNameIntoBuffer(name, sizeof(name), dir);
-                Path *tarf = Path::lookup(name);
-                assert(length_to_read > 0);
-                debug(RESTORE, "reading %ju bytes from offset %ju in tar part %s\n",
-                      length_to_read, offset_inside_part, tarf->c_str());
-                rc = restore_->backupFileSystem()->pread(tarf, buf, length_to_read, offset_inside_part);
-                if (rc == -1)
-                {
-                    failure(RESTORE,
-                            "Could not read from file >%s< in underlying filesystem err %d",
-                            tarf->c_str(), errno);
-                    goto err;
-                }
-                size -= length_to_read;
-                offset += length_to_read;
-                buf += length_to_read;
-            }
+            n =  e->readParts(file_offset, buf, size,
+                      [&](uint partnr, off_t offset_inside_part, char *buffer, size_t length_to_read)
+                      {
+                          char name[4096];
+                          tfn.size = e->part_size;
+                          tfn.last_size = e->last_part_size;
+                          tfn.part_nr = partnr;
+                          tfn.num_parts = e->num_parts;
+                          Path *dir = e->path->parent()->prepend(restore_->rootDir());
+                          tfn.writeTarFileNameIntoBuffer(name, sizeof(name), dir);
+                          Path *tarf = Path::lookup(name);
+                          assert(length_to_read > 0);
+                          debug(RESTORE, "reading %ju bytes from offset %ju in tar part %s\n",
+                                length_to_read, offset_inside_part, tarf->c_str());
+                          int nn = restore_->backupFileSystem()->pread(tarf, buffer, length_to_read, offset_inside_part);
+                          if (nn <= 0)
+                          {
+                              failure(RESTORE,
+                                      "Could not read from file >%s< in underlying filesystem err %d",
+                                      tarf->c_str(), errno);
+                              return 0;
+                          }
+                          return nn;
+                      });
         }
     ok:
 
         UNLOCK(&restore_->global);
-        return rc;
+        return n;
 
     err:
 
@@ -903,7 +892,7 @@ unique_ptr<Restore> newRestore(ptr<FileSystem> backup_fs)
 void RestoreEntry::loadFromIndex(IndexEntry *ie)
 {
     fs = ie->fs;
-    offset = ie->offset;
+    offset_ = ie->offset;
     path = ie->path;
     is_sym_link = ie->is_sym_link;
     symlink = ie->link;
@@ -915,7 +904,7 @@ void RestoreEntry::loadFromIndex(IndexEntry *ie)
     last_part_size = ie->last_part_size;
 }
 
-bool RestoreEntry::findPartContainingOffset(off_t file_offset, uint *partnr, off_t *where_in_part)
+bool RestoreEntry::findPartContainingOffset(size_t file_offset, uint *partnr, size_t *offset_inside_part)
 {
     // The first file header HHHH can be longer than the part header hh
     // The size of the parts are always the same, except for the last part.
@@ -924,21 +913,31 @@ bool RestoreEntry::findPartContainingOffset(off_t file_offset, uint *partnr, off
     // hh ffffff
     // hh fff
 
-    if (file_offset+offset < part_size) {
+    //fprintf(stdout, "\n\nfile_offset=%zu ====>\n", file_offset);
+    if ((size_t)file_offset < part_size)
+    {
         // We are in the first part:
         *partnr = 0;
-        *where_in_part = file_offset+offset;
+        *offset_inside_part = file_offset;
+        //fprintf(stdout, "first part partnr=0 part_offset=%zu\n", *offset_inside_part);
         return true;
     }
     // Remove the first part.
-    size_t first_part_data_size = part_size - offset;
-    file_offset -= first_part_data_size;
+    file_offset -= part_size;
+    //fprintf(stdout, "adjusted file_offset=%zu\n", file_offset);
+    //size_t first_part_data_size = part_size - part_offset;
+    //fprintf(stdout, "first_part_data_size=%zu\n", first_part_data_size);
     // Now all parts have the same part_offset
     size_t part_data_size = part_size - part_offset;
+    //fprintf(stdout, "part_data_size=%zu\n", part_data_size);
+
     uint n = file_offset/part_data_size;
+    //fprintf(stdout, "n=%u\n", n);
     size_t remainder = file_offset - n*part_data_size;
-    *where_in_part = remainder + part_offset;
+    //fprintf(stdout, "remainder=%zu\n", remainder);
+    *offset_inside_part = remainder + part_offset;
     *partnr = n+1;
+    //fprintf(stdout, "====> partnr=%u offset=%zu\n", *partnr, *offset_inside_part);
     return true;
 }
 
@@ -949,4 +948,37 @@ size_t RestoreEntry::lengthOfPart(uint partnr)
         return last_part_size;
     }
     return part_size;
+}
+
+ssize_t RestoreEntry::readParts(off_t file_offset, char *buffer, size_t length,
+                                function<ssize_t(uint partnr, off_t part_offset, char *buffer, size_t length)> cb)
+{
+    ssize_t n = 0;
+    // First adjust the file internal offset to skip the tar offset for the whole file,
+    // which is stored inside the first part.
+    file_offset += offset_;
+    while (length > 0)
+    {
+        uint partnr;
+        size_t offset_inside_part;
+        //fprintf(stdout, "\n\nLength to read %zu", length);
+        findPartContainingOffset(file_offset, &partnr, &offset_inside_part);
+        size_t length_of_part = lengthOfPart(partnr);
+        size_t length_to_read = length;
+        if (length_to_read+offset_inside_part > length_of_part)
+        {
+            length_to_read = length_of_part-offset_inside_part;
+        }
+        assert(length_to_read > 0);
+        ssize_t nn = cb(partnr, offset_inside_part, buffer, length_to_read);
+        if (nn <= 0)
+        {
+            break;
+        }
+        n += nn;
+        length -= length_to_read;
+        file_offset += length_to_read;
+        buffer += length_to_read;
+    }
+    return n;
 }

@@ -431,20 +431,20 @@ size_t TarFile::readVirtualTar(char *buf, size_t bufsize, off_t offset, FileSyst
     while (bufsize>0)
     {
         //fprintf(stderr, "partnr=%u buf=%p from=%zu bufsize=%zu headersize=%zu\n", partnr, buf, from, bufsize, header_size_);
-        if (partnr > 0 && from < header_size_)
+        if (partnr > 0 && from < part_header_size_)
         {
             debug(TARFILE, "Copying max %zu from %zu, now inside header (header size=%ju)\n",
                   bufsize, from,
-                  header_size_);
+                  part_header_size_);
 
-            char tmp[header_size_];
-            memset(tmp, 0, header_size_);
+            char tmp[part_header_size_];
+            memset(tmp, 0, part_header_size_);
             TarHeader th;
 
             TarEntry *te = contents_.begin()->second;
             assert(te != NULL);
 
-            size_t file_offset = calculateOriginTarOffset(partnr, header_size_);
+            size_t file_offset = calculateOriginTarOffset(partnr, part_header_size_);
             assert(file_offset > te->headerSize());
             file_offset -= te->headerSize();
             th.setMultivolType(te->tarpath(), file_offset);
@@ -454,12 +454,12 @@ size_t TarFile::readVirtualTar(char *buf, size_t bufsize, off_t offset, FileSyst
             memcpy(tmp, th.buf(), T_BLOCKSIZE);
 
             // Copy the header out
-            size_t len = header_size_-from;
+            size_t len = part_header_size_-from;
             if (len > bufsize) {
                 len = bufsize;
             }
             debug(TARFILE, "multivol header out from %zu size=%zu\n", from, len);
-            assert(from+len <= header_size_);
+            assert(from+len <= part_header_size_);
             memcpy(buf, tmp+from, len);
             bufsize -= len;
             buf += len;
@@ -499,29 +499,30 @@ bool TarFile::createFile(Path *file, FileStat *stat, uint partnr,
     return true;
 }
 
-void splitParts_(size_t file_size,
+void splitParts_(size_t total_tar_size,
                  size_t split_size,
                  TarHeaderStyle ths,
                  uint *num_parts,
                  size_t *part_size,
                  size_t *last_part_size,
-                 size_t *mv_header_size)
+                 size_t *part_header_size)
 {
-    // The size_ is already rounded up to the nearest 512 byte block.
+    // The total tar size includes any potential tar headers for the file
+    // and is already rounded up to the nearest 512 byte block.
     *part_size = split_size;
     if (ths == None) {
-        *mv_header_size = 0;
+        *part_header_size = 0;
     } else {
         // Multivol header size, is actually fixed 512 bytes.
         // No need for long link headers. Just truncate the file name.
-        *mv_header_size = 512;
+        *part_header_size = 512;
     }
-    assert(*part_size > *mv_header_size);
+    assert(*part_size > *part_header_size);
     // To make the multivol parts the exact same size (except the last)
     // take into account that there is no multivol header in the first
     // part, therefore the space for the multivol header in the first part
     // is instead used for the tarentry content (that has its own header).
-    // Which is why we subtract the header_size from the total size before
+    // Which is why we subtract the part header_size from the total size before
     // dividing with what can be stored in each part.
     // For example: Total size of tarentry = 13, header size = 1, split size = 5
     // 13 content c fits exactly in three tar splits a size 5. H = multivol header
@@ -534,9 +535,9 @@ void splitParts_(size_t file_size,
     // 3 = (14-1)/(5-1) = 13/4 = 3 but 5+(3-1)*(5-1) == 13 => not equals 14
     // we need another multivol part, which will have size 1+14-13
 
-    *num_parts = (file_size - *mv_header_size) / (*part_size - *mv_header_size);
-    size_t stores = *part_size + (*num_parts -1)*(*part_size - *mv_header_size);
-    if (stores == file_size)
+    *num_parts = (total_tar_size - *part_header_size) / (*part_size - *part_header_size);
+    size_t stores = *part_size + (*num_parts -1)*(*part_size - *part_header_size);
+    if (stores == total_tar_size)
     {
         *last_part_size = *part_size;
         debug(TARFILE, "Splitting file into same sized parts %u parts partsize=%zu lastpartsize=%zu\n",
@@ -547,14 +548,14 @@ void splitParts_(size_t file_size,
         // The size was not a multiple of what can be stored in the parts.
         // We need an extra final part.
         (*num_parts)++;
-        *last_part_size = *mv_header_size + file_size - stores;
+        *last_part_size = *part_header_size + total_tar_size - stores;
         size_t stored_in_first_part = *part_size;
-        size_t stored_in_middle_parts = *part_size - *mv_header_size;
-        size_t stored_in_last_part = file_size - stored_in_first_part - (*num_parts-2)*(stored_in_middle_parts);
-        assert(*last_part_size == stored_in_last_part+*mv_header_size);
-        debug(TARFILE, "Splitting file with tarentry size %zu into %u parts partsize=%zu lastpartsize=%zu "
+        size_t stored_in_middle_parts = *part_size - *part_header_size;
+        size_t stored_in_last_part = total_tar_size - stored_in_first_part - (*num_parts-2)*(stored_in_middle_parts);
+        assert(*last_part_size == stored_in_last_part+*part_header_size);
+        debug(TARFILE, "Splitting file with total tarentry size %zu into %u parts partsize=%zu lastpartsize=%zu "
               "with first=%zu middles=%zu last=%zu.\n",
-              file_size,
+              total_tar_size,
               *num_parts, *part_size, *last_part_size,
               stored_in_first_part, stored_in_middle_parts, stored_in_last_part);
     }
@@ -567,7 +568,7 @@ void TarFile::fixSize(size_t split_size, TarHeaderStyle ths)
         // No splitting needed.
         num_parts_ = 1;
         part_size_ = size_;
-        header_size_ = 0;
+        part_header_size_ = 0;
         return;
     }
 
@@ -577,7 +578,7 @@ void TarFile::fixSize(size_t split_size, TarHeaderStyle ths)
                 &num_parts_,
                 &part_size_,
                 &last_part_size_,
-                &header_size_);
+                &part_header_size_);
 
     if (num_parts_ > 1) {
         tar_contents_ = SPLIT_LARGE_FILE_TAR;
@@ -607,16 +608,16 @@ size_t TarFile::calculateOriginTarOffset(uint partnr, size_t offset)
     // For all other parts, we might have a multivol header in this part, drop that
     // If the offset points into the multivol header, then fail hard! We cannot
     // calcualte the origin offset when we are looking inside the multivol header!
-    assert(offset >= header_size_);
+    assert(offset >= part_header_size_);
     // Given file with size 14. split size 5 and header size 1.
     // For examble partnr=2 and offset = 3 should give origin offset 11
     // Part 0      Part 1      Part 2      Part 3
     // [c c c c c] [H c c c c] [H c c c c] [H c]
     // Remove header from offset 3 => 2
-    offset -= header_size_;
+    offset -= part_header_size_;
 
     // Now add the first part size, and the content (part_size_-header_size_) for
     // each multivol part before this part.
     // origin offset = 2 + 5 + (2-1)*(5-1) = 3+5+1*4 = 12
-    return offset + part_size_ + (partnr-1)*(part_size_-header_size_);
+    return offset + part_size_ + (partnr-1)*(part_size_-part_header_size_);
 }

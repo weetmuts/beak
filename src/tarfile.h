@@ -162,9 +162,9 @@ struct TarFile
         return size_;
     }
     size_t size(uint partnr);
-    size_t headerSize()
+    size_t partHeaderSize()
     {
-        return header_size_;
+        return part_header_size_;
     }
     // Given an offset into a multivol part, find the offset into
     // the original tarfile that includes a header.
@@ -236,7 +236,7 @@ private:
     // The last part can be smaller.
     size_t last_part_size_ {};
     // A tar parts file by itself can have a tar continutation header.
-    size_t header_size_ {};
+    size_t part_header_size_ {};
     // How many extra 512 byte blocks are need if the file name exceeds 100 chars?
     size_t num_long_path_blocks_;
 };

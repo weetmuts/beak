@@ -501,7 +501,7 @@ void cookEntry(string *listing, TarEntry *entry) {
         char nps[256];
         TarFile *tf = entry->tarFile();
         uint np = tf->numParts();
-        snprintf(nps, sizeof(nps), "%u,%zu,%zu,%zu", np, tf->headerSize(), tf->size(0), tf->size(np-1));
+        snprintf(nps, sizeof(nps), "%u,%zu,%zu,%zu", np, tf->partHeaderSize(), tf->size(0), tf->size(np-1));
         listing->append(nps);
     }
     listing->append(separator_string);
