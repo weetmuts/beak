@@ -445,6 +445,8 @@ if [ $do_test ]; then
     performStore "-ta 25K -ts 66K --tarheader=full"
     standardStoreUntarTest
     cleanCheck
+    standardStoreRestoreTest
+    cleanCheck
     beakfs="$mount"
     startMountTest standardTest "-ta 25K -ts 66K --tarheader=full"
     compareStoreAndMount
@@ -461,6 +463,8 @@ if [ $do_test ]; then
     performStore "-ta 25K -ts 66K"
     standardStoreUntarTest
     cleanCheck
+    standardStoreRestoreTest
+    cleanCheck
     beakfs="$mount"
     startMountTest standardTest "-ta 25K -ts 66K"
     compareStoreAndMount
@@ -474,6 +478,8 @@ if [ $do_test ]; then
     performStore "-ta 100K -ts 213K"
     standardStoreUntarTest
     cleanCheck
+    standardStoreRestoreTest
+    cleanCheck
     beakfs="$mount"
     startMountTest standardTest "-ta 100K -ts 213K"
     compareStoreAndMount
@@ -486,6 +492,8 @@ if [ $do_test ]; then
     dd if=/dev/urandom of=$root'/largefile' count=8192 bs=2048 > /dev/null 2>&1
     performStore "-ta 15K -ts 37K"
     standardStoreUntarTest
+    cleanCheck
+    standardStoreRestoreTest
     cleanCheck
     beakfs="$mount"
     startMountTest standardTest "-ta 15K -ts 37K"

@@ -181,16 +181,52 @@ bool OriginToolImplementation::extractFileFromBackup(RestoreEntry *entry,
           file_to_extract->c_str(), stat->st_size, permissionString(stat).c_str(),
           tar_file->c_str(), tar_file_offset);
 
+    TarFileName tfn;
+    string d;
+    if (!tfn.parseFileName(tar_file->str(), &d)) {
+        debug(ORIGINTOOL, "bad tar file name '%s'\n", tar_file->c_str());
+    }
+    Path *tar_inside_dir = Path::lookup(d);
+
     origin_fs_->mkDirpWriteable(file_to_extract->parent());
     origin_fs_->createFile(file_to_extract, stat,
-        [backup_fs,tar_file_offset,file_to_extract,tar_file] (off_t offset, char *buffer, size_t len)
+        [&] (off_t offset, char *buffer, size_t len)
         {
-            debug(ORIGINTOOL,"Extracting %ju bytes to file %s\n", len, file_to_extract->c_str());
-            ssize_t n = backup_fs->pread(tar_file, buffer, len, tar_file_offset + offset);
-            debug(ORIGINTOOL, "Extracted %ju bytes from %ju to %ju.\n", n,
-                  tar_file_offset+offset, offset);
-            assert(n > 0);
-            return n;
+            if (entry->num_parts == 1) {
+                debug(ORIGINTOOL,"Extracting %ju bytes to file %s\n", len, file_to_extract->c_str());
+                ssize_t n = backup_fs->pread(tar_file, buffer, len, tar_file_offset + offset);
+                debug(ORIGINTOOL, "Extracted %ju bytes from %ju to %ju.\n", n,
+                      tar_file_offset+offset, offset);
+                assert(n > 0);
+                return n;
+            } else {
+                // There is more than one part
+                ssize_t n =  entry->readParts(offset, buffer, len,
+                      [&](uint partnr, off_t offset_inside_part, char *buffer, size_t length_to_read)
+                      {
+                          char name[4096];
+                          tfn.size = entry->part_size;
+                          tfn.last_size = entry->last_part_size;
+                          tfn.part_nr = partnr;
+                          tfn.num_parts = entry->num_parts;
+                          tfn.writeTarFileNameIntoBuffer(name, sizeof(name), tar_inside_dir);
+                          Path *tarf = Path::lookup(name);
+                          assert(length_to_read > 0);
+                          debug(ORIGINTOOL, "reading %ju bytes from offset %ju in tar part %s\n",
+                                length_to_read, offset_inside_part, tarf->c_str());
+                          int nn = backup_fs->pread(tarf, buffer, length_to_read, offset_inside_part);
+                          if (nn <= 0)
+                          {
+                              failure(ORIGINTOOL,
+                                      "Could not read from file >%s< in underlying filesystem err %d",
+                                      tarf->c_str(), errno);
+                              return 0;
+                          }
+                          return nn;
+                      });
+                assert(n > 0);
+                return n;
+            }
         });
 
     origin_fs_->utime(file_to_extract, stat);
