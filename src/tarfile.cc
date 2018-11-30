@@ -305,7 +305,7 @@ bool TarFileName::parseFileNameVersion2_(string &name, size_t p0, size_t p1)
     part_nr = strtol(partnrs.c_str(), NULL, 16);
 
     string numparts;
-    k = hexDigitsOnly(&name[p4+1], p6-p5-1, &numparts);
+    k = hexDigitsOnly(&name[p5+1], p6-p5-1, &numparts);
     if (!k) return false;
     num_parts = strtol(numparts.c_str(), NULL, 16);
 

@@ -133,7 +133,7 @@ void parse_rclone_verbose_output(ProgressStatistics *st,
             st->stats.num_files_stored++;
             st->updateProgress();
         } else {
-            fprintf(stderr, "Error! No file size found for %s\n", path->c_str());
+            debug(RCLONE, "Error! No file size found for %s\n", path->c_str());
         }
     }
 }
