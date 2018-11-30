@@ -691,7 +691,7 @@ struct RestoreFuseAPI : FuseAPI
             if (n == -1)
             {
                 failure(RESTORE,
-                        "Could not read from file >%s< in underlying filesystem err %d",
+                        "Could not read (1) from file >%s< in underlying filesystem err %d\n",
                         tar->c_str(), errno);
                 goto err;
             }
@@ -717,7 +717,7 @@ struct RestoreFuseAPI : FuseAPI
                           if (nn <= 0)
                           {
                               failure(RESTORE,
-                                      "Could not read from file >%s< in underlying filesystem err %d",
+                                      "Could not read (2) from file >%s< in underlying filesystem err %d\n",
                                       tarf->c_str(), errno);
                               return 0;
                           }

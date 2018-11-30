@@ -351,11 +351,11 @@ RC CacheFS::loadDirectoryStructure(map<Path*,CacheEntry> *entries)
         // Initially the cache entry is marked as not cached.
         (*entries)[p.first] = CacheEntry(p.second, p.first, false);
         CacheEntry *ce = &(*entries)[p.first];
+        debug(CACHE, "adding %s to cache index\n", p.first->c_str());
         if (TarFileName::isIndexFile(p.first) && !ce->isCached(cache_fs_, cache_dir_, p.first))
         {
             index_files.push_back(p.first);
             debug(CACHE, "needs index %s\n", p.first->c_str());
-
         }
         // Add this file to its directory.
         dir_entry->direntries.push_back(ce);

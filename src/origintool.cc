@@ -218,7 +218,7 @@ bool OriginToolImplementation::extractFileFromBackup(RestoreEntry *entry,
                           if (nn <= 0)
                           {
                               failure(ORIGINTOOL,
-                                      "Could not read from file >%s< in underlying filesystem err %d",
+                                      "Could not read (3) from file >%s< in underlying filesystem err %d\n",
                                       tarf->c_str(), errno);
                               return 0;
                           }
