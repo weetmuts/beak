@@ -312,22 +312,18 @@ RC CacheFS::loadDirectoryStructure(map<Path*,CacheEntry> *entries)
     vector<TarFileName> bad_files;
     vector<std::string> other_files;
     map<Path*,FileStat> contents;
+    RC rc = RC::OK;
 
     switch (storage_->type) {
     case NoSuchStorage:
     case FileSystemStorage:
-    {
         break;
-    }
     case RSyncStorage:
+        rc = rsyncListBeakFiles(storage_, &files, &bad_files, &other_files, &contents, sys_, progress_);
+        break;
     case RCloneStorage:
-        RC rc = RC::OK;
-        if (storage_->type == RCloneStorage) {
-            rc = rcloneListBeakFiles(storage_, &files, &bad_files, &other_files, &contents, sys_, progress_);
-        } else {
-            rc = rsyncListBeakFiles(storage_, &files, &bad_files, &other_files, &contents, sys_, progress_);
-        }
-        if (rc.isErr()) return RC::ERR;
+        rc = rcloneListBeakFiles(storage_, &files, &bad_files, &other_files, &contents, sys_, progress_);
+        break;
     }
 
     Path *prev_dir = NULL;
@@ -337,7 +333,8 @@ RC CacheFS::loadDirectoryStructure(map<Path*,CacheEntry> *entries)
 
     vector<Path*> index_files;
 
-    for (auto &p : contents) {
+    for (auto &p : contents)
+    {
         Path *dir = p.first->parent();
         CacheEntry *dir_entry = NULL;
         if (dir == prev_dir) {
@@ -364,7 +361,6 @@ RC CacheFS::loadDirectoryStructure(map<Path*,CacheEntry> *entries)
         dir_entry->direntries.push_back(ce);
     }
 
-    RC rc = RC::OK;
     if (index_files.size() > 0) {
         info(CACHE, "Prefetching %zu index files...", index_files.size());
         rc = fetchFiles(&index_files);

@@ -193,10 +193,10 @@ bool TarFileName::isIndexFile(Path *p)
     // foo/bar/dir/z01_(001501080787).(579054757)_(0)_(3b5e4ec7fe38d0f9846947207a0ea44c)_(0).gz
 
     size_t len = p->name()->str().length();
-    if (len < 20) return false;
     const char *s = p->name()->c_str();
-
-    return 0==strncmp(s, "z01_", 3) && 0==strncmp(s+len-3, ".gz", 3);
+    bool b = (0==strncmp(s, "z02_", 3) || 0==strncmp(s, "z01_", 3))
+              && 0==strncmp(s+len-3, ".gz", 3);
+    return b;
 }
 
 bool TarFileName::parseFileName(string &name, string *dir)
@@ -371,7 +371,7 @@ void TarFileName::writeTarFileNameIntoBufferVersion2_(char *buf, size_t buf_len,
     // dirprefix/(l)02_(1501080787).(579054757)_(3b5e4ec7fe38d0f9846947207a0ea44c)_(07)_(1119232).(tar)
     char sizes[32];
     memset(sizes, 0, sizeof(sizes));
-    if (part_nr == num_parts-1) {
+    if (num_parts > 1 && part_nr == num_parts-1) {
         snprintf(sizes, 32, "%zu", last_size);
     } else {
         snprintf(sizes, 32, "%zu", size);
