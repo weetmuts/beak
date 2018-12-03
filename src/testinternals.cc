@@ -75,7 +75,8 @@ int main(int argc, char *argv[])
     }
     try {
         fs = newDefaultFileSystem();
-/*        testMatching();
+        /*
+        testMatching();
         testRandom();
         testFileSystem();
         testGzip();
@@ -83,7 +84,8 @@ int main(int argc, char *argv[])
         testHumanReadable();
         testHexStrings();
         testFit();
-        testSplitLogic();*/
+        */
+        testSplitLogic();
         testReadSplitLogic();
 //        testContentSplit();
 
@@ -411,67 +413,50 @@ extern void splitParts_(size_t tar_file_size, // Includes the tar headers for th
                         size_t *last_part_size,
                         size_t *part_header_size);
 
-void testSplitLogic()
+void splitCheck(const char *test, size_t file_size, size_t tar_header_size, TarHeaderStyle type, size_t split_size,
+                uint expect_num_parts, size_t expect_part_size, size_t expect_last_part_size, size_t expect_part_header_size)
+
 {
+    size_t tar_size = file_size+tar_header_size;
     uint num_parts = 0;
     size_t part_size = 0;
     size_t last_part_size = 0;
-    size_t mv_header_size = 0;
+    size_t part_header_size = 0;
 
-    size_t file_size = 700*1024*1024;
-    size_t split_size = 50*1024*1024;
+    splitParts_(tar_size, split_size, type, &num_parts, &part_size, &last_part_size, &part_header_size);
+    verbose(TEST_SPLIT, "%s\n"
+            "file_size=%zu tar_header_size=%zu tar_size=%zu num_parts=%u part_size=%zu last_part_size=%zu part_header_size=%zu\n",
+            test, file_size, tar_header_size, tar_size, num_parts, part_size, last_part_size, part_header_size);
 
-    splitParts_(file_size, split_size, Simple, &num_parts, &part_size, &last_part_size, &mv_header_size);
-
-    verbose(TEST_SPLIT, "Simple header %zu %zu np=%u ps=%zu lps=%zu mhs=%zu\n",
-            file_size, split_size, num_parts, part_size, last_part_size, mv_header_size);
-
-    if (num_parts != 15 || part_size != split_size || last_part_size != 7168 || mv_header_size != 512)
+    if (num_parts != expect_num_parts || part_size != expect_part_size ||
+        last_part_size != expect_last_part_size || part_header_size != expect_part_header_size)
     {
-        error(TEST_FIT,"Split calculated the wrong values.\n");
+        error(TEST_SPLIT,"Split calculated the wrong values!\n");
     }
+}
 
-    splitParts_( file_size, split_size, Simple, &num_parts, &part_size, &last_part_size, &mv_header_size);
+void testSplitLogic()
+{
 
-    verbose(TEST_SPLIT, "Simple header long path %zu %zu np=%u ps=%zu lps=%zu mhs=%zu\n",
-            file_size, split_size, num_parts, part_size, last_part_size, mv_header_size);
+    // Small tar header for original file that is going to be split.
+    splitCheck("Simple header, 700M / 50M", 700*1024*1024, 512, Simple, 50*1024*1024,
+               15, 50*1024*1024, 7680, 512);
 
-    if (num_parts != 15 || part_size != split_size || last_part_size != 21504 || mv_header_size != 1536)
-    {
-        error(TEST_FIT,"Split calculated the wrong values.\n");
-    }
+    splitCheck("Large header, 700M / 50M", 700*1024*1024, 512*3, Simple, 50*1024*1024,
+               15, 50*1024*1024, 8704, 512);
 
-    splitParts_( file_size, split_size, None, &num_parts, &part_size, &last_part_size, &mv_header_size);
+    splitCheck("No headers, 500M / 50M", 500*1024*1024, 0, None, 50*1024*1024,
+               10, 50*1024*1024, 50*1024*1024, 0);
 
-    verbose(TEST_SPLIT, "No header %zu %zu np=%u ps=%zu lps=%zu mhs=%zu\n",
-            file_size, split_size, num_parts, part_size, last_part_size, mv_header_size);
+    splitCheck("Tiny parts No headers, 32768 / 1024", 32768, 0, None, 1024,
+               32, 1024, 1024, 0);
 
-    if (num_parts != 14 || part_size != split_size || last_part_size != split_size || mv_header_size != 0)
-    {
-        error(TEST_FIT,"Split calculated the wrong values.\n");
-    }
+    splitCheck("Tiny parts Small headers, 32768 / 1024", 32768, 512, Simple, 1024,
+               64, 1024, 1024, 512);
 
-    file_size = 32768;
-    split_size = 1024;
-    splitParts_( file_size, split_size, None, &num_parts, &part_size, &last_part_size, &mv_header_size);
+    splitCheck("Tiny parts Small headers except tar header, 32768 / 1024", 32768, 512*3, Simple, 1024,
+               66, 1024, 1024, 512);
 
-    verbose(TEST_SPLIT, "Tiny parts no headers %zu %zu np=%u ps=%zu lps=%zu mhs=%zu\n",
-            file_size, split_size, num_parts, part_size, last_part_size, mv_header_size);
-
-    if (num_parts != 32 || part_size != split_size || last_part_size != split_size || mv_header_size != 0)
-    {
-        error(TEST_FIT,"Split calculated the wrong values.\n");
-    }
-
-    splitParts_( file_size, split_size, Simple, &num_parts, &part_size, &last_part_size, &mv_header_size);
-
-    verbose(TEST_SPLIT, "Tiny parts no headers %zu %zu np=%u ps=%zu lps=%zu mhs=%zu\n",
-            file_size, split_size, num_parts, part_size, last_part_size, mv_header_size);
-
-    if (num_parts != 63 || part_size != split_size || last_part_size != split_size || mv_header_size != 512)
-    {
-        error(TEST_SPLIT,"Split calculated the wrong values.\n");
-    }
 }
 
 void testReadSplitLogic()
@@ -496,7 +481,7 @@ void testReadSplitLogic()
     splitParts_(file_size+header_size, split_size, Simple, &re.num_parts,
                 &re.part_size, &re.last_part_size, &re.part_offset);
 
-    verbose(TEST_READSPLIT, "File with no tar-headers: file_size=%zu split_size=%zu => "
+    verbose(TEST_READSPLIT, "Read test file: file_size=%zu split_size=%zu => "
             "num_parts=%zu part_size=%zu last_part_size=%zu part_offset=%zu\n",
             file_size, split_size, re.num_parts, re.part_size, re.last_part_size, re.part_offset);
 
@@ -517,8 +502,6 @@ void testContentSplit()
 {
     vector<ContentChunk> chunks;
     splitContent(Path::lookup("gurka"), &chunks, ((size_t)100));
-
-
 
     error(TEST_CONTENTSPLIT,"Content split calculated the wrong values.\n");
 
