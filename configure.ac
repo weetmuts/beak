@@ -32,17 +32,20 @@ AC_SUBST(PLATFORM)
 AC_SUBST(PLATFORM_CFLAGS)
 AC_SUBST(PATH_SEP)
 AC_SUBST(CONF_MNEMONIC)
+
 if test "${host_vendor}" = "w64"; then
    PLATFORM=WINAPI
    PATH_SEP=';'
    PLATFORM_CFLAGS=""
    FUSE_DEFAULT="no"
+   ASAN_DEFALUT="no"
    CONF_MNEMONIC="winapi64"
 else
    PLATFORM=POSIX
    PATH_SEP=':'
    PLATFORM_CFLAGS="-DUSE_SYSLOG"
    FUSE_DEFAULT="yes"
+   ASAN_DEFAULT="yes"
    if test "${host_cpu}" = "arm"; then
        CONF_MNEMONIC="arm32"
    else
@@ -75,6 +78,27 @@ fi
 if test "x$STRIP" = "x"; then
     AC_PATH_TOOL([STRIP], [strip], [:])
 fi
+
+AC_MSG_CHECKING([for address/leak sanitizer])
+
+AC_ARG_ENABLE([asan],
+  [AS_HELP_STRING([--disable-asan],
+      [disable address sanitizer for debug builds @<:@enabled@:>@])],
+      [ENABLE_ASAN=${enable_asan}], [ENABLE_ASAN=${ASAN_DEFAULT}])
+
+if test "x$ENABLE_ASAN" = xyes; then
+    ASAN_CFLAGS="-ggdb -fsanitize=address -fno-omit-frame-pointer"
+    ASAN_LDFLAGS="-fsanitize=address -static-libasan"
+    ASAN_LIBS="-lasan"
+    AC_MSG_RESULT([using ${with_fuse}])
+else
+    AC_MSG_RESULT([explicitly disabled])
+fi
+
+AC_SUBST(ENABLE_ASAN)
+AC_SUBST(ASAN_CFLAGS)
+AC_SUBST(ASAN_LDFLAGS)
+AC_SUBST(ASAN_LIBS)
 
 AC_MSG_CHECKING([for fuse])
 
@@ -188,12 +212,13 @@ fi
 
 CXXFLAGS="-DPLATFORM_${PLATFORM} -Wall -Werror -fmessage-length=0 -std=c++11 -Wno-maybe-uninitialized -Wno-unused-function"
 
-CXXFLAGS_debug="-O0 -g"
+CXXFLAGS_debug="-O0 -g ${ASAN_CFLAGS}"
 CXXFLAGS_release="-Os"
 
 LDFLAGS=""
-LDFLAGS_debug="-g"
+LDFLAGS_debug="-g ${ASAN_LDFLAGS}"
 LDFLAGS_release="-Os"
+LDFLAGSEND_debug="${ASAN_LIBS}"
 
 CFLAGS=""
 
@@ -206,7 +231,9 @@ AC_SUBST(CXXFLAGS_debug)
 AC_SUBST(CXXFLAGS_release)
 AC_SUBST(LDFLAGS)
 AC_SUBST(LDFLAGS_debug)
+AC_SUBST(LDFLAGSEND_debug)
 AC_SUBST(LDFLAGS_release)
+AC_SUBST(LDFLAGSEND_release)
 
 AC_CONFIG_FILES([$OUTPUT_ROOT/spec.gmk:$SRC_ROOT/autoconf/spec.gmk.in])
 AC_CONFIG_FILES([$OUTPUT_ROOT/Makefile:$SRC_ROOT/make/Makefile.in])

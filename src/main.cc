@@ -44,7 +44,8 @@ int main(int argc, char *argv[])
     }
 }
 
-int run(int argc, char *argv[]) {
+int run(int argc, char *argv[])
+{
     RC rc = RC::OK;
 
     // First create the OS interface to invoke external commands like rclone and rsync.

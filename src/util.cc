@@ -371,7 +371,7 @@ string eatTo(vector<char> &v, vector<char>::iterator &i, int c, size_t max, bool
         i++;
         max--;
     }
-    if (c != -1 && *i != c)
+    if (c != -1 && (i == v.end() || *i != c))
     {
         *err = true;
     }

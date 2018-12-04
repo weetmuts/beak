@@ -623,7 +623,9 @@ ac_includes_default="\
 
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
+LDFLAGSEND_release
 LDFLAGS_release
+LDFLAGSEND_debug
 LDFLAGS_debug
 CXXFLAGS_release
 CXXFLAGS_debug
@@ -635,6 +637,10 @@ OPENSSL_CFLAGS
 FUSE_LIBS
 FUSE_CFLAGS
 ENABLE_FUSE
+ASAN_LIBS
+ASAN_LDFLAGS
+ASAN_CFLAGS
+ENABLE_ASAN
 STRIP
 LD
 CXX
@@ -705,6 +711,7 @@ SHELL'
 ac_subst_files=''
 ac_user_opts='
 enable_option_checking
+enable_asan
 enable_fuse
 with_fuse
 with_openssl
@@ -1343,6 +1350,7 @@ Optional Features:
   --disable-option-checking  ignore unrecognized --enable/--with options
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
+  --disable-asan          disable address sanitizer for debug builds [enabled]
   --disable-fuse          disable libfuse (mount will not work) [enabled]
 
 Optional Packages:
@@ -2245,17 +2253,20 @@ ac_config_headers="$ac_config_headers ${OUTPUT_ROOT}/config.h:autoconf/config.h.
 
 
 
+
 if test "${host_vendor}" = "w64"; then
    PLATFORM=WINAPI
    PATH_SEP=';'
    PLATFORM_CFLAGS=""
    FUSE_DEFAULT="no"
+   ASAN_DEFALUT="no"
    CONF_MNEMONIC="winapi64"
 else
    PLATFORM=POSIX
    PATH_SEP=':'
    PLATFORM_CFLAGS="-DUSE_SYSLOG"
    FUSE_DEFAULT="yes"
+   ASAN_DEFAULT="yes"
    if test "${host_cpu}" = "arm"; then
        CONF_MNEMONIC="arm32"
    else
@@ -3921,6 +3932,33 @@ fi
 
 fi
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for address/leak sanitizer" >&5
+$as_echo_n "checking for address/leak sanitizer... " >&6; }
+
+# Check whether --enable-asan was given.
+if test "${enable_asan+set}" = set; then :
+  enableval=$enable_asan; ENABLE_ASAN=${enable_asan}
+else
+  ENABLE_ASAN=${ASAN_DEFAULT}
+fi
+
+
+if test "x$ENABLE_ASAN" = xyes; then
+    ASAN_CFLAGS="-ggdb -fsanitize=address -fno-omit-frame-pointer"
+    ASAN_LDFLAGS="-fsanitize=address -static-libasan"
+    ASAN_LIBS="-lasan"
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: using ${with_fuse}" >&5
+$as_echo "using ${with_fuse}" >&6; }
+else
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: explicitly disabled" >&5
+$as_echo "explicitly disabled" >&6; }
+fi
+
+
+
+
+
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for fuse" >&5
 $as_echo_n "checking for fuse... " >&6; }
 
@@ -4171,14 +4209,17 @@ fi
 
 CXXFLAGS="-DPLATFORM_${PLATFORM} -Wall -Werror -fmessage-length=0 -std=c++11 -Wno-maybe-uninitialized -Wno-unused-function"
 
-CXXFLAGS_debug="-O0 -g"
+CXXFLAGS_debug="-O0 -g ${ASAN_CFLAGS}"
 CXXFLAGS_release="-Os"
 
 LDFLAGS=""
-LDFLAGS_debug="-g"
+LDFLAGS_debug="-g ${ASAN_LDFLAGS}"
 LDFLAGS_release="-Os"
+LDFLAGSEND_debug="${ASAN_LIBS}"
 
 CFLAGS=""
+
+
 
 
 
