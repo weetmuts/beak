@@ -31,6 +31,7 @@ using namespace std;
 
 static ComponentId SYSTEM = registerLogComponent("system");
 static ComponentId SYSTEMIO = registerLogComponent("systemio");
+static ComponentId THREAD = registerLogComponent("thread");
 
 struct ThreadCallbackImplementation : ThreadCallback
 {
@@ -52,9 +53,10 @@ private:
 
 void ThreadCallbackImplementation::stop()
 {
+    debug(THREAD, "Stopping thread\n");
     running_ = false;
     if (thread_) {
-        //pthread_kill(thread_, SIGUSR2);
+        pthread_kill(thread_, SIGUSR1);
     }
 }
 
@@ -81,9 +83,9 @@ void *regularThread(void *data)
             int rc = usleep(1000000);
             if (rc == -1) {
                 if (errno == EINTR) {
-                    debug(SYSTEM, "regular thread callback awaken by signal.\n");
+                    debug(THREAD, "regular thread callback awaken by signal.\n");
                 } else {
-                    error(SYSTEM, "could not sleep.\n");
+                    error(THREAD, "could not sleep.\n");
                 }
             }
         }
@@ -97,7 +99,7 @@ ThreadCallbackImplementation::ThreadCallbackImplementation(int millis, function<
     running_ = true;
     int rc  = pthread_create(&thread_, NULL, regularThread, this);
     if (rc) {
-        error(SYSTEM, "Could not create thread.\n");
+        error(DEBUG, "Could not create thread.\n");
     }
     millis_++;
 }
@@ -105,11 +107,12 @@ ThreadCallbackImplementation::ThreadCallbackImplementation(int millis, function<
 
 ThreadCallbackImplementation::~ThreadCallbackImplementation()
 {
-    fprintf(stderr, "Destructing regular thread\n");
+    debug(THREAD, "Destructing regular thread\n");
+    running_ = false;
     if (thread_) {
-        //pthread_kill(thread_, SIGUSR2);
+        pthread_kill(thread_, SIGUSR1);
         pthread_join(thread_, NULL);
-        fprintf(stderr, "JOINED thread properly!\n");
+        debug(THREAD, "Joined thread properly!\n");
     }
 }
 
@@ -137,6 +140,8 @@ void doNothing(int signum) {
 
 void onExit(string msg, function<void()> cb)
 {
+    assert(exit_handler_ == NULL);
+
     exit_handler_ = cb;
     struct sigaction new_action, old_action;
 
@@ -152,6 +157,13 @@ void onExit(string msg, function<void()> cb)
 
     sigaction (SIGTERM, NULL, &old_action);
     if (old_action.sa_handler != SIG_IGN) sigaction (SIGTERM, &new_action, NULL);
+
+    new_action.sa_handler = doNothing;
+    sigemptyset (&new_action.sa_mask);
+    new_action.sa_flags = 0;
+
+    sigaction (SIGUSR1, NULL, &old_action);
+    if (old_action.sa_handler != SIG_IGN) sigaction(SIGUSR1, &new_action, NULL);
 }
 
 void onChildExit(string msg, function<void()> cb)
@@ -186,6 +198,7 @@ struct SystemImplementation : System
                      bool daemon, unique_ptr<FuseMount> &fm,
                      bool foreground, bool debug);
 
+    SystemImplementation();
     ~SystemImplementation() = default;
 
     private:
@@ -202,6 +215,14 @@ unique_ptr<System> newSystem()
 string protect_(string arg)
 {
     return arg;
+}
+
+SystemImplementation::SystemImplementation()
+{
+    onExit("Main", [&](){
+            fprintf(stderr, "Exiting!\n");
+        });
+
 }
 
 RC SystemImplementation::invoke(string program,

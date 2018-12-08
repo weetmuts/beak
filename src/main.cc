@@ -86,6 +86,7 @@ int run(int argc, char *argv[])
         break;
 
     case diff_cmd:
+        rc = beak->diff(&settings);
         break;
 
     case fsck_cmd:

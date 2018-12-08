@@ -381,7 +381,7 @@ uint32_t hashString(string a)
     return djb_hash(a.c_str(), a.length());
 }
 
-static map<string, Atom*> interned_atoms;
+static map<string, unique_ptr<Atom>> interned_atoms;
 
 Atom *Atom::lookup(string n)
 {
@@ -389,10 +389,10 @@ Atom *Atom::lookup(string n)
     auto l = interned_atoms.find(n);
     if (l != interned_atoms.end())
     {
-        return l->second;
+        return l->second.get();
     }
     Atom *na = new Atom(n);
-    interned_atoms[n] = na;
+    interned_atoms[n] = unique_ptr<Atom>(na);
     return na;
 }
 
@@ -408,7 +408,7 @@ bool Atom::lessthan(Atom *a, Atom *b)
     return rc < 0;
 }
 
-static map<string, Path*> interned_paths;
+static map<string, unique_ptr<Path>> interned_paths;
 static Path *interned_root;
 
 Path *Path::lookup(string p)
@@ -431,18 +431,18 @@ Path *Path::lookup(string p)
     auto pl = interned_paths.find(p);
     if (pl != interned_paths.end())
     {
-        return pl->second;
+        return pl->second.get();
     }
     auto s = dirname_(p);
     if (s.second)
     {
         Path *parent = lookup(s.first);
         Path *np = new Path(parent, Atom::lookup(basename_(p)), p);
-        interned_paths[p] = np;
+        interned_paths[p] = unique_ptr<Path>(np);
         return np;
     }
     Path *np = new Path(NULL, Atom::lookup(basename_(p)), p);
-    interned_paths[p] = np;
+    interned_paths[p] = unique_ptr<Path>(np);
     return np;
 }
 
@@ -582,7 +582,7 @@ Path::Initializer::Initializer()
 {
     Atom *root = Atom::lookup("");
     string s = string("");
-    interned_paths[""] = new Path(NULL, root, s);
+    interned_paths[""] = unique_ptr<Path>(new Path(NULL, root, s));
     interned_root = lookup("");
 }
 

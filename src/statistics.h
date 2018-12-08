@@ -56,6 +56,7 @@ struct ProgressStatistics
     virtual void startDisplayOfProgress() = 0;
     virtual void updateProgress() = 0;
     virtual void finishProgress() = 0;
+    virtual ~ProgressStatistics() {};
 };
 
 enum ProgressDisplayType

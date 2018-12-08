@@ -79,8 +79,9 @@ struct BeakImplementation : Beak {
     void printVersion();
     void printLicense();
 
-    RC fsck(Settings *settings);
     RC configure(Settings *settings);
+    RC diff(Settings *settings);
+    RC fsck(Settings *settings);
     RC push(Settings *settings);
     RC pull(Settings *settings);
     RC prune(Settings *settings);
@@ -106,7 +107,7 @@ struct BeakImplementation : Beak {
     private:
 
     string argsToVector_(int argc, char **argv, vector<string> *args);
-    unique_ptr<Restore> accessBackup_(Settings *settings, ProgressStatistics *progress);
+    unique_ptr<Restore> accessBackup_(Settings *settings, WhichArgument wa, ProgressStatistics *progress);
     RC mountRestoreInternal_(Settings *settings, bool daemon, ProgressStatistics *progress);
     bool hasPointsInTime_(Path *path, FileSystem *fs);
 
@@ -420,6 +421,32 @@ string BeakImplementation::argsToVector_(int argc, char **argv, vector<string> *
     return argv[0];
 }
 
+const char *arg_name_(ArgumentType at) {
+
+    switch (at) {
+
+    case ArgUnspecified:
+        return "?";
+    case ArgNone:
+        return "no";
+    case ArgOrigin:
+        return "origin";
+    case ArgRule:
+        return "rule";
+    case ArgStorage:
+        return "storage";
+    case ArgDir:
+        return "dir";
+    case ArgFile:
+        return "file";
+    case ArgORS:
+        return "origin, rule or storage";
+    case ArgNORS:
+        return "?";
+    }
+    return "?";
+}
+
 Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *settings)
 {
     vector<string> args;
@@ -659,6 +686,21 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
         }
     }
 
+
+    if (cmde->expected_from != ArgNone)
+    {
+        if (settings->from.type == ArgUnspecified)
+        {
+            error(COMMANDLINE, "Command expects %s as first argument.\n", arg_name_(cmde->expected_from));
+        }
+        if (cmde->expected_to != ArgNone)
+        {
+            if (settings->to.type == ArgUnspecified)
+            {
+                error(COMMANDLINE, "Command expects %s as second argument.\n", arg_name_(cmde->expected_to));
+            }
+        }
+    }
     settings->updateFuseArgsArray();
 
     return cmd;
@@ -681,7 +723,7 @@ RC BeakImplementation::store(Settings *settings)
     // This command scans the origin file system and builds
     // an in memory representation of the backup file system,
     // with tar files,index files and directories.
-    rc = backup->scanFileSystem(settings);
+    rc = backup->scanFileSystem(settings, WhichArgument::FirstArg);
 
 
     // Now store the beak file system into the selected storage.
@@ -701,21 +743,23 @@ RC BeakImplementation::store(Settings *settings)
     return rc;
 }
 
-unique_ptr<Restore> BeakImplementation::accessBackup_(Settings *settings, ProgressStatistics *progress)
+unique_ptr<Restore> BeakImplementation::accessBackup_(Settings *settings, WhichArgument wa, ProgressStatistics *progress)
 {
     RC rc = RC::OK;
 
-    assert(settings->from.type == ArgStorage);
+    Argument *arg = (wa == WhichArgument::FirstArg) ? &settings->from : &settings->to;
+
+    assert(arg->type == ArgStorage);
     FileSystem *backup_fs = local_fs_;
-    if (settings->from.storage->type == RCloneStorage ||
-        settings->from.storage->type == RSyncStorage) {
-        backup_fs = storage_tool_->asCachedReadOnlyFS(settings->from.storage,
+    if (arg->storage->type == RCloneStorage ||
+        arg->storage->type == RSyncStorage) {
+        backup_fs = storage_tool_->asCachedReadOnlyFS(arg->storage,
                                                       progress);
     }
     unique_ptr<Restore> restore  = newRestore(backup_fs);
 
     rc = restore->lookForPointsInTime(PointInTimeFormat::absolute_point,
-                                      settings->from.storage->storage_location);
+                                      arg->storage->storage_location);
 
     if (rc.isErr()) {
         error(COMMANDLINE, "No points in time found!\n");
@@ -748,7 +792,7 @@ RC BeakImplementation::restore(Settings *settings)
     umask(0);
     RC rc = RC::OK;
 
-    auto restore  = accessBackup_(settings, progress.get());
+    auto restore  = accessBackup_(settings, WhichArgument::FirstArg, progress.get());
     if (!restore) {
         return RC::ERR;
     }
@@ -856,12 +900,32 @@ RC BeakImplementation::prune(Settings *settings)
     return RC::OK;
 }
 
+RC BeakImplementation::diff(Settings *settings)
+{
+    RC rc = RC::OK;
+
+    assert(settings->from.type == ArgOrigin || settings->from.type == ArgRule);
+    assert(settings->to.type == ArgStorage);
+
+    auto progress = newProgressStatistics(settings->progress);
+
+    auto backup  = newBackup(origin_tool_->fs());
+    rc = backup->scanFileSystem(settings, WhichArgument::FirstArg);
+
+    //auto restore = accessBackup_(settings, WhichArgument::SecondArg, progress.get());
+
+/*    if (!restore) {
+        return RC::ERR;
+        }*/
+    return rc;
+}
+
 RC BeakImplementation::fsck(Settings *settings)
 {
     RC rc = RC::OK;
 
     auto progress = newProgressStatistics(settings->progress);
-    auto restore  = accessBackup_(settings, progress.get());
+    auto restore  = accessBackup_(settings, WhichArgument::FirstArg, progress.get());
     if (!restore) {
         return RC::ERR;
     }
@@ -990,7 +1054,7 @@ RC BeakImplementation::mountBackupDaemon(Settings *settings)
     dir = settings->to.dir;
 
     unique_ptr<Backup> backup  = newBackup(origin_fs);
-    RC rc = backup->scanFileSystem(settings);
+    RC rc = backup->scanFileSystem(settings, WhichArgument::FirstArg);
 
     if (rc.isErr()) {
         return RC::ERR;
@@ -1004,7 +1068,7 @@ RC BeakImplementation::mountBackup(Settings *settings, ProgressStatistics *progr
     ptr<FileSystem> fs = origin_tool_->fs();
 
     unique_ptr<Backup> backup  = newBackup(fs);
-    RC rc = backup->scanFileSystem(settings);
+    RC rc = backup->scanFileSystem(settings, WhichArgument::FirstArg);
 
     if (rc.isErr()) {
         return RC::ERR;
@@ -1037,7 +1101,7 @@ RC BeakImplementation::mountRestore(Settings *settings, ProgressStatistics *prog
 
 RC BeakImplementation::mountRestoreInternal_(Settings *settings, bool daemon, ProgressStatistics *progress)
 {
-    auto restore  = accessBackup_(settings, progress);
+    auto restore  = accessBackup_(settings, WhichArgument::FirstArg, progress);
     if (!restore) {
         return RC::ERR;
     }
@@ -1218,4 +1282,10 @@ void Settings::updateFuseArgsArray()
         }
     }
     fuse_argv[j] = 0;
+}
+
+
+Settings::~Settings()
+{
+    if (fuse_argv) { delete [] fuse_argv; }
 }

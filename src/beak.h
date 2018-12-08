@@ -36,6 +36,7 @@
 enum Command : short;
 enum PointInTimeFormat : short;
 enum TarHeaderStyle : short;
+enum class WhichArgument { FirstArg, SecondArg  };
 
 struct Settings;
 struct PointInTime;
@@ -54,6 +55,7 @@ struct Beak
     virtual RC shell(Settings *settings) = 0;
     virtual RC prune(Settings *settings) = 0;
 
+    virtual RC diff(Settings *settings) = 0;
     virtual RC fsck(Settings *settings) = 0;
     virtual RC configure(Settings *settings) = 0;
 
@@ -104,7 +106,7 @@ enum ArgumentType
 #define LIST_OF_COMMANDS \
     X(bmount,"Mount your file system as a backup.",ArgOrigin,ArgDir) \
     X(config,"Configure backup rules.",ArgNone,ArgNone) \
-    X(diff,"Show changes since last backup.",ArgORS,ArgORS) \
+    X(diff,"Show changes relation to or between backups.",ArgOrigin, ArgStorage) \
     X(fsck,"Check the integrity of your backup.",ArgStorage,ArgNone) \
     X(genautocomplete,"Output bash completion script for beak.",ArgFile,ArgNone) \
     X(genmounttrigger,"Output systemd rule to trigger backup when USB drive is mounted.",ArgFile,ArgNone) \
@@ -196,6 +198,8 @@ LIST_OF_OPTIONS
 
     Settings copy() { return *this; }
     void updateFuseArgsArray();
+
+    ~Settings();
 };
 
 

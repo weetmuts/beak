@@ -49,7 +49,7 @@ struct Filter {
 
 struct Backup
 {
-    RC scanFileSystem(Settings *settings);
+    RC scanFileSystem(Settings *settings, WhichArgument wa);
 
     pthread_mutex_t global;
     pthread_mutexattr_t global_attr;

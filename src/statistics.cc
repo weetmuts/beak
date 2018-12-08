@@ -32,6 +32,7 @@ using namespace std;
 struct ProgressStatisticsImplementation : ProgressStatistics
 {
     ProgressStatisticsImplementation(ProgressDisplayType t) : display_type_(t) {}
+    ~ProgressStatisticsImplementation() = default;
 
 private:
 

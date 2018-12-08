@@ -21,6 +21,7 @@
 #include "always.h"
 #include "filesystem.h"
 #include "tar.h"
+#include "tarentry.h"
 #include "util.h"
 
 #include <stddef.h>
