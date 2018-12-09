@@ -138,6 +138,18 @@ void childExitHandler(int signum)
 void doNothing(int signum) {
 }
 
+void ignoreSIGUSR1()
+{
+    struct sigaction new_action, old_action;
+
+    new_action.sa_handler = doNothing;
+    sigemptyset (&new_action.sa_mask);
+    new_action.sa_flags = 0;
+
+    sigaction (SIGUSR1, NULL, &old_action);
+    if (old_action.sa_handler != SIG_IGN) sigaction(SIGUSR1, &new_action, NULL);
+}
+
 void onExit(string msg, function<void()> cb)
 {
     assert(exit_handler_ == NULL);
@@ -219,10 +231,13 @@ string protect_(string arg)
 
 SystemImplementation::SystemImplementation()
 {
-    onExit("Main", [&](){
+    ignoreSIGUSR1();
+    /*onExit("Main", [&](){
             fprintf(stderr, "Exiting!\n");
+            Have to stop all threads and background processes here.
+            Then trigger an exit(0);
         });
-
+    */
 }
 
 RC SystemImplementation::invoke(string program,

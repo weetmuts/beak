@@ -625,6 +625,7 @@ RC FileSystemImplementationPosix::enableWatch()
 
 RC FileSystemImplementationPosix::addWatch(Path *p)
 {
+    if (!inotify_fd_) return RC::OK;
     int wd = inotify_add_watch(inotify_fd_, p->c_str(),
                                IN_ATTRIB |
                                IN_CREATE |

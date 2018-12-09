@@ -58,6 +58,7 @@ using namespace std;
 static ComponentId COMMANDLINE = registerLogComponent("commandline");
 static ComponentId STORE = registerLogComponent("store");
 static ComponentId FUSE = registerLogComponent("fuse");
+static ComponentId DIFF = registerLogComponent("diff");
 
 struct CommandEntry;
 struct OptionEntry;
@@ -107,7 +108,7 @@ struct BeakImplementation : Beak {
     private:
 
     string argsToVector_(int argc, char **argv, vector<string> *args);
-    unique_ptr<Restore> accessBackup_(Settings *settings, WhichArgument wa, ProgressStatistics *progress);
+    unique_ptr<Restore> accessBackup_(Argument *storage, string pointintime, ProgressStatistics *progress);
     RC mountRestoreInternal_(Settings *settings, bool daemon, ProgressStatistics *progress);
     bool hasPointsInTime_(Path *path, FileSystem *fs);
 
@@ -723,8 +724,7 @@ RC BeakImplementation::store(Settings *settings)
     // This command scans the origin file system and builds
     // an in memory representation of the backup file system,
     // with tar files,index files and directories.
-    rc = backup->scanFileSystem(settings, WhichArgument::FirstArg);
-
+    rc = backup->scanFileSystem(&settings->from, settings);
 
     // Now store the beak file system into the selected storage.
     storage_tool_->storeBackupIntoStorage(backup.get(),
@@ -743,38 +743,37 @@ RC BeakImplementation::store(Settings *settings)
     return rc;
 }
 
-unique_ptr<Restore> BeakImplementation::accessBackup_(Settings *settings, WhichArgument wa, ProgressStatistics *progress)
+unique_ptr<Restore> BeakImplementation::accessBackup_(Argument *storage,
+                                                      string pointintime, ProgressStatistics *progress)
 {
     RC rc = RC::OK;
 
-    Argument *arg = (wa == WhichArgument::FirstArg) ? &settings->from : &settings->to;
-
-    assert(arg->type == ArgStorage);
+    assert(storage->type == ArgStorage);
     FileSystem *backup_fs = local_fs_;
-    if (arg->storage->type == RCloneStorage ||
-        arg->storage->type == RSyncStorage) {
-        backup_fs = storage_tool_->asCachedReadOnlyFS(arg->storage,
+    if (storage->storage->type == RCloneStorage ||
+        storage->storage->type == RSyncStorage) {
+        backup_fs = storage_tool_->asCachedReadOnlyFS(storage->storage,
                                                       progress);
     }
     unique_ptr<Restore> restore  = newRestore(backup_fs);
 
     rc = restore->lookForPointsInTime(PointInTimeFormat::absolute_point,
-                                      arg->storage->storage_location);
+                                      storage->storage->storage_location);
 
     if (rc.isErr()) {
         error(COMMANDLINE, "No points in time found!\n");
         return NULL;
     }
 
-    if (settings->pointintime != "") {
-        auto point = restore->setPointInTime(settings->pointintime);
+    if (pointintime != "") {
+        auto point = restore->setPointInTime(pointintime);
         if (!point) {
             error(STORE, "No such point in time!\n");
             return NULL;
         }
     }
 
-    rc = restore->loadBeakFileSystem(settings);
+    rc = restore->loadBeakFileSystem(storage);
     if (rc.isErr()) {
         error(STORE, "Could not load beak file system.\n");
         return NULL;
@@ -792,10 +791,11 @@ RC BeakImplementation::restore(Settings *settings)
     umask(0);
     RC rc = RC::OK;
 
-    auto restore  = accessBackup_(settings, WhichArgument::FirstArg, progress.get());
+    auto restore  = accessBackup_(&settings->from, settings->pointintime, progress.get());
     if (!restore) {
         return RC::ERR;
     }
+
     auto point = restore->singlePointInTime();
     if (!point) {
         // The settings did not specify a point in time, lets use the most recent for the restore.
@@ -909,14 +909,160 @@ RC BeakImplementation::diff(Settings *settings)
 
     auto progress = newProgressStatistics(settings->progress);
 
-    auto backup  = newBackup(origin_tool_->fs());
-    rc = backup->scanFileSystem(settings, WhichArgument::FirstArg);
+    auto restore = accessBackup_(&settings->to, settings->pointintime, progress.get());
+    auto point = restore->singlePointInTime();
+    if (!point) {
+        // The settings did not specify a point in time, lets use the most recent for the restore.
+        point = restore->setPointInTime("@0");
+    }
 
-    //auto restore = accessBackup_(settings, WhichArgument::SecondArg, progress.get());
-
-/*    if (!restore) {
+    if (!restore) {
         return RC::ERR;
-        }*/
+    }
+    auto origin_fs = origin_tool_->fs();
+    auto backup_fs = restore->asFileSystem();
+
+    map<Path*,FileStat> old;
+    rc = backup_fs->recurse(Path::lookupRoot(),
+                            [&](Path *path, FileStat *stat)
+                            {
+                                old[path] = *stat;
+                                debug(DIFF, "Old \"%s\"\n", path->c_str());
+                                return RecurseContinue;
+                            }
+        );
+
+    map<Path*,FileStat> curr;
+    int depth = settings->from.origin->depth();
+    rc = origin_fs->recurse(settings->from.origin,
+                            [&](Path *path, FileStat *stat)
+                            {
+                                if (path->depth() > depth) {
+                                    Path *p = path->subpath(depth)->prepend(Path::lookupRoot());
+                                    curr[p] = *stat;
+                                    debug(DIFF, "Curr \"%s\"\n", p->c_str());
+                                }
+                                return RecurseContinue;
+                            }
+        );
+
+    set<Path*> diff_permissions;
+    set<Path*> diff_contents;
+    set<Path*> removed;
+    set<Path*> added;
+
+    bool changes_found = false;
+
+    for (auto& p : curr)
+    {
+        if (old.count(p.first) == 1)
+        {
+            // File exists in curr and old, lets compare the stats.
+            FileStat *newstat = &p.second;
+            FileStat *oldstat = &old[p.first];
+            if (newstat->isRegularFile())
+            {
+                if (!newstat->sameSize(oldstat) ||
+                    !newstat->sameMTime(oldstat))
+                {
+                    if (newstat->st_nlink > 0 || oldstat->st_nlink > 0) {
+                        fprintf(stderr, "Hard links!\n");
+                    } else {
+                        debug(DIFF, "Content diff %s\n", p.first->c_str());
+                        diff_contents.insert(p.first);
+                        changes_found = true;
+                    }
+                }
+                if (!newstat->samePermissions(oldstat))
+                {
+                    debug(DIFF, "Permission diff %s\n", p.first->c_str());
+                    diff_permissions.insert(p.first);
+                    changes_found = true;
+                }
+            }
+            if (newstat->isRegularFile())
+            {
+                if (!newstat->sameSize(oldstat) ||
+                    !newstat->sameMTime(oldstat))
+                {
+                    debug(DIFF, "Content diff for %s \n", p.first->c_str());
+                    diff_contents.insert(p.first);
+                    changes_found = true;
+                }
+                if (!newstat->samePermissions(oldstat))
+                {
+                    debug(DIFF, "Permission diff for %s\n", p.first->c_str());
+                    diff_permissions.insert(p.first);
+                    changes_found = true;
+                }
+            }
+        } else {
+            // New file found
+            debug(DIFF, "New file found %s\n", p.first->c_str());
+            added.insert(p.first);
+            changes_found = true;
+        }
+    }
+
+    for (auto& p : old)
+    {
+        if (curr.count(p.first) == 0)
+        {
+            // File that disappeard found.
+            debug(DIFF, "Removed file found %s\n", p.first->c_str());
+            removed.insert(p.first);
+            changes_found = true;
+        }
+    }
+
+    printf("Diff between %s %s\n\n", settings->from.origin->c_str(), settings->to.storage->storage_location->c_str());
+
+    for (auto p : diff_contents)
+    {
+        printf("    changed:       %s\n", p->c_str());
+    }
+
+    for (auto p : diff_permissions)
+    {
+        printf(" permission:       %s\n", p->c_str());
+    }
+
+    for (auto p : added)
+    {
+        printf("      added:       %s\n", p->c_str());
+    }
+
+    for (auto p : removed)
+    {
+        printf("    removed:       %s\n", p->c_str());
+    }
+
+    if (changes_found) {
+        printf("\n");
+    }
+
+    if (diff_contents.size() > 0) {
+        printf("%zu changed files ", diff_contents.size());
+        changes_found = true;
+    }
+    if (diff_permissions.size() > 0) {
+        printf("%zu permissions changed ", diff_permissions.size());
+        changes_found = true;
+    }
+    if (added.size() > 0) {
+        printf("%zu files added ", added.size());
+        changes_found = true;
+    }
+    if (removed.size() > 0) {
+        printf("%zu files removed ", removed.size());
+        changes_found = true;
+    }
+
+    if (changes_found) {
+        printf("\n");
+    } else {
+        printf("No changes detected.\n");
+    }
     return rc;
 }
 
@@ -925,7 +1071,7 @@ RC BeakImplementation::fsck(Settings *settings)
     RC rc = RC::OK;
 
     auto progress = newProgressStatistics(settings->progress);
-    auto restore  = accessBackup_(settings, WhichArgument::FirstArg, progress.get());
+    auto restore  = accessBackup_(&settings->from, settings->pointintime, progress.get());
     if (!restore) {
         return RC::ERR;
     }
@@ -1054,7 +1200,7 @@ RC BeakImplementation::mountBackupDaemon(Settings *settings)
     dir = settings->to.dir;
 
     unique_ptr<Backup> backup  = newBackup(origin_fs);
-    RC rc = backup->scanFileSystem(settings, WhichArgument::FirstArg);
+    RC rc = backup->scanFileSystem(&settings->from, settings);
 
     if (rc.isErr()) {
         return RC::ERR;
@@ -1068,7 +1214,7 @@ RC BeakImplementation::mountBackup(Settings *settings, ProgressStatistics *progr
     ptr<FileSystem> fs = origin_tool_->fs();
 
     unique_ptr<Backup> backup  = newBackup(fs);
-    RC rc = backup->scanFileSystem(settings, WhichArgument::FirstArg);
+    RC rc = backup->scanFileSystem(&settings->from, settings);
 
     if (rc.isErr()) {
         return RC::ERR;
@@ -1101,7 +1247,7 @@ RC BeakImplementation::mountRestore(Settings *settings, ProgressStatistics *prog
 
 RC BeakImplementation::mountRestoreInternal_(Settings *settings, bool daemon, ProgressStatistics *progress)
 {
-    auto restore  = accessBackup_(settings, WhichArgument::FirstArg, progress);
+    auto restore  = accessBackup_(&settings->from, settings->pointintime, progress);
     if (!restore) {
         return RC::ERR;
     }

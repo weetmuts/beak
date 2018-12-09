@@ -1010,14 +1010,12 @@ struct BackupFuseAPI : FuseAPI
     }
 };
 
-RC Backup::scanFileSystem(Settings *settings, WhichArgument wa)
+RC Backup::scanFileSystem(Argument *origin, Settings *settings)
 {
-    Argument *arg = (wa == WhichArgument::FirstArg) ? &settings->from : &settings->to;
-
-    if (arg->type == ArgOrigin && arg->origin) {
-        root_dir_path = arg->origin;
-    } else if (arg->type == ArgRule && arg->rule) {
-        root_dir_path = arg->rule->origin_path;
+    if (origin->type == ArgOrigin && origin->origin) {
+        root_dir_path = origin->origin;
+    } else if (origin->type == ArgRule && origin->rule) {
+        root_dir_path = origin->rule->origin_path;
     } else {
         assert(0);
     }

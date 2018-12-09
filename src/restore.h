@@ -109,7 +109,7 @@ private:
 
 struct Restore
 {
-    RC loadBeakFileSystem(Settings *settings);
+    RC loadBeakFileSystem(Argument *storage);
 
     pthread_mutex_t global;
     pthread_mutexattr_t global_attr;
@@ -140,9 +140,7 @@ struct Restore
     Restore(FileSystem *backup_fs);
 
     Path *rootDir() { return root_dir_; }
-    Path *mountDir() { return mount_dir_; }
     void setRootDir(Path *p) { root_dir_ = p; }
-    void setMountDir(Path *p) { mount_dir_ = p; }
 
     ptr<FileSystem> asFileSystem() { return contents_fs_; }
     FuseAPI *asFuseAPI();
@@ -151,7 +149,6 @@ struct Restore
     private:
 
     Path *root_dir_;
-    Path *mount_dir_;
 
     std::vector<PointInTime> history_;
     std::map<std::string,PointInTime*> points_in_time_;

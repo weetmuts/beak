@@ -74,6 +74,9 @@ struct FileStat {
     FileStat(const struct stat *sb) {
         loadFrom(sb);
     }
+    bool equal(FileStat *b) {
+        return samePermissions(b) && sameSize(b) && sameMTime(b);
+    }
     bool samePermissions(FileStat *b) { return (st_mode&07777) == (b->st_mode&07777); }
     bool sameSize(FileStat *b) { return st_size == b->st_size; }
     bool sameMTime(FileStat *b) { return st_mtim.tv_sec == b->st_mtim.tv_sec &&

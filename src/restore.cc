@@ -334,7 +334,7 @@ Path *Restore::loadDirContents(PointInTime *point, Path *path)
 
 void Restore::loadCache(PointInTime *point, Path *path)
 {
-    Path *opath = path;
+//    Path *opath = path;
 
     RestoreEntry *e = point->getPath(path);
     if (e != NULL && e->loaded)
@@ -347,23 +347,20 @@ void Restore::loadCache(PointInTime *point, Path *path)
     for (;;)
     {
         Path *gz = loadDirContents(point, path);
-        if (point->hasPath(path))
+        if (gz != NULL)
         {
-            if (path == Path::lookupRoot())
+            if (point->hasPath(path))
             {
-                debug(RESTORE, "reached root\n");
+                if (path == Path::lookupRoot())
+                {
+                    debug(RESTORE, "reached root\n");
+                    return;
+                }
+                // Success
+                debug(RESTORE, "found '%s' in index '%s'\n", path->c_str(), gz->c_str());
                 return;
             }
-            // Success
-            debug(RESTORE, "found '%s' in index '%s'\n", path->c_str(), gz->c_str());
-            return;
-        }
-        if (path != opath)
-        {
-            // The file, if it exists should have been found here. Therefore we
-            // conclude that the file does not exist.
-            debug(RESTORE, "NOT found %s in index %s\n", path->c_str(), gz->c_str());
-            return;
+            // Can we terminate this search early?
         }
         if (path->isRoot()) {
             // No gz file found anywhere! This filesystem should not have been mounted!
@@ -372,6 +369,7 @@ void Restore::loadCache(PointInTime *point, Path *path)
         }
         // Move up in the directory tree.
         path = path->parent();
+        debug(RESTORE, "moving up to %s\n", path->c_str());
     }
     assert(0);
 }
@@ -828,10 +826,9 @@ PointInTime *Restore::setPointInTime(string g) {
     return single_point_in_time_;
 }
 
-RC Restore::loadBeakFileSystem(Settings *settings)
+RC Restore::loadBeakFileSystem(Argument *storage)
 {
-    setRootDir(settings->from.storage->storage_location);
-    setMountDir(settings->to.origin);
+    setRootDir(storage->storage->storage_location);
 
     for (auto &point : history()) {
         string name = point.filename;
