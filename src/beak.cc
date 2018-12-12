@@ -259,6 +259,19 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
         return argument;
     }
 
+    if (expected_type == ArgFile) {
+        Path *file = Path::lookup(arg);
+        Path *rp = file->realpath();
+        if (!rp)
+        {
+            error(COMMANDLINE, "Expected file. Got \"%s\" instead.\n", arg.c_str());
+        }
+        argument.file = rp;
+        argument.type = ArgFile;
+        debug(COMMANDLINE, "found file arg \"%s\", as expected.\n", file->c_str());
+        return argument;
+    }
+
     if (expected_type == ArgORS || expected_type == ArgStorage) {
         Path *storage_location = Path::lookup(arg);
         Storage *storage = configuration_->findStorageFrom(storage_location);

@@ -133,7 +133,19 @@ function performReStore {
     fi
 }
 
-
+function performDiff {
+    extra="$1"
+    if [ -z "$test" ]; then
+        # Normal test execution, execute the store
+        eval "${BEAK} diff $extra ${root} ${store} > $log"
+    else
+        if [ -z "$gdb" ]; then
+            ${BEAK} diff --log=all $extra ${root} ${store} 2>&1 | tee $log
+        else
+            gdb -ex=r --args ${BEAK} diff -f $extra ${root} ${store}
+        fi
+    fi
+}
 
 function startMountTest {
     run="$1"
@@ -580,6 +592,17 @@ if [ $do_test ]; then
     startMountTest standardTest
     compareStoreAndMount
     stopMount
+    echo OK
+fi
+
+setup diffwithlinks "Diff with hard links"
+if [ $do_test ]; then
+    mkdir -p $root/Alfa/Beta
+    mkdir -p $root/Alfa/Gamma
+    echo HEJSAN > $root/Alfa/Beta/gurka
+    ln $root/Alfa/Beta/gurka $root/Alfa/Gamma/gurka
+    performStore
+
     echo OK
 fi
 

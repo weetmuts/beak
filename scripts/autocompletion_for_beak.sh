@@ -11,7 +11,7 @@ _beakusermounts()
     return 0
 }
 
-_beakrules()
+_beakorigins()
 {
   local cur=${COMP_WORDS[COMP_CWORD]}
   local rules=$(grep -o \\[.*\\] ~/.config/beak/beak.conf | tr -d '[' | tr ']' ':' | sort)
@@ -25,7 +25,7 @@ _beakrules()
   return 0
 }
 
-_beakremotes()
+_beakstorages()
 {
   local cur=${COMP_WORDS[COMP_CWORD]}
   local prev=${COMP_WORDS[COMP_CWORD-1]}
@@ -53,27 +53,29 @@ _beak()
     if [ "$prev" = ":" ]; then prev="$prevprev" ; prevprev="$prevprevprev"; fi
 
     case "$prev" in
-        mount) _beakrules ;;
-        prune) _beakrules ;;
-        pull) _beakrules ;;
-        push) _beakrules ;;
-        restore) _beakremotes ;;
-        shell) _beakremotes ;;
-        store) _beakremotes ;;
+        mount) _beakorigins ;;
+        prune) _beakorigins ;;
+        pull) _beakorigins ;;
+        push) _beakorigins ;;
+        restore) _beakstorages ;;
+        shell) _beakstorages ;;
+        store) _beakstorages ;;
         umount) _beakusermounts ;;
+        diff) _beakorigins ;;
     esac
 
     case "$prevprev" in
         mount) _filedir -d ;;
-        prune) _beakremotes ;;
-        pull) _beakremotes ;;
-        push) _beakremotes ;;
-        restore) _beakrules ;;
-        store) _beakremotes ;;
+        prune) _beakstorages ;;
+        pull) _beakstorages ;;
+        push) _beakstorages ;;
+        restore) _beakorigins ;;
+        store) _beakstorages ;;
+        diff) _beakstorages ;;
     esac
 
     if [ -z "$COMPREPLY" ]; then
-        COMPREPLY=($(compgen -W "mount prune pull push restore shell store umount" -- $cur))
+        COMPREPLY=($(compgen -W "bmount config diff fsck genautocomplete genmounttrigger help prune mount pull push restore shell status store umount" -- $cur))
     fi
 }
 
