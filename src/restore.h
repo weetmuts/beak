@@ -51,9 +51,8 @@ struct RestoreEntry
     bool is_sym_link {};
     // A symbolic link can be anything! Must not point to a real file.
     std::string symlink;
-    bool is_hard_link {};
     // A hard link always points a real file stored in the same directory or in a subdirectory.
-    Path *hard_link {};
+    // The actual pointer is stored in the FileStat.
     size_t offset_ {};
     uint num_parts {};
     size_t part_offset {};

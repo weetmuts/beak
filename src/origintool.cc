@@ -106,7 +106,7 @@ void OriginToolImplementation::addRestoreWork(ProgressStatistics *st,
 {
     RestoreEntry *entry = restore->findEntry(point, path);
     Path *file_to_extract = path->prepend(settings->to.origin);
-    if (entry->is_hard_link) st->stats.num_hard_links++;
+    if (entry->fs.hard_link) st->stats.num_hard_links++;
     else if (stat->isRegularFile()) {
         stat->checkStat(origin_fs_, file_to_extract);
         if (stat->disk_update == Store) {
@@ -331,10 +331,10 @@ RecurseOption OriginToolImplementation::handleHardLinks(Path *path, FileStat *st
 {
     auto entry = restore->findEntry(point, path);
 
-    if (entry->is_hard_link) {
+    if (entry->fs.hard_link) {
         auto file_to_extract = path->prepend(settings->to.origin);
         // Special case since hard links are not encoded in stat structure.
-        extractHardLink(entry->hard_link,
+        extractHardLink(entry->fs.hard_link,
                         settings->to.origin,
                         file_to_extract, stat, st);
     }
@@ -351,7 +351,7 @@ RecurseOption OriginToolImplementation::handleRegularFiles(Path *path, FileStat 
     auto tar_file_offset = entry->offset_;
     auto file_to_extract = path->prepend(settings->to.origin);
 
-    if (!entry->is_hard_link && stat->isRegularFile()) {
+    if (!entry->fs.hard_link && stat->isRegularFile()) {
         extractFileFromBackup(entry, backup_fs, tar_file, tar_file_offset,
                               file_to_extract, stat, st);
         //st->num_files_handled++;
@@ -367,7 +367,7 @@ RecurseOption OriginToolImplementation::handleNodes(Path *path, FileStat *stat,
     auto entry = restore->findEntry(point, path);
     auto file_to_extract = path->prepend(settings->to.origin);
 
-    if (!entry->is_hard_link && stat->isFIFO()) {
+    if (!entry->fs.hard_link && stat->isFIFO()) {
         extractNode(file_to_extract, stat, st);
     }
     return RecurseContinue;
@@ -380,7 +380,7 @@ RecurseOption OriginToolImplementation::handleSymbolicLinks(Path *path, FileStat
     auto entry = restore->findEntry(point, path);
     auto file_to_extract = path->prepend(settings->to.origin);
 
-    if (!entry->is_hard_link && stat->isSymbolicLink()) {
+    if (!entry->fs.hard_link && stat->isSymbolicLink()) {
         extractSymbolicLink(entry->symlink, file_to_extract, stat, st);
     }
     return RecurseContinue;

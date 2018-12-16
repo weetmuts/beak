@@ -260,10 +260,10 @@ bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
                          RestoreEntry *e = point->getPath(ie->path);
                          assert(e->path = ie->path);
                          e->loadFromIndex(ie);
-                         if (e->is_hard_link) {
+                         if (ie->is_hard_link) {
                              // A Hard link as stored in the beakfs >must< point to a file
                              // in the same directory or to a file in subdirectory.
-                             e->hard_link = dir_to_prepend->append(ie->link);
+                             e->fs.hard_link = dir_to_prepend->append(ie->link);
                          }
                          es.push_back(e);
                      },
@@ -893,7 +893,6 @@ void RestoreEntry::loadFromIndex(IndexEntry *ie)
     path = ie->path;
     is_sym_link = ie->is_sym_link;
     symlink = ie->link;
-    is_hard_link = ie->is_hard_link;
     tar = Path::lookup(ie->tar);
     num_parts = ie->num_parts;
     part_offset = ie->part_offset;

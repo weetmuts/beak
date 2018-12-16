@@ -59,6 +59,7 @@ static ComponentId COMMANDLINE = registerLogComponent("commandline");
 static ComponentId STORE = registerLogComponent("store");
 static ComponentId FUSE = registerLogComponent("fuse");
 static ComponentId DIFF = registerLogComponent("diff");
+static ComponentId HARDLINKS = registerLogComponent("hardlinks");
 
 struct CommandEntry;
 struct OptionEntry;
@@ -975,16 +976,22 @@ RC BeakImplementation::diff(Settings *settings)
             FileStat *oldstat = &old[p.first];
             if (newstat->isRegularFile())
             {
+                if (newstat->hard_link) {
+                    debug(HARDLINKS, "Hard link in new: %s\n", newstat->hard_link->c_str());
+                }
+                if (oldstat->hard_link) {
+                    debug(HARDLINKS, "Hard link in old: %s\n", oldstat->hard_link->c_str());
+                    if (old.count(oldstat->hard_link) > 0) {
+                        oldstat = &old[oldstat->hard_link];
+                        debug(HARDLINKS, "Followed hard link\n");
+                    }
+                }
                 if (!newstat->sameSize(oldstat) ||
                     !newstat->sameMTime(oldstat))
                 {
-                    if (newstat->st_nlink > 0 || oldstat->st_nlink > 0) {
-                        fprintf(stderr, "Hard links!\n");
-                    } else {
-                        debug(DIFF, "Content diff %s\n", p.first->c_str());
-                        diff_contents.insert(p.first);
-                        changes_found = true;
-                    }
+                    debug(DIFF, "Content diff %s\n", p.first->c_str());
+                    diff_contents.insert(p.first);
+                    changes_found = true;
                 }
                 if (!newstat->samePermissions(oldstat))
                 {

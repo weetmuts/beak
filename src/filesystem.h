@@ -57,20 +57,21 @@ enum UpdateDisk {
 };
 
 struct FileStat {
-    ino_t st_ino;
-    mode_t st_mode;
-    nlink_t st_nlink;
-    uid_t st_uid;
-    gid_t st_gid;
-    dev_t st_rdev;
-    off_t st_size;
-    struct timespec st_atim;
-    struct timespec st_mtim;
-    struct timespec st_ctim;
+    ino_t st_ino {};
+    mode_t st_mode {};
+    nlink_t st_nlink {};
+    Path *hard_link {};
+    uid_t st_uid {};
+    gid_t st_gid {};
+    dev_t st_rdev {};
+    off_t st_size {};
+    struct timespec st_atim {};
+    struct timespec st_mtim {};
+    struct timespec st_ctim {};
 
-    UpdateDisk disk_update;
+    UpdateDisk disk_update {};
 
-    FileStat() { memset(this, 0,sizeof(FileStat)); };
+    FileStat() { };
     FileStat(const struct stat *sb) {
         loadFrom(sb);
     }
