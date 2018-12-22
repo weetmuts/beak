@@ -67,7 +67,8 @@ struct OptionEntry;
 struct BeakImplementation : Beak {
 
     BeakImplementation(ptr<Configuration> configuration,
-                       ptr<System> sys, ptr<FileSystem> local_fs,
+                       ptr<System> sys,
+                       ptr<FileSystem> local_fs,
                        ptr<StorageTool> storage_tool,
                        ptr<OriginTool> origin_tool);
 
@@ -139,7 +140,8 @@ unique_ptr<Beak> newBeak(ptr<Configuration> configuration,
                          ptr<System> sys,
                          ptr<FileSystem> local_fs,
                          ptr<StorageTool> storage_tool,
-                         ptr<OriginTool> origin_tool) {
+                         ptr<OriginTool> origin_tool)
+{
     return unique_ptr<Beak>(new BeakImplementation(configuration, sys, local_fs, storage_tool, origin_tool));
 }
 
@@ -588,6 +590,9 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
                     error(COMMANDLINE, "No such progress display type \"%s\".", value.c_str());
                 }
                 break;
+            case robot_option:
+                settings->robot = true;
+                break;
             case tarheader_option:
             {
                 if (value == "none") settings->tarheader = TarHeaderStyle::None;
@@ -1035,8 +1040,6 @@ RC BeakImplementation::diff(Settings *settings)
         }
     }
 
-    printf("Diff between %s %s\n\n", settings->from.origin->c_str(), settings->to.storage->storage_location->c_str());
-
     for (auto p : diff_contents)
     {
         printf("    changed:       %s\n", p->c_str());
@@ -1080,8 +1083,6 @@ RC BeakImplementation::diff(Settings *settings)
 
     if (changes_found) {
         printf("\n");
-    } else {
-        printf("No changes detected.\n");
     }
     return rc;
 }

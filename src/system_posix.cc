@@ -121,40 +121,44 @@ unique_ptr<ThreadCallback> newRegularThreadCallback(int millis, std::function<bo
     return unique_ptr<ThreadCallback>(new ThreadCallbackImplementation(millis, thread_cb));
 }
 
-function<void()> exit_handler_;
+vector<pair<string,function<void()>>> exit_handlers_;
 
 void exitHandler(int signum)
 {
-    if (exit_handler_) exit_handler_();
-}
-
-function<void()> child_exit_handler_;
-
-void childExitHandler(int signum)
-{
-    if (child_exit_handler_) child_exit_handler_();
+    for (auto & p : exit_handlers_)
+    {
+        debug(THREAD, "Invoking exit handler %s\n", p.first.c_str());
+        p.second();
+    }
 }
 
 void doNothing(int signum) {
 }
 
-void ignoreSIGUSR1()
+// There are more process children, but these are the ones that needs to be auto-waited.
+vector<pair<pid_t,function<void()>>> children_to_wait_for_;
+
+void autoHandleChildExit(pid_t pid, function<void()> cb)
 {
-    struct sigaction new_action, old_action;
-
-    new_action.sa_handler = doNothing;
-    sigemptyset (&new_action.sa_mask);
-    new_action.sa_flags = 0;
-
-    sigaction (SIGUSR1, NULL, &old_action);
-    if (old_action.sa_handler != SIG_IGN) sigaction(SIGUSR1, &new_action, NULL);
+    children_to_wait_for_.push_back( {pid,cb} );
 }
 
-void onExit(string msg, function<void()> cb)
+void childExitHandler(int signum)
 {
-    assert(exit_handler_ == NULL);
+    int status;
 
-    exit_handler_ = cb;
+    for (auto & p : children_to_wait_for_)
+    {
+        pid_t pp = waitpid(p.first, &status, WNOHANG);
+        if (pp == p.first) {
+            debug(THREAD, "Child pid %d exited.\n", p);
+            p.second();
+        }
+    }
+}
+
+void handleSignals()
+{
     struct sigaction new_action, old_action;
 
     new_action.sa_handler = exitHandler;
@@ -170,6 +174,13 @@ void onExit(string msg, function<void()> cb)
     sigaction (SIGTERM, NULL, &old_action);
     if (old_action.sa_handler != SIG_IGN) sigaction (SIGTERM, &new_action, NULL);
 
+    new_action.sa_handler = childExitHandler;
+    sigemptyset (&new_action.sa_mask);
+    new_action.sa_flags = 0;
+
+    sigaction (SIGCHLD, NULL, &old_action);
+    if (old_action.sa_handler != SIG_IGN) sigaction(SIGCHLD, &new_action, NULL);
+
     new_action.sa_handler = doNothing;
     sigemptyset (&new_action.sa_mask);
     new_action.sa_flags = 0;
@@ -178,17 +189,13 @@ void onExit(string msg, function<void()> cb)
     if (old_action.sa_handler != SIG_IGN) sigaction(SIGUSR1, &new_action, NULL);
 }
 
-void onChildExit(string msg, function<void()> cb)
+void onTerminated(string msg, function<void()> cb)
 {
-    child_exit_handler_ = cb;
-    struct sigaction new_action, old_action;
+    debug(THREAD, "onTerminated called from pid %d (with parent %d) for the purpose %s (%zu)\n",
+          getpid(), getppid(), msg.c_str(), exit_handlers_.size());
 
-    new_action.sa_handler = childExitHandler;
-    sigemptyset (&new_action.sa_mask);
-    new_action.sa_flags = 0;
+    exit_handlers_.push_back({msg,cb});
 
-    sigaction (SIGCHLD, NULL, &old_action);
-    if (old_action.sa_handler != SIG_IGN) sigaction(SIGCHLD, &new_action, NULL);
 }
 
 struct SystemImplementation : System
@@ -231,7 +238,7 @@ string protect_(string arg)
 
 SystemImplementation::SystemImplementation()
 {
-    ignoreSIGUSR1();
+    handleSignals();
     /*onExit("Main", [&](){
             fprintf(stderr, "Exiting!\n");
             Have to stop all threads and background processes here.
@@ -335,9 +342,6 @@ RC SystemImplementation::invokeShell(Path *init_file)
     int pid = fork();
 
     if (pid == 0) {
-        onExit("Invoke shell", [&](){
-                // Cleanup here?
-            });
         // This is the child process, run the shell here.
         execvp(argv[0], (char*const*)argv);
     } else {
@@ -345,7 +349,7 @@ RC SystemImplementation::invokeShell(Path *init_file)
     }
     int status;
     waitpid(running_shell_pid_, &status, 0);
-    logSystem(SYSTEM, "Beak shell exited!\n");
+    debug(SYSTEM, "beak shell exited!\n");
 
     return RC::OK;
 }
@@ -464,31 +468,31 @@ RC SystemImplementation::mountInternal(Path *dir, FuseAPI *fuseapi,
 
     if (fuse_mount_info->loop_pid == 0) {
         // This is the child process.
-        onExit("Child running fuse mount",
-               [this,fuse_mount_info,dir](){
-                logSystem(SYSTEM, "Child running fuse mount terminated! %s\n", dir->c_str());
-                umount(fuse_mount_info);
-                exit(-1);
-            });
+        onTerminated("fuse process aborted",
+                     [&](){
+                         info(THREAD, "\n\nFuse mount process aborted! Unmounting %s\n", dir->c_str());
+                         umount(fuse_mount_info);
+                     });
         // Serve the virtual file system.
         fuse_loop_mt (fuse_mount_info->fuse);
         exit(0);
     }
-    onChildExit("Fuse mount",
-                [this,fuse_mount_info,dir](){
-                    pid_t pid;
-                    int   status;
-                    pid = waitpid(-1, &status, WNOHANG);
-                    logSystem(SYSTEM, "Child %d %x exited! %s\n", pid, status, dir->c_str());
-                });
-    onExit("Beak process",
-        [this,fuse_mount_info,dir](){
-            logSystem(SYSTEM, "Beak terminated! \n", dir->c_str());
-            umount(fuse_mount_info);
-            if (running_shell_pid_ != 0) {
-                kill(running_shell_pid_, SIGTERM);
-            }
-        });
+    autoHandleChildExit(fuse_mount_info->loop_pid,
+                        [&]{
+                            // The fuse mount exited improperly, shut down the shell.
+                            if (running_shell_pid_ != 0) {
+                                kill(running_shell_pid_, SIGTERM);
+                            }
+                        }
+        );
+    onTerminated("beak aborted",
+                 [&](){
+                     info(THREAD, "\n\nBeak program aborted! Unmounting %s\n", dir->c_str());
+                     umount(fuse_mount_info);
+                     if (running_shell_pid_ != 0) {
+                         kill(running_shell_pid_, SIGTERM);
+                     }
+                 });
     fm = unique_ptr<FuseMount>(fuse_mount_info);
 
     return RC::OK;

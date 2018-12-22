@@ -96,6 +96,7 @@ function setup {
         logreverse=$dir/logreverse.txt
         org=$dir/org.txt
         dest=$dir/dest.txt
+        diff=$dir/diff.txt
         mkdir -p $root
         mkdir -p $mount
         mkdir -p $mountreverse
@@ -137,10 +138,10 @@ function performDiff {
     extra="$1"
     if [ -z "$test" ]; then
         # Normal test execution, execute the store
-        eval "${BEAK} diff $extra ${root} ${store} > $log"
+        eval "${BEAK} diff $extra ${root} ${store} > $diff"
     else
         if [ -z "$gdb" ]; then
-            ${BEAK} diff --log=all $extra ${root} ${store} 2>&1 | tee $log
+            ${BEAK} diff --log=all $extra ${root} ${store} 2>&1 | tee $diff
         else
             gdb -ex=r --args ${BEAK} diff -f $extra ${root} ${store}
         fi
@@ -451,6 +452,59 @@ if [ $do_test ]; then
     echo OK
 fi
 
+setup simplediff "Simple diff"
+if [ $do_test ]; then
+    mkdir -p $root/Alfa/Beta
+    mkdir -p $root/Alfa/Gamma
+    echo HEJSAN > $root/Alfa/Beta/gurka
+    echo HEJSAN > $root/Alfa/Gamma/banan
+    echo HEJSAN > $root/Alfa/Gamma/toppen
+    performStore
+    performDiff
+    CHECK=$(cat $diff)
+    if [ ! "$CHECK" = "" ]; then
+        echo Failed beak diff! Expected no change. Check in $dir for more information.
+        exit
+    fi
+    echo SVEJSAN > $root/Alfa/Gamma/gurka
+    performDiff
+    CHECK=$(grep ":  " $diff | tr -d ' \n')
+    if [ ! "$CHECK" = "added:/Alfa/Gamma/gurka" ]; then
+        cat $diff
+        echo CHECK=\"${CHECK}\"
+        echo Failed beak diff! Expected one added. Check in $dir for more information.
+        exit
+    fi
+    echo SVEJSAN > $root/Alfa/Gamma/banan
+    performDiff
+    CHECK=$(grep ":  " $diff | tr -d ' \n' )
+    if [ ! "$CHECK" = "changed:/Alfa/Gamma/bananadded:/Alfa/Gamma/gurka" ]; then
+        cat $diff
+        echo CHECK=\"${CHECK}\"
+        echo Failed beak diff! Expected one added and one changed. Check in $dir for more information.
+        exit
+    fi
+    rm $root/Alfa/Beta/gurka
+    performDiff
+    CHECK=$(grep ":  " $diff | tr -d ' \n' )
+    if [ ! "$CHECK" = "changed:/Alfa/Gamma/bananadded:/Alfa/Gamma/gurkaremoved:/Alfa/Beta/gurka" ]; then
+        cat $diff
+        echo CHECK=\"${CHECK}\"
+        echo Failed beak diff! Expected one added, one removed and one changed. Check in $dir for more information.
+        exit
+    fi
+    touch $root/Alfa/Beta/toppen
+    performDiff
+    CHECK=$(grep ":  " $diff | tr -d ' \n' )
+    if [ ! "$CHECK" = "changed:/Alfa/Gamma/bananadded:/Alfa/Gamma/gurkaremoved:/Alfa/Beta/gurka" ]; then
+        cat $diff
+        echo CHECK=\"${CHECK}\"
+        echo Failed beak diff! Expected one added, one removed, one changed and one permission. Check in $dir for more information.
+        exit
+    fi
+    echo OK
+fi
+
 setup splitparts "Split large file into multiple small parts"
 if [ $do_test ]; then
     dd if=/dev/urandom of=$root'/largefile' count=71 bs=1023 > /dev/null 2>&1
@@ -592,17 +646,6 @@ if [ $do_test ]; then
     startMountTest standardTest
     compareStoreAndMount
     stopMount
-    echo OK
-fi
-
-setup diffwithlinks "Diff with hard links"
-if [ $do_test ]; then
-    mkdir -p $root/Alfa/Beta
-    mkdir -p $root/Alfa/Gamma
-    echo HEJSAN > $root/Alfa/Beta/gurka
-    ln $root/Alfa/Beta/gurka $root/Alfa/Gamma/gurka
-    performStore
-
     echo OK
 fi
 

@@ -117,7 +117,7 @@ enum ArgumentType
     X(push,"Backup a rule to a storage location.",ArgRule,ArgNone) \
     X(restore,"Restore from a backup into your file system.",ArgStorage,ArgOrigin) \
     X(shell,"Mount your backup(s) and spawn a shell. Exit the shell to unmount.",ArgStorage,ArgNone) \
-    X(status,"Show the status of your backups of a rule.",ArgRule,ArgNone) \
+    X(status,"Show the status of your rule backups.",ArgRule,ArgNone) \
     X(store,"Store your file system into a backup.",ArgOrigin,ArgStorage) \
     X(umount,"Unmount a virtual file system.",ArgDir,ArgNone) \
     X(version,"Show version.",ArgNone,ArgNone) \
@@ -147,6 +147,7 @@ LIST_OF_COMMANDS
       "                           E.g. absolute,relative or both. Default is both.")    \
     X(pr,progress,ProgressDisplayType,true,"How to present the progress of the backup or restore.\n" \
       "                           E.g. none,plain,ansi,os. Default is ansi.") \
+    X(,robot,bool,false,"Switch to a terminal output format that suitable for parsing by another program.\n") \
     X(,tarheader,TarHeaderStyle,true,"Style of tar headers used. E.g. --tarheader=simple\n"   \
       "                           Alternatives are: none,simple,full Default is simple.")    \
     X(ta,targetsize,size_t,true,"Tar target size. E.g. --targetsize=20M\n" \
