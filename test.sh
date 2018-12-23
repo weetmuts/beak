@@ -478,7 +478,7 @@ if [ $do_test ]; then
     echo SVEJSAN > $root/Alfa/Gamma/banan
     performDiff
     CHECK=$(grep ":  " $diff | tr -d ' \n' )
-    if [ ! "$CHECK" = "changed:/Alfa/Gamma/bananadded:/Alfa/Gamma/gurka" ]; then
+    if [ ! "$CHECK" = "newmodtime:/Alfa/Gamma/bananadded:/Alfa/Gamma/gurka" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff! Expected one added and one changed. Check in $dir for more information.
@@ -487,7 +487,7 @@ if [ $do_test ]; then
     rm $root/Alfa/Beta/gurka
     performDiff
     CHECK=$(grep ":  " $diff | tr -d ' \n' )
-    if [ ! "$CHECK" = "changed:/Alfa/Gamma/bananadded:/Alfa/Gamma/gurkaremoved:/Alfa/Beta/gurka" ]; then
+    if [ ! "$CHECK" = "newmodtime:/Alfa/Gamma/bananadded:/Alfa/Gamma/gurkaremoved:/Alfa/Beta/gurka" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff! Expected one added, one removed and one changed. Check in $dir for more information.
@@ -496,10 +496,54 @@ if [ $do_test ]; then
     chmod a-w $root/Alfa/Gamma/toppen
     performDiff
     CHECK=$(grep ":  " $diff | tr -d ' \n' )
-    if [ ! "$CHECK" = "changed:/Alfa/Gamma/bananpermission:/Alfa/Gamma/toppenadded:/Alfa/Gamma/gurkaremoved:/Alfa/Beta/gurka" ]; then
+    if [ ! "$CHECK" = "newmodtime:/Alfa/Gamma/bananpermission:/Alfa/Gamma/toppenadded:/Alfa/Gamma/gurkaremoved:/Alfa/Beta/gurka" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff! Expected one added, one removed, one changed and one permission. Check in $dir for more information.
+        exit
+    fi
+    echo OK
+fi
+
+setup hardlinkdiff "Hardlink diff"
+if [ $do_test ]; then
+    mkdir -p $root/Alfa/Beta
+    mkdir -p $root/Alfa/Gamma
+    echo HEJSAN > $root/Alfa/Beta/gurka
+    ln $root/Alfa/Beta/gurka $root/Alfa/Gamma/banana
+    performStore
+    performDiff
+    CHECK=$(cat $diff)
+    if [ ! "$CHECK" = "" ]; then
+        echo Failed beak diff! Expected no change. Check in $dir for more information.
+        exit
+    fi
+    echo SVEJSAN > $root/Alfa/Gamma/banana
+    performDiff
+    CHECK=$(grep ":  " $diff | tr -d ' \n')
+    if [ ! "$CHECK" = "newmodtime:/Alfa/Beta/gurkanewmodtime:/Alfa/Gamma/banana" ]; then
+        cat $diff
+        echo CHECK=\"${CHECK}\"
+        echo Failed beak diff! Expected both ends of hardlink to change. Check in $dir for more information.
+        exit
+    fi
+    performReStore
+    (cd "$root"; cp -a $check/* .)
+    performDiff
+    CHECK=$(cat $diff)
+    if [ ! "$CHECK" = "" ]; then
+        cat $diff
+        echo Failed beak diff! Expected no change after restore. Check in $dir for more information.
+        exit
+    fi
+    rm $root/Alfa/Gamma/banana
+    echo SVEJSAN > $root/Alfa/Gamma/banana
+    performDiff
+    CHECK=$(grep ":  " $diff | tr -d ' \n')
+    if [ ! "$CHECK" = "newmodtime:/Alfa/Gamma/banana" ]; then
+        cat $diff
+        echo CHECK=\"${CHECK}\"
+        echo Failed beak diff! Expected only one file to change. Check in $dir for more information.
         exit
     fi
     echo OK

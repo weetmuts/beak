@@ -1042,7 +1042,7 @@ RC BeakImplementation::diff(Settings *settings)
 
     for (auto p : diff_contents)
     {
-        printf("    changed:       %s\n", p->c_str());
+        printf("new modtime:       %s\n", p->c_str());
     }
 
     for (auto p : diff_permissions)
