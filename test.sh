@@ -493,10 +493,10 @@ if [ $do_test ]; then
         echo Failed beak diff! Expected one added, one removed and one changed. Check in $dir for more information.
         exit
     fi
-    touch $root/Alfa/Beta/toppen
+    chmod a-w $root/Alfa/Gamma/toppen
     performDiff
     CHECK=$(grep ":  " $diff | tr -d ' \n' )
-    if [ ! "$CHECK" = "changed:/Alfa/Gamma/bananadded:/Alfa/Gamma/gurkaremoved:/Alfa/Beta/gurka" ]; then
+    if [ ! "$CHECK" = "changed:/Alfa/Gamma/bananpermission:/Alfa/Gamma/toppenadded:/Alfa/Gamma/gurkaremoved:/Alfa/Beta/gurka" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff! Expected one added, one removed, one changed and one permission. Check in $dir for more information.
