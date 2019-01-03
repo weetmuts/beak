@@ -914,8 +914,89 @@ cleanup:
     return rc;
 }
 
+uint64_t to_day(uint64_t p) {
+    return p/(3600*24);
+}
+
+uint64_t to_week(uint64_t p) {
+    return p/(3600*24*7);
+}
+
+uint64_t to_month(uint64_t p) {
+    return p/(3600*24*30);
+}
+
 RC BeakImplementation::prune(Settings *settings)
 {
+    RC rc = RC::OK;
+    assert(settings->from.type == ArgStorage);
+    Argument *storage = &settings->from;
+    auto progress = newProgressStatistics(settings->progress);
+
+    FileSystem *backup_fs = local_fs_;
+    if (storage->storage->type == RCloneStorage ||
+        storage->storage->type == RSyncStorage) {
+        backup_fs = storage_tool_->asCachedReadOnlyFS(storage->storage,
+                                                      progress.get());
+    }
+    unique_ptr<Restore> restore  = newRestore(backup_fs);
+
+    rc = restore->lookForPointsInTime(PointInTimeFormat::absolute_point,
+                                      storage->storage->storage_location);
+
+    if (rc.isErr()) {
+        error(COMMANDLINE, "Backup is empty, cannot be pruned.\n");
+        return RC::OK;
+    }
+
+    map<uint64_t,uint64_t> daily_max;
+    map<uint64_t,uint64_t> weekly_max;
+    map<uint64_t,uint64_t> monthly_max;
+
+    //uint64_t prev = 0;
+    for (auto& h : restore->history())
+    {
+        uint64_t p = h.ts.tv_sec*1000000000 + h.ts.tv_nsec;
+        fprintf(stderr, "%zu.%zu %s %zu\n", h.ts.tv_sec, h.ts.tv_nsec, h.datetime.c_str(), p);
+
+        // event add
+        // any p d w m
+        // where
+        // @grd_1 p ∈ ℕ
+        // @grd_2 p > max(points_in_time)
+//        assert(p > prev);
+        //prev = p;
+        // @grd_3 d = to_day(p)
+        uint64_t d = to_day(p);
+        //@grd_4 w = to_week(p)
+        uint64_t w = to_week(p);
+        // @grd_5 m = to_month(p)
+        uint64_t m = to_month(p);
+        fprintf(stderr, "p=%zu d=%zu w=%zu m=%zu\n", p, d, w, m);
+        // then
+        // @act_1 points_in_time ≔ points_in_time ∪ {p}
+        // @act_2 daily_max(d) ≔ p
+        daily_max[d] = p;
+        // @act_3 weekly_max(w) ≔ p
+        weekly_max[w] = p;
+        // @act_4 monthly_max(m) ≔ p
+        monthly_max[m] = p;
+        //end
+    }
+
+    // event prune
+    // then
+    // @act_1 points_in_time ≔ ran(daily_max) ∪ ran(weekly_max) ∪ ran(monthly_max)
+    set<uint64_t> pruned;
+
+    for (auto &p : daily_max) { pruned.insert(p.second); }
+    for (auto &p : weekly_max) { pruned.insert(p.second); }
+    for (auto &p : monthly_max) { pruned.insert(p.second); }
+
+    for (auto &p : pruned) {
+        fprintf(stderr, "LEFT %zu\n", p);
+    }
+
     return RC::OK;
 }
 
@@ -927,7 +1008,6 @@ RC BeakImplementation::diff(Settings *settings)
     assert(settings->to.type == ArgStorage);
 
     auto progress = newProgressStatistics(settings->progress);
-
     auto restore = accessBackup_(&settings->to, settings->pointintime, progress.get());
     auto point = restore->singlePointInTime();
     if (!point) {
@@ -1042,7 +1122,7 @@ RC BeakImplementation::diff(Settings *settings)
 
     for (auto p : diff_contents)
     {
-        printf("new modtime:       %s\n", p->c_str());
+        printf("    changed:       %s\n", p->c_str());
     }
 
     for (auto p : diff_permissions)

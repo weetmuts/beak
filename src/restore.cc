@@ -748,8 +748,8 @@ RC Restore::lookForPointsInTime(PointInTimeFormat f, Path *path)
         TarFileName tfn;
         ok = tfn.parseFileName(f->str());
 
-        if (ok && tfn.type == REG_FILE) {
-
+        if (ok && tfn.type == REG_FILE)
+        {
             PointInTime p;
             p.ts.tv_sec = tfn.sec;
             p.ts.tv_nsec = tfn.nsec;

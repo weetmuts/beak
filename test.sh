@@ -478,7 +478,7 @@ if [ $do_test ]; then
     echo SVEJSAN > $root/Alfa/Gamma/banan
     performDiff
     CHECK=$(grep ":  " $diff | tr -d ' \n' )
-    if [ ! "$CHECK" = "newmodtime:/Alfa/Gamma/bananadded:/Alfa/Gamma/gurka" ]; then
+    if [ ! "$CHECK" = "changed:/Alfa/Gamma/bananadded:/Alfa/Gamma/gurka" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff! Expected one added and one changed. Check in $dir for more information.
@@ -487,7 +487,7 @@ if [ $do_test ]; then
     rm $root/Alfa/Beta/gurka
     performDiff
     CHECK=$(grep ":  " $diff | tr -d ' \n' )
-    if [ ! "$CHECK" = "newmodtime:/Alfa/Gamma/bananadded:/Alfa/Gamma/gurkaremoved:/Alfa/Beta/gurka" ]; then
+    if [ ! "$CHECK" = "changed:/Alfa/Gamma/bananadded:/Alfa/Gamma/gurkaremoved:/Alfa/Beta/gurka" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff! Expected one added, one removed and one changed. Check in $dir for more information.
@@ -496,7 +496,7 @@ if [ $do_test ]; then
     chmod a-w $root/Alfa/Gamma/toppen
     performDiff
     CHECK=$(grep ":  " $diff | tr -d ' \n' )
-    if [ ! "$CHECK" = "newmodtime:/Alfa/Gamma/bananpermission:/Alfa/Gamma/toppenadded:/Alfa/Gamma/gurkaremoved:/Alfa/Beta/gurka" ]; then
+    if [ ! "$CHECK" = "changed:/Alfa/Gamma/bananpermission:/Alfa/Gamma/toppenadded:/Alfa/Gamma/gurkaremoved:/Alfa/Beta/gurka" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff! Expected one added, one removed, one changed and one permission. Check in $dir for more information.
@@ -521,7 +521,7 @@ if [ $do_test ]; then
     echo SVEJSAN > $root/Alfa/Gamma/banana
     performDiff
     CHECK=$(grep ":  " $diff | tr -d ' \n')
-    if [ ! "$CHECK" = "newmodtime:/Alfa/Beta/gurkanewmodtime:/Alfa/Gamma/banana" ]; then
+    if [ ! "$CHECK" = "changed:/Alfa/Beta/gurkachanged:/Alfa/Gamma/banana" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff! Expected both ends of hardlink to change. Check in $dir for more information.
@@ -540,12 +540,70 @@ if [ $do_test ]; then
     echo SVEJSAN > $root/Alfa/Gamma/banana
     performDiff
     CHECK=$(grep ":  " $diff | tr -d ' \n')
-    if [ ! "$CHECK" = "newmodtime:/Alfa/Gamma/banana" ]; then
+    if [ ! "$CHECK" = "changed:/Alfa/Gamma/banana" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff! Expected only one file to change. Check in $dir for more information.
         exit
     fi
+    echo OK
+fi
+
+setup simpleprune "Prune backup storage"
+if [ $do_test ]; then
+    mkdir -p $root/Alfa/Beta
+    echo HEJSAN > $root/Alfa/Beta/gurka
+    find $root -exec touch -d '-720 days' '{}' +
+    performStore
+    find $root -exec touch -d '-719 days' '{}' +
+    performStore
+    find $root -exec touch -d '-600 days' '{}' +
+    performStore
+    find $root -exec touch -d '-300 days' '{}' +
+    performStore
+    find $root -exec touch -d '-299 days' '{}' +
+    performStore
+    find $root -exec touch -d '-298 days' '{}' +
+    performStore
+    find $root -exec touch -d '-42 days' '{}' +
+    performStore
+    find $root -exec touch -d '-41 days' '{}' +
+    performStore
+    find $root -exec touch -d '-35 days' '{}' +
+    performStore
+    find $root -exec touch -d '-34 days' '{}' +
+    performStore
+    find $root -exec touch -d '-33 days' '{}' +
+    performStore
+    find $root -exec touch -d '-21 days' '{}' +
+    performStore
+    find $root -exec touch -d '-20 days' '{}' +
+    performStore
+    find $root -exec touch -d '-7 days' '{}' +
+    performStore
+    find $root -exec touch -d '-6 days' '{}' +
+    performStore
+    find $root -exec touch -d '-5 days' '{}' +
+    performStore
+    find $root -exec touch -d '-4 days' '{}' +
+    performStore
+    find $root -exec touch -d '-3 days' '{}' +
+    performStore
+    find $root -exec touch -d '-50 hours' '{}' +
+    performStore
+    find $root -exec touch -d '-49 hours' '{}' +
+    performStore
+    find $root -exec touch -d '-48 hours' '{}' +
+    performStore
+    find $root -exec touch -d '-47 hours' '{}' +
+    performStore
+    find $root -exec touch -d '-20 hours' '{}' +
+    performStore
+    find $root -exec touch -d '-12 hours' '{}' +
+    performStore
+    find $root -exec touch -d '-1 hour' '{}' +
+    performStore
+    echo $dir
     echo OK
 fi
 
