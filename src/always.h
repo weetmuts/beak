@@ -77,5 +77,6 @@ public:
     ptr(const ptr& that) { t = that.t; }
 };
 
+#define mapContains(M,K) (M.count(K) != 0)
 
 #endif

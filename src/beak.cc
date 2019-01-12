@@ -364,7 +364,6 @@ void BeakImplementation::printCommands()
     }
 }
 
-
 bool isExperimental(OptionEntry &e)
 {
     const char *exp = "Experimental!";
@@ -1050,6 +1049,10 @@ RC BeakImplementation::diff(Settings *settings)
     set<Path*> removed;
     set<Path*> added;
 
+    map<Path*,int> entries_changed;
+    map<Path*,int> entries_removed;
+    map<Path*,int> entries_added;
+
     bool changes_found = false;
 
     for (auto& p : curr)
@@ -1076,6 +1079,7 @@ RC BeakImplementation::diff(Settings *settings)
                 {
                     debug(DIFF, "Content diff %s\n", p.first->c_str());
                     diff_contents.insert(p.first);
+                    entries_changed[p.first->parent()]++;
                     changes_found = true;
                 }
                 if (!newstat->samePermissions(oldstat))
@@ -1085,26 +1089,11 @@ RC BeakImplementation::diff(Settings *settings)
                     changes_found = true;
                 }
             }
-            if (newstat->isRegularFile())
-            {
-                if (!newstat->sameSize(oldstat) ||
-                    !newstat->sameMTime(oldstat))
-                {
-                    debug(DIFF, "Content diff for %s \n", p.first->c_str());
-                    diff_contents.insert(p.first);
-                    changes_found = true;
-                }
-                if (!newstat->samePermissions(oldstat))
-                {
-                    debug(DIFF, "Permission diff for %s\n", p.first->c_str());
-                    diff_permissions.insert(p.first);
-                    changes_found = true;
-                }
-            }
         } else {
             // New file found
             debug(DIFF, "New file found %s\n", p.first->c_str());
             added.insert(p.first);
+            entries_added[p.first->parent()]++;
             changes_found = true;
         }
     }
@@ -1116,6 +1105,7 @@ RC BeakImplementation::diff(Settings *settings)
             // File that disappeard found.
             debug(DIFF, "Removed file found %s\n", p.first->c_str());
             removed.insert(p.first);
+            entries_removed[p.first->parent()]++;
             changes_found = true;
         }
     }
@@ -1132,12 +1122,42 @@ RC BeakImplementation::diff(Settings *settings)
 
     for (auto p : added)
     {
-        printf("      added:       %s\n", p->c_str());
+        Path *par = p->parent();
+        if (par == NULL || !mapContains(added, par)) {
+            // The parent is either the root or it has not been added.
+            // Therefore we should print this added entry.
+            int c = 0;
+            if (mapContains(entries_added,p)) {
+                c = entries_added[p];
+            }
+            if (c > 0) {
+                // This is a directory.
+                printf("      added:       %s/... (%d entries)\n", p->c_str(), c);
+            } else {
+                // This is a file, or empty directory.
+                printf("      added:       %s\n", p->c_str());
+            }
+        }
     }
 
     for (auto p : removed)
     {
-        printf("    removed:       %s\n", p->c_str());
+        Path *par = p->parent();
+        if (par == NULL || !mapContains(removed, par)) {
+            // The parent is either the root or it has not been removed.
+            // Therefore we should print this removed entry.
+            int c = 0;
+            if (mapContains(entries_removed,p)) {
+                c = entries_removed[p];
+            }
+            if (c > 0) {
+                // This is a directory.
+                printf("    removed:       %s/... (%d entries)\n", p->c_str(), c);
+            } else {
+                // This is a file, or empty directory.
+                printf("    removed:       %s\n", p->c_str());
+            }
+        }
     }
 
     if (changes_found) {
