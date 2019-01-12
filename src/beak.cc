@@ -1030,12 +1030,17 @@ RC BeakImplementation::diff(Settings *settings)
                             }
         );
 
+    Atom *dotbeak = Atom::lookup(".beak");
     map<Path*,FileStat> curr;
     int depth = settings->from.origin->depth();
     rc = origin_fs->recurse(settings->from.origin,
                             [&](Path *path, FileStat *stat)
                             {
                                 if (path->depth() > depth) {
+                                    if (path->name() == dotbeak) {
+                                        debug(DIFF, "Skipping \"%s\"\n", path->c_str());
+                                        return RecurseSkipSubTree;
+                                    }
                                     Path *p = path->subpath(depth)->prepend(Path::lookupRoot());
                                     curr[p] = *stat;
                                     debug(DIFF, "Curr \"%s\"\n", p->c_str());
@@ -1049,7 +1054,7 @@ RC BeakImplementation::diff(Settings *settings)
     set<Path*> removed;
     set<Path*> added;
 
-    map<Path*,int> entries_changed;
+    map<Path*,int> object_files_changed;
     map<Path*,int> entries_removed;
     map<Path*,int> entries_added;
 
@@ -1079,7 +1084,6 @@ RC BeakImplementation::diff(Settings *settings)
                 {
                     debug(DIFF, "Content diff %s\n", p.first->c_str());
                     diff_contents.insert(p.first);
-                    entries_changed[p.first->parent()]++;
                     changes_found = true;
                 }
                 if (!newstat->samePermissions(oldstat))

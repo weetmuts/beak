@@ -165,6 +165,7 @@ struct Path
     Path *subpath(int from, int len = -1);
     Path *prepend(Path *p);
     Path *append(std::string p);
+    int findPart(Path* part) { Path *p = this; while (p) { if (p->atom_ == part->atom_) { return p->depth_; }; p = p->parent_; } return 1; }
     bool isRoot() { return depth_ == 1 && atom_->c_str_len() == 0; }
     #ifdef PLATFORM_WINAPI
     bool isDrive() {

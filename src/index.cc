@@ -18,7 +18,6 @@
 #include <string>
 #include <set>
 
-#include "diff.h"
 #include "index.h"
 #include "filesystem.h"
 #include "log.h"

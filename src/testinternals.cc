@@ -46,6 +46,7 @@ bool verbose_ = false;
 bool err_found_ = false;
 
 unique_ptr<FileSystem> fs;
+void testPaths();
 void testMatching();
 void testRandom();
 void testFileSystem();
@@ -75,7 +76,8 @@ int main(int argc, char *argv[])
     }
     try {
         fs = newDefaultFileSystem();
-        /*
+
+        testPaths();
         testMatching();
         testRandom();
         testFileSystem();
@@ -83,8 +85,7 @@ int main(int argc, char *argv[])
         testKeeps();
         testHumanReadable();
         testHexStrings();
-        testFit();
-        */
+//        testFit();
         testSplitLogic();
         testReadSplitLogic();
 //        testContentSplit();
@@ -97,6 +98,20 @@ int main(int argc, char *argv[])
     }
     catch (string e) {
         fprintf(stderr, "%s\n", e.c_str());
+    }
+}
+
+void testPaths()
+{
+    int depth = 0;
+    Path *p = Path::lookup("/home/fredrik/.git/objects");
+    Path *gp = Path::lookup(".git");
+
+    depth = p->findPart(gp);
+    if (depth != 4) {
+        error(TEST_MATCH, "Expected findPart %s in %s to return depth %d, but got %d\n",
+                gp->c_str(), p->c_str(), 4, depth);
+        err_found_ = true;
     }
 }
 
@@ -280,7 +295,7 @@ void testHumanReadable()
 
     testHRTime(123, "123us");
     testHRTime(43232, "43.23ms");
-    testHRTime(970000000, "970.00ms");
+    testHRTime(970000000, "970.00s");
 }
 
 void testHexString(size_t v, size_t mv, string expected) {
@@ -295,12 +310,12 @@ void testHexString(size_t v, size_t mv, string expected) {
 
 void testHexStrings()
 {
-    testHexString(2, 8, "64.00 KiB");
-    testHexString(32, 60, "64.00 KiB");
-    testHexString(53, 2160, "64.00 KiB");
-    testHexString(54, 65535, "64.00 KiB");
-    testHexString(192, 193, "64.00 KiB");
-    testHexString(1234567, 99999999, "64.00 KiB");
+    testHexString(2, 8, "2");
+    testHexString(32, 60, "20");
+    testHexString(53, 2160, "035");
+    testHexString(54, 65535, "0036");
+    testHexString(192, 193, "c0");
+    testHexString(1234567, 99999999, "012d687");
 }
 
 void testFit()
