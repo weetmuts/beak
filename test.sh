@@ -452,8 +452,8 @@ if [ $do_test ]; then
     echo OK
 fi
 
-setup simplediff "Simple diff"
-if [ $do_test ]; then
+#setup simplediff "Simple diff"
+if [ /bin/false && $do_test ]; then
     mkdir -p $root/Alfa/Beta
     mkdir -p $root/Alfa/Gamma
     echo HEJSAN > $root/Alfa/Beta/gurka
@@ -505,8 +505,8 @@ if [ $do_test ]; then
     echo OK
 fi
 
-setup hardlinkdiff "Hardlink diff"
-if [ $do_test ]; then
+#setup hardlinkdiff "Hardlink diff"
+if [ /bin/false && $do_test ]; then
     mkdir -p $root/Alfa/Beta
     mkdir -p $root/Alfa/Gamma
     echo HEJSAN > $root/Alfa/Beta/gurka
@@ -549,8 +549,8 @@ if [ $do_test ]; then
     echo OK
 fi
 
-setup simpleprune "Prune backup storage"
-if [ $do_test ]; then
+#setup simpleprune "Prune backup storage"
+if [ /bin/false && $do_test ]; then
     mkdir -p $root/Alfa/Beta
     echo HEJSAN > $root/Alfa/Beta/gurka
     find $root -exec touch -d '-720 days' '{}' +

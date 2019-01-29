@@ -161,6 +161,7 @@ struct Configuration
     virtual std::vector<Rule*> sortedRules() = 0;
     virtual Rule *findRuleFromStorageLocation(Path *storage_location) = 0;
     virtual Storage *findStorageFrom(Path *storage_location) = 0;
+    virtual Storage *createStorageFrom(Path *storage_location) = 0;
 
     virtual ~Configuration() = default;
 };

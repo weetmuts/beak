@@ -1139,9 +1139,9 @@ RC Backup::scanFileSystem(Argument *origin, Settings *settings)
     uint64_t group_time = stop - start;
     string scant = humanReadableTimeTwoDecimals(scan_time);
     string groupt = humanReadableTimeTwoDecimals(group_time);
-    info(BACKUP, "Mounted %s with %zu virtual tars with %zu entries.\n"
+    info(BACKUP, "Mounted %zu virtual tars with %zu entries.\n"
             "Time to scan %jdms, time to group %jdms.\n",
-            mount_dir.c_str(), num_tars, files.size(),
+            num_tars, files.size(),
             scan_time / 1000, group_time / 1000);
 
     return RC::OK;

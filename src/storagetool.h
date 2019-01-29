@@ -43,6 +43,8 @@ struct StorageTool
 
     virtual FileSystem *asCachedReadOnlyFS(Storage *storage,
                                            ProgressStatistics *progress) = 0;
+
+    virtual ~StorageTool() = default;
 };
 
 std::unique_ptr<StorageTool> newStorageTool(ptr<System> sys,

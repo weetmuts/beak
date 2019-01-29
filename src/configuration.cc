@@ -19,6 +19,7 @@
 #include "log.h"
 #include "configuration.h"
 #include "system.h"
+#include "tarfile.h"
 #include "ui.h"
 #include "util.h"
 
@@ -96,6 +97,7 @@ public:
     vector<Rule*> sortedRules();
     Rule *findRuleFromStorageLocation(Path *storage_location);
     Storage *findStorageFrom(Path *storage_location);
+    Storage *createStorageFrom(Path *storage_location);
 
     void editRule();
     void createNewRule();
@@ -978,6 +980,32 @@ void ConfigurationImplementation::editRemoteKeep(Storage *s)
     }
 }
 
+bool has_index_files_or_is_empty_(FileSystem *fs, Path *path)
+{
+    if (path == NULL) return false;
+
+    vector<Path*> contents;
+    if (!fs->readdir(path, &contents)) {
+        return false;
+    }
+    if (contents.size() == 2)
+    {
+        // Only . and ..
+        return true;
+    }
+    for (auto f : contents)
+    {
+        TarFileName tfn;
+        bool ok = tfn.parseFileName(f->str());
+
+        if (ok && tfn.type == REG_FILE)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool ConfigurationImplementation::isFileSystemStorage(Path *storage_location)
 {
     Path *rp = storage_location->realpath();
@@ -986,7 +1014,13 @@ bool ConfigurationImplementation::isFileSystemStorage(Path *storage_location)
         return false;
     }
 
-    return true;
+    FileStat stat;
+    RC rc = fs_->stat(rp, &stat);
+    if (rc.isErr() || !stat.isDirectory())
+    {
+        return false;
+    }
+    return has_index_files_or_is_empty_(fs_, storage_location);
 }
 
 bool ConfigurationImplementation::isRCloneStorage(Path *storage_location, string *type)
@@ -1047,6 +1081,7 @@ bool ConfigurationImplementation::isRSyncStorage(Path *storage_location)
     return false;
 }
 
+// Storage created on the fly depending on the command line arguments.
 Storage a_storage;
 
 Storage *ConfigurationImplementation::findStorageFrom(Path *storage_location)
@@ -1054,32 +1089,64 @@ Storage *ConfigurationImplementation::findStorageFrom(Path *storage_location)
     // This is a storage that is configured inside a rule.
     Rule *rule = findRuleFromStorageLocation(storage_location);
 
-    if (rule) {
+    if (rule)
+    {
         return rule->storage(storage_location);
     }
 
     // Ok, not a known storage location.
     // Let us check if it is rclone, rsync or a directory.
-    if (isRCloneStorage(storage_location)) {
+    if (isRCloneStorage(storage_location))
+    {
         a_storage.type = RCloneStorage;
         a_storage.storage_location = storage_location;
         return &a_storage;
     }
-    else if (isRSyncStorage(storage_location)) {
+    else if (isRSyncStorage(storage_location))
+    {
         a_storage.type = RSyncStorage;
         a_storage.storage_location = storage_location;
         return &a_storage;
     }
-    else {
+    else
+    {
         Path *rp = storage_location->realpath();
         if (rp) {
             storage_location = rp;
         }
-        if (isFileSystemStorage(storage_location)) {
+        if (isFileSystemStorage(storage_location))
+        {
             a_storage.type = FileSystemStorage;
             a_storage.storage_location = storage_location;
             return &a_storage;
         }
+    }
+
+    return NULL;
+}
+
+Storage *ConfigurationImplementation::createStorageFrom(Path *storage_location)
+{
+    Path *rp = storage_location->realpath();
+    if (rp) {
+        storage_location = rp;
+    }
+    FileStat stat;
+    RC rc = fs_->stat(storage_location, &stat);
+    if (rc.isOk()) {
+        // Something exists, do not create a storage here.
+        return NULL;
+    }
+    bool b = fs_->mkDirpWriteable(storage_location);
+    if (!b) {
+        error(CONFIGURATION, "Could not create directory %s\n", storage_location->c_str());
+    }
+    info(CONFIGURATION, "Created storage directory %s\n", storage_location->c_str());
+    if (isFileSystemStorage(storage_location))
+    {
+        a_storage.type = FileSystemStorage;
+        a_storage.storage_location = storage_location;
+        return &a_storage;
     }
 
     return NULL;

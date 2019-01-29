@@ -132,10 +132,17 @@ struct Atom
     const char *c_str() { return literal_.c_str(); }
     size_t c_str_len() { return literal_.length(); }
 
+    const char *ext_c_str_() { return ext_; }
+
     private:
 
-    Atom(std::string n) : literal_(n) { }
+    Atom(std::string n) : literal_(n)
+    {
+        size_t p0 = n.rfind('.');
+        if (p0 == std::string::npos) { ext_ = ""; } else { ext_ = n.c_str()+p0+1; }
+    }
     std::string literal_;
+    const char *ext_;
 };
 
 struct Path
@@ -155,6 +162,11 @@ struct Path
     std::string &str() { return path_cache_; }
     const char *c_str() { return &path_cache_[0]; }
     size_t c_str_len() { return path_cache_.length(); }
+    // Return the c_str without the leading slash, if it exists.
+    const char *c_str_nls() {
+        if (c_str()[0] == '/') { return c_str()+1; }
+        else { return c_str(); }
+    }
 
     // The root aka "/" aka "" has depth 1
     // "/Hello" has depth 2
@@ -165,7 +177,14 @@ struct Path
     Path *subpath(int from, int len = -1);
     Path *prepend(Path *p);
     Path *append(std::string p);
-    int findPart(Path* part) { Path *p = this; while (p) { if (p->atom_ == part->atom_) { return p->depth_; }; p = p->parent_; } return 1; }
+    int findPart(Path* part) {
+        Path *p = this;
+        while (p) {
+            if (p->atom_ == part->atom_) { return p->depth_; }
+            p = p->parent_;
+        }
+        return -1;
+    }
     bool isRoot() { return depth_ == 1 && atom_->c_str_len() == 0; }
     #ifdef PLATFORM_WINAPI
     bool isDrive() {

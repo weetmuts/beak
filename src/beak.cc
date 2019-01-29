@@ -19,6 +19,7 @@
 
 #include "backup.h"
 #include "configuration.h"
+#include "diff.h"
 #include "log.h"
 #include "filesystem.h"
 #include "restore.h"
@@ -58,8 +59,6 @@ using namespace std;
 static ComponentId COMMANDLINE = registerLogComponent("commandline");
 static ComponentId STORE = registerLogComponent("store");
 static ComponentId FUSE = registerLogComponent("fuse");
-static ComponentId DIFF = registerLogComponent("diff");
-static ComponentId HARDLINKS = registerLogComponent("hardlinks");
 
 struct CommandEntry;
 struct OptionEntry;
@@ -278,7 +277,10 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
     if (expected_type == ArgORS || expected_type == ArgStorage) {
         Path *storage_location = Path::lookup(arg);
         Storage *storage = configuration_->findStorageFrom(storage_location);
-
+        if (!storage) {
+            // Try to create a missing directory.
+            storage = configuration_->createStorageFrom(storage_location);
+        }
         if (storage) {
             argument.type = ArgStorage;
             argument.storage = storage;
@@ -1003,191 +1005,44 @@ RC BeakImplementation::diff(Settings *settings)
 {
     RC rc = RC::OK;
 
-    assert(settings->from.type == ArgOrigin || settings->from.type == ArgRule);
-    assert(settings->to.type == ArgStorage);
+    assert(settings->from.type == ArgOrigin || settings->from.type == ArgRule || settings->from.type == ArgStorage);
+    assert(settings->to.type == ArgOrigin || settings->to.type == ArgRule || settings->to.type == ArgStorage);
 
     auto progress = newProgressStatistics(settings->progress);
-    auto restore = accessBackup_(&settings->to, settings->pointintime, progress.get());
-    auto point = restore->singlePointInTime();
-    if (!point) {
-        // The settings did not specify a point in time, lets use the most recent for the restore.
-        point = restore->setPointInTime("@0");
-    }
 
-    if (!restore) {
-        return RC::ERR;
-    }
-    auto origin_fs = origin_tool_->fs();
-    auto backup_fs = restore->asFileSystem();
+    FileSystem *curr_fs = NULL, *old_fs = NULL;
+    Path *curr_path =NULL, *old_path = Path::lookupRoot();
 
-    map<Path*,FileStat> old;
-    rc = backup_fs->recurse(Path::lookupRoot(),
-                            [&](Path *path, FileStat *stat)
-                            {
-                                old[path] = *stat;
-                                debug(DIFF, "Old \"%s\"\n", path->c_str());
-                                return RecurseContinue;
-                            }
-        );
+    // Setup the curr file system.
+    curr_fs = origin_tool_->fs();
+    curr_path = settings->from.origin;
+    assert(curr_path != NULL);
 
-    Atom *dotbeak = Atom::lookup(".beak");
-    map<Path*,FileStat> curr;
-    int depth = settings->from.origin->depth();
-    rc = origin_fs->recurse(settings->from.origin,
-                            [&](Path *path, FileStat *stat)
-                            {
-                                if (path->depth() > depth) {
-                                    if (path->name() == dotbeak) {
-                                        debug(DIFF, "Skipping \"%s\"\n", path->c_str());
-                                        return RecurseSkipSubTree;
-                                    }
-                                    Path *p = path->subpath(depth)->prepend(Path::lookupRoot());
-                                    curr[p] = *stat;
-                                    debug(DIFF, "Curr \"%s\"\n", p->c_str());
-                                }
-                                return RecurseContinue;
-                            }
-        );
+    unique_ptr<Restore> restore;
 
-    set<Path*> diff_permissions;
-    set<Path*> diff_contents;
-    set<Path*> removed;
-    set<Path*> added;
-
-    map<Path*,int> object_files_changed;
-    map<Path*,int> entries_removed;
-    map<Path*,int> entries_added;
-
-    bool changes_found = false;
-
-    for (auto& p : curr)
-    {
-        if (old.count(p.first) == 1)
-        {
-            // File exists in curr and old, lets compare the stats.
-            FileStat *newstat = &p.second;
-            FileStat *oldstat = &old[p.first];
-            if (newstat->isRegularFile())
-            {
-                if (newstat->hard_link) {
-                    debug(HARDLINKS, "Hard link in new: %s\n", newstat->hard_link->c_str());
-                }
-                if (oldstat->hard_link) {
-                    debug(HARDLINKS, "Hard link in old: %s\n", oldstat->hard_link->c_str());
-                    if (old.count(oldstat->hard_link) > 0) {
-                        oldstat = &old[oldstat->hard_link];
-                        debug(HARDLINKS, "Followed hard link\n");
-                    }
-                }
-                if (!newstat->sameSize(oldstat) ||
-                    !newstat->sameMTime(oldstat))
-                {
-                    debug(DIFF, "Content diff %s\n", p.first->c_str());
-                    diff_contents.insert(p.first);
-                    changes_found = true;
-                }
-                if (!newstat->samePermissions(oldstat))
-                {
-                    debug(DIFF, "Permission diff %s\n", p.first->c_str());
-                    diff_permissions.insert(p.first);
-                    changes_found = true;
-                }
-            }
-        } else {
-            // New file found
-            debug(DIFF, "New file found %s\n", p.first->c_str());
-            added.insert(p.first);
-            entries_added[p.first->parent()]++;
-            changes_found = true;
+    // Setup the old file system.
+    if (settings->to.type == ArgOrigin) {
+        old_fs = origin_tool_->fs();
+        old_path = settings->to.origin;
+    } else if (settings->to.type == ArgStorage) {
+        restore = accessBackup_(&settings->to, settings->pointintime, progress.get());
+        auto point = restore->singlePointInTime();
+        if (!point) {
+            // The settings did not specify a point in time, lets use the most recent for the restore.
+            point = restore->setPointInTime("@0");
         }
-    }
 
-    for (auto& p : old)
-    {
-        if (curr.count(p.first) == 0)
-        {
-            // File that disappeard found.
-            debug(DIFF, "Removed file found %s\n", p.first->c_str());
-            removed.insert(p.first);
-            entries_removed[p.first->parent()]++;
-            changes_found = true;
+        if (!restore) {
+            return RC::ERR;
         }
+        old_fs = restore->asFileSystem();
     }
 
-    for (auto p : diff_contents)
-    {
-        printf("    changed:       %s\n", p->c_str());
-    }
-
-    for (auto p : diff_permissions)
-    {
-        printf(" permission:       %s\n", p->c_str());
-    }
-
-    for (auto p : added)
-    {
-        Path *par = p->parent();
-        if (par == NULL || !mapContains(added, par)) {
-            // The parent is either the root or it has not been added.
-            // Therefore we should print this added entry.
-            int c = 0;
-            if (mapContains(entries_added,p)) {
-                c = entries_added[p];
-            }
-            if (c > 0) {
-                // This is a directory.
-                printf("      added:       %s/... (%d entries)\n", p->c_str(), c);
-            } else {
-                // This is a file, or empty directory.
-                printf("      added:       %s\n", p->c_str());
-            }
-        }
-    }
-
-    for (auto p : removed)
-    {
-        Path *par = p->parent();
-        if (par == NULL || !mapContains(removed, par)) {
-            // The parent is either the root or it has not been removed.
-            // Therefore we should print this removed entry.
-            int c = 0;
-            if (mapContains(entries_removed,p)) {
-                c = entries_removed[p];
-            }
-            if (c > 0) {
-                // This is a directory.
-                printf("    removed:       %s/... (%d entries)\n", p->c_str(), c);
-            } else {
-                // This is a file, or empty directory.
-                printf("    removed:       %s\n", p->c_str());
-            }
-        }
-    }
-
-    if (changes_found) {
-        printf("\n");
-    }
-
-    if (diff_contents.size() > 0) {
-        printf("%zu changed files ", diff_contents.size());
-        changes_found = true;
-    }
-    if (diff_permissions.size() > 0) {
-        printf("%zu permissions changed ", diff_permissions.size());
-        changes_found = true;
-    }
-    if (added.size() > 0) {
-        printf("%zu files added ", added.size());
-        changes_found = true;
-    }
-    if (removed.size() > 0) {
-        printf("%zu files removed ", removed.size());
-        changes_found = true;
-    }
-
-    if (changes_found) {
-        printf("\n");
-    }
+    auto d = newDiff();
+    rc = d->diff(old_fs, old_path,
+                 curr_fs, curr_path,
+                 progress.get());
+    d->report();
     return rc;
 }
 

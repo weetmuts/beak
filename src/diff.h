@@ -15,25 +15,23 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef FILETYPE_H
-#define FILETYPE_H
+#ifndef DIFF_H
+#define DIFF_H
 
 #include"always.h"
-#include"filesystem.h"
+#include"beak.h"
+#include"configuration.h"
 
-enum class FileType
+struct Diff
 {
-    Unknown,
-    Source,
-    Object,
-    Library,
-    Executable,
-    Build,
-    VCS,
-    Media,
-    Document
+    virtual RC diff(FileSystem *old_fs, Path *old_path,
+                    FileSystem *new_fs, Path *new_path,
+                    ProgressStatistics *progress) = 0;
+    virtual void report() = 0;
+
+    virtual ~Diff() = default;
 };
 
-FileType fileType(Path *p);
+std::unique_ptr<Diff> newDiff();
 
 #endif

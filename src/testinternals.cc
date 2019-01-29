@@ -17,6 +17,7 @@
 
 #include "contentsplit.h"
 #include "filesystem.h"
+#include "fileinfo.h"
 #include "fit.h"
 #include "log.h"
 #include "match.h"
@@ -31,14 +32,15 @@ using namespace std;
 static ComponentId TEST_MATCH = registerLogComponent("test_match");
 static ComponentId TEST_RANDOM = registerLogComponent("test_random");
 static ComponentId TEST_FILESYSTEM = registerLogComponent("test_filesystem");
+static ComponentId TEST_FILEINFOS = registerLogComponent("test_fileinfos");
 static ComponentId TEST_GZIP = registerLogComponent("test_filesystem");
 static ComponentId TEST_KEEP = registerLogComponent("test_keep");
 static ComponentId TEST_FIT = registerLogComponent("test_fit");
-static ComponentId TEST_HUMANREADABLE = registerLogComponent("human_readable");
-static ComponentId TEST_HEXSTRING = registerLogComponent("hex_string");
-static ComponentId TEST_SPLIT = registerLogComponent("split");
-static ComponentId TEST_READSPLIT = registerLogComponent("readsplit");
-static ComponentId TEST_CONTENTSPLIT = registerLogComponent("contentsplit");
+static ComponentId TEST_HUMANREADABLE = registerLogComponent("test_human_readable");
+static ComponentId TEST_HEXSTRING = registerLogComponent("test_hexstring");
+static ComponentId TEST_SPLIT = registerLogComponent("test_split");
+static ComponentId TEST_READSPLIT = registerLogComponent("test_readsplit");
+static ComponentId TEST_CONTENTSPLIT = registerLogComponent("test_contentsplit");
 
 void testMatch(string pattern, const char *path, bool should_match);
 
@@ -50,6 +52,7 @@ void testPaths();
 void testMatching();
 void testRandom();
 void testFileSystem();
+void testFileInfos();
 void testGzip();
 void testKeeps();
 void testHumanReadable();
@@ -58,6 +61,7 @@ void testFit();
 void testSplitLogic();
 void testContentSplit();
 void testReadSplitLogic();
+
 void predictor(int argc, char **argv);
 
 int main(int argc, char *argv[])
@@ -81,6 +85,7 @@ int main(int argc, char *argv[])
         testMatching();
         testRandom();
         testFileSystem();
+        testFileInfos();
         testGzip();
         testKeeps();
         testHumanReadable();
@@ -196,8 +201,29 @@ void testFileSystem()
     verbose(TEST_FILESYSTEM,"REALPATH %s %s\n", contents[0]->c_str(), rp->c_str());
 }
 
+void testFileType(const char *path, FileType expected_ft, const char *expected_id)
+{
+    Path *p = Path::lookup(path);
+    FileInfo fi = fileInfo(p);
 
-void testGzip() {
+    if (fi.type != expected_ft || strcmp(fi.identifier, expected_id))
+    {
+        error(TEST_FILEINFOS, "Expected file type \"%s\" with identifier (%s) for path \"%s\", but got \"%s\" (%s)\n",
+              fileTypeName(expected_ft), expected_id, path, fileTypeName(fi.type), fi.identifier);
+    }
+}
+
+
+void testFileInfos()
+{
+    testFileType("/home/bar/foo.c", FileType::Source, "c");
+    testFileType("/home/bar/foo.C", FileType::Source, "c");
+    testFileType("/home/intro.tex", FileType::Document, "tex");
+    testFileType("/home/intro.docx", FileType::Document, "docx");
+}
+
+void testGzip()
+{
     string s = "Hejsan Hoppsan ";
     string w;
     for (int i=0; i<10; ++i) {

@@ -34,6 +34,7 @@ void strprintf(std::string &s, const char* fmt, ...);
 std::string humanReadable(size_t s);
 std::string humanReadableTwoDecimals(size_t s);
 std::string humanReadableTimeTwoDecimals(uint64_t micros);
+std::string humanReadableTime(int seconds, bool show_seconds);
 std::string toHex(size_t value, size_t max_value);
 size_t roundoffHumanReadable(size_t s);
 RC parseHumanReadable(std::string s, size_t *out);

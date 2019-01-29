@@ -139,6 +139,35 @@ std::string humanReadableTimeTwoDecimals(uint64_t micros)
     return helper(1000*1000, micros, "s");
 }
 
+std::string humanReadableTime(int seconds, bool show_seconds)
+{
+    int days  = seconds / (3600*24);
+    seconds -= (days * 3600*24);
+    int hours = seconds / 3600;
+    seconds -= (hours * 3600);
+    int minutes = seconds / 60;
+    seconds -= (minutes * 60);
+
+    std::string s = "";
+    if (days > 0) {
+        s += to_string(days)+"d";
+    }
+    if (hours > 0) {
+        s += to_string(hours)+"h";
+    }
+    if (minutes > 0) {
+        if (!show_seconds) minutes++;
+        s += to_string(minutes)+"m";
+    }
+    if (show_seconds) {
+        if (seconds < 10) {
+            s += "0";
+        }
+        s += to_string(seconds)+"s";
+    }
+    return s;
+}
+
 std::string toHex(size_t value, size_t max_value)
 {
     // The max_value is used to calculate the width of the string,

@@ -106,7 +106,7 @@ enum ArgumentType
 #define LIST_OF_COMMANDS \
     X(bmount,"Mount your file system as a backup.",ArgOrigin,ArgDir) \
     X(config,"Configure backup rules.",ArgNone,ArgNone) \
-    X(diff,"Show changes relation to or between backups.",ArgOrigin, ArgStorage) \
+    X(diff,"Show changes relation to or between backups.",ArgOrigin,ArgORS) \
     X(fsck,"Check the integrity of your backup.",ArgStorage,ArgNone) \
     X(genautocomplete,"Output bash completion script for beak.",ArgFile,ArgNone) \
     X(genmounttrigger,"Output systemd rule to trigger backup when USB drive is mounted.",ArgFile,ArgNone) \

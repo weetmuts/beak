@@ -46,6 +46,8 @@ struct Stats
 
     size_t num_total {};
 
+    uint64_t latest_update {};
+
     std::map<Path*,size_t> file_sizes;
 };
 
