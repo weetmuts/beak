@@ -48,6 +48,7 @@ bool verbose_ = false;
 bool err_found_ = false;
 
 unique_ptr<FileSystem> fs;
+void testParsing();
 void testPaths();
 void testMatching();
 void testRandom();
@@ -80,7 +81,7 @@ int main(int argc, char *argv[])
     }
     try {
         fs = newDefaultFileSystem();
-
+        testParsing();
         testPaths();
         testMatching();
         testRandom();
@@ -104,6 +105,27 @@ int main(int argc, char *argv[])
     catch (string e) {
         fprintf(stderr, "%s\n", e.c_str());
     }
+}
+
+void testParsing()
+{
+    RC rc = RC::OK;
+    size_t out;
+    out = 0;
+    rc = parseHumanReadable("1 GiB", &out);
+    assert(rc.isOk() && out == (1024*1024*1024));
+    out = 0;
+    rc = parseHumanReadable("1G", &out);
+    assert(rc.isOk() && out == (1024*1024*1024));
+    out = 0;
+    rc = parseHumanReadable("1M", &out);
+    assert(rc.isOk() && out == (1024*1024));
+    out = 0;
+    rc = parseHumanReadable("295.037M", &out);
+    assert(rc.isOk() && out == 309368717);
+    out = 0;
+    rc = parseHumanReadable("   94.988M  ", &out);
+    assert(rc.isOk() && out == 99602137);
 }
 
 void testPaths()

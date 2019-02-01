@@ -216,6 +216,7 @@ RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backup,
     case RSyncStorage:
     case RCloneStorage:
     {
+        progress->updateProgress();
         Path *mount = local_fs_->mkTempDir("beak_send_");
         unique_ptr<FuseMount> fuse_mount = sys_->mount(mount, backup->asFuseAPI(), settings->fusedebug);
 

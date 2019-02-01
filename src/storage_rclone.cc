@@ -103,7 +103,8 @@ void parse_rclone_verbose_output(ProgressStatistics *st,
 {
     // Parse verbose output and look for:
     // 2018/01/29 20:05:36 INFO  : code/src/s01_001517180913.689221661_11659264_b6f526ca4e988180fe6289213a338ab5a4926f7189dfb9dddff5a30ab50fc7f3_0.tar: Copied (new)
-
+    // And look for stat lines like:
+    // 2019/01/29 22:32:37 INFO  :       185M / 2.370 GBytes, 8%, 3.079 MBytes/s, ETA 12m8s (xfr#0/242)
     size_t from, to;
     // Find the beginning of the file path.
     for (from=1; from<len-1; ++from) {
@@ -116,6 +117,25 @@ void parse_rclone_verbose_output(ProgressStatistics *st,
     for (to=len-2; to>from; --to) {
         if (buf[to] == ':' && buf[to+1] == ' ') {
             break;
+        }
+    }
+    if (from == to) {
+        // Perhaps a stat line
+        // Sadly the stats are currently not usable.
+        size_t slash = 0;
+        for (slash=from; slash<len-1; ++slash) {
+            if (buf[slash] == '/') {
+                break;
+            }
+        }
+        string size_hint_s = string(buf+from, buf+slash);
+        size_t size_hint = 0;
+        RC rc = parseHumanReadable(size_hint_s, &size_hint);
+        if (rc.isOk()) {
+            debug(RCLONE, "stat found \"%s\" => %zu \n", size_hint_s.c_str(), size_hint);
+            st->updateStatHint(size_hint);
+        } else {
+            debug(RCLONE, "could not parse stat \"%s\"\n", size_hint_s.c_str());
         }
     }
     string file = storage->storage_location->str()+"/"+string(buf+from, to-from);
@@ -157,6 +177,8 @@ RC rcloneSendFiles(Storage *storage,
     vector<string> args;
     args.push_back("copy");
     args.push_back("-v");
+    args.push_back("--stats-one-line");
+    args.push_back("--stats=10s");
     args.push_back("--include-from");
     args.push_back(tmp->c_str());
     args.push_back(dir->c_str());

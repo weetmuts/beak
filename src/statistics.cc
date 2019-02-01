@@ -46,21 +46,30 @@ private:
 
     ProgressDisplayType display_type_;
 
+    int rotate_ {};
+
     bool redrawLine();
     void startDisplayOfProgress();
+    void updateStatHint(size_t s);
     void updateProgress();
     void finishProgress();
 };
 
+const char *spinner_[] = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" };
+
 void ProgressStatisticsImplementation::startDisplayOfProgress()
 {
     start_time = clockGetTimeMicroSeconds();
-
     regular_ = newRegularThreadCallback(1000, [this](){ return redrawLine();});
 }
 
 //Tar emot objekt: 100% (814178/814178), 669.29 MiB | 6.71 MiB/s, klart.
 //Analyserar delta: 100% (690618/690618), klart.
+void ProgressStatisticsImplementation::updateStatHint(size_t s)
+{
+    stats.stat_size_files_transferred = s;
+    stats.latest_stat = clockGetTimeMicroSeconds();
+}
 
 void ProgressStatisticsImplementation::updateProgress()
 {
@@ -78,8 +87,16 @@ bool ProgressStatisticsImplementation::redrawLine()
     if (copy.num_files == 0 || copy.num_files_to_store == 0) return true;
     uint64_t now = clockGetTimeMicroSeconds();
     double secs = ((double)((now-start_time)/1000))/1000.0;
+
     double secs_latest_update = ((double)((copy.latest_update-start_time)/1000))/1000.0;
     double bytes = (double)copy.size_files_stored;
+
+    /*
+    // The stats from rclone are not useful in the beginning, where they are needed....
+    if (stats.latest_stat > copy.latest_update) {
+        secs_latest_update = ((double)((stats.latest_stat-start_time)/1000))/1000.0;
+        bytes = (double)stats.stat_size_files_transferred;
+    }*/
     secsbytes.push_back({secs_latest_update,bytes});
 
     double bps = bytes/secs_latest_update;
@@ -88,6 +105,11 @@ bool ProgressStatisticsImplementation::redrawLine()
     string mibs = humanReadableTwoDecimals(copy.size_files_to_store);
     string average_speed = humanReadableTwoDecimals(bps);
 
+    if (bytes == 0) {
+        average_speed = spinner_[rotate_];
+        rotate_++;
+        if (rotate_>9) rotate_ = 0;
+    }
     string msg = "Full";
     if (copy.num_files > copy.num_files_to_store) {
         msg = "Incr";
@@ -119,10 +141,10 @@ bool ProgressStatisticsImplementation::redrawLine()
         // Do not show the estimate when all bytes are transferred.
         estimated_total = "";
     }
-    UI::redrawLineOutput("%s store: %d%% (%ju/%ju) %s %s/s | %s%s",
-                         msg.c_str(),
+    UI::redrawLineOutput("%s store: %s %d%% (%ju/%ju) %s/s | %s%s",
+                         msg.c_str(), mibs.c_str(),
                          percentage, copy.num_files_stored, copy.num_files_to_store,
-                         mibs.c_str(), average_speed.c_str(),
+                         average_speed.c_str(),
                          elapsed.c_str(), estimated_total.c_str());
     return true;
 }

@@ -160,7 +160,7 @@ std::string humanReadableTime(int seconds, bool show_seconds)
         s += to_string(minutes)+"m";
     }
     if (show_seconds) {
-        if (seconds < 10) {
+        if (seconds < 10 && s.length() > 0) {
             s += "0";
         }
         s += to_string(seconds)+"s";
@@ -240,6 +240,8 @@ RC parseHumanReadable(string s, size_t *out)
     string suffix;
     char c = s.back();
 
+    while (s.front() == ' ') s.erase(0,1);
+
     // Extract the suffix from the end
     while (c < '0' || c > '9') {
         if (c != ' ') {
@@ -272,16 +274,37 @@ RC parseHumanReadable(string s, size_t *out)
     }
 
     string n;
+    bool found_dot = false, found_digit = false, found_digit_after_dot = false;
     for (auto c : s)
     {
         if (isdigit(c)) {
             n.push_back(c);
-        } else {
+            found_digit = true;
+            if (found_dot) {
+                found_digit_after_dot = true;
+            }
+        }
+        else
+        if (c == '.' && found_digit && !found_dot) {
+            n.push_back(c);
+            found_dot = true;
+        }
+        else
+        {
             return RC::ERR;
         }
     }
 
-    *out = mul * atol(s.c_str());
+    if (found_dot) {
+        if (!found_digit_after_dot) {
+            return RC::ERR;
+        }
+        *out = (size_t)(((double)mul) * atof(n.c_str()));
+    }
+    else
+    {
+        *out = mul * atol(n.c_str());
+    }
     return RC::OK;
 }
 

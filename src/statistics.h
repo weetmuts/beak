@@ -48,6 +48,9 @@ struct Stats
 
     uint64_t latest_update {};
 
+    size_t   stat_size_files_transferred {};
+    uint64_t latest_stat {};
+
     std::map<Path*,size_t> file_sizes;
 };
 
@@ -56,6 +59,7 @@ struct ProgressStatistics
     Stats stats;
 
     virtual void startDisplayOfProgress() = 0;
+    virtual void updateStatHint(size_t s) = 0;
     virtual void updateProgress() = 0;
     virtual void finishProgress() = 0;
     virtual ~ProgressStatistics() {};

@@ -516,15 +516,20 @@ Rule *ConfigurationImplementation::rule(string name)
 
 Rule *ConfigurationImplementation::findRuleFromStorageLocation(Path *storage_location)
 {
+    Path *rp = storage_location->realpath();
+    if (rp) {
+        storage_location = rp;
+    }
+
     for (auto rule : sortedRules())
     {
-	for (auto storage : rule->sortedStorages())
+        for (auto storage : rule->sortedStorages())
         {
             if (storage->storage_location == storage_location)
             {
                 return rule;
             }
-	}
+        }
     }
     return NULL;
 }
