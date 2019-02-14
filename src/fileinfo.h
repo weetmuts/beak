@@ -34,7 +34,7 @@
     X(Web,web file,web files)             \
     X(Archive,archive,archives)           \
     X(Runtime,runtime file,runtime files) \
-    X(Sound,sound file,sound files)       \
+    X(Audio,audio file,audio files)       \
     X(Video,video,videos)                 \
     X(Image,image,images)                 \
     X(DiskImage,disk image,disk images)   \

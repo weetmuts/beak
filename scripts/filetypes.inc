@@ -22,6 +22,7 @@ conf
 Data:
 csv
 dat
+json
 log
 xml
 
@@ -37,6 +38,9 @@ ods  # openoffice/libreoffice spreadsheet
 pdf  # portable document format
 ps   # postscript
 rtf  # ms rich text format
+key  # keynote presentation
+pps
+ppt
 tex
 txt
 wks  # ms works
@@ -63,11 +67,14 @@ psd
 svg
 tif
 tiff
+tga
+xcf
 
 
 Source:
 c
 h
+m
 cc
 cs
 js
@@ -78,19 +85,21 @@ vb
 asm
 bat
 cpp
+dtd
 hpp
 sql
 java
 swift
 makefile
-
+vcxproj
+xcodeproj
 
 Object:
 o
 class
 
 
-Sound:
+Audio:
 aif
 cda
 mid
@@ -118,4 +127,5 @@ wmv
 
 Web:
 css
+htm
 html
