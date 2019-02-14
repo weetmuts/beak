@@ -23,6 +23,8 @@
 
 #define LIST_OF_FILETYPES                 \
     X(Source,source,sources)              \
+    X(Config,config file,config files)    \
+    X(Data,data file,data files)          \
     X(Document,document,documents)        \
     X(Build,build file,build files)       \
     X(Object,object file,object files)    \
@@ -32,6 +34,7 @@
     X(Web,web file,web files)             \
     X(Archive,archive,archives)           \
     X(Runtime,runtime file,runtime files) \
+    X(Sound,sound file,sound files)       \
     X(Video,video,videos)                 \
     X(Image,image,images)                 \
     X(DiskImage,disk image,disk images)   \
