@@ -26,36 +26,7 @@ using namespace std;
 #define STRLEN(s) ((sizeof(s)/sizeof(s[0]))-1)
 
 // Map extensions to file types.
-#define LIST_OF_SUFFIXES \
-    X(c,Source)          \
-    X(h,Source)          \
-    X(o,Object)          \
-                         \
-    X(cc,Source)         \
-    X(js,Source)         \
-    X(py,Source)         \
-    X(sh,Source)         \
-    X(xz,Archive)        \
-                         \
-    X(bat,Source)        \
-    X(cpp,Source)        \
-    X(css,Web)           \
-    X(doc,Document)      \
-    X(exe,Executable)    \
-    X(hpp,Source)        \
-    X(pdf,Document)      \
-    X(png,Image)         \
-    X(tex,Document)      \
-    X(txt,Document)      \
-                         \
-    X(docx,Document)     \
-    X(html,Web)          \
-    X(java,Source)       \
-                         \
-    X(class,Object)      \
-                         \
-    X(makefile,Source)   \
-
+#include"generated_filetypes.h"
 
 // Any other found extension is stored here.
 set<string> extensions_;

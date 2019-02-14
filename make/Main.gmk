@@ -80,10 +80,16 @@ $(OUTPUT_ROOT)/generated_autocomplete.h: $(SRC_ROOT)/scripts/autocompletion_for_
 	echo Generating autocomplete include.
 	cat $< | sed 's/\\/\\\\/g' | sed 's/\"/\\\"/g' | sed 's/^\(.*\)$$/"\1\\n"/g'> $@
 
+$(OUTPUT_ROOT)/generated_filetypes.h: $(SRC_ROOT)/scripts/filetypes.inc
+	echo Generating filetypes include.
+	echo '#define LIST_OF_SUFFIXES \\' > $@
+	$(SRC_ROOT)/scripts/generate_filetypes.sh $(SRC_ROOT)/scripts/filetypes.inc >> $@
+	echo  >> $@
+
 BEAK_OBJS:=$($(PLATFORM)_BEAK_OBJS)
 TESTINTERNALS_OBJS:=$($(PLATFORM)_TESTINTERNALS_OBJS)
 
-$(OUTPUT_ROOT)/$(TYPE)/beak.o: $(OUTPUT_ROOT)/generated_autocomplete.h
+$(OUTPUT_ROOT)/$(TYPE)/beak.o: $(OUTPUT_ROOT)/generated_autocomplete.h $(OUTPUT_ROOT)/generated_filetypes.h
 
 $(OUTPUT_ROOT)/$(TYPE)/%.o: $(SRC_ROOT)/src/%.cc
 	@echo Compiling $(TYPE) $(CONF_MNEMONIC) $$(basename $<)
@@ -116,6 +122,7 @@ ifeq ($(CLEAN),clean)
 release debug:
 	rm -f $(OUTPUT_ROOT)/$(TYPE)/*
 	rm -f $(OUTPUT_ROOT)/$(TYPE)/generated_autocomplete.h
+	rm -f $(OUTPUT_ROOT)/$(TYPE)/generated_filetypes.h
 else
 # Build!
 release debug:$(OUTPUT_ROOT)/$(TYPE)/beak $(OUTPUT_ROOT)/$(TYPE)/testinternals $(EXTRA_LIBS)
