@@ -1038,7 +1038,7 @@ RC BeakImplementation::diff(Settings *settings)
         old_fs = restore->asFileSystem();
     }
 
-    auto d = newDiff();
+    auto d = newDiff(settings->verbose);
     rc = d->diff(old_fs, old_path,
                  curr_fs, curr_path,
                  progress.get());

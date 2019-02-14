@@ -43,12 +43,14 @@ struct TypeSummary
     size_t count {};
     size_t size {};
     set<const char *> suffixes;
+    vector<Path*> files;
 
-    void add(const char *suffix, const FileStat *stat)
+    void add(const char *suffix, const FileStat *stat, Path *f)
     {
         size += stat->st_size;
         count++;
         suffixes.insert(suffix);
+        if (f) files.push_back(f);
         assert(suffix);
     }
 };
@@ -60,8 +62,8 @@ public:
     void removeDir();
     void addDir();
 
-    void add(Action a, const FileInfo &fi, const FileStat *stat);
-    void addChildren(Action a, const FileInfo &fi, const FileStat *stat);
+    void add(Action a, const FileInfo &fi, const FileStat *stat, Path *file, bool detailed);
+    void addChildren(Action a, const FileInfo &fi, const FileStat *stat, Path *file, bool detailed);
 
     bool isChanged();
     bool isRemoved();
@@ -86,7 +88,8 @@ public:
 
     void report();
 
-    DiffImplementation() {
+    DiffImplementation(bool detailed) {
+        detailed_ = detailed;
         dotgit_ = Atom::lookup(".git");
     }
     ~DiffImplementation() = default;
@@ -96,6 +99,7 @@ private:
     map<Path*,FileStat,TarSort> curr;
     map<Path*,DirSummary,TarSort> dirs;
     Atom *dotgit_;
+    bool detailed_;
 
     void addStats(Action a, Path *p, FileStat *stat);
     void addToDirSummary(Action a, Path *file_or_dir, FileStat *stat);
@@ -147,9 +151,9 @@ const char *actionName(Action a)
     assert(0);
 }
 
-unique_ptr<Diff> newDiff()
+unique_ptr<Diff> newDiff(bool detailed)
 {
-    return unique_ptr<Diff>(new DiffImplementation());
+    return unique_ptr<Diff>(new DiffImplementation(detailed));
 }
 
 
@@ -158,13 +162,13 @@ void DiffImplementation::addStats(Action a, Path *p, FileStat *stat)
     Path *dir = p->parent();
     DirSummary *dir_summary = &dirs[dir]; // Remember, [] will add missing entry automatically.
     FileInfo fi = fileInfo(p);
-    dir_summary->add(a, fi, stat);
+    dir_summary->add(a, fi, stat, p, detailed_);
 
     while (dir->parent())
     {
         dir = dir->parent();
         DirSummary *parent_dir_summary = &dirs[dir];
-        parent_dir_summary->addChildren(a, fi, stat);
+        parent_dir_summary->addChildren(a, fi, stat, p, detailed_);
     }
 }
 
@@ -330,21 +334,21 @@ void DiffImplementation::report()
 }
 
 
-void DirSummary::add(Action a, const FileInfo &fi, const FileStat *stat)
+void DirSummary::add(Action a, const FileInfo &fi, const FileStat *stat, Path *file, bool detailed)
 {
     // Set the current dir summary
     TypeSummary *ts = &content_[{a,fi.type}];
-    ts->add(fi.identifier, stat);
+    ts->add(fi.identifier, stat, detailed?file:NULL);
     // Add to the accumulated summary
     TypeSummary *tsall = &all_content_[{a,fi.type}];
-    tsall->add(fi.identifier, stat);
+    tsall->add(fi.identifier, stat, detailed?file:NULL);
 }
 
-void DirSummary::addChildren(Action a, const FileInfo &fi, const FileStat *stat)
+void DirSummary::addChildren(Action a, const FileInfo &fi, const FileStat *stat, Path *file, bool detailed)
 {
     // Only to the accumulated summary
     TypeSummary *tsall = &all_content_[{a,fi.type}];
-    tsall->add(fi.identifier, stat);
+    tsall->add(fi.identifier, stat, detailed?file:NULL);
 }
 
 void DirSummary::removeDir()
@@ -444,6 +448,12 @@ void DirSummary::print(Path *p, bool hide_content)
             printf("...");
         }
         printf(")\n");
+        for (auto p : st->files) {
+            printf("    %s\n", p->c_str_nls());
+        }
+        if (st->files.size()) {
+            printf("\n");
+        }
     }
     printf("\n");
 }

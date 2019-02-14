@@ -69,16 +69,19 @@ Source:
 c
 h
 cc
+cs
 js
 pl
 py
 sh
+vb
 asm
 bat
 cpp
 hpp
 sql
 java
+swift
 makefile
 
 
