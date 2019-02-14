@@ -21,22 +21,25 @@
 #include"always.h"
 #include"filesystem.h"
 
-#define LIST_OF_FILETYPES \
-    X(Source) \
-    X(Document) \
-    X(Build) \
-    X(Object) \
-    X(Library) \
-    X(Executable) \
-    X(VCS) \
-    X(Runtime) \
-    X(Video) \
-    X(Picture) \
-    X(DiskImage) \
-    X(Other)
+#define LIST_OF_FILETYPES                 \
+    X(Source,source,sources)              \
+    X(Document,document,documents)        \
+    X(Build,build file,build files)       \
+    X(Object,object file,object files)    \
+    X(Library,library,libraries)          \
+    X(Executable,executable,executables)  \
+    X(VCS,vcs file,vcs files)             \
+    X(Web,web file,web files)             \
+    X(Archive,archive,archives)           \
+    X(Runtime,runtime file,runtime files) \
+    X(Video,video,videos)                 \
+    X(Image,image,images)                 \
+    X(DiskImage,disk image,disk images)   \
+    X(Other,other file,other files)       \
+    X(OtherDir,directory,directories)
 
 enum class FileType : short {
-#define X(name) name,
+#define X(type,name,names) type,
 LIST_OF_FILETYPES
 #undef X
 };
@@ -47,9 +50,11 @@ struct FileInfo
     // The identifier is interned. Ie, it will be a constant unique pointer,
     // ie a c string "c" for c files, "h" for h files and "Makefile" for makefiles etc.
     const char * const identifier; // suffix (c,h,tex,java) or whole file (Makefile)
+    const char * const name; // source, library, other file
+    const char * const names; // sources, libraries, other files
 };
 
 FileInfo fileInfo(Path *p);
-const char *fileTypeName(FileType ft);
+const char *fileTypeName(FileType ft, bool pluralis);
 
 #endif

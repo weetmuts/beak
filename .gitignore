@@ -3,4 +3,5 @@ autom4te.cache/
 config.log
 doc/
 3rdparty/
+stuff/
 *~

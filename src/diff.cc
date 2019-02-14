@@ -28,20 +28,13 @@ using namespace std;
 
 static ComponentId DIFF = registerLogComponent("diff");
 
-enum class Action : short {
+enum class Action : short
+{
     NoChange, Changed, Permission, Added, Removed
 };
 
-const char *actionName(Action a) {
-    switch (a) {
-    case Action::NoChange: return "unchanged";
-    case Action::Changed: return "changed";
-    case Action::Permission: return "permission changed";
-    case Action::Added: return "added";
-    case Action::Removed: return "removed";
-    };
-    assert(0);
-}
+const char *actionName(Action a);
+
 // How many files found for a given file type
 // ie 723 Source files á 12374 KiB with
 // suffixes (c,cc,h,perl)
@@ -51,118 +44,177 @@ struct TypeSummary
     size_t size {};
     set<const char *> suffixes;
 
-    void add(const char *identifier, const FileStat *stat) {
+    void add(const char *suffix, const FileStat *stat)
+    {
         size += stat->st_size;
-        count ++;
-        suffixes.insert(identifier);
+        count++;
+        suffixes.insert(suffix);
+        assert(suffix);
     }
 };
 
-struct DirSummary
+class DirSummary
 {
-    map<pair<Action,FileType>,TypeSummary> types;
+public:
 
-    void add(Action a, const FileInfo &fi, const FileStat *stat) {
-        TypeSummary *ts = &types[{a,fi.type}];
-        ts->add(fi.identifier, stat);
-    }
+    void removeDir();
+    void addDir();
 
-    void print(Path *p) {
-        printf("\n%s:\n", p->c_str_nls());
-        for (auto& a : types) {
-            Action act = a.first.first;
-            FileType ft = a.first.second;
-            TypeSummary *st = &a.second;
-            // 32 sources added (java,c,perl)
-            const char *an_s = NULL;
-            an_s = "";
-            if (st->count > 1) {
-                an_s = "s";
-            }
-            printf("%zu %s%s %s (", st->count, fileTypeName(ft), an_s, actionName(act));
-            for (auto s: st->suffixes) {
-                printf("%s", s);
-            }
-            printf(")\n");
-        }
-    }
+    void add(Action a, const FileInfo &fi, const FileStat *stat);
+    void addChildren(Action a, const FileInfo &fi, const FileStat *stat);
+
+    bool isChanged();
+    bool isRemoved();
+    bool isAdded();
+
+    void print(Path *p, bool hide_content);
+
+private:
+
+    map<pair<Action,FileType>,TypeSummary> content_;
+    map<pair<Action,FileType>,TypeSummary> all_content_;
+    bool dir_removed_ = false;
+    bool dir_added_ = false;
 };
 
 class DiffImplementation : public Diff
 {
-    map<Path*,FileStat,depthFirstSortPath> old;
-    map<Path*,FileStat,depthFirstSortPath> curr;
-    // Remember the summaries for each directory.
-    map<Path*,DirSummary,depthFirstSortPath> dirs;
-
-    // Directories to skip: .beak
-    set<Path*> skip_these_directories;
-
-    // The grouped directories are for example: .git .hg
-    // For these, diff, will report a summary of changed/added/removed inside the dir.
-    set<Path*> group_these_directories;
-
-    set<Path*> files_with_changed_permissions;
-    set<Path*> files_with_changed_mtime;
-    set<Path*> files_removed;
-    set<Path*> files_added;
-
-    map<Path*,int> entries_removed;
-    map<Path*,int> entries_added;
-    map<Path*,size_t> entries_removed_size;
-    map<Path*,size_t> entries_added_size;
-
-    bool changes_found {};
-
+public:
     RC diff(FileSystem *old_fs, Path *old_path,
             FileSystem *curr_fs, Path *curr_path,
             ProgressStatistics *progress);
 
     void report();
 
-    void add(Action a, Path *p, FileStat *stat);
-
+    DiffImplementation() {
+        dotgit_ = Atom::lookup(".git");
+    }
     ~DiffImplementation() = default;
+
+private:
+    map<Path*,FileStat,TarSort> old;
+    map<Path*,FileStat,TarSort> curr;
+    map<Path*,DirSummary,TarSort> dirs;
+    Atom *dotgit_;
+
+    void addStats(Action a, Path *p, FileStat *stat);
+    void addToDirSummary(Action a, Path *file_or_dir, FileStat *stat);
+
+    bool should_hide_(Path *p)
+    {
+        p = p->parent();
+        if (p && dirs.count(p)) {
+            DirSummary *ds = &dirs[p];
+            if (ds->isRemoved() || ds->isAdded()) {
+                return true;
+            }
+        }
+        while (p)
+        {
+            if (p->name() == dotgit_)
+            {
+                return true;
+            }
+            p = p->parent();
+        }
+        return false;
+    }
+
+    bool should_hide_content_(Path *p)
+    {
+        while (p) {
+            if (p->name() == dotgit_) {
+                return true;
+            }
+            p = p->parent();
+        }
+        return false;
+    }
+
 };
+
+/////////////////////////////
+
+const char *actionName(Action a)
+{
+    switch (a) {
+    case Action::NoChange: return "unchanged";
+    case Action::Changed: return "changed";
+    case Action::Permission: return "permission changed";
+    case Action::Added: return "added";
+    case Action::Removed: return "removed";
+    };
+    assert(0);
+}
 
 unique_ptr<Diff> newDiff()
 {
     return unique_ptr<Diff>(new DiffImplementation());
 }
 
-void DiffImplementation::add(Action a, Path *p, FileStat *stat)
+
+void DiffImplementation::addStats(Action a, Path *p, FileStat *stat)
+{
+    Path *dir = p->parent();
+    DirSummary *dir_summary = &dirs[dir]; // Remember, [] will add missing entry automatically.
+    FileInfo fi = fileInfo(p);
+    dir_summary->add(a, fi, stat);
+
+    while (dir->parent())
+    {
+        dir = dir->parent();
+        DirSummary *parent_dir_summary = &dirs[dir];
+        parent_dir_summary->addChildren(a, fi, stat);
+    }
+}
+
+void DiffImplementation::addToDirSummary(Action a, Path *p, FileStat *stat)
 {
     if (stat->isRegularFile())
     {
-        Path *dir = p->parent();
-        DirSummary *dir_summary = &dirs[dir]; // Remember, [] will add missing entry automatically.
-        FileInfo fi = fileInfo(p);
-        dir_summary->add(a, fi, stat);
+        addStats(a, p, stat);
+    }
+    else if (stat->isDirectory())
+    {
+        DirSummary *ds = &dirs[p]; // Remember, [] will add missing entry automatically.
+        if (a == Action::Added)
+        {
+            ds->addDir();
+        }
+        else if (a == Action::Removed)
+        {
+            ds->removeDir();
+        }
     }
 }
 
 /*
    beak diff work: s3_work_crypt:
 
-   HomeAutomation/Docs:
+   HomeAutomation/Docs
 
-   7 documents changed (.docx)
+       7 documents changed (.docx)
 
-   HomeAutomation/Development:
+   HomeAutomation/Development
 
-   32 sources added (java,c,perl)
-   2 sources changed (Makefile,c)
-   32 object files added (class,o)
-   1 library file changed (so)
-   1 virtual image changed (vmk)
-   3 other files changed (pof,xml,...)
+       32 sources added (java,c,perl)
+       2 sources changed (Makefile,c)
+       32 object files added (class,o)
+       1 library file changed (so)
+       1 virtual image changed (vmk)
+       3 other files changed (pof,xml,...)
 
-   Media:
-   7 pictures changed (jpg)
-   1 video added (mp4)
+   Media
+
+       7 pictures changed (jpg)
+       1 video added (mp4)
 
    Foobar/... removed (1287 files 8.5 GiB)
+
+       32 sources removed (java,c,perl,bas)
+
    Local/Barfoo/... added (923 files 128.5 GiB)
+
 */
 
 RC DiffImplementation::diff(FileSystem *old_fs, Path *old_path,
@@ -210,14 +262,15 @@ RC DiffImplementation::diff(FileSystem *old_fs, Path *old_path,
                             }
         );
 
-
     for (auto& p : curr)
     {
-        if (old.count(p.first) == 1)
+        Path *entry = p.first;
+
+        if (old.count(entry) == 1)
         {
             // File exists in curr and old, lets compare the stats.
             FileStat *newstat = &p.second;
-            FileStat *oldstat = &old[p.first];
+            FileStat *oldstat = &old[entry];
             if (newstat->isRegularFile())
             {
                 if (newstat->hard_link) {
@@ -233,37 +286,29 @@ RC DiffImplementation::diff(FileSystem *old_fs, Path *old_path,
                 if (!newstat->sameSize(oldstat) ||
                     !newstat->sameMTime(oldstat))
                 {
-                    debug(DIFF, "Content diff %s\n", p.first->c_str());
-                    files_with_changed_mtime.insert(p.first);
-                    changes_found = true;
-                    add(Action::Changed, p.first, newstat);
+                    debug(DIFF, "content diff %s\n", p.first->c_str());
+                    addToDirSummary(Action::Changed, p.first, newstat);
                 }
                 if (!newstat->samePermissions(oldstat))
                 {
-                    debug(DIFF, "Permission diff %s\n", p.first->c_str());
-                    files_with_changed_permissions.insert(p.first);
-                    changes_found = true;
-                    add(Action::Permission, p.first, newstat);
+                    debug(DIFF, "permission diff %s\n", p.first->c_str());
+                    addToDirSummary(Action::Permission, p.first, newstat);
                 }
             }
         } else {
-            // New file found
-            debug(DIFF, "New file found %s\n", p.first->c_str());
-            files_added.insert(p.first);
-            add(Action::Added, p.first, &p.second);
-            changes_found = true;
+            debug(DIFF, "new entry found %s\n", p.first->c_str());
+            addToDirSummary(Action::Added, p.first, &p.second);
         }
     }
 
     for (auto& p : old)
     {
-        if (curr.count(p.first) == 0)
+        Path *entry = p.first;
+
+        if (curr.count(entry) == 0)
         {
-            // File that disappeard found.
-            debug(DIFF, "Removed file found %s\n", p.first->c_str());
-            files_removed.insert(p.first);
-            add(Action::Removed, p.first, &p.second);
-            changes_found = true;
+            debug(DIFF, "removed entry found %s\n", p.first->c_str());
+            addToDirSummary(Action::Removed, p.first, &p.second);
         }
     }
 
@@ -274,96 +319,141 @@ void DiffImplementation::report()
 {
     for (auto &d : dirs)
     {
-        d.second.print(d.first);
-    }
-
-    /*
-    for (auto& p : files_with_changed_mtime)
-    {
-        string hr = humanReadable(p);
-        printf("    changed:       %s (%s)\n", p.first->c_str(), hr.c_str());
-    }
-
-    for (auto p : files_with_changed_permissions)
-    {
-        printf(" permission:       %s\n", p->c_str());
-    }
-
-    for (auto p : files_added)
-    {
-        Path *par = p->parent();
-        if (par == NULL || !mapContains(files_added, par)) {
-            // The parent is either the root or it has not been added.
-            // Therefore we should print this added entry.
-            int c = 0;
-            if (mapContains(entries_added,p)) {
-                c = entries_added[p];
-            }
-            if (c > 0) {
-                // This is a a new directory with children.
-                string hr = humanReadable(entries_added_size[p]);
-                printf("      added:       %s/... (%d entries %s)\n", p->c_str(), c, hr.c_str());
-            } else {
-                // This is a file, or empty directory.
-                printf("      added:       %s\n", p->c_str());
-            }
+        DirSummary &ds = d.second;
+        Path *p = d.first;
+        if (!should_hide_(p)) {
+            bool hc = should_hide_content_(p);
+            ds.print(p, hc);
         }
     }
 
-    for (auto p : files_removed)
+}
+
+
+void DirSummary::add(Action a, const FileInfo &fi, const FileStat *stat)
+{
+    // Set the current dir summary
+    TypeSummary *ts = &content_[{a,fi.type}];
+    ts->add(fi.identifier, stat);
+    // Add to the accumulated summary
+    TypeSummary *tsall = &all_content_[{a,fi.type}];
+    tsall->add(fi.identifier, stat);
+}
+
+void DirSummary::addChildren(Action a, const FileInfo &fi, const FileStat *stat)
+{
+    // Only to the accumulated summary
+    TypeSummary *tsall = &all_content_[{a,fi.type}];
+    tsall->add(fi.identifier, stat);
+}
+
+void DirSummary::removeDir()
+{
+    dir_removed_ = true;
+}
+
+void DirSummary::addDir()
+{
+    dir_added_ = true;
+}
+
+void DirSummary::print(Path *p, bool hide_content)
+{
+    map<pair<Action,FileType>,TypeSummary> *infos;
+
+    if (dir_removed_)
     {
-        Path *par = p->parent();
-        if (par == NULL || !mapContains(files_removed, par)) {
-            // The parent is either the root or it has not been removed.
-            // Therefore we should print this removed entry.
-            int c = 0;
-            if (mapContains(entries_removed,p)) {
-                c = entries_removed[p];
+        if (all_content_.size() > 0)
+        {
+            printf("%s/... dir removed\n", p->c_str_nls());
+        }
+        else
+        {
+            printf("%s/ dir removed\n", p->c_str_nls());
+            infos = &all_content_;
+        }
+        infos = &all_content_;
+    }
+    else if (dir_added_ )
+    {
+        if (all_content_.size() > 0)
+        {
+            printf("%s/... dir added\n", p->c_str_nls());
+        }
+        else
+        {
+            printf("%s/ dir added\n", p->c_str_nls());
+            infos = &all_content_;
+        }
+        infos = &all_content_;
+    }
+    else if (hide_content)
+    {
+        // Hide the contents of this directory
+        // and print a summary of all content.
+        printf("%s/... \n", p->c_str_nls());
+        infos = &all_content_;
+    }
+    else
+    {
+        if (content_.size() == 0)
+        {
+            debug(DIFF, "hiding dir with only timestamp change %s\n", p->c_str_nls());
+            return;
+        }
+        // Print this directory only.
+        printf("%s/\n", p->c_str_nls());
+        infos = &content_;
+    }
+    debug(DIFF, "%s content.size=%zu allcontent.size=%zu dir_removed=%d dir_added=%d\n",
+          p->c_str_nls(),
+          content_.size(), all_content_.size(), dir_removed_, dir_added_);
+
+    for (auto& a : *infos)
+    {
+        Action act = a.first.first;
+        FileType ft = a.first.second;
+        TypeSummary *st = &a.second;
+        // 32 sources added (java,c,perl)
+        printf("    %zu %s %s (", st->count, fileTypeName(ft, st->count > 1), actionName(act));
+        bool comma = false;
+        bool dotdotdot = false;
+        int count = 0;
+        for (auto s: st->suffixes) {
+            if (++count > 10) {
+                dotdotdot = true;
+                break;
             }
-            if (c > 0) {
-                // This is a removed directory, with children now removed.
-                string hr = humanReadable(entries_removed_size[p]);
-                printf("    removed:       %s/... (%d entries %s)\n", p->c_str(), c, hr.c_str());
+            if (s[0] == 0) {
+                // Found a file with no suffix, or unrecognizable suffix.
+                // Render this as three dots last.
+                dotdotdot = true;
             } else {
-                // This is a file, or empty directory.
-                printf("    removed:       %s\n", p->c_str());
+                if (comma) {
+                    printf(",");
+                } else {
+                    comma = true;
+                }
+                printf("%s", s);
             }
         }
+        if (dotdotdot) {
+            if (comma) {
+                printf(",");
+            }
+            printf("...");
+        }
+        printf(")\n");
     }
+    printf("\n");
+}
 
-    if (changes_found) {
-        printf("\nSummary: ");
-    }
+bool DirSummary::isRemoved()
+{
+    return dir_removed_;
+}
 
-    bool comma_needed = false;
-    if (files_with_changed_mtime.size() > 0) {
-        string hr = humanReadable(sum_of_all_changed_mtime_files_sizes);
-        printf("%zu changed (%s)", files_with_changed_mtime .size(), hr.c_str());
-        changes_found = true;
-        comma_needed = true;
-    }
-    if (files_with_changed_permissions.size() > 0) {
-        if (comma_needed) printf(", ");
-        printf("%zu permissions", files_with_changed_permissions.size());
-        changes_found = true;
-        comma_needed = true;
-    }
-    if (files_added.size() > 0) {
-        if (comma_needed) printf(", ");
-        string hr = humanReadable(sum_of_all_added_files_sizes);
-        printf("%zu added (%s)", files_added.size(), hr.c_str());
-        changes_found = true;
-        comma_needed = true;
-    }
-    if (files_removed.size() > 0) {
-        if (comma_needed) printf(", ");
-        string hr = humanReadable(sum_of_all_removed_files_sizes);
-        printf("%zu removed (%s)", files_removed.size(), hr.c_str());
-        changes_found = true;
-    }
-
-    if (changes_found) {
-        printf("\n");
-    }
-    */
+bool DirSummary::isAdded()
+{
+    return dir_added_;
 }

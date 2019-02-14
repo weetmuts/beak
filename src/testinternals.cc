@@ -231,7 +231,7 @@ void testFileType(const char *path, FileType expected_ft, const char *expected_i
     if (fi.type != expected_ft || strcmp(fi.identifier, expected_id))
     {
         error(TEST_FILEINFOS, "Expected file type \"%s\" with identifier (%s) for path \"%s\", but got \"%s\" (%s)\n",
-              fileTypeName(expected_ft), expected_id, path, fileTypeName(fi.type), fi.identifier);
+              fileTypeName(expected_ft, false), expected_id, path, fileTypeName(fi.type, false), fi.identifier);
     }
 }
 

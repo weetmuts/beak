@@ -32,12 +32,24 @@ using namespace std;
     X(o,Object)          \
                          \
     X(cc,Source)         \
+    X(js,Source)         \
+    X(py,Source)         \
+    X(sh,Source)         \
+    X(xz,Archive)        \
                          \
+    X(bat,Source)        \
     X(cpp,Source)        \
+    X(css,Web)           \
+    X(doc,Document)      \
+    X(exe,Executable)    \
+    X(hpp,Source)        \
     X(pdf,Document)      \
+    X(png,Image)         \
     X(tex,Document)      \
+    X(txt,Document)      \
                          \
     X(docx,Document)     \
+    X(html,Web)          \
     X(java,Source)       \
                          \
     X(class,Object)      \
@@ -48,23 +60,50 @@ using namespace std;
 // Any other found extension is stored here.
 set<string> extensions_;
 
+const char *intern_extension_(const char *s)
+{
+    string e = string(s);
+    set<string>::iterator i = extensions_.find(e);
+    if (i == extensions_.end()) {
+        extensions_.insert(e);
+        i = extensions_.find(e);
+    }
+    return (*i).c_str();
+}
+
 FileInfo fileInfo(Path *p)
 {
     const char *s = p->name()->str().c_str();
     size_t l = p->name()->str().length();
 
-#define X(name,type) { size_t len = STRLEN(#name); if (l>(len+2) && s[l-len-1] == '.' && !strncasecmp(&s[l-len], #name, len)) { return { FileType::type, #name }; } }
-LIST_OF_SUFFIXES
-#undef X
+#define X(suffix,type)                \
+    {                                 \
+        size_t len = STRLEN(#suffix); \
+        if (l>(len+2) && s[l-len-1] == '.' && !strncasecmp(&s[l-len], #suffix, len)) { \
+            return { FileType::type, #suffix, \
+                     fileTypeName(FileType::type, false), \
+                     fileTypeName(FileType::type, true) };       \
+        } \
+    }
 
-    return { FileType::Other, "" };
+LIST_OF_SUFFIXES
+
+#undef X
+    const char *dot = strrchr(s, '.');
+
+    if (dot) {
+        dot = intern_extension_(dot+1);
+    } else {
+        dot = "";
+    }
+    return { FileType::Other, dot, fileTypeName(FileType::Other, false), fileTypeName(FileType::Other, true) };
 }
 
-const char *fileTypeName(FileType ft)
+const char *fileTypeName(FileType ft, bool pluralis)
 {
     switch (ft)
     {
-#define X(name) case FileType::name: return #name;
+#define X(type,name,names) case FileType::type: return pluralis?#names:#name;
 LIST_OF_FILETYPES
 #undef X
     };

@@ -452,13 +452,13 @@ if [ $do_test ]; then
     echo OK
 fi
 
-#setup simplediff "Simple diff"
-if [ /bin/false && $do_test ]; then
+setup simplediff "Simple diff"
+if [ $do_test ]; then
     mkdir -p $root/Alfa/Beta
     mkdir -p $root/Alfa/Gamma
-    echo HEJSAN > $root/Alfa/Beta/gurka
-    echo HEJSAN > $root/Alfa/Gamma/banan
-    echo HEJSAN > $root/Alfa/Gamma/toppen
+    echo HEJSAN > $root/Alfa/Beta/gurka.cc
+    echo HEJSAN > $root/Alfa/Gamma/banan.txt
+    echo HEJSAN > $root/Alfa/Gamma/toppen.h
     performStore
     performDiff
     CHECK=$(cat $diff)
@@ -466,37 +466,37 @@ if [ /bin/false && $do_test ]; then
         echo Failed beak diff! Expected no change. Check in $dir for more information.
         exit
     fi
-    echo SVEJSAN > $root/Alfa/Gamma/gurka
+    echo SVEJSAN > $root/Alfa/Gamma/gurka.cc
     performDiff
-    CHECK=$(grep ":  " $diff | tr -d ' \n')
-    if [ ! "$CHECK" = "added:/Alfa/Gamma/gurka" ]; then
+    CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
+    if [ ! "$CHECK" = "Alfa/Gamma/ 1 source added (cc)" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff! Expected one added. Check in $dir for more information.
         exit
     fi
-    echo SVEJSAN > $root/Alfa/Gamma/banan
+    echo SVEJSAN > $root/Alfa/Gamma/banan.txt
     performDiff
-    CHECK=$(grep ":  " $diff | tr -d ' \n' )
-    if [ ! "$CHECK" = "changed:/Alfa/Gamma/bananadded:/Alfa/Gamma/gurka" ]; then
+    CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
+    if [ ! "$CHECK" = "Alfa/Gamma/ 1 document changed (txt) 1 source added (cc)" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff! Expected one added and one changed. Check in $dir for more information.
         exit
     fi
-    rm $root/Alfa/Beta/gurka
+    rm $root/Alfa/Beta/gurka.cc
     performDiff
-    CHECK=$(grep ":  " $diff | tr -d ' \n' )
-    if [ ! "$CHECK" = "changed:/Alfa/Gamma/bananadded:/Alfa/Gamma/gurkaremoved:/Alfa/Beta/gurka" ]; then
+    CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
+    if [ ! "$CHECK" = "Alfa/Beta/ 1 source removed (cc)Alfa/Gamma/ 1 document changed (txt) 1 source added (cc)" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff! Expected one added, one removed and one changed. Check in $dir for more information.
         exit
     fi
-    chmod a-w $root/Alfa/Gamma/toppen
+    chmod a-w $root/Alfa/Gamma/toppen.h
     performDiff
-    CHECK=$(grep ":  " $diff | tr -d ' \n' )
-    if [ ! "$CHECK" = "changed:/Alfa/Gamma/bananpermission:/Alfa/Gamma/toppenadded:/Alfa/Gamma/gurkaremoved:/Alfa/Beta/gurka" ]; then
+    CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
+    if [ ! "$CHECK" = "Alfa/Beta/ 1 source removed (cc)Alfa/Gamma/ 1 document changed (txt) 1 source permission changed (h) 1 source added (cc)" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff! Expected one added, one removed, one changed and one permission. Check in $dir for more information.
@@ -505,12 +505,12 @@ if [ /bin/false && $do_test ]; then
     echo OK
 fi
 
-#setup hardlinkdiff "Hardlink diff"
-if [ /bin/false && $do_test ]; then
+setup hardlinkdiff "Hardlink diff"
+if [ $do_test ]; then
     mkdir -p $root/Alfa/Beta
     mkdir -p $root/Alfa/Gamma
-    echo HEJSAN > $root/Alfa/Beta/gurka
-    ln $root/Alfa/Beta/gurka $root/Alfa/Gamma/banana
+    echo HEJSAN > $root/Alfa/Beta/gurka.pdf
+    ln $root/Alfa/Beta/gurka.pdf $root/Alfa/Gamma/banana.pdf
     performStore
     performDiff
     CHECK=$(cat $diff)
@@ -518,10 +518,10 @@ if [ /bin/false && $do_test ]; then
         echo Failed beak diff! Expected no change. Check in $dir for more information.
         exit
     fi
-    echo SVEJSAN > $root/Alfa/Gamma/banana
+    echo SVEJSAN > $root/Alfa/Gamma/banana.pdf
     performDiff
-    CHECK=$(grep ":  " $diff | tr -d ' \n')
-    if [ ! "$CHECK" = "changed:/Alfa/Beta/gurkachanged:/Alfa/Gamma/banana" ]; then
+    CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
+    if [ ! "$CHECK" = "Alfa/Beta/ 1 document changed (pdf)Alfa/Gamma/ 1 document changed (pdf)" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff! Expected both ends of hardlink to change. Check in $dir for more information.
@@ -536,14 +536,50 @@ if [ /bin/false && $do_test ]; then
         echo Failed beak diff! Expected no change after restore. Check in $dir for more information.
         exit
     fi
-    rm $root/Alfa/Gamma/banana
-    echo SVEJSAN > $root/Alfa/Gamma/banana
+    rm $root/Alfa/Gamma/banana.pdf
+    echo SVEJSAN > $root/Alfa/Gamma/banana.pdf
     performDiff
-    CHECK=$(grep ":  " $diff | tr -d ' \n')
-    if [ ! "$CHECK" = "changed:/Alfa/Gamma/banana" ]; then
+    CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
+    if [ ! "$CHECK" = "Alfa/Gamma/ 1 document changed (pdf)" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff! Expected only one file to change. Check in $dir for more information.
+        exit
+    fi
+    echo OK
+fi
+
+setup simplediff "Smarter diff"
+if [ $do_test ]; then
+    mkdir -p $root/Alfa/Beta/.git/content
+    mkdir -p $root/Alfa/Gamma/.git/content
+    echo HEJSAN > $root/Alfa/Beta/gurka.cc
+    echo HEJSAN > $root/Alfa/Beta/.git/content/123123123
+    echo HEJSAN > $root/Alfa/Gamma/prog.bas
+    echo HEJSAN > $root/Alfa/Gamma/.git/content/sdfsdf
+    performStore
+    performDiff
+    CHECK=$(cat $diff)
+    if [ ! "$CHECK" = "" ]; then
+        echo Failed beak diff! Expected no change. Check in $dir for more information.
+        exit
+    fi
+    echo SVEJSAN > $root/Alfa/Gamma/.git/content/sxkxkxkx
+    performDiff
+    CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
+    if [ ! "$CHECK" = "Alfa/Gamma/.git/... 1 other file added (...)" ]; then
+        cat $diff
+        echo CHECK=\"${CHECK}\"
+        echo Failed beak diff! Expected one added. Check in $dir for more information.
+        exit
+    fi
+    rm -rf $root/Alfa/Gamma
+    performDiff
+    CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
+    if [ ! "$CHECK" = "Alfa/Gamma/... dir removed 2 sources removed (h,cc) 1 document removed (txt) 2 other files removed (bas,...)" ]; then
+        cat $diff
+        echo CHECK=\"${CHECK}\"
+        echo Failed beak diff! Expected one added. Check in $dir for more information.
         exit
     fi
     echo OK
