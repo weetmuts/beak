@@ -61,6 +61,7 @@ using namespace std;
 static ComponentId COMMANDLINE = registerLogComponent("commandline");
 static ComponentId STORE = registerLogComponent("store");
 static ComponentId FUSE = registerLogComponent("fuse");
+static ComponentId PRUNE = registerLogComponent("prune");
 
 struct CommandEntry;
 struct OptionEntry;
@@ -567,6 +568,10 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
             case include_option:
                 settings->include.push_back(value);
                 break;
+            case keep_option:
+                settings->keep = value;
+                settings->keep_supplied = true;
+                break;
             case license_option:
                 settings->license = true;
                 break;
@@ -941,7 +946,14 @@ RC BeakImplementation::prune(Settings *settings)
         return RC::OK;
     }
 
-    auto prune = newPrune(clockGetUnixTimeNanoSeconds());
+    Keep keep("all:2d daily:2w weekly:2m monthly:2y");
+    if (settings->keep_supplied) {
+        bool ok = keep.parse(settings->keep);
+        if (!ok) {
+            error(PRUNE, "Not a valid keep rule: \"%s\"\n", settings->keep.c_str());
+        }
+    }
+    auto prune = newPrune(clockGetUnixTimeNanoSeconds(), keep);
 
     auto v = restore->history();
     for (auto it = v.rbegin(); it != v.rend(); it++)

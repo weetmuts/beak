@@ -137,6 +137,7 @@ LIST_OF_COMMANDS
     X(f,foreground,bool,false,"When mounting do not spawn a daemon.")   \
     X(fd,fusedebug,bool,false,"Enable fuse debug mode, this also triggers foreground.") \
     X(i,include,std::vector<std::string>,true,"Only matching paths are inluded. E.g. -i '*.c'") \
+    X(k,keep,std::string,true,"Keep rule for prune.") \
     X(,license,bool,false,"Show copyright holders,licenses and notices for the program.") \
     X(l,log,std::string,true,"Log debug messages for these parts. E.g. --log=backup,hashing --log=all,-lock") \
     X(ll,listlog,bool,false,"List all log parts available.") \

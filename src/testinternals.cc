@@ -270,7 +270,7 @@ void testGzip()
     }
 }
 
-void testKeep(string k, time_t tz_offset, time_t all, time_t daily, time_t weekly, time_t monthly)
+void testKeep(string k, time_t tz_offset, uint64_t all, uint64_t daily, uint64_t weekly, uint64_t monthly)
 {
     Keep keep;
 

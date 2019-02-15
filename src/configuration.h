@@ -54,16 +54,16 @@ struct Keep
 
     // The following values are absolute number of seconds back in time from now.
     // Number of seconds to keep all points in time. Zero means do not store using this interval.
-    time_t all {};
+    uint64_t all {};
 
     // Number of seconds to keep the last one per day
-    time_t daily {};
+    uint64_t daily {};
 
     // Number of seconds to keep the last one per week
-    time_t weekly {};
+    uint64_t weekly {};
 
     // Number of seconds to keep the last one per month
-    time_t monthly {};
+    uint64_t monthly {};
 
     Keep() = default;
     Keep(std::string s) { parse(s); }
