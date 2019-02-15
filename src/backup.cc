@@ -127,7 +127,7 @@ RecurseOption Backup::addTarEntry(Path *abspath, FileStat *st)
     if (te->isDirectory()) {
         // Storing the path in the lookup
         directories[te->path()] = te;
-        origin_fs_->addWatch(abspath);
+        //origin_fs_->addWatch(abspath); avoid inotify watch for now
         debug(BACKUP, "added dir >%s< %p %p\n", te->path()->c_str(), te->path(), directories[te->path()]);
     }
     return RecurseContinue;
