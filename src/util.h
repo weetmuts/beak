@@ -44,6 +44,7 @@ bool parseLengthOfTime(std::string s, time_t *out);
 std::string getLengthOfTime(time_t t);
 time_t getTimeZoneOffset();
 std::string getTimeZoneOffsetAsString(time_t t);
+std::string timeToString(uint64_t t);
 size_t basepos(std::string& s);
 std::wstring to_wstring(std::string const& s);
 std::string wto_string(std::wstring const& s);
@@ -73,8 +74,10 @@ void fixEndian(uint64_t *t);
 bool isInTheFuture(struct timespec *tm);
 std::string timeAgo(struct timespec *tm);
 
-// Seconds since 1970-01-01
+// Seconds since 1970-01-01 UTC
 uint64_t clockGetUnixTimeSeconds();
+// Nanoseconds since 1970-01-01 UTC
+uint64_t clockGetUnixTimeNanoSeconds();
 // Microseconds since the computer was started.
 uint64_t clockGetTimeMicroSeconds();
 void captureStartTime();

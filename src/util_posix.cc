@@ -35,6 +35,12 @@ uint64_t clockGetUnixTimeSeconds()
     return time(NULL);
 }
 
+// Nanoseconds since 1970-01-01 Z timezone.
+uint64_t clockGetUnixTimeNanoSeconds()
+{
+    return 1000000000ull * time(NULL);
+}
+
 // Return microseconds
 uint64_t clockGetTimeMicroSeconds()
 {

@@ -609,8 +609,8 @@ if [ $do_test ]; then
     echo OK
 fi
 
-#setup simpleprune "Prune backup storage"
-if [ /bin/false && $do_test ]; then
+setup simpleprune "Prune backup storage"
+if [ $do_test ]; then
     mkdir -p $root/Alfa/Beta
     echo HEJSAN > $root/Alfa/Beta/gurka
     find $root -exec touch -d '-720 days' '{}' +

@@ -862,3 +862,14 @@ bool hexDigitsOnly(char *p, size_t len, string *s) {
     }
     return true;
 }
+
+string timeToString(uint64_t t)
+{
+    char buf[256];
+    memset(buf, 0, sizeof(buf));
+    time_t pp = t/(1000*1000*1000);
+    struct tm tid;
+    localtime_r(&pp, &tid);
+    strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &tid);
+    return buf;
+}

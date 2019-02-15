@@ -25,6 +25,7 @@
 #include "restore.h"
 #include "index.h"
 #include "origintool.h"
+#include "prune.h"
 #include "statistics.h"
 #include "storagetool.h"
 #include "system.h"
@@ -37,6 +38,7 @@ const char *autocomplete =
     ;
 
 #include <algorithm>
+#include <assert.h>
 #include <memory.h>
 #include <limits.h>
 #include <stddef.h>
@@ -916,18 +918,6 @@ cleanup:
     return rc;
 }
 
-uint64_t to_day(uint64_t p) {
-    return p/(3600*24);
-}
-
-uint64_t to_week(uint64_t p) {
-    return p/(3600*24*7);
-}
-
-uint64_t to_month(uint64_t p) {
-    return p/(3600*24*30);
-}
-
 RC BeakImplementation::prune(Settings *settings)
 {
     RC rc = RC::OK;
@@ -951,53 +941,18 @@ RC BeakImplementation::prune(Settings *settings)
         return RC::OK;
     }
 
-    map<uint64_t,uint64_t> daily_max;
-    map<uint64_t,uint64_t> weekly_max;
-    map<uint64_t,uint64_t> monthly_max;
+    auto prune = newPrune(clockGetUnixTimeNanoSeconds());
 
-    //uint64_t prev = 0;
-    for (auto& h : restore->history())
+    auto v = restore->history();
+    for (auto it = v.rbegin(); it != v.rend(); it++)
     {
+        auto h = *it;
         uint64_t p = h.ts.tv_sec*1000000000 + h.ts.tv_nsec;
-        fprintf(stderr, "%zu.%zu %s %zu\n", h.ts.tv_sec, h.ts.tv_nsec, h.datetime.c_str(), p);
-
-        // event add
-        // any p d w m
-        // where
-        // @grd_1 p ∈ ℕ
-        // @grd_2 p > max(points_in_time)
-//        assert(p > prev);
-        //prev = p;
-        // @grd_3 d = to_day(p)
-        uint64_t d = to_day(p);
-        //@grd_4 w = to_week(p)
-        uint64_t w = to_week(p);
-        // @grd_5 m = to_month(p)
-        uint64_t m = to_month(p);
-        fprintf(stderr, "p=%zu d=%zu w=%zu m=%zu\n", p, d, w, m);
-        // then
-        // @act_1 points_in_time ≔ points_in_time ∪ {p}
-        // @act_2 daily_max(d) ≔ p
-        daily_max[d] = p;
-        // @act_3 weekly_max(w) ≔ p
-        weekly_max[w] = p;
-        // @act_4 monthly_max(m) ≔ p
-        monthly_max[m] = p;
-        //end
+        prune->addPointInTime(p);
     }
 
-    // event prune
-    // then
-    // @act_1 points_in_time ≔ ran(daily_max) ∪ ran(weekly_max) ∪ ran(monthly_max)
-    set<uint64_t> pruned;
-
-    for (auto &p : daily_max) { pruned.insert(p.second); }
-    for (auto &p : weekly_max) { pruned.insert(p.second); }
-    for (auto &p : monthly_max) { pruned.insert(p.second); }
-
-    for (auto &p : pruned) {
-        fprintf(stderr, "LEFT %zu\n", p);
-    }
+    map<uint64_t,bool> result;
+    prune->prune(&result);
 
     return RC::OK;
 }

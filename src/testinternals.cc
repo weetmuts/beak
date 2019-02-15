@@ -41,6 +41,7 @@ static ComponentId TEST_HEXSTRING = registerLogComponent("test_hexstring");
 static ComponentId TEST_SPLIT = registerLogComponent("test_split");
 static ComponentId TEST_READSPLIT = registerLogComponent("test_readsplit");
 static ComponentId TEST_CONTENTSPLIT = registerLogComponent("test_contentsplit");
+static ComponentId TEST_PRUNE = registerLogComponent("test_prune");
 
 void testMatch(string pattern, const char *path, bool should_match);
 
@@ -62,6 +63,7 @@ void testFit();
 void testSplitLogic();
 void testContentSplit();
 void testReadSplitLogic();
+void testPrune();
 
 void predictor(int argc, char **argv);
 
@@ -95,6 +97,7 @@ int main(int argc, char *argv[])
         testSplitLogic();
         testReadSplitLogic();
 //        testContentSplit();
+        testPrune();
 
         if (!err_found_) {
             printf("OK\n");
@@ -568,4 +571,9 @@ void testContentSplit()
 
     error(TEST_CONTENTSPLIT,"Content split calculated the wrong values.\n");
 
+}
+
+void testPrune()
+{
+    error(TEST_PRUNE, "Prune failed\n");
 }
