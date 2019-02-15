@@ -192,7 +192,6 @@ LIST_OF_OPTIONS
     char **fuse_argv {};
 
     Command help_me_on_this_cmd {};
-    int point_in_time {};
 
     Settings copy() { return *this; }
     void updateFuseArgsArray();

@@ -472,7 +472,6 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
 
     settings->help_me_on_this_cmd = nosuch_cmd;
     settings->fuse_args.push_back("beak"); // Application name
-    settings->depth = 2; // Default value
     settings->pointintimeformat = both_point;
 
     if (args.size() < 1) return nosuch_cmd;
@@ -493,6 +492,8 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
         fprintf(stderr, "No such command \"%s\"\n", args[0].c_str());
         return cmd;
     }
+
+    settings->depth = 2; // Default value
 
     auto i = args.begin();
     i = args.erase(i);
@@ -545,9 +546,14 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
                 break;
             case depth_option:
                 settings->depth = atoi(value.c_str());
-                if (settings->depth < 1) {
-                    error(COMMANDLINE, "Option depth (-d) cannot be set to "
+                settings->depth_supplied = true;
+                if ((cmd == store_cmd || cmd == bmount_cmd) && settings->depth < 1) {
+                    error(COMMANDLINE, "For store/bmount depth (-d) cannot be set to "
                           "less than 1, ie the root.\n");
+                }
+                if ((cmd == diff_cmd) && settings->depth < 0) {
+                    error(COMMANDLINE, "For diff depth (-d) cannot be set to "
+                          "less than 0, ie the root.\n");
                 }
                 break;
             case foreground_option:

@@ -148,6 +148,20 @@ function performDiff {
     fi
 }
 
+function performDiffInsideBackup {
+    extra="$1"
+    if [ -z "$test" ]; then
+        # Normal test execution, execute the store
+        eval "${BEAK} diff $extra ${store}@0 ${store}@1 > $diff"
+    else
+        if [ -z "$gdb" ]; then
+            ${BEAK} diff --log=all $extra ${store}@0 ${store}@1 2>&1 | tee $diff
+        else
+            gdb -ex=r --args ${BEAK} diff -f $extra ${store}@0 ${store}@1
+        fi
+    fi
+}
+
 function startMountTest {
     run="$1"
     extra="$2"
@@ -173,17 +187,17 @@ function startMountTest {
 
 function startMountTestArchive {
     run="$1"
-    extra="$2"
+    point="$2"
     if [ -z "$test" ]; then
-        ${BEAK} mount $extra $packed $check > $log
+        ${BEAK} mount ${packed}${point} $check > $log
         ${run}
     else
         if [ -z "$gdb" ]; then
             (sleep 2; eval ${run}) &
-            ${BEAK} mount -f $extra $packed $check 2>&1 | tee $log &
+            ${BEAK} mount -f ${packed}${point} $check 2>&1 | tee $log &
         else
             (sleep 3; eval ${run}) &
-            gdb -ex=r --args ${BEAK} mount -f $extra $packed $check
+            gdb -ex=r --args ${BEAK} mount -f ${packed}${point} $check
         fi
     fi
 }
@@ -225,22 +239,23 @@ function stopMountArchive {
 function startTwoFS {
     run="$1"
     extra="$2"
-    extrareverse="$3"
+    point="$3"
     if [ -z "$test" ]; then
         ${BEAK} bmount $extra $root $mount > $log
         sleep 2
-        ${BEAK} mount $extrareverse $mount $mountreverse > $log
+        ${BEAK} mount ${mount}${point} $mountreverse > $log
         ${run}
     else
         if [ -z "$gdb" ]; then
             (sleep 4; eval ${run}) &
             ${BEAK} bmount $extra $root $mount 2>&1 | tee $log &
-            ${BEAK} mount -f $extrareverse $mount $mountreverse 2>&1 | tee $logreverse &
+            sleep 2
+            ${BEAK} mount -f ${mount}${point} $mountreverse 2>&1 | tee $logreverse &
         else
             (sleep 5; eval ${run}) &
             ${BEAK} bmount $extra $root $mount > $log
             sleep 2
-            gdb -ex=r --args ${BEAK} mount -f $extrareverse $mount $mountreverse
+            gdb -ex=r --args ${BEAK} mount -f ${mount}${point} $mountreverse
         fi
     fi
 }
@@ -460,14 +475,14 @@ if [ $do_test ]; then
     echo HEJSAN > $root/Alfa/Gamma/banan.txt
     echo HEJSAN > $root/Alfa/Gamma/toppen.h
     performStore
-    performDiff
+    performDiff "-d 0"
     CHECK=$(cat $diff)
     if [ ! "$CHECK" = "" ]; then
         echo Failed beak diff! Expected no change. Check in $dir for more information.
         exit
     fi
     echo SVEJSAN > $root/Alfa/Gamma/gurka.cc
-    performDiff
+    performDiff "-d 0"
     CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
     if [ ! "$CHECK" = "Alfa/Gamma/ 1 source added (cc)" ]; then
         cat $diff
@@ -476,27 +491,27 @@ if [ $do_test ]; then
         exit
     fi
     echo SVEJSAN > $root/Alfa/Gamma/banan.txt
-    performDiff
+    performDiff "-d 0"
     CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
-    if [ ! "$CHECK" = "Alfa/Gamma/ 1 document changed (txt) 1 source added (cc)" ]; then
+    if [ ! "$CHECK" = "Alfa/Gamma/ 1 source added (cc) 1 document changed (txt)" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff! Expected one added and one changed. Check in $dir for more information.
         exit
     fi
     rm $root/Alfa/Beta/gurka.cc
-    performDiff
+    performDiff "-d 0"
     CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
-    if [ ! "$CHECK" = "Alfa/Beta/ 1 source removed (cc)Alfa/Gamma/ 1 document changed (txt) 1 source added (cc)" ]; then
+    if [ ! "$CHECK" = "Alfa/Beta/ 1 source removed (cc)Alfa/Gamma/ 1 source added (cc) 1 document changed (txt)" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff! Expected one added, one removed and one changed. Check in $dir for more information.
         exit
     fi
     chmod a-w $root/Alfa/Gamma/toppen.h
-    performDiff
+    performDiff "-d 0"
     CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
-    if [ ! "$CHECK" = "Alfa/Beta/ 1 source removed (cc)Alfa/Gamma/ 1 document changed (txt) 1 source permission changed (h) 1 source added (cc)" ]; then
+    if [ ! "$CHECK" = "Alfa/Beta/ 1 source removed (cc)Alfa/Gamma/ 1 source permission changed (h) 1 source added (cc) 1 document changed (txt)" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff! Expected one added, one removed, one changed and one permission. Check in $dir for more information.
@@ -512,14 +527,14 @@ if [ $do_test ]; then
     echo HEJSAN > $root/Alfa/Beta/gurka.pdf
     ln $root/Alfa/Beta/gurka.pdf $root/Alfa/Gamma/banana.pdf
     performStore
-    performDiff
+    performDiff "-d 0"
     CHECK=$(cat $diff)
     if [ ! "$CHECK" = "" ]; then
         echo Failed beak diff! Expected no change. Check in $dir for more information.
         exit
     fi
     echo SVEJSAN > $root/Alfa/Gamma/banana.pdf
-    performDiff
+    performDiff "-d 0"
     CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
     if [ ! "$CHECK" = "Alfa/Beta/ 1 document changed (pdf)Alfa/Gamma/ 1 document changed (pdf)" ]; then
         cat $diff
@@ -529,7 +544,7 @@ if [ $do_test ]; then
     fi
     performReStore
     (cd "$root"; cp -a $check/* .)
-    performDiff
+    performDiff "-d 0"
     CHECK=$(cat $diff)
     if [ ! "$CHECK" = "" ]; then
         cat $diff
@@ -538,12 +553,21 @@ if [ $do_test ]; then
     fi
     rm $root/Alfa/Gamma/banana.pdf
     echo SVEJSAN > $root/Alfa/Gamma/banana.pdf
-    performDiff
+    performDiff "-d 0"
     CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
     if [ ! "$CHECK" = "Alfa/Gamma/ 1 document changed (pdf)" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff! Expected only one file to change. Check in $dir for more information.
+        exit
+    fi
+    performStore
+    performDiffInsideBackup "-d 0"
+    CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
+    if [ ! "$CHECK" = "Alfa/Gamma/ 1 document changed (pdf)" ]; then
+        cat $diff
+        echo CHECK=\"${CHECK}\"
+        echo Failed beak diff inside backup! Expected only one file to change. Check in $dir for more information.
         exit
     fi
     echo OK
@@ -565,7 +589,7 @@ if [ $do_test ]; then
         exit
     fi
     echo SVEJSAN > $root/Alfa/Gamma/.git/content/sxkxkxkx
-    performDiff
+    performDiff "-d 0"
     CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
     if [ ! "$CHECK" = "Alfa/Gamma/.git/... 1 other file added (...)" ]; then
         cat $diff
@@ -574,7 +598,7 @@ if [ $do_test ]; then
         exit
     fi
     rm -rf $root/Alfa/Gamma
-    performDiff
+    performDiff "-d 0"
     CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
     if [ ! "$CHECK" = "Alfa/Gamma/... dir removed 2 sources removed (h,cc) 1 document removed (txt) 2 other files removed (bas,...)" ]; then
         cat $diff
@@ -1321,7 +1345,7 @@ function compareTwo {
 setup reverse1 "Forward mount of libtar, Reverse mount back!"
 if [ $do_test ]; then
     ./scripts/generate_filesystem.sh $root 5 10
-    startTwoFS compareTwo "" "-p @0"
+    startTwoFS compareTwo "" "@0"
     echo OK
 fi
 
@@ -1337,7 +1361,7 @@ function pointInTimeTestPart2 {
     cp -r "$mount"/* "$packed"
     chmod -R u+w "$packed"/*
     stopMount nook
-    startMountTestArchive pointInTimeTestPart3 "-p @0"
+    startMountTestArchive pointInTimeTestPart3 "@0"
 }
 
 function pointInTimeTestPart3 {
@@ -1347,7 +1371,7 @@ function pointInTimeTestPart3 {
         exit
     fi
     stopMountArchive
-    startMountTestArchive pointInTimeTestPart4 "-p @1"
+    startMountTestArchive pointInTimeTestPart4 "@1"
     echo OK
 }
 

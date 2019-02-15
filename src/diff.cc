@@ -108,7 +108,7 @@ private:
 
     bool should_hide_(Path *p)
     {
-        if (p->depth() > depth_)
+        if (depth_ && p->depth() > depth_)
         {
             return true;
         }
@@ -132,7 +132,7 @@ private:
 
     bool should_hide_content_(Path *p)
     {
-        if (p->depth() == depth_)
+        if (depth_ && p->depth() == depth_)
         {
             return true;
         }
@@ -289,12 +289,16 @@ RC DiffImplementation::diff(FileSystem *old_fs, Path *old_path,
             {
                 if (newstat->hard_link) {
                     debug(DIFF, "Hard link in new: %s\n", newstat->hard_link->c_str());
+                    if (curr.count(newstat->hard_link) > 0) {
+                        newstat = &old[newstat->hard_link];
+                        debug(DIFF, "Followed new hard link\n");
+                    }
                 }
                 if (oldstat->hard_link) {
                     debug(DIFF, "Hard link in old: %s\n", oldstat->hard_link->c_str());
                     if (old.count(oldstat->hard_link) > 0) {
                         oldstat = &old[oldstat->hard_link];
-                        debug(DIFF, "Followed hard link\n");
+                        debug(DIFF, "Followed old hard link\n");
                     }
                 }
                 if (!newstat->sameSize(oldstat) ||
@@ -371,6 +375,13 @@ void DirSummary::addDir()
     dir_added_ = true;
 }
 
+
+FileType all_filetypes_[] = {
+#define X(type,name,names) FileType::type,
+LIST_OF_FILETYPES
+#undef X
+};
+
 void DirSummary::print(Path *p, bool hide_content)
 {
     map<pair<Action,FileType>,TypeSummary> *infos;
@@ -423,46 +434,50 @@ void DirSummary::print(Path *p, bool hide_content)
           p->c_str_nls(),
           content_.size(), all_content_.size(), dir_removed_, dir_added_);
 
-    for (auto& a : *infos)
+    for (auto filetype : all_filetypes_)
     {
-        Action act = a.first.first;
-        FileType ft = a.first.second;
-        TypeSummary *st = &a.second;
-        // 32 sources added (java,c,perl)
-        printf("    %zu %s %s (", st->count, fileTypeName(ft, st->count > 1), actionName(act));
-        bool comma = false;
-        bool dotdotdot = false;
-        int count = 0;
-        for (auto s: st->suffixes) {
-            if (++count > 10) {
-                dotdotdot = true;
-                break;
+        for (auto& a : *infos)
+        {
+            Action act = a.first.first;
+            FileType ft = a.first.second;
+            if (ft != filetype) continue;
+            TypeSummary *st = &a.second;
+            // 32 sources added (java,c,perl)
+            printf("    %zu %s %s (", st->count, fileTypeName(ft, st->count > 1), actionName(act));
+            bool comma = false;
+            bool dotdotdot = false;
+            int count = 0;
+            for (auto s: st->suffixes) {
+                if (++count > 10) {
+                    dotdotdot = true;
+                    break;
+                }
+                if (s[0] == 0) {
+                    // Found a file with no suffix, or unrecognizable suffix.
+                    // Render this as three dots last.
+                    dotdotdot = true;
+                } else {
+                    if (comma) {
+                        printf(",");
+                    } else {
+                        comma = true;
+                    }
+                    printf("%s", s);
+                }
             }
-            if (s[0] == 0) {
-                // Found a file with no suffix, or unrecognizable suffix.
-                // Render this as three dots last.
-                dotdotdot = true;
-            } else {
+            if (dotdotdot) {
                 if (comma) {
                     printf(",");
-                } else {
-                    comma = true;
                 }
-                printf("%s", s);
+                printf("...");
             }
-        }
-        if (dotdotdot) {
-            if (comma) {
-                printf(",");
+            printf(")\n");
+            for (auto p : st->files) {
+                printf("    %s\n", p->c_str_nls());
             }
-            printf("...");
-        }
-        printf(")\n");
-        for (auto p : st->files) {
-            printf("    %s\n", p->c_str_nls());
-        }
-        if (st->files.size()) {
-            printf("\n");
+            if (st->files.size()) {
+                printf("\n");
+            }
         }
     }
     printf("\n");
