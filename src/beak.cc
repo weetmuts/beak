@@ -123,7 +123,7 @@ struct BeakImplementation : Beak {
 
     CommandEntry *parseCommand(string s);
     OptionEntry *parseOption(string s, bool *has_value, string *value);
-    Argument parseArgument(std::string arg, ArgumentType expected_type, Settings *settings);
+    Argument parseArgument(std::string arg, ArgumentType expected_type, Settings *settings, Command cmd);
 
     unique_ptr<FuseMount> backup_fuse_mount_;
     unique_ptr<FuseMount> restore_fuse_mount_;
@@ -225,7 +225,7 @@ OptionEntry *BeakImplementation::parseOption(string s, bool *has_value, string *
     return ce;
 }
 
-Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_type, Settings *settings)
+Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_type, Settings *settings, Command cmd)
 {
     Argument argument;
 
@@ -241,7 +241,7 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
         //            in: /media/you/USBDevice@0
         auto point = arg.substr(at);
         arg = arg.substr(0,at);
-        if (expected_type != ArgStorage) {
+        if (expected_type != ArgStorage && expected_type != ArgORS && expected_type != ArgNORS) {
             error(COMMANDLINE, "A point in time must only be suffixed to a storage.\n");
         }
         argument.point_in_time = point;
@@ -277,8 +277,8 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
     if (expected_type == ArgORS || expected_type == ArgStorage) {
         Path *storage_location = Path::lookup(arg);
         Storage *storage = configuration_->findStorageFrom(storage_location);
-        if (!storage) {
-            // Try to create a missing directory.
+        if (!storage && cmd == store_cmd) {
+            // If we are storing, then try to create a missing directory.
             storage = configuration_->createStorageFrom(storage_location);
         }
         if (storage) {
@@ -571,9 +571,6 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
                 listLogComponents();
                 exit(0);
                 break;
-            case pointintime_option:
-                settings->pointintime = value;
-                break;
             case pointintimeformat_option:
                 if (value == "absolute") settings->pointintimeformat = absolute_point;
                 else if (value == "relative") settings->pointintimeformat = relative_point;
@@ -684,14 +681,11 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
         {
             if (settings->from.type == ArgUnspecified)
             {
-                settings->from = parseArgument(*i, cmde->expected_from, settings);
-                if (settings->from.point_in_time != "") {
-                    settings->pointintime = settings->from.point_in_time;
-                }
+                settings->from = parseArgument(*i, cmde->expected_from, settings, cmd);
             }
             else if (settings->to.type == ArgUnspecified)
             {
-                settings->to = parseArgument(*i, cmde->expected_to, settings);
+                settings->to = parseArgument(*i, cmde->expected_to, settings, cmd);
                 if (settings->to.type == ArgOrigin)
                 {
                     settings->fuse_args.push_back(settings->to.origin->c_str());
@@ -764,7 +758,8 @@ RC BeakImplementation::store(Settings *settings)
 }
 
 unique_ptr<Restore> BeakImplementation::accessBackup_(Argument *storage,
-                                                      string pointintime, ProgressStatistics *progress)
+                                                      string pointintime,
+                                                      ProgressStatistics *progress)
 {
     RC rc = RC::OK;
 
@@ -811,7 +806,7 @@ RC BeakImplementation::restore(Settings *settings)
     umask(0);
     RC rc = RC::OK;
 
-    auto restore  = accessBackup_(&settings->from, settings->pointintime, progress.get());
+    auto restore  = accessBackup_(&settings->from, settings->to.point_in_time, progress.get());
     if (!restore) {
         return RC::ERR;
     }
@@ -1010,35 +1005,54 @@ RC BeakImplementation::diff(Settings *settings)
 
     auto progress = newProgressStatistics(settings->progress);
 
-    FileSystem *curr_fs = NULL, *old_fs = NULL;
-    Path *curr_path =NULL, *old_path = Path::lookupRoot();
+    FileSystem *curr_fs = NULL;
+    FileSystem *old_fs = NULL;
+    Path *curr_path =NULL;
+    Path *old_path = NULL;
+
+    unique_ptr<Restore> restore_curr;
 
     // Setup the curr file system.
-    curr_fs = origin_tool_->fs();
-    curr_path = settings->from.origin;
-    assert(curr_path != NULL);
+    if (settings->from.type == ArgOrigin) {
+        curr_fs = origin_tool_->fs();
+        curr_path = settings->from.origin;
+    } else if (settings->from.type == ArgStorage) {
+        restore_curr = accessBackup_(&settings->from, settings->from.point_in_time, progress.get());
+        auto point = restore_curr->singlePointInTime();
+        if (!point) {
+            // The settings did not specify a point in time, lets use the most recent for the restore.
+            point = restore_curr->setPointInTime("@0");
+        }
 
-    unique_ptr<Restore> restore;
+        if (!restore_curr) {
+            return RC::ERR;
+        }
+        curr_fs = restore_curr->asFileSystem();
+        curr_path = Path::lookupRoot();
+    }
+
+    unique_ptr<Restore> restore_old;
 
     // Setup the old file system.
     if (settings->to.type == ArgOrigin) {
         old_fs = origin_tool_->fs();
         old_path = settings->to.origin;
     } else if (settings->to.type == ArgStorage) {
-        restore = accessBackup_(&settings->to, settings->pointintime, progress.get());
-        auto point = restore->singlePointInTime();
+        restore_old = accessBackup_(&settings->to, settings->to.point_in_time, progress.get());
+        auto point = restore_old->singlePointInTime();
         if (!point) {
             // The settings did not specify a point in time, lets use the most recent for the restore.
-            point = restore->setPointInTime("@0");
+            point = restore_old->setPointInTime("@0");
         }
 
-        if (!restore) {
+        if (!restore_old) {
             return RC::ERR;
         }
-        old_fs = restore->asFileSystem();
+        old_fs = restore_old->asFileSystem();
+        old_path = Path::lookupRoot();
     }
 
-    auto d = newDiff(settings->verbose);
+    auto d = newDiff(settings->verbose, settings->depth);
     rc = d->diff(old_fs, old_path,
                  curr_fs, curr_path,
                  progress.get());
@@ -1051,7 +1065,7 @@ RC BeakImplementation::fsck(Settings *settings)
     RC rc = RC::OK;
 
     auto progress = newProgressStatistics(settings->progress);
-    auto restore  = accessBackup_(&settings->from, settings->pointintime, progress.get());
+    auto restore  = accessBackup_(&settings->from, settings->from.point_in_time, progress.get());
     if (!restore) {
         return RC::ERR;
     }
@@ -1227,7 +1241,7 @@ RC BeakImplementation::mountRestore(Settings *settings, ProgressStatistics *prog
 
 RC BeakImplementation::mountRestoreInternal_(Settings *settings, bool daemon, ProgressStatistics *progress)
 {
-    auto restore  = accessBackup_(&settings->from, settings->pointintime, progress);
+    auto restore  = accessBackup_(&settings->from, settings->from.point_in_time, progress);
     if (!restore) {
         return RC::ERR;
     }

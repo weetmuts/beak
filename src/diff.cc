@@ -88,8 +88,9 @@ public:
 
     void report();
 
-    DiffImplementation(bool detailed) {
+    DiffImplementation(bool detailed, int depth) {
         detailed_ = detailed;
+        depth_ = depth;
         dotgit_ = Atom::lookup(".git");
     }
     ~DiffImplementation() = default;
@@ -100,12 +101,17 @@ private:
     map<Path*,DirSummary,TarSort> dirs;
     Atom *dotgit_;
     bool detailed_;
+    int depth_;
 
     void addStats(Action a, Path *p, FileStat *stat);
     void addToDirSummary(Action a, Path *file_or_dir, FileStat *stat);
 
     bool should_hide_(Path *p)
     {
+        if (p->depth() > depth_)
+        {
+            return true;
+        }
         p = p->parent();
         if (p && dirs.count(p)) {
             DirSummary *ds = &dirs[p];
@@ -126,6 +132,10 @@ private:
 
     bool should_hide_content_(Path *p)
     {
+        if (p->depth() == depth_)
+        {
+            return true;
+        }
         while (p) {
             if (p->name() == dotgit_) {
                 return true;
@@ -151,9 +161,9 @@ const char *actionName(Action a)
     assert(0);
 }
 
-unique_ptr<Diff> newDiff(bool detailed)
+unique_ptr<Diff> newDiff(bool detailed, int depth)
 {
-    return unique_ptr<Diff>(new DiffImplementation(detailed));
+    return unique_ptr<Diff>(new DiffImplementation(detailed, depth));
 }
 
 

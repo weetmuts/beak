@@ -106,7 +106,7 @@ enum ArgumentType
 #define LIST_OF_COMMANDS \
     X(bmount,"Mount your file system as a backup.",ArgOrigin,ArgDir) \
     X(config,"Configure backup rules.",ArgNone,ArgNone) \
-    X(diff,"Show changes relation to or between backups.",ArgOrigin,ArgORS) \
+    X(diff,"Show differences between backups and/or origins.",ArgORS,ArgORS) \
     X(fsck,"Check the integrity of your backup.",ArgStorage,ArgNone) \
     X(genautocomplete,"Output bash completion script for beak.",ArgFile,ArgNone) \
     X(genmounttrigger,"Output systemd rule to trigger backup when USB drive is mounted.",ArgFile,ArgNone) \
@@ -140,9 +140,6 @@ LIST_OF_COMMANDS
     X(,license,bool,false,"Show copyright holders,licenses and notices for the program.") \
     X(l,log,std::string,true,"Log debug messages for these parts. E.g. --log=backup,hashing --log=all,-lock") \
     X(ll,listlog,bool,false,"List all log parts available.") \
-    X(p,pointintime,std::string,true,"When mounting an archive pick this point in time only.\n" \
-      "                           -p @0 is always the most recent. -p @1 the second most recent.\n" \
-      "                           You can also suffix @1 to the storage directory." )        \
     X(pf,pointintimeformat,PointInTimeFormat,true,"How to present the point in time.\n" \
       "                           E.g. absolute,relative or both. Default is both.")    \
     X(pr,progress,ProgressDisplayType,true,"How to present the progress of the backup or restore.\n" \

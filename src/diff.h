@@ -32,6 +32,6 @@ struct Diff
     virtual ~Diff() = default;
 };
 
-std::unique_ptr<Diff> newDiff(bool detailed);
+std::unique_ptr<Diff> newDiff(bool detailed, int depth);
 
 #endif
