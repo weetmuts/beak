@@ -32,9 +32,9 @@ public:
     PruneImplementation(uint64_t now, const Keep &keep) { now_ = now; keep_ = keep; }
 private:
 
-    uint64_t now_;
+    uint64_t now_ {};
     Keep keep_;
-    uint64_t prev_;
+    uint64_t prev_ {};
     map<uint64_t,bool> points_;
     set<uint64_t> all_;
     map<uint64_t,uint64_t> daily_max_;
