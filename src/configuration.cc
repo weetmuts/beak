@@ -241,7 +241,7 @@ bool ConfigurationImplementation::parseRow(string key, string value,
                 error(CONFIGURATION, "Local path must be specified before local keep rule.\n");
             }
             if (!current_rule->local->keep.parse(value)) {
-                error(CONFIGURATION, "Invalid keep rule \"%s\".", value.c_str());
+                error(CONFIGURATION, "Invalid keep rule \"%s\".\n", value.c_str());
             }
             break;
         }
@@ -281,7 +281,7 @@ bool ConfigurationImplementation::parseRow(string key, string value,
                 error(CONFIGURATION, "Remote must be specified before keep rule.\n");
             }
             if (!(*current_storage)->keep.parse(value)) {
-                error(CONFIGURATION, "Invalid keep rule \"%s\".", value.c_str());
+                error(CONFIGURATION, "Invalid keep rule \"%s\".\n", value.c_str());
             }
             break;
         }
@@ -846,23 +846,15 @@ size_t calcTime(string s)
 
 bool Keep::parse(string s)
 {
-    // Example:    "tz:+0100 all:2d daily:2w weekly:2m monthly:2y"
-    // Example:    "tz:+0100 all:2d daily:1w monthly:12m"
+    // Example:    "all:2d daily:2w weekly:2m monthly:2y"
+    // Example:    "all:2d daily:1w monthly:12m"
     vector<char> data(s.begin(), s.end());
     auto i = data.begin();
     string tz, offset;
     bool eof, err, ok;
     int level = 0; // 0=all 1=daily, 2=weekly, 3=monthly
 
-    tz_offset = all = daily = weekly = monthly = 0;
-
-    tz = eatToSkipWhitespace(data, i, ':', 16, &eof, &err);
-    if (eof || err) goto err;
-    if (tz != "tz") goto err;
-    offset = eatToSkipWhitespace(data, i, ' ', 16, &eof, &err);
-    if (err) goto err;
-    ok = parseTimeZoneOffset(offset, &tz_offset);
-    if (!ok) goto err;
+    all = daily = weekly = monthly = 0;
 
     while (true) {
         string key = eatToSkipWhitespace(data, i, ':', 16, &eof, &err);
@@ -906,10 +898,8 @@ err:
 
 string Keep::str()
 {
-    string s = "tz:";
+    string s;
 
-    s += getTimeZoneOffsetAsString(tz_offset);
-    s += " ";
     if (all) s += "all:"+getLengthOfTime(all)+" ";
     if (daily) s += "daily:"+getLengthOfTime(daily)+" ";
     if (weekly) s += "weekly:"+getLengthOfTime(weekly)+" ";
@@ -919,7 +909,6 @@ string Keep::str()
 }
 
 bool Keep::subsetOf(const Keep &keep) {
-    if (tz_offset != keep.tz_offset) return false;
     if (all > keep.all) return false;
     if (daily > keep.daily) return false;
     if (weekly > keep.weekly) return false;

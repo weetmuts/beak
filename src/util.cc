@@ -345,6 +345,12 @@ bool parseLengthOfTime(string s, time_t *out)
     time_t mul = 1;
     char c = s.back();
 
+    if (s == "forever") {
+        // Forever is 500 years....
+        // Its because uin64_t nanos will only run to that.
+        *out = 3600ull*24*366*500;
+        return true;
+    }
     if (s.length() > 16)
     {
         return false;

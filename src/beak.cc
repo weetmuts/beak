@@ -559,6 +559,10 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
                           "less than 0, ie the root.\n");
                 }
                 break;
+            case dryrun_option:
+                settings->dryrun = true;
+                settings->dryrun_supplied = true;
+                break;
             case foreground_option:
                 settings->foreground = true;
                 break;

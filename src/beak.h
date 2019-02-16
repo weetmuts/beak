@@ -134,6 +134,7 @@ LIST_OF_COMMANDS
     X(,contentsplit,std::vector<std::string>,true,"Split matching files based on content. E.g. -cs '*.vdi'") \
     X(d,depth,int,true,"Force all dirs at this depth to contain tars.\n" \
       "                           1 is the root, 2 is the first subdir. The default is 2.")    \
+    X(,dryrun,bool,true,"Print what would be done, do not actually perform the prune/store.\n")  \
     X(f,foreground,bool,false,"When mounting do not spawn a daemon.")   \
     X(fd,fusedebug,bool,false,"Enable fuse debug mode, this also triggers foreground.") \
     X(i,include,std::vector<std::string>,true,"Only matching paths are inluded. E.g. -i '*.c'") \

@@ -270,26 +270,23 @@ void testGzip()
     }
 }
 
-void testKeep(string k, time_t tz_offset, uint64_t all, uint64_t daily, uint64_t weekly, uint64_t monthly)
+void testKeep(string k, uint64_t all, uint64_t daily, uint64_t weekly, uint64_t monthly)
 {
     Keep keep;
 
     verbose(TEST_KEEP, "Testing Keep \"%s\" ", k.c_str());
     keep.parse(k);
-    if (keep.tz_offset != tz_offset ||
-        keep.all != all ||
+    if (keep.all != all ||
         keep.daily != daily ||
         keep.weekly != weekly ||
         keep.monthly != monthly)
     {
         verbose(TEST_KEEP, "Keep parse \"%s\" failed!\n", k.c_str());
         verbose(TEST_KEEP, "Expected / Got \n"
-                "tz=%" PRINTF_TIME_T "d / %" PRINTF_TIME_T "d \n"
                 "all=%" PRINTF_TIME_T "d / %" PRINTF_TIME_T "d \n"
                 "daily=%" PRINTF_TIME_T "d / %" PRINTF_TIME_T "d \n"
                 "weekly=%" PRINTF_TIME_T "d / %" PRINTF_TIME_T "d \n"
                 "monthly=%" PRINTF_TIME_T "d / %" PRINTF_TIME_T "d \n",
-                tz_offset, keep.tz_offset,
                 all, keep.all,
                 daily, keep.daily,
                 weekly, keep.weekly,
@@ -302,13 +299,13 @@ void testKeep(string k, time_t tz_offset, uint64_t all, uint64_t daily, uint64_t
 
 void testKeeps()
 {
-    testKeep("tz:+0100 all:10d", 3600, 3600*24*10, 0, 0, 0);
-    testKeep("tz:+0000  all: 7d     daily:2w", 0, 3600*24*7, 3600*24*14, 0, 0);
-    testKeep(" tz : -1030 all:1d daily: 1w weekly:1m monthly:1y", -3600*10.5,
+    testKeep("all:10d", 3600*24*10, 0, 0, 0);
+    testKeep("all: 7d     daily:2w", 3600*24*7, 3600*24*14, 0, 0);
+    testKeep("all:1d daily: 1w weekly:1m monthly:1y",
              3600*24/*all*/, 3600*24*7/*daily*/, 3600*24*31/*weekly*/, 3600*24*366/*monthly*/);
-    testKeep("tz:+0500 weekly:1y", 3600*5,
+    testKeep("weekly:1y",
              0/*all*/, 0/*daily*/, 3600*24*366/*weekly*/, 0/*monthly*/);
-    testKeep("tz:+1001 monthly:10y", 3600*10+60,
+    testKeep("monthly:10y",
              0/*all*/, 0/*daily*/, 0/*weekly*/, 366*24*3600*10/*monthly*/);
 }
 

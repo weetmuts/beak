@@ -22,6 +22,7 @@
 #include"configuration.h"
 
 #include<deque>
+#include<limits>
 #include<memory.h>
 #include<stddef.h>
 #include<string>

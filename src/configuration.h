@@ -41,17 +41,14 @@ LIST_OF_TYPES
 };
 
 // Keep examples:
-// tz:+0100 all:2d daily:2w weekly:2m monthly:2y
-// tz:+0100 all:forever
-// tz:+0100 weekly:forever
-// tz:+0100 daily:100d
-// tz:+0100 mirror
+// all:2d daily:2w weekly:2m monthly:2y
+// all:forever
+// weekly:forever
+// daily:100d
+// mirror
 
 struct Keep
 {
-    // Time zone offset. E.g. CET(Central European) = 3600 IST (Indian Standard) = 5.5*3600
-    time_t tz_offset {};
-
     // The following values are absolute number of seconds back in time from now.
     // Number of seconds to keep all points in time. Zero means do not store using this interval.
     uint64_t all {};
