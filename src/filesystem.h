@@ -30,7 +30,7 @@
 #include <sys/types.h>
 
 #ifdef FUSE_USE_VERSION
-#include <fuse/fuse.h>
+#include <fuse.h>
 #else
 #include "nofuse.h"
 #endif
