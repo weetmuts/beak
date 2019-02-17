@@ -24,17 +24,18 @@
 #include <fcntl.h>
 #include <ftw.h>
 #include <grp.h>
-#if CONF_MNEMONIC == linux64
-#include <linux/kdev_t.h>
-#endif
-#if CONF_MNEMONIC == osx64
 #include <sys/stat.h>
-#endif
 #include <pwd.h>
 #include <sys/inotify.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <unistd.h>
+
+#if CONF_MNEMONIC == osx64
+#define MKDEV(a,b) 0
+#define MAJOR(a) 0
+#define MINOR(b) 0
+#endif
 
 using namespace std;
 
