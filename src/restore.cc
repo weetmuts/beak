@@ -243,7 +243,7 @@ bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
     bool parsed_tars_already = point->hasGzFiles();
 
     rc = Index::loadIndex(contents, i, &index_entry, &index_tar, dir_to_prepend,
-             [this,point,&es,dir_to_prepend](IndexEntry *ie){
+             [point,&es,dir_to_prepend](IndexEntry *ie){
                          if (!point->hasPath(ie->path)) {
                              debug(RESTORE, "adding entry for >%s< %p\n", ie->path->c_str());
                              // Trigger storage of entry.
@@ -261,7 +261,7 @@ bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
                          }
                          es.push_back(e);
                      },
-                     [this,point,parsed_tars_already](IndexTar *it)
+                     [point,parsed_tars_already](IndexTar *it)
                           {
                               if (!parsed_tars_already)
                               {
