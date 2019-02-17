@@ -23,7 +23,11 @@
 #include <memory.h>
 #include <pthread.h>
 #include <sys/types.h>
+#ifdef OSX64
+#include <sys/wait.h>
+#else
 #include <wait.h>
+#endif
 
 #include <unistd.h>
 
