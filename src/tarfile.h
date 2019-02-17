@@ -148,8 +148,6 @@ private:
 
     void writeTarFileNameIntoBufferVersion1_(char *buf, size_t buf_len, Path *dir);
     void writeTarFileNameIntoBufferVersion2_(char *buf, size_t buf_len, Path *dir);
-
-    size_t num_long_path_blocks_ {};
 };
 
 struct TarFile
