@@ -26,7 +26,7 @@
 #include <grp.h>
 #include <sys/stat.h>
 #include <pwd.h>
-#include <sys/inotify.h>
+//include <sys/inotify.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -40,7 +40,7 @@
 using namespace std;
 
 static ComponentId FILESYSTEM = registerLogComponent("filesystem");
-static ComponentId WATCH = registerLogComponent("watch");
+//static ComponentId WATCH = registerLogComponent("watch");
 
 bool FileStat::isRegularFile() { return S_ISREG(st_mode); }
 bool FileStat::isDirectory() { return S_ISDIR(st_mode); }
@@ -613,17 +613,19 @@ Path *cacheDir()
 
 RC FileSystemImplementationPosix::enableWatch()
 {
-    inotify_fd_ = inotify_init1(IN_NONBLOCK);
+    /*
+    //inotify_fd_ = inotify_init1(IN_NONBLOCK);
 
     if (inotify_fd_ == -1) {
         error(FILESYSTEM, "Could not enable inotify watch. errno=%d\n", errno);
     }
-
+    */
     return RC::OK;
 }
 
 RC FileSystemImplementationPosix::addWatch(Path *p)
 {
+    /*
     if (!inotify_fd_) return RC::OK;
     int wd = inotify_add_watch(inotify_fd_, p->c_str(),
                                IN_ATTRIB |
@@ -638,16 +640,17 @@ RC FileSystemImplementationPosix::addWatch(Path *p)
     debug(WATCH,"added \"%s\"\n", p->c_str());
     if (wd == -1) {
         warning(FILESYSTEM, "Could not add watch to \"%s\". (errno=%d %s)\n", p->c_str(), errno, strerror(errno));
-    }
+        }*/
     return RC::OK;
 }
 
-#define LEN_NAME    256
-#define EVENT_SIZE  sizeof(struct inotify_event)
-#define BUF_LEN     (EVENT_SIZE + LEN_NAME + 1)
+//#define LEN_NAME    256
+//#define EVENT_SIZE  sizeof(struct inotify_event)
+//#define BUF_LEN     (EVENT_SIZE + LEN_NAME + 1)
 
 int FileSystemImplementationPosix::endWatch()
 {
+    /*
     ssize_t n = 0;
     int rc = ioctl(inotify_fd_, FIONREAD, &n);
     if (rc) {
@@ -707,4 +710,6 @@ int FileSystemImplementationPosix::endWatch()
     close(inotify_fd_);
 
     return count;
+    */
+    return 0;
 }
