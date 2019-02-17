@@ -138,7 +138,7 @@ struct FileSystemImplementationPosix : FileSystem
 
 private:
 
-    int inotify_fd_ {};
+    //int inotify_fd_ {};
 };
 
 FileSystem *default_file_system_ {};
