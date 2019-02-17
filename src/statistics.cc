@@ -31,7 +31,7 @@ using namespace std;
 
 struct ProgressStatisticsImplementation : ProgressStatistics
 {
-    ProgressStatisticsImplementation(ProgressDisplayType t) : display_type_(t) {}
+    ProgressStatisticsImplementation() {}
     ~ProgressStatisticsImplementation() = default;
 
 private:
@@ -43,8 +43,6 @@ private:
     vector<SecsBytes> secsbytes;
 
     unique_ptr<ThreadCallback> regular_;
-
-    ProgressDisplayType display_type_;
 
     int rotate_ {};
 
@@ -160,5 +158,5 @@ void ProgressStatisticsImplementation::finishProgress()
 
 unique_ptr<ProgressStatistics> newProgressStatistics(ProgressDisplayType t)
 {
-    return unique_ptr<ProgressStatisticsImplementation>(new ProgressStatisticsImplementation(t));
+    return unique_ptr<ProgressStatisticsImplementation>(new ProgressStatisticsImplementation());
 }
