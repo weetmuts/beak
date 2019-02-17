@@ -216,7 +216,28 @@ if test "x${have_st_mtime}" = "xyes"; then
     AC_DEFINE(HAS_ST_MTIME,1,Stat structure has st_mtime)
 fi
 
-CXXFLAGS="-DPLATFORM_${PLATFORM} -Wall -Werror -fmessage-length=0 -std=c++11 -Wno-maybe-uninitialized -Wno-unused-function"
+AC_LANG_PUSH([C++])
+AC_COMPILE_IFELSE(
+[AC_LANG_PROGRAM([], [[
+#ifndef __clang__
+       not clang
+#endif
+]])],
+[CLANG=yes], [CLANG=no])
+AC_LANG_POP([C++])
+
+AC_SUBST([CLANG])
+
+GCC_EXTRA_CXXFLAGS=""
+if test "x$CLANG" = xyes; then
+    AC_MSG_RESULT([checking type of compiler: using clang])
+    GCC_EXTRA_CXXFLAGS=""
+else
+    AC_MSG_RESULT([checking type of compiler: using g++])
+    GCC_EXTRA_CXXFLAGS="-Wno-maybe-uninitialized"
+fi
+
+CXXFLAGS="-DPLATFORM_${PLATFORM} -Wall -Werror -fmessage-length=0 -std=c++11 $GCC_EXTRA_CXXFLAGS -Wno-unused-function"
 
 CXXFLAGS_debug="-O0 -g ${ASAN_CFLAGS}"
 CXXFLAGS_release="-Os"
