@@ -241,7 +241,7 @@ else
     GCC_EXTRA_CXXFLAGS="-Wno-maybe-uninitialized"
 fi
 
-CXXFLAGS="-DPLATFORM_${PLATFORM} -Wall -Werror -fmessage-length=0 -std=c++11 $GCC_EXTRA_CXXFLAGS -Wno-unused-function"
+CXXFLAGS="-DPLATFORM_${PLATFORM} -DCONF_MNEMONIC=${CONF_MNEMONIC} -Wall -Werror -fmessage-length=0 -std=c++11 $GCC_EXTRA_CXXFLAGS -Wno-unused-function"
 
 CXXFLAGS_debug="-O0 -g ${ASAN_CFLAGS}"
 CXXFLAGS_release="-Os"
