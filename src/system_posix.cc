@@ -22,6 +22,7 @@
 
 #include <memory.h>
 #include <pthread.h>
+#include <sys/errno.h>
 #include <sys/types.h>
 #ifdef OSX64
 #include <sys/wait.h>
@@ -155,7 +156,7 @@ void childExitHandler(int signum)
     {
         pid_t pp = waitpid(p.first, &status, WNOHANG);
         if (pp == p.first) {
-            debug(THREAD, "Child pid %d exited.\n", p);
+            debug(THREAD, "Child pid %d exited.\n", pp);
             p.second();
         }
     }
@@ -163,6 +164,7 @@ void childExitHandler(int signum)
 
 void handleSignals()
 {
+#ifndef OSX64
     struct sigaction new_action, old_action;
 
     new_action.sa_handler = exitHandler;
@@ -191,6 +193,7 @@ void handleSignals()
 
     sigaction (SIGUSR1, NULL, &old_action);
     if (old_action.sa_handler != SIG_IGN) sigaction(SIGUSR1, &new_action, NULL);
+#endif
 }
 
 void onTerminated(string msg, function<void()> cb)
