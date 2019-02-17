@@ -34,6 +34,8 @@
 
 #ifdef OSX64
 
+#define O_NOATIME 0
+
 #define MKDEV(a,b) 0
 #define MAJOR(a) 0
 #define MINOR(b) 0
