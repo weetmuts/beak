@@ -258,8 +258,8 @@ void Backup::pruneDirectories() {
     string utf8 = ".UTF-8";
     if (utf8.size() > lcn.size() ||
         !equal(utf8.rbegin(), utf8.rend(), lcn.rbegin())) {
-        error(BACKUP, "Tarredfs expects your locale to use the encoding UTF-8!\n"
-              "You might want to: export LC_ALL='en_US.UTF-8' or something similar.\n");
+        /*error(BACKUP, "Tarredfs expects your locale to use the encoding UTF-8!\n"
+          "You might want to: export LC_ALL='en_US.UTF-8' or something similar.\n");*/
     }
     #endif
 

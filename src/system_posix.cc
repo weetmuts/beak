@@ -165,7 +165,6 @@ void childExitHandler(int signum)
 
 void handleSignals()
 {
-#ifndef OSX64
     struct sigaction new_action, old_action;
 
     new_action.sa_handler = exitHandler;
@@ -194,7 +193,6 @@ void handleSignals()
 
     sigaction (SIGUSR1, NULL, &old_action);
     if (old_action.sa_handler != SIG_IGN) sigaction(SIGUSR1, &new_action, NULL);
-#endif
 }
 
 void onTerminated(string msg, function<void()> cb)
