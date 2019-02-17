@@ -532,7 +532,7 @@ void testReadSplitLogic()
     char *to = new char[total_size];
     char *p = from;
     for (size_t i=0; i<header_size; ++i) {
-        *p = 255;
+        *p = (char)0xff;
         p++;
     }
     for (size_t i=0; i<file_size; ++i) {
