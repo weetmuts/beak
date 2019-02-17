@@ -455,3 +455,17 @@ You can have multiple configurations enabled at the same time.
 `./configure --host=x86_64-w64-mingw32 --with-zlib=3rdparty/zlib-1.2.11-winapi --with-openssl=3rdparty/openssl-1.0.2-winapi`
 
 `./configure --host=arm-linux-gnueabihf --with-fuse=3rdparty/libfuse-arm/usr --with-openssl=3rdparty/openssl-1.0.2-arm --with-zlib=3rdparty/zlib-1.2.11-arm`
+
+### Compiling on Darwin
+
+Install brew from https://brew.sh/
+
+`brew install pkg-config`
+
+Install FUSE for macOS from https://osxfuse.github.io/
+
+`export PKG_CONFIG_PATH="/usr/local/opt/openssl/lib/pkgconfig"`
+
+`./configure`
+
+`make`
