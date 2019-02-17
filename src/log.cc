@@ -109,7 +109,7 @@ void listLogComponents()
 {
     vector<string> c;
     for (int i=0; i<num_components_; ++i) {
-        c.push_back(all_components_[i]);
+        c.push_back(string(all_components_[i]));
     }
     sort(c.begin(), c.end());
     for (auto & s : c) {
