@@ -23,6 +23,7 @@
 
 #include<deque>
 #include<limits>
+#include<locale>
 #include<memory.h>
 #include<stddef.h>
 #include<string>
