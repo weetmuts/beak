@@ -25,6 +25,7 @@
 #include <sys/errno.h>
 #include <sys/types.h>
 #ifdef OSX64
+#include <signal.h>
 #include <sys/wait.h>
 #else
 #include <wait.h>
