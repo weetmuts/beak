@@ -49,11 +49,11 @@ else
    ASAN_DEFAULT="yes"
    if test "${host_cpu}" = "arm"; then
        CONF_MNEMONIC="arm32"
-       MNEMONIC="arm32"
+       MNEMONIC="ARM32"
    fi
    if test "${host_vendor}" = "apple"; then
        CONF_MNEMONIC="osx64"
-       MNEMONIC="osx64"
+       MNEMONIC="OSX64"
    fi
    if test "${host_vendor}" = "pc"; then
        CONF_MNEMONIC="linux64"
