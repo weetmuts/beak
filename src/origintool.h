@@ -51,6 +51,8 @@ struct OriginTool
                                 PointInTime *point) = 0;
 
     virtual ptr<FileSystem> fs() = 0;
+
+    virtual ~OriginTool() = default;
 };
 
 std::unique_ptr<OriginTool> newOriginTool(ptr<System> sys,
