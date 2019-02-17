@@ -2274,6 +2274,12 @@ else
    fi
 fi
 
+PKG_CONFIG="$(which pkg-config)"
+if test "$PKG_CONFIG" = ""; then
+    PKG_CONFIG=/bin/false
+    as_fn_error $? "You need pkg-config to build. Please install." "$LINENO" 5
+fi
+
 mkdir -p "$OUTPUT_ROOT"
 if test ! -d "$OUTPUT_ROOT"; then
     as_fn_error $? "Could not create build directory $OUTPUT_ROOT" "$LINENO" 5
@@ -3983,9 +3989,9 @@ fi
 
 if test "x$ENABLE_FUSE" = xyes; then
    if test "x${with_fuse}" = "x"; then
-       if pkg-config fuse; then
-           FUSE_CFLAGS="-DFUSE_USE_VERSION=26 $(pkg-config --cflags fuse)"
-           FUSE_LIBS="$(pkg-config --libs fuse)"
+       if $PKG_CONFIG fuse; then
+           FUSE_CFLAGS="-DFUSE_USE_VERSION=26 $($PKG_CONFIG --cflags fuse)"
+           FUSE_LIBS="$($PKG_CONFIG --libs fuse)"
            { $as_echo "$as_me:${as_lineno-$LINENO}: result: found" >&5
 $as_echo "found" >&6; }
        else
@@ -4021,8 +4027,8 @@ fi
 #x86_64-w64-mingw32-g++ -I../openssl-1.0.2l/include/ test.cc ../openssl-1.0.2l/libcrypto.a
 
 if test "x${with_openssl}" = "x"; then
-    OPENSSL_CFLAGS="$(pkg-config openssl --cflags)"
-    OPENSSL_LIBS="$(pkg-config openssl --libs)"
+    OPENSSL_CFLAGS="$($PKG_CONFIG openssl --cflags)"
+    OPENSSL_LIBS="$($PKG_CONFIG openssl --libs)"
     { $as_echo "$as_me:${as_lineno-$LINENO}: result: found" >&5
 $as_echo "found" >&6; }
 else
@@ -4046,8 +4052,8 @@ fi
 
 
 if test "x${with_zlib}" = "x"; then
-    ZLIB_CFLAGS="$(pkg-config zlib --cflags)"
-    ZLIB_LIBS="$(pkg-config zlib --libs)"
+    ZLIB_CFLAGS="$($PKG_CONFIG zlib --cflags)"
+    ZLIB_LIBS="$($PKG_CONFIG zlib --libs)"
     { $as_echo "$as_me:${as_lineno-$LINENO}: result: found" >&5
 $as_echo "found" >&6; }
 else

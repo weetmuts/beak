@@ -53,6 +53,12 @@ else
    fi
 fi
 
+PKG_CONFIG="$(which pkg-config)"
+if test "$PKG_CONFIG" = ""; then
+    PKG_CONFIG=/bin/false
+    AC_MSG_ERROR([You need pkg-config to build. Please install.])
+fi
+
 mkdir -p "$OUTPUT_ROOT"
 if test ! -d "$OUTPUT_ROOT"; then
     AC_MSG_ERROR([Could not create build directory $OUTPUT_ROOT])
@@ -117,9 +123,9 @@ AC_ARG_WITH(fuse, [AS_HELP_STRING([--with-fuse],
 
 if test "x$ENABLE_FUSE" = xyes; then
    if test "x${with_fuse}" = "x"; then
-       if pkg-config fuse; then
-           FUSE_CFLAGS="-DFUSE_USE_VERSION=26 $(pkg-config --cflags fuse)"
-           FUSE_LIBS="$(pkg-config --libs fuse)"
+       if $PKG_CONFIG fuse; then
+           FUSE_CFLAGS="-DFUSE_USE_VERSION=26 $($PKG_CONFIG --cflags fuse)"
+           FUSE_LIBS="$($PKG_CONFIG --libs fuse)"
            AC_MSG_RESULT([found])
        else
            AC_MSG_ERROR(Please install fuse-dev, for example using: sudo apt install libfuse-dev)
@@ -148,8 +154,8 @@ AC_ARG_WITH(openssl, [AS_HELP_STRING([--with-openssl],
 #x86_64-w64-mingw32-g++ -I../openssl-1.0.2l/include/ test.cc ../openssl-1.0.2l/libcrypto.a
 
 if test "x${with_openssl}" = "x"; then
-    OPENSSL_CFLAGS="$(pkg-config openssl --cflags)"
-    OPENSSL_LIBS="$(pkg-config openssl --libs)"
+    OPENSSL_CFLAGS="$($PKG_CONFIG openssl --cflags)"
+    OPENSSL_LIBS="$($PKG_CONFIG openssl --libs)"
     AC_MSG_RESULT([found])
 else
     with_openssl=$(realpath ${with_openssl})
@@ -167,8 +173,8 @@ AC_ARG_WITH(zlib, [AS_HELP_STRING([--with-zlib],
       (expecting the libraries under PATH and the headers under PATH)])])
 
 if test "x${with_zlib}" = "x"; then
-    ZLIB_CFLAGS="$(pkg-config zlib --cflags)"
-    ZLIB_LIBS="$(pkg-config zlib --libs)"
+    ZLIB_CFLAGS="$($PKG_CONFIG zlib --cflags)"
+    ZLIB_LIBS="$($PKG_CONFIG zlib --libs)"
     AC_MSG_RESULT([found])
 else
     with_zlib=$(realpath ${with_zlib})
