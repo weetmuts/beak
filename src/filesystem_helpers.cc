@@ -129,17 +129,13 @@ ssize_t StatOnlyFileSystem::pread(Path *p, char *buf, size_t size, off_t offset)
 
 RC StatOnlyFileSystem::recurse(Path *root, std::function<RecurseOption(Path *path, FileStat *stat)> cb)
 {
+    assert(0);
     return RC::ERR;
 }
 
 RC StatOnlyFileSystem::recurse(Path *root, std::function<RecurseOption(const char *path, const struct stat *sb)> cb)
 {
-    return RC::ERR;
-}
-
-RC StatOnlyFileSystem::listFilesBelow(Path *p, std::vector<Path*> *files, SortOrder so)
-{
-    // TODO
+    assert(0);
     return RC::ERR;
 }
 
@@ -234,19 +230,39 @@ ssize_t ReadOnlyCacheFileSystemBaseImplementation::pread(Path *p, char *buf, siz
     return cache_fs_->pread(pp, buf, size, offset);
 }
 
+RecurseOption ReadOnlyCacheFileSystemBaseImplementation::recurse_helper_(Path *p,
+                                                                         std::function<RecurseOption(Path *path, FileStat *stat)> cb)
+{
+    printf("FGOO\n");
+    CacheEntry *ce = &entries_[p];
+    assert(ce);
+    RecurseOption ro = cb(ce->path, &ce->stat);
+    if (ro == RecurseSkipSubTree || ro == RecurseStop) {
+        return ro;
+    }
+
+    for (CacheEntry *e : ce->direntries) {
+        if (e->stat.isDirectory()) {
+            ro = recurse_helper_(e->path, cb);
+            if (ro == RecurseStop) {
+                return ro;
+            }
+        } else {
+            ro = cb(ce->path, &ce->stat);
+        }
+    }
+    return RecurseContinue;
+}
+
 RC ReadOnlyCacheFileSystemBaseImplementation::recurse(Path *root, function<RecurseOption(Path *path, FileStat *stat)> cb)
 {
-    return RC::ERR;
+    recurse_helper_(root, cb);
+    return RC::OK;
 }
 
 RC ReadOnlyCacheFileSystemBaseImplementation::recurse(Path *root, std::function<RecurseOption(const char *path, const struct stat *sb)> cb)
 {
-    return RC::ERR;
-}
-
-RC ReadOnlyCacheFileSystemBaseImplementation::listFilesBelow(Path *p, std::vector<Path*> *files, SortOrder so)
-{
-    // TODO
+    assert(0);
     return RC::ERR;
 }
 

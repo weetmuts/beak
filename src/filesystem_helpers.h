@@ -63,7 +63,6 @@ struct StatOnlyFileSystem : ReadOnlyFileSystem
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
     RC recurse(Path *root, std::function<RecurseOption(Path *path, FileStat *stat)> cb);
     RC recurse(Path *root, std::function<RecurseOption(const char *path, const struct stat *sb)> cb);
-    RC listFilesBelow(Path *p, std::vector<Path*> *files, SortOrder so);
     RC ctimeTouch(Path *p);
 
     RC stat(Path *p, FileStat *fs);
@@ -122,7 +121,6 @@ struct ReadOnlyCacheFileSystemBaseImplementation : ReadOnlyFileSystem
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
     RC recurse(Path *root, std::function<RecurseOption(Path *path, FileStat *stat)> cb);
     RC recurse(Path *root, std::function<RecurseOption(const char *path, const struct stat *sb)> cb);
-    RC listFilesBelow(Path *p, std::vector<Path*> *files, SortOrder so);
     RC ctimeTouch(Path *p);
 
     RC stat(Path *p, FileStat *fs);
@@ -138,6 +136,8 @@ struct ReadOnlyCacheFileSystemBaseImplementation : ReadOnlyFileSystem
     bool fileCached(Path *p);
     CacheEntry *cacheEntry(Path *p);
     ProgressStatistics *progress_ {};
+
+    RecurseOption recurse_helper_(Path *root, std::function<RecurseOption(Path *path, FileStat *stat)> cb);
 };
 
 

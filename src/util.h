@@ -72,8 +72,8 @@ std::string toHex(const char *b, size_t len);
 std::string toHex(std::vector<char> &b);
 void hex2bin(std::string s, std::vector<char> *target);
 void fixEndian(uint64_t *t);
-bool isInTheFuture(struct timespec *tm);
-std::string timeAgo(struct timespec *tm);
+bool isInTheFuture(const struct timespec *tm);
+std::string timeAgo(const struct timespec *tm);
 
 // Seconds since 1970-01-01 UTC
 uint64_t clockGetUnixTimeSeconds();

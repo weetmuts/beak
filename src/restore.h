@@ -79,7 +79,6 @@ enum PointInTimeFormat : short {
 
 struct PointInTime {
     int key;
-    struct timespec ts;
     std::string ago;
     std::string datetime;
     std::string direntry;
@@ -92,15 +91,29 @@ struct PointInTime {
         entries_[p] = RestoreEntry();
         return &entries_[p];
     }
-
+    void addTar(Path *p) {
+        tars_.push_back(p);
+    }
     bool hasLoadedGzFile(Path *gz) { return loaded_gz_files_.count(gz) == 1; }
     void addLoadedGzFile(Path *gz) { loaded_gz_files_.insert(gz); }
     bool hasGzFiles() { return gz_files_.size() != 0; }
     void addGzFile(Path *parent, Path *p) { gz_files_[parent] = p; }
     Path *getGzFile(Path *p) { if (gz_files_.count(p) == 1) { return gz_files_[p]; } else { return NULL; } }
+    std::vector<Path*> *tars() { return &tars_; }
 
+    const struct timespec *ts() { return &ts_; }
+    uint64_t point() { return point_; }
+
+    PointInTime(time_t sec, unsigned int nsec) {
+        ts_.tv_sec = sec;
+        ts_.tv_nsec = nsec;
+        point_ = 1000000000ull*sec + nsec;
+    }
 private:
 
+    struct timespec ts_;
+    uint64_t point_;
+    std::vector<Path*> tars_;
     std::map<Path*,RestoreEntry,depthFirstSortPath> entries_;
     std::map<Path*,Path*> gz_files_;
     std::set<Path*> loaded_gz_files_;
@@ -122,10 +135,8 @@ struct Restore
                struct fuse_file_info *fi);
     int readlinkCB(const char *path, char *buf, size_t s);
 
-    int parseTarredfsContent(PointInTime *point, std::vector<char> &v, std::vector<char>::iterator &i,
-                             Path *dir_to_prepend);
-    int parseTarredfsTars(PointInTime *point, std::vector<char> &v, std::vector<char>::iterator &i);
     bool loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend);
+
     Path *loadDirContents(PointInTime *point, Path *path);
     void loadCache(PointInTime *point, Path *path);
 

@@ -112,7 +112,11 @@ struct BeakImplementation : Beak {
     private:
 
     string argsToVector_(int argc, char **argv, vector<string> *args);
-    unique_ptr<Restore> accessBackup_(Argument *storage, string pointintime, ProgressStatistics *progress);
+    unique_ptr<Restore> accessBackup_(Argument *storage,
+                                      string pointintime,
+                                      ProgressStatistics *progress,
+                                      FileSystem **out_backup_fs = NULL,
+                                      Path **out_root = NULL);
     RC mountRestoreInternal_(Settings *settings, bool daemon, ProgressStatistics *progress);
     bool hasPointsInTime_(Path *path, FileSystem *fs);
 
@@ -776,7 +780,9 @@ RC BeakImplementation::store(Settings *settings)
 
 unique_ptr<Restore> BeakImplementation::accessBackup_(Argument *storage,
                                                       string pointintime,
-                                                      ProgressStatistics *progress)
+                                                      ProgressStatistics *progress,
+                                                      FileSystem **out_backup_fs,
+                                                      Path **out_root)
 {
     RC rc = RC::OK;
 
@@ -788,6 +794,8 @@ unique_ptr<Restore> BeakImplementation::accessBackup_(Argument *storage,
                                                       progress);
     }
     unique_ptr<Restore> restore  = newRestore(backup_fs);
+    if (out_backup_fs) { *out_backup_fs = backup_fs; }
+    if (out_root) { *out_root = storage->storage->storage_location; }
 
     rc = restore->lookForPointsInTime(PointInTimeFormat::absolute_point,
                                       storage->storage->storage_location);
@@ -929,26 +937,11 @@ cleanup:
 
 RC BeakImplementation::prune(Settings *settings)
 {
-    RC rc = RC::OK;
     assert(settings->from.type == ArgStorage);
-    Argument *storage = &settings->from;
     auto progress = newProgressStatistics(settings->progress);
-
-    FileSystem *backup_fs = local_fs_;
-    if (storage->storage->type == RCloneStorage ||
-        storage->storage->type == RSyncStorage) {
-        backup_fs = storage_tool_->asCachedReadOnlyFS(storage->storage,
-                                                      progress.get());
-    }
-    unique_ptr<Restore> restore  = newRestore(backup_fs);
-
-    rc = restore->lookForPointsInTime(PointInTimeFormat::absolute_point,
-                                      storage->storage->storage_location);
-
-    if (rc.isErr()) {
-        error(COMMANDLINE, "Backup is empty, cannot be pruned.\n");
-        return RC::OK;
-    }
+    FileSystem *backup_fs;
+    Path *root;
+    auto restore = accessBackup_(&settings->from, "", progress.get(), &backup_fs, &root);
 
     Keep keep("all:2d daily:2w weekly:2m monthly:2y");
     if (settings->keep_supplied) {
@@ -959,17 +952,46 @@ RC BeakImplementation::prune(Settings *settings)
     }
     auto prune = newPrune(clockGetUnixTimeNanoSeconds(), keep);
 
-    auto v = restore->history();
-    for (auto it = v.rbegin(); it != v.rend(); it++)
+    set<Path*> all_tars;
+
+    for (auto pit = restore->history().rbegin(); pit != restore->history().rend(); pit++)
     {
-        auto h = *it;
-        uint64_t p = h.ts.tv_sec*1000000000 + h.ts.tv_nsec;
-        prune->addPointInTime(p);
+        prune->addPointInTime(pit->point());
     }
 
-    map<uint64_t,bool> result;
-    prune->prune(&result);
+    map<uint64_t,bool> keeps;
+    prune->prune(&keeps);
 
+    for (auto pit = restore->history().rbegin(); pit != restore->history().rend(); pit++)
+    {
+        if (keeps[pit->point()]) {
+            // We should keep this point in time, lets remember all the tars required.
+            for (auto& t : *(pit->tars())) {
+                all_tars.insert(t);
+            }
+            Path *p = Path::lookup(pit->filename);
+            p = p->prepend(Path::lookupRoot());
+            all_tars.insert(p);
+        }
+    }
+
+    vector<Path*> files;
+    backup_fs->listFilesBelow(root, &files, SortOrder::Unspecified);
+
+    vector<Path*> files_to_remove;
+    for (auto p : files)
+    {
+        if (all_tars.count(p) == 0)
+        {
+            files_to_remove.push_back(p);
+        }
+        debug(PRUNE,"keeping %s\n", p->c_str());
+    }
+
+    for (auto p : files_to_remove)
+    {
+        debug(PRUNE, "removing %s\n", p->c_str());
+    }
     return RC::OK;
 }
 

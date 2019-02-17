@@ -94,12 +94,6 @@ struct RestoreFileSystem : FileSystem
             });
     }
 
-    RC listFilesBelow(Path *p, std::vector<Path*> *files, SortOrder so)
-    {
-        // TODO
-        return RC::ERR;
-    }
-
     RC ctimeTouch(Path *p)
     {
         return RC::ERR;
@@ -276,6 +270,7 @@ bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
                                   {
                                       point->addGzFile(p->parent(), p);
                                   }
+                                  point->addTar(p);
                               }
                           });
 
@@ -417,16 +412,16 @@ struct RestoreFuseAPI : FuseAPI
             stbuf->st_uid = geteuid();
             stbuf->st_gid = getegid();
 #if HAS_ST_MTIM
-            stbuf->st_mtim.tv_sec = restore_->mostRecentPointInTime()->ts.tv_sec;
-            stbuf->st_mtim.tv_nsec = restore_->mostRecentPointInTime()->ts.tv_nsec;
-            stbuf->st_atim.tv_sec = restore_->mostRecentPointInTime()->ts.tv_sec;
-            stbuf->st_atim.tv_nsec = restore_->mostRecentPointInTime()->ts.tv_nsec;
-            stbuf->st_ctim.tv_sec = restore_->mostRecentPointInTime()->ts.tv_sec;
-            stbuf->st_ctim.tv_nsec = restore_->mostRecentPointInTime()->ts.tv_nsec;
+            stbuf->st_mtim.tv_sec = restore_->mostRecentPointInTime()->ts()->tv_sec;
+            stbuf->st_mtim.tv_nsec = restore_->mostRecentPointInTime()->ts()->tv_nsec;
+            stbuf->st_atim.tv_sec = restore_->mostRecentPointInTime()->ts()->tv_sec;
+            stbuf->st_atim.tv_nsec = restore_->mostRecentPointInTime()->ts()->tv_nsec;
+            stbuf->st_ctim.tv_sec = restore_->mostRecentPointInTime()->ts()->tv_sec;
+            stbuf->st_ctim.tv_nsec = restore_->mostRecentPointInTime()->ts()->tv_nsec;
 #elif HAS_ST_MTIME
-            stbuf->st_mtime = restore_->mostRecentPointInTime()->ts.tv_sec;
-            stbuf->st_atime = restore_->mostRecentPointInTime()->ts.tv_sec;
-            stbuf->st_ctime = restore_->mostRecentPointInTime()->ts.tv_sec;
+            stbuf->st_mtime = restore_->mostRecentPointInTime()->ts()->tv_sec;
+            stbuf->st_atime = restore_->mostRecentPointInTime()->ts()->tv_sec;
+            stbuf->st_ctime = restore_->mostRecentPointInTime()->ts()->tv_sec;
 #else
 #error
 #endif
@@ -448,16 +443,16 @@ struct RestoreFuseAPI : FuseAPI
                 stbuf->st_uid = geteuid();
                 stbuf->st_gid = getegid();
 #if HAS_ST_MTIM
-                stbuf->st_mtim.tv_sec = point->ts.tv_sec;
-                stbuf->st_mtim.tv_nsec = point->ts.tv_nsec;
-                stbuf->st_atim.tv_sec = point->ts.tv_sec;
-                stbuf->st_atim.tv_nsec = point->ts.tv_nsec;
-                stbuf->st_ctim.tv_sec = point->ts.tv_sec;
-                stbuf->st_ctim.tv_nsec = point->ts.tv_nsec;
+                stbuf->st_mtim.tv_sec = point->ts()->tv_sec;
+                stbuf->st_mtim.tv_nsec = point->ts()->tv_nsec;
+                stbuf->st_atim.tv_sec = point->ts()->tv_sec;
+                stbuf->st_atim.tv_nsec = point->ts()->tv_nsec;
+                stbuf->st_ctim.tv_sec = point->ts()->tv_sec;
+                stbuf->st_ctim.tv_nsec = point->ts()->tv_nsec;
 #elif HAS_ST_MTIME
-                stbuf->st_mtime = point->ts.tv_sec;
-                stbuf->st_atime = point->ts.tv_sec;
-                stbuf->st_ctime = point->ts.tv_sec;
+                stbuf->st_mtime = point->ts()->tv_sec;
+                stbuf->st_atime = point->ts()->tv_sec;
+                stbuf->st_ctime = point->ts()->tv_sec;
 #else
 #error
 #endif
@@ -750,14 +745,12 @@ RC Restore::lookForPointsInTime(PointInTimeFormat f, Path *path)
 
         if (ok && tfn.type == REG_FILE)
         {
-            PointInTime p;
-            p.ts.tv_sec = tfn.sec;
-            p.ts.tv_nsec = tfn.nsec;
+            PointInTime p(tfn.sec, tfn.nsec);;
             char datetime[20];
             memset(datetime, 0, sizeof(datetime));
-            strftime(datetime, 20, "%Y-%m-%d_%H:%M", localtime(&p.ts.tv_sec));
+            strftime(datetime, 20, "%Y-%m-%d_%H:%M", localtime(&p.ts()->tv_sec));
 
-            p.ago = timeAgo(&p.ts);
+            p.ago = timeAgo(p.ts());
             p.datetime = datetime;
             p.filename = f->str();
             history_.push_back(p);
@@ -770,9 +763,9 @@ RC Restore::lookForPointsInTime(PointInTimeFormat f, Path *path)
     }
     sort(history_.begin(), history_.end(),
               [](PointInTime &a, PointInTime &b)->bool {
-                  return (b.ts.tv_sec < a.ts.tv_sec) ||
-                      (b.ts.tv_sec == a.ts.tv_sec &&
-                       b.ts.tv_nsec < a.ts.tv_nsec);
+                  return (b.ts()->tv_sec < a.ts()->tv_sec) ||
+                      (b.ts()->tv_sec == a.ts()->tv_sec &&
+                       b.ts()->tv_nsec < a.ts()->tv_nsec);
                       });
 
     most_recent_point_in_time_ = &history_[0];

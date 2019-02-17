@@ -93,7 +93,6 @@ struct FileSystemImplementationPosix : FileSystem
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
     RC recurse(Path *p, function<RecurseOption(Path *path, FileStat *stat)> cb);
     RC recurse(Path *p, function<RecurseOption(const char *path, const struct stat *sb)> cb);
-    RC listFilesBelow(Path *p, std::vector<Path*> *files, SortOrder so);
     RC ctimeTouch(Path *file);
     RC stat(Path *p, FileStat *fs);
     RC chmod(Path *p, FileStat *stat);
@@ -248,12 +247,6 @@ RC FileSystemImplementationPosix::recurse(Path *p, function<RecurseOption(const 
         return RC::ERR;
     }
     return RC::OK;
-}
-
-RC FileSystemImplementationPosix::listFilesBelow(Path *p, std::vector<Path*> *files, SortOrder so)
-{
-    // TODO
-    return RC::ERR;
 }
 
 RC FileSystemImplementationPosix::ctimeTouch(Path *p)

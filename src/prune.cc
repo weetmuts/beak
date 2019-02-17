@@ -17,9 +17,12 @@
 
 #include "prune.h"
 
+#include "log.h"
 #include "util.h"
 
 #include <set>
+
+static ComponentId PRUNE = registerLogComponent("prune");
 
 using namespace std;
 
@@ -168,16 +171,16 @@ void PruneImplementation::prune(std::map<uint64_t,bool> *result)
 
         uint64_t monthid = to_month_identifier_since_epoch(p);
         if (keep) {
-            printf("KEEP    %s ", s.c_str());
+            verbose(PRUNE, "keeping    %s ", s.c_str());
         } else {
-            printf("DISCARD %s ", s.c_str());
+            verbose(PRUNE, "discarding %s ", s.c_str());
         }
-        printf(" %5zu %4zu %02d %6zu", days, weeknr, weekday, monthid);
-        if (isAll(p)) printf(" ALL");
-        if (isDailyMax(p)) printf(" DAY");
-        if (isWeeklyMax(p)) printf(" WEEK");
-        if (isMonthlyMax(p)) printf(" MONTH");
-        printf(" \n");
+        verbose(PRUNE, " %5zu %4zu %02d %6zu", days, weeknr, weekday, monthid);
+        if (isAll(p)) verbose(PRUNE, " ALL");
+        if (isDailyMax(p)) verbose(PRUNE, " DAY");
+        if (isWeeklyMax(p)) verbose(PRUNE, " WEEK");
+        if (isMonthlyMax(p)) verbose(PRUNE, " MONTH");
+        verbose(PRUNE, " \n");
     }
 
     *result = points_;

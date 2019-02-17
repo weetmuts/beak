@@ -95,7 +95,6 @@ struct FileSystemImplementationWinapi : FileSystem
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
     RC recurse(Path *p, function<RecurseOption(Path*,FileStat*)> cb);
     RC recurse(Path *p, function<RecurseOption(const char *path, const struct stat *sb)> cb);
-    RC listFilesBelow(Path *p, std::vector<Path*> *files, SortOrder so);
     RC ctimeTouch(Path *file);
     RC stat(Path *p, FileStat *fs);
     RC chmod(Path *p, FileStat *fs);
@@ -209,16 +208,13 @@ ssize_t FileSystemImplementationWinapi::pread(Path *p, char *buf, size_t count, 
 
 RC FileSystemImplementationWinapi::recurse(Path *p, function<RecurseOption(Path *,FileStat*)> cb)
 {
+    assert(0);
     return RC::ERR;
 }
 
 RC FileSystemImplementationWinapi::recurse(Path *p, function<RecurseOption(const char *path, const struct stat *sb)> cb)
 {
-    return RC::ERR;
-}
-
-RC FileSystemImplementationWinapi::listFilesBelow(Path *p, std::vector<Path*> *files, SortOrder so)
-{
+    assert(0);
     return RC::ERR;
 }
 

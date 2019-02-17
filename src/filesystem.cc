@@ -33,7 +33,6 @@ struct FileSystemFuseAPIImplementation : FileSystem
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
     RC recurse(Path *root, function<RecurseOption(Path *path, FileStat *stat)> cb);
     RC recurse(Path *root, function<RecurseOption(const char *path, const struct stat *sb)> cb);
-    RC listFilesBelow(Path *p, vector<Path*> *files, SortOrder so);
     RC ctimeTouch(Path *p);
     RC stat(Path *p, FileStat *fs);
     RC chmod(Path *p, FileStat *stat);
@@ -105,6 +104,7 @@ ssize_t FileSystemFuseAPIImplementation::pread(Path *p, char *buf, size_t size, 
 
 RC FileSystemFuseAPIImplementation::recurse(Path *root, function<RecurseOption(Path *path, FileStat *stat)> cb)
 {
+    assert(0);
     return RC::ERR;
 }
 
@@ -115,11 +115,6 @@ RC FileSystemFuseAPIImplementation::recurse(Path *root, std::function<RecurseOpt
             st->storeIn(&sb);
             return cb(p->c_str(), &sb);
         });
-}
-
-RC FileSystemFuseAPIImplementation::listFilesBelow(Path *p, std::vector<Path*> *files, SortOrder so)
-{
-    return RC::ERR;
 }
 
 RC FileSystemFuseAPIImplementation::ctimeTouch(Path *p)
@@ -838,6 +833,28 @@ bool FileSystem::mkDirpWriteable(Path* path)
     return makeDirHelper(path->c_str());
 }
 
+RC FileSystem::listFilesBelow(Path *p, std::vector<Path*> *files, SortOrder so)
+{
+    int depth = p->depth();
+    vector<pair<Path*,FileStat>> found;
+    RC rc = RC::OK;
+    rc = recurse(p,
+                 [&found](Path *path, FileStat *stat)
+                 {
+                     if (stat->isRegularFile()) {
+                         found.push_back({ path, *stat });
+                     }
+                     return RecurseContinue;
+                 });
+
+    sortOn(so, found);
+    for (auto& f : found)
+    {
+        files->push_back(f.first->subpath(depth)->prepend(Path::lookupRoot()));
+    }
+    return rc;
+}
+
 void FileStat::checkStat(FileSystem *dst, Path *target)
 {
     FileStat old_stat;
@@ -859,4 +876,9 @@ void FileStat::checkStat(FileSystem *dst, Path *target)
 unique_ptr<FileSystem> newStatOnlyFileSystem(map<Path*,FileStat> contents)
 {
     return unique_ptr<FileSystem>(new StatOnlyFileSystem(contents));
+}
+
+RC sortOn(SortOrder so, vector<pair<Path*,FileStat>> &files)
+{
+    return RC::OK;
 }

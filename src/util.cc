@@ -570,14 +570,14 @@ string tolowercase(string const& s)
     return wto_string(ss);
 }
 
-bool isInTheFuture(struct timespec *tm)
+bool isInTheFuture(const struct timespec *tm)
 {
     // What happens with summer and winter time changes?
     return tm->tv_sec > start_time_.tv_sec ||
         (tm->tv_sec == start_time_.tv_sec && tm->tv_nsec > start_time_.tv_nsec);
 }
 
-string timeAgo(struct timespec *tm)
+string timeAgo(const struct timespec *tm)
 {
     if (start_time_.tv_sec == tm->tv_sec &&
         start_time_.tv_nsec == tm->tv_nsec) {
