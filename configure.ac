@@ -40,6 +40,7 @@ if test "${host_vendor}" = "w64"; then
    FUSE_DEFAULT="no"
    ASAN_DEFALUT="no"
    CONF_MNEMONIC="winapi64"
+   MNEMONIC="WINAPI64"
 else
    PLATFORM=POSIX
    PATH_SEP=':'
@@ -48,12 +49,15 @@ else
    ASAN_DEFAULT="yes"
    if test "${host_cpu}" = "arm"; then
        CONF_MNEMONIC="arm32"
+       MNEMONIC="arm32"
    fi
    if test "${host_vendor}" = "apple"; then
        CONF_MNEMONIC="osx64"
+       MNEMONIC="osx64"
    fi
    if test "${host_vendor}" = "pc"; then
        CONF_MNEMONIC="linux64"
+       MNEMONIC="LINUX64"
    fi
 fi
 
@@ -241,7 +245,7 @@ else
     GCC_EXTRA_CXXFLAGS="-Wno-maybe-uninitialized"
 fi
 
-CXXFLAGS="-DPLATFORM_${PLATFORM} -DCONF_MNEMONIC=${CONF_MNEMONIC} -Wall -Werror -fmessage-length=0 -std=c++11 $GCC_EXTRA_CXXFLAGS -Wno-unused-function"
+CXXFLAGS="-DPLATFORM_${PLATFORM} -D${MNEMONIC} -Wall -Werror -fmessage-length=0 -std=c++11 $GCC_EXTRA_CXXFLAGS -Wno-unused-function"
 
 CXXFLAGS_debug="-O0 -g ${ASAN_CFLAGS}"
 CXXFLAGS_release="-Os"

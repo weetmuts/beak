@@ -32,15 +32,19 @@ endif
 VERBOSE?=@
 
 ifeq (winapi64,$(findstring winapi64,$(MAKECMDGOALS)))
-BUILDDIRS:=$(filter %x86_64-w64-mingw32/,$(BUILDDIRS))
+BUILDDIRS:=$(filter %x86_64-w64-mingw32%,$(BUILDDIRS))
 endif
 
 ifeq (linux64,$(findstring linux64,$(MAKECMDGOALS)))
-BUILDDIRS:=$(filter %x86_64-pc-linux-gnu/,$(BUILDDIRS))
+BUILDDIRS:=$(filter %x86_64-pc-linux-gnu%,$(BUILDDIRS))
+endif
+
+ifeq (osx64,$(findstring osx64,$(MAKECMDGOALS)))
+BUILDDIRS:=$(filter %x86_64-apple-darwin%,$(BUILDDIRS))
 endif
 
 ifeq (arm32,$(findstring arm32,$(MAKECMDGOALS)))
-BUILDDIRS:=$(filter %arm-unknown-linux-gnueabihf/,$(BUILDDIRS))
+BUILDDIRS:=$(filter %arm-unknown-linux-gnueabihf%,$(BUILDDIRS))
 endif
 
 release:

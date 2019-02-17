@@ -26,15 +26,26 @@
 #include <grp.h>
 #include <sys/stat.h>
 #include <pwd.h>
+#include <sys/errno.h>
 //include <sys/inotify.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <unistd.h>
 
-#if CONF_MNEMONIC == osx64
+#ifdef OSX64
+
 #define MKDEV(a,b) 0
 #define MAJOR(a) 0
 #define MINOR(b) 0
+
+#define NO_ATIME 0
+#define FTW_CONTINUE 0
+#define FTW_SKIP_SUBTREE 1
+#define FTW_STOP 2
+#define FTW_ACTIONRETVAL 3
+
+#else
+#include<linux/kdev_t.h>
 #endif
 
 using namespace std;
