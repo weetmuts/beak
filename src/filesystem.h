@@ -38,7 +38,6 @@
 #define MAX_FILE_NAME_LENGTH 255
 #define MAX_PATH_LENGTH 4096
 #define MAXPATH 4096
-#define ARG_MAX 4096
 
 #ifdef PLATFORM_WINAPI
 #include "filesystem_winapi.h"
