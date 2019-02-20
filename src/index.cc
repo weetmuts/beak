@@ -132,16 +132,39 @@ RC Index::loadIndex(vector<char> &v,
         // Remove the newline at the end.
         name.pop_back();
         if (name.length()==0) continue;
-        Path *p = Path::lookup(name);
-        if (p->parent()) {
-            debug(INDEX, "found tar %d %s in dir %s\n", num_tars,  p->name()->c_str(), p->parent()->c_str());
-        } else {
-            debug(INDEX, "found tar %d %s\n", num_tars, p->name()->c_str());
-        }
+        auto dots = name.find(" ... ");
 
-        it->path = p;
-        on_tar(it);
-        num_tars--;
+        if (dots != string::npos)
+        {
+            TarFileName fromfile, tofile;
+            string from = name.substr(0,dots);
+            string to = name.substr(dots+5);
+            fromfile.parseFileName(from);
+            tofile.parseFileName(to);
+            fromfile.last_size = tofile.size;
+            for (uint i=0; i<fromfile.num_parts; ++i) {
+                char buf[1024];
+                fromfile.part_nr = i;
+                fromfile.writeTarFileNameIntoBuffer(buf, sizeof(buf), Path::lookupRoot());
+                Path *pp = Path::lookup(buf);
+                it->path = pp;
+                on_tar(it);
+            }
+            num_tars--;
+        }
+        else
+        {
+            Path *p = Path::lookup(name);
+            if (p->parent()) {
+                debug(INDEX, "found tar %d %s in dir %s\n", num_tars,  p->name()->c_str(), p->parent()->c_str());
+            } else {
+                debug(INDEX, "found tar %d %s\n", num_tars, p->name()->c_str());
+            }
+
+            it->path = p;
+            on_tar(it);
+            num_tars--;
+        }
     }
 
     if (num_tars != 0) {
@@ -180,31 +203,3 @@ RC Index::loadIndex(vector<char> &v,
     }
     return RC::OK;
 };
-
-RC Index::listFilesReferencedInIndex(ptr<FileSystem> fs, Path *gz, std::set<Path*> *files)
-{
-    RC rc = RC::OK;
-
-    vector<char> buf;
-    rc = fs->loadVector(gz, T_BLOCKSIZE, &buf);
-    if (rc.isErr()) return rc;
-
-    vector<char> contents;
-    gunzipit(&buf, &contents);
-    auto i = contents.begin();
-
-    struct IndexEntry index_entry;
-    struct IndexTar index_tar;
-
-    rc = Index::loadIndex(contents, i, &index_entry, &index_tar, NULL,
-                          [](IndexEntry *ie){ /* Do nothing per file. */ },
-                          [files](IndexTar *it){ files->insert(it->path); }
-                          );
-
-    if (rc.isErr()) {
-        failure(INDEX, "Could not parse the index file %s\n", gz->c_str());
-        return rc;
-    }
-
-    return rc;
-}

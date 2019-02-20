@@ -432,6 +432,7 @@ Hosts supported:
 * x86_64-pc-linux-gnu
 * x86_64-w64-mingw32
 * arm-linux-gnueabihf
+* x86_64-apple-darwin18.2.0
 
 To have beak print detailed debug information do: `export BEAK_DEBUG_hardlinks=true`
 
@@ -461,6 +462,7 @@ You can have multiple configurations enabled at the same time.
 Install brew from https://brew.sh/
 
 `brew install pkg-config`
+`brew install openssl`
 
 Install FUSE for macOS from https://osxfuse.github.io/
 

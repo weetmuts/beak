@@ -148,6 +148,20 @@ function performDiff {
     fi
 }
 
+function performPrune {
+    extra="$1"
+    if [ -z "$test" ]; then
+        # Normal test execution, execute the prune
+        eval "${BEAK} prune $extra ${store} > $dest"
+    else
+        if [ -z "$gdb" ]; then
+            ${BEAK} prune --log=all $extra ${store} 2>&1 | tee $dest
+        else
+            gdb -ex=r --args ${BEAK} prune -f $extra ${store}
+        fi
+    fi
+}
+
 function performDiffInsideBackup {
     extra="$1"
     if [ -z "$test" ]; then
@@ -379,6 +393,23 @@ function cleanCheck {
     rm -rf "$check"
     mkdir -p "$check"
 }
+
+setup basicprune "Prune small backup"
+if [ $do_test ]; then
+    mkdir -p $root/Alfa/Beta
+    echo HEJSAN > $root/Alfa/Beta/gurka.c
+    find $root -exec touch -d '-720 days' '{}' +
+    performStore
+    echo HEJSAN > $root/Alfa/Beta/banan.cc
+    find $root -exec touch -d '-1 hour' '{}' +
+    performStore
+    performPrune "-v --dryrun -k 'all:forever'"
+    cat ${dest} ${org}
+    performPrune "-v --dryrun -k 'all:1d'"
+    diff ${org} ${dest}
+    exit
+    echo OK
+fi
 
 setup basic01 "Short simple file (fits in 100 char name)"
 if [ $do_test ]; then

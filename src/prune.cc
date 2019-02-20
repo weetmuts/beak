@@ -69,7 +69,7 @@ uint64_t to_weeks_since_epoch(uint64_t p)
     // week number changes align with sun -> mon.
     // What is important is that you usually start new work
     // on monday, thus the previous weeks last commit should be saved.
-    return (p+3*3600ull*24*4*NANOS)/(3600ull*24*7*NANOS);
+    return (p+3*3600ull*24*NANOS)/(3600ull*24*7*NANOS);
 }
 
 uint64_t to_month_identifier_since_epoch(uint64_t p)

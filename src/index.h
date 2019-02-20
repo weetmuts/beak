@@ -50,8 +50,6 @@ struct Index {
                          Path *dir_to_prepend,
                          std::function<void(IndexEntry*)> on_entry,
                          std::function<void(IndexTar*)> on_tar);
-
-    static RC listFilesReferencedInIndex(ptr<FileSystem> fs, Path *gz, std::set<Path*> *files);
 };
 
 #endif
