@@ -984,8 +984,6 @@ RC BeakImplementation::prune(Settings *settings)
         if (all_tars.count(p) == 0)
         {
             files_to_remove.push_back(p);
-        } else {
-            debug(PRUNE,"keeping %s\n", p->c_str());
         }
     }
 

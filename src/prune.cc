@@ -151,6 +151,9 @@ void PruneImplementation::addPointInTime(uint64_t p)
     }
 }
 
+const char* weekday_names[] = { "mon", "tue", "wed", "thu", "fri", "sat", "sun" };
+const char* month_names[] = { "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec" };
+
 void PruneImplementation::prune(std::map<uint64_t,bool> *result)
 {
     for (auto& p : all_) { points_[p] = true; }
@@ -175,7 +178,8 @@ void PruneImplementation::prune(std::map<uint64_t,bool> *result)
         } else {
             verbose(PRUNE, "discarding %s ", s.c_str());
         }
-        verbose(PRUNE, " %5zu %4zu %02d %6zu", days, weeknr, weekday, monthid);
+        verbose(PRUNE, " %5zu %4zu(%s) %6zu(%s)", days, weeknr, weekday_names[weekday], monthid,
+            month_names[monthid%100-1]);
         if (isAll(p)) verbose(PRUNE, " ALL");
         if (isDailyMax(p)) verbose(PRUNE, " DAY");
         if (isWeeklyMax(p)) verbose(PRUNE, " WEEK");
