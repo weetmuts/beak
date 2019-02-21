@@ -294,7 +294,7 @@ struct FileSystem
     virtual RC recurse(Path *p, std::function<RecurseOption(Path *path, FileStat *stat)> cb) = 0;
     virtual RC recurse(Path *p, std::function<RecurseOption(const char *path, const struct stat *sb)> cb) = 0;
     // List all files below p, sort on CTimeDesc
-    virtual RC listFilesBelow(Path *p, std::vector<Path*> *files, SortOrder so);
+    virtual RC listFilesBelow(Path *p, std::vector<std::pair<Path*,FileStat>> *files, SortOrder so);
     // Touch the meta data of the file to trigger an update of the ctime to NOW.
     virtual RC ctimeTouch(Path *file) = 0;
     virtual RC stat(Path *p, FileStat *fs) = 0;

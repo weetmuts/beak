@@ -161,15 +161,14 @@ void parse_rclone_verbose_output(ProgressStatistics *st,
 
 RC rcloneSendFiles(Storage *storage,
                    vector<Path*> *files,
-                   Path *dir,
+                   Path *local_dir,
                    FileSystem *local_fs,
                    ptr<System> sys,
                    ProgressStatistics *st)
 {
     string files_to_fetch;
     for (auto& p : *files) {
-        Path *n = p->subpath(1); // storage->storage_location->depth());
-        files_to_fetch.append(n->str());
+        files_to_fetch.append(p->c_str_nls()); // Drop the leading slash
         files_to_fetch.append("\n");
     }
     Path *tmp = local_fs->mkTempFile("beak_sending_", files_to_fetch);
@@ -181,7 +180,7 @@ RC rcloneSendFiles(Storage *storage,
     args.push_back("--stats=10s");
     args.push_back("--include-from");
     args.push_back(tmp->c_str());
-    args.push_back(dir->c_str());
+    args.push_back(local_dir->c_str());
     args.push_back(storage->storage_location->str());
     vector<char> output;
     RC rc = sys->invoke("rclone", args, &output, CaptureBoth,
@@ -199,20 +198,18 @@ RC rcloneSendFiles(Storage *storage,
 
 RC rcloneFetchFiles(Storage *storage,
                     vector<Path*> *files,
-                    Path *dir,
+                    Path *local_dir,
                     System *sys,
                     FileSystem *local_fs,
                     ProgressStatistics *progress)
 {
-    Path *target_dir = storage->storage_location->prepend(dir);
+    Path *target_dir = storage->storage_location->prepend(local_dir);
 
     string files_to_fetch;
     for (auto& p : *files) {
-        // Rclone does not like to have a leading /, we have to remove it.
-        Path *n = p->subpath(1);
-        files_to_fetch.append(n->str());
+        files_to_fetch.append(p->c_str_nls()); // Drop the leading slash
         files_to_fetch.append("\n");
-        debug(RCLONE, "fetch \"%s\"\n", n->c_str());
+        debug(RCLONE, "fetch \"%s\"\n", p->c_str_nls());
     }
 
     Path *tmp = local_fs->mkTempFile("beak_fetching_", files_to_fetch);
@@ -231,6 +228,42 @@ RC rcloneFetchFiles(Storage *storage,
                                                      storage,
                                                      buf,
                                                      len);
+                     });
+    local_fs->deleteFile(tmp);
+
+    return rc;
+}
+
+
+RC rcloneDeleteFiles(Storage *storage,
+                     std::vector<Path*> *files,
+                     FileSystem *local_fs,
+                     ptr<System> sys,
+                     ProgressStatistics *progress)
+{
+    string files_to_delete;
+    for (auto& p : *files) {
+        files_to_delete.append(p->c_str_nls()); // Drop the leading slash
+        files_to_delete.append("\n");
+        debug(RCLONE, "delete \"%s\"\n", p->c_str_nls());
+    }
+
+    Path *tmp = local_fs->mkTempFile("beak_deleting_", files_to_delete);
+
+    RC rc = RC::OK;
+    vector<string> args;
+    args.push_back("delete");
+    args.push_back("--include-from");
+    args.push_back(tmp->c_str());
+    args.push_back(storage->storage_location->c_str());
+    vector<char> output;
+    rc = sys->invoke("rclone", args, &output, CaptureBoth,
+                     [&progress, storage](char *buf, size_t len) {
+                         printf("RCLONEDEL %*s\n", (int)len, buf);
+                         /*parse_rclone_verbose_output(progress,
+                                                     storage,
+                                                     buf,
+                                                     len);*/
                      });
     local_fs->deleteFile(tmp);
 

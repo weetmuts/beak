@@ -44,6 +44,10 @@ struct StorageToolImplementation : public StorageTool
     RC listPointsInTime(Storage *storage, vector<pair<Path*,struct timespec>> *v,
                         ProgressStatistics *st);
 
+    RC removeBackupFiles(Storage *storage,
+                         std::vector<Path*>& files,
+                         ProgressStatistics *progress);
+
     FileSystem *asCachedReadOnlyFS(Storage *storage,
                                    ProgressStatistics *progress);
 
@@ -281,6 +285,61 @@ RC StorageToolImplementation::listPointsInTime(Storage *storage, vector<pair<Pat
     case NoSuchStorage:
         assert(0);
     }
+
+    return RC::OK;
+}
+
+RC StorageToolImplementation::removeBackupFiles(Storage *storage,
+                                                std::vector<Path*>& files_to_remove,
+                                                ProgressStatistics *progress)
+{
+    progress->startDisplayOfProgress();
+
+    // This is the list of files to be sent to the storage.
+
+    switch (storage->type) {
+    case FileSystemStorage:
+    {
+        for (auto p : files_to_remove)
+        {
+            Path *pp = p->prepend(storage->storage_location);
+            debug(STORAGETOOL, "removing backup file %s\n", pp->c_str());
+
+            bool ok = local_fs_->deleteFile(pp);
+            if (!ok) {
+                error(STORAGETOOL, "Could not delete local backup file: %s\n", p->c_str());
+            }
+        }
+        break;
+    }
+    case RSyncStorage:
+    case RCloneStorage:
+    {
+        progress->updateProgress();
+        RC rc = RC::OK;
+        if (storage->type == RCloneStorage) {
+            rc = rcloneDeleteFiles(storage,
+                                   &files_to_remove,
+                                   local_fs_,
+                                   sys_, progress);
+        } else {
+            rc = rsyncDeleteFiles(storage,
+                                  &files_to_remove,
+                                  local_fs_,
+                                  sys_, progress);
+        }
+
+        if (rc.isErr()) {
+            error(STORAGETOOL, "Error when invoking rclone/rsync.\n");
+        }
+
+        break;
+    }
+    case NoSuchStorage:
+        assert(0);
+    }
+
+    progress->finishProgress();
 
     return RC::OK;
 }

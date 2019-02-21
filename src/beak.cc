@@ -937,7 +937,10 @@ cleanup:
 
 RC BeakImplementation::prune(Settings *settings)
 {
+    RC rc = RC::OK;
+
     assert(settings->from.type == ArgStorage);
+
     auto progress = newProgressStatistics(settings->progress);
     FileSystem *backup_fs;
     Path *root;
@@ -954,12 +957,15 @@ RC BeakImplementation::prune(Settings *settings)
 
     set<Path*> all_tars;
 
+    // Iterate over the points in time, from the oldest to the newest!
     for (auto pit = restore->history().rbegin(); pit != restore->history().rend(); pit++)
     {
         prune->addPointInTime(pit->point());
     }
 
     map<uint64_t,bool> keeps;
+
+    // Perform the prune calculation
     prune->prune(&keeps);
 
     for (auto pit = restore->history().rbegin(); pit != restore->history().rend(); pit++)
@@ -975,23 +981,64 @@ RC BeakImplementation::prune(Settings *settings)
         }
     }
 
-    vector<Path*> files;
+    vector<pair<Path*,FileStat>> files;
     backup_fs->listFilesBelow(root, &files, SortOrder::Unspecified);
 
-    vector<Path*> files_to_remove;
-    for (auto p : files)
+    vector<Path*> files_to_delete;
+    size_t total_size_removed = 0;
+    size_t total_size_kept = 0;
+
+    for (auto &p : files)
     {
-        if (all_tars.count(p) == 0)
+        // Should we delete this file, check if the file is found in all_tars...
+        if (all_tars.count(p.first) > 0)
         {
-            files_to_remove.push_back(p);
+            total_size_kept += p.second.st_size;
+        }
+        else
+        {
+            // Not found! Ie, it is no longer needed.
+            // Lets queue it up for deletion.
+            files_to_delete.push_back(p.first);
+            total_size_removed += p.second.st_size;
+
+            if (settings->dryrun == true) {
+                verbose(PRUNE, "would remove %s\n", p.first->c_str());
+            } else {
+                debug(PRUNE, "removing %s\n", p.first->c_str());
+            }
         }
     }
 
-    for (auto p : files_to_remove)
+    string removed_size = humanReadableTwoDecimals(total_size_removed);
+    string kept_size = humanReadableTwoDecimals(total_size_kept);
+
+    assert( (total_size_removed == 0 && files_to_delete.size() == 0) ||
+            (total_size_removed > 0 && files_to_delete.size() > 0));
+
+    if (total_size_removed == 0)
     {
-        debug(PRUNE, "removing %s\n", p->c_str());
+        UI::output("No pruning needed, everything was up to date. Total size %s.\n", kept_size.c_str());
+        return RC::OK;
     }
-    return RC::OK;
+    else
+    {
+        UI::output("Prune will delete %s and keep %s.\n", removed_size.c_str(), kept_size.c_str());
+    }
+
+    if (settings->dryrun == false)
+    {
+        auto proceed = UI::yesOrNo("Proceed?");
+
+        if (proceed == UIYes)
+        {
+            storage_tool_->removeBackupFiles(settings->from.storage,
+                                             files_to_delete,
+                                             progress.get());
+        }
+    }
+
+    return rc;
 }
 
 RC BeakImplementation::diff(Settings *settings)

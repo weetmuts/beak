@@ -833,7 +833,7 @@ bool FileSystem::mkDirpWriteable(Path* path)
     return makeDirHelper(path->c_str());
 }
 
-RC FileSystem::listFilesBelow(Path *p, std::vector<Path*> *files, SortOrder so)
+RC FileSystem::listFilesBelow(Path *p, std::vector<pair<Path*,FileStat>> *files, SortOrder so)
 {
     int depth = p->depth();
     vector<pair<Path*,FileStat>> found;
@@ -850,7 +850,7 @@ RC FileSystem::listFilesBelow(Path *p, std::vector<Path*> *files, SortOrder so)
     sortOn(so, found);
     for (auto& f : found)
     {
-        files->push_back(f.first->subpath(depth)->prepend(Path::lookupRoot()));
+        files->push_back( { f.first->subpath(depth)->prepend(Path::lookupRoot()), f.second } );
     }
     return rc;
 }

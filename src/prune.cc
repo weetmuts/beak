@@ -39,6 +39,7 @@ private:
     Keep keep_;
     uint64_t prev_ {};
     map<uint64_t,bool> points_;
+    uint64_t latest_;
     set<uint64_t> all_;
     map<uint64_t,uint64_t> daily_max_;
     map<uint64_t,uint64_t> weekly_max_;
@@ -137,15 +138,25 @@ void PruneImplementation::addPointInTime(uint64_t p)
     uint64_t w = to_weeks_since_epoch(p);
     uint64_t m = to_month_identifier_since_epoch(p);
 
+    // Always keep the latest
+    latest_ = p;
+
+    // Keep all
     if (diff < keep_.all) {
         all_.insert(p);
     }
+
+    // Keep dailys
     if (diff < keep_.daily) {
         daily_max_[d] = p;
     }
+
+    // Keep weeklys
     if (diff < keep_.weekly) {
         weekly_max_[w] = p;
     }
+
+    // Keep monthlys
     if (diff < keep_.monthly) {
         monthly_max_[m] = p;
     }
@@ -156,6 +167,7 @@ const char* month_names[] = { "jan", "feb", "mar", "apr", "may", "jun", "jul", "
 
 void PruneImplementation::prune(std::map<uint64_t,bool> *result)
 {
+    points_[latest_] = true;
     for (auto& p : all_) { points_[p] = true; }
     for (auto& e : daily_max_) { points_[e.second] = true; }
     for (auto& e : weekly_max_) { points_[e.second] = true; }
@@ -174,17 +186,18 @@ void PruneImplementation::prune(std::map<uint64_t,bool> *result)
 
         uint64_t monthid = to_month_identifier_since_epoch(p);
         if (keep) {
-            verbose(PRUNE, "keeping    %s ", s.c_str());
+            info(PRUNE, "keeping    %s ", s.c_str());
         } else {
-            verbose(PRUNE, "discarding %s ", s.c_str());
+            info(PRUNE, "discarding %s ", s.c_str());
         }
-        verbose(PRUNE, " %5zu %4zu(%s) %6zu(%s)", days, weeknr, weekday_names[weekday], monthid,
+        info(PRUNE, " %5zu %4zu(%s) %6zu(%s)", days, weeknr, weekday_names[weekday], monthid,
             month_names[monthid%100-1]);
-        if (isAll(p)) verbose(PRUNE, " ALL");
-        if (isDailyMax(p)) verbose(PRUNE, " DAY");
-        if (isWeeklyMax(p)) verbose(PRUNE, " WEEK");
-        if (isMonthlyMax(p)) verbose(PRUNE, " MONTH");
-        verbose(PRUNE, " \n");
+        if (latest_ == p) info(PRUNE, " LATEST");
+        if (isAll(p)) info(PRUNE, " ALL");
+        if (isDailyMax(p)) info(PRUNE, " DAY");
+        if (isWeeklyMax(p)) info(PRUNE, " WEEK");
+        if (isMonthlyMax(p)) info(PRUNE, " MONTH");
+        info(PRUNE, " \n");
     }
 
     *result = points_;

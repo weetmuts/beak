@@ -202,3 +202,12 @@ RC rsyncFetchFiles(Storage *storage,
 
     return rc;
 }
+
+RC rsyncDeleteFiles(Storage *storage,
+                    vector<Path*> *files_to_delete,
+                    FileSystem *local_fs,
+                    ptr<System> sys,
+                    ProgressStatistics *progress)
+{
+    return RC::OK;
+}

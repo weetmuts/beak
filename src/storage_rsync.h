@@ -47,3 +47,10 @@ RC rsyncSendFiles(Storage *storage,
                   FileSystem *local_fs,
                   ptr<System> sys,
                   ProgressStatistics *progress);
+
+
+RC rsyncDeleteFiles(Storage *storage,
+                    std::vector<Path*> *files,
+                    FileSystem *local_fs,
+                    ptr<System> sys,
+                    ProgressStatistics *progress);

@@ -36,14 +36,20 @@ RC rcloneListBeakFiles(Storage *storage,
 
 RC rcloneFetchFiles(Storage *storage,
                     std::vector<Path*> *files,
-                    Path *dir,
+                    Path *local_dir,
                     System *sys,
                     FileSystem *local_fs,
                     ProgressStatistics *st);
 
 RC rcloneSendFiles(Storage *storage,
                    std::vector<Path*> *files,
-                   Path *dir,
+                   Path *local_dir,
                    FileSystem *local_fs,
                    ptr<System> sys,
                    ProgressStatistics *st);
+
+RC rcloneDeleteFiles(Storage *storage,
+                     std::vector<Path*> *files,
+                     FileSystem *local_fs,
+                     ptr<System> sys,
+                     ProgressStatistics *st);
