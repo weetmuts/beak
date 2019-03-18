@@ -257,15 +257,16 @@ RC rcloneDeleteFiles(Storage *storage,
     args.push_back(tmp->c_str());
     args.push_back(storage->storage_location->c_str());
     vector<char> output;
-    rc = sys->invoke("rclone", args, &output, CaptureBoth,
+/*    rc = sys->invoke("rclone", args, &output, CaptureBoth,
                      [&progress, storage](char *buf, size_t len) {
                          printf("RCLONEDEL %*s\n", (int)len, buf);
-                         /*parse_rclone_verbose_output(progress,
+                         parse_rclone_verbose_output(progress,
                                                      storage,
                                                      buf,
-                                                     len);*/
+                                                     len);
                      });
-    local_fs->deleteFile(tmp);
+*/
+    //local_fs->deleteFile(tmp);
 
     return rc;
 }

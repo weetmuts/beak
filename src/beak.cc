@@ -62,6 +62,7 @@ static ComponentId COMMANDLINE = registerLogComponent("commandline");
 static ComponentId STORE = registerLogComponent("store");
 static ComponentId FUSE = registerLogComponent("fuse");
 static ComponentId PRUNE = registerLogComponent("prune");
+static ComponentId FSCK = registerLogComponent("fsck");
 
 struct CommandEntry;
 struct OptionEntry;
@@ -955,12 +956,12 @@ RC BeakImplementation::prune(Settings *settings)
     }
     auto prune = newPrune(clockGetUnixTimeNanoSeconds(), keep);
 
-    set<Path*> all_tars;
+    set<Path*> required_beak_files;
 
     // Iterate over the points in time, from the oldest to the newest!
-    for (auto pit = restore->history().rbegin(); pit != restore->history().rend(); pit++)
+    for (auto &i : restore->historyOldToNew())
     {
-        prune->addPointInTime(pit->point());
+        prune->addPointInTime(i.point());
     }
 
     map<uint64_t,bool> keeps;
@@ -968,30 +969,49 @@ RC BeakImplementation::prune(Settings *settings)
     // Perform the prune calculation
     prune->prune(&keeps);
 
-    for (auto pit = restore->history().rbegin(); pit != restore->history().rend(); pit++)
+    for (auto& i : restore->historyOldToNew())
     {
-        if (keeps[pit->point()]) {
+        if (keeps[i.point()]) {
             // We should keep this point in time, lets remember all the tars required.
-            for (auto& t : *(pit->tars())) {
-                all_tars.insert(t);
+            for (auto& t : *(i.tars())) {
+                required_beak_files.insert(t);
             }
-            Path *p = Path::lookup(pit->filename);
-            p = p->prepend(Path::lookupRoot());
-            all_tars.insert(p);
+            Path *p = Path::lookup(i.filename);
+            required_beak_files.insert(p);
         }
     }
 
-    vector<pair<Path*,FileStat>> files;
-    backup_fs->listFilesBelow(root, &files, SortOrder::Unspecified);
+    vector<pair<Path*,FileStat>> existing_beak_files;
+    backup_fs->listFilesBelow(root, &existing_beak_files, SortOrder::Unspecified);
 
-    vector<Path*> files_to_delete;
+    set<Path*> set_of_existing_beak_files;
+    for (auto& p : existing_beak_files)
+    {
+        printf("EXISTING %s\n", p.first->c_str());
+        set_of_existing_beak_files.insert(p.first);
+    }
+
+    vector<Path*> beak_files_to_delete;
     size_t total_size_removed = 0;
     size_t total_size_kept = 0;
 
-    for (auto &p : files)
+    int num_lost = 0;
+    // Check that all expected tars actually exist in the storage location.
+    for (auto p : required_beak_files)
     {
-        // Should we delete this file, check if the file is found in all_tars...
-        if (all_tars.count(p.first) > 0)
+        printf("Has? (%zu) %s\n", set_of_existing_beak_files.count(p), p->c_str());
+        if (set_of_existing_beak_files.count(p) == 0)
+        {
+            warning(PRUNE, "storage lost: %s\n", p->c_str());
+            num_lost++;
+        }
+    }
+
+    for (auto &p : existing_beak_files)
+    {
+        printf("Keep? (%zu) %s\n", required_beak_files.count(p.first), p.first->c_str());
+        // Should we delete this file, check if the file is found in required_beak_files...
+        if (required_beak_files.count(p.first) > 0)
         {
             total_size_kept += p.second.st_size;
         }
@@ -999,7 +1019,7 @@ RC BeakImplementation::prune(Settings *settings)
         {
             // Not found! Ie, it is no longer needed.
             // Lets queue it up for deletion.
-            files_to_delete.push_back(p.first);
+            beak_files_to_delete.push_back(p.first);
             total_size_removed += p.second.st_size;
 
             if (settings->dryrun == true) {
@@ -1013,8 +1033,8 @@ RC BeakImplementation::prune(Settings *settings)
     string removed_size = humanReadableTwoDecimals(total_size_removed);
     string kept_size = humanReadableTwoDecimals(total_size_kept);
 
-    assert( (total_size_removed == 0 && files_to_delete.size() == 0) ||
-            (total_size_removed > 0 && files_to_delete.size() > 0));
+    assert( (total_size_removed == 0 && beak_files_to_delete.size() == 0) ||
+            (total_size_removed > 0 && beak_files_to_delete.size() > 0));
 
     if (total_size_removed == 0)
     {
@@ -1026,6 +1046,11 @@ RC BeakImplementation::prune(Settings *settings)
         UI::output("Prune will delete %s and keep %s.\n", removed_size.c_str(), kept_size.c_str());
     }
 
+    if (num_lost > 0)
+    {
+        UI::output("Warning! Lost %d backup files! Maybe fsck instead?\n", num_lost);
+    }
+
     if (settings->dryrun == false)
     {
         auto proceed = UI::yesOrNo("Proceed?");
@@ -1033,7 +1058,7 @@ RC BeakImplementation::prune(Settings *settings)
         if (proceed == UIYes)
         {
             storage_tool_->removeBackupFiles(settings->from.storage,
-                                             files_to_delete,
+                                             beak_files_to_delete,
                                              progress.get());
         }
     }
@@ -1073,7 +1098,7 @@ RC BeakImplementation::diff(Settings *settings)
             return RC::ERR;
         }
         curr_fs = restore_curr->asFileSystem();
-        curr_path = Path::lookupRoot();
+        curr_path = NULL;
     }
 
     unique_ptr<Restore> restore_old;
@@ -1094,7 +1119,7 @@ RC BeakImplementation::diff(Settings *settings)
             return RC::ERR;
         }
         old_fs = restore_old->asFileSystem();
-        old_path = Path::lookupRoot();
+        old_path = NULL;
     }
 
     auto d = newDiff(settings->verbose, settings->depth);
@@ -1109,101 +1134,45 @@ RC BeakImplementation::fsck(Settings *settings)
 {
     RC rc = RC::OK;
 
+    assert(settings->from.type == ArgStorage);
+
     auto progress = newProgressStatistics(settings->progress);
-    auto restore  = accessBackup_(&settings->from, settings->from.point_in_time, progress.get());
-    if (!restore) {
-        return RC::ERR;
-    }
-    //FileSystem *backup_fs = restore->backupFileSystem(); // Access the archive files storing content.
+    FileSystem *backup_fs;
+    Path *root;
+    auto restore = accessBackup_(&settings->from, "", progress.get(), &backup_fs, &root);
 
-    //CacheFS *cache_fs = dynamic_cast<CacheFS>(backup_fs); // Get more information about the storage location.
-    /*
-    vector<TarFileName> existing_files, bad_files;
-    vector<string> other_files;
-    map<Path*,FileStat> contents;
-    //rc = storage_tool_->listBeakFiles(settings->from.storage,
-    //&existing_files, &bad_files, &other_files, &contents);
+    set<Path*> required_beak_files;
+    vector<pair<Path*,FileStat>> existing_beak_files;
+    set<Path*> set_of_existing_beak_files;
 
-    if (bad_files.size() > 0) {
-        UI::output("Found %ju files with the wrong sizes!\n", bad_files.size());
-        for (auto& f : bad_files) {
-            verbose(CHECK, "Wrong size: %s\n", f.path->c_str());
-        }
-    }
-    if (other_files.size() > 0) {
-        UI::output("Found %ju non-beak files!\n", other_files.size());
-        for (auto& f : other_files) {
-            verbose(CHECK, "Non-beak: %s\n", f.c_str());
-        }
-    }
-
-    size_t total_size = 0;
-    set<Path*> set_of_existing_files;
-    vector<TarFileName*> indexes;
-    for (auto& f : existing_files) {
-        total_size += f.size;
-        if (f.type == REG_FILE && f.path->depth() == 1) {
-            // This is one of the index files in the root directory.
-            indexes.push_back(&f);
-        } else {
-            // The root index files are not listed inside themselves. Which is a side
-            // effect of the index file being named with the hash of the index contents.
-            // It cannot have the hash of itself. Well, perhaps it could with a fixpoint
-            // calculation/solving, but that is probably not feasable, nor interesting. :-)
-            set_of_existing_files.insert(f.path);
-        }
-    }
-
-    string total = humanReadable(total_size);
-    UI::output("Backup location uses %s in %ju beak files.\n", total.c_str(), existing_files.size());
-
-    verbose(CHECK, "Using cache location %s\n", rule->cache_path->c_str());
-    //rc = storage_tool_->fetchBeakFilesFromStorage(storage, &indexes, rule->cache_path);
-
-    if (rc.isErr()) return rc;
-
-    set<Path*> set_of_beak_files;
-    for (auto& f : indexes) {
-        Path *gz = f->path->prepend(rule->cache_path);
-        rc = Index::listFilesReferencedInIndex(local_fs_, gz, &set_of_beak_files);
-        if (rc.isErr()) {
-            failure(CHECK, "Cannot read index file %s\n", gz->c_str());
-            return rc;
-        }
-        set_of_existing_files.erase(f->path);
-    }
-
-     UI::output("Found %d points in time.\n", indexes.size());
-
-    vector<Path*> missing_files;
-    for (auto p : set_of_existing_files) {
-        if (set_of_beak_files.count(p) > 0)
+    for (auto& i : restore->historyOldToNew())
+    {
+        Path *p = Path::lookup(i.filename);
+        required_beak_files.insert(p);
+        for (auto& t : *(i.tars()))
         {
-            set_of_beak_files.erase(p);
+            required_beak_files.insert(t);
         }
-        else
+    }
+
+    backup_fs->listFilesBelow(root, &existing_beak_files, SortOrder::Unspecified);
+    for (auto& p : existing_beak_files)
+    {
+        set_of_existing_beak_files.insert(p.first);
+        if (required_beak_files.count(p.first) == 0)
         {
-            missing_files.push_back(p);
+            warning(FSCK, "superfluous storage: %s\n", p.first->c_str());
         }
     }
 
-    if (set_of_beak_files.size() > 0) {
-        UI::output("Found %d superflous files!\n", set_of_beak_files.size());
-        for (auto& f : set_of_beak_files) {
-            verbose(CHECK, "Superflouous: %s\n", f->c_str());
+    for (auto p : required_beak_files)
+    {
+        if (set_of_existing_beak_files.count(p) == 0)
+        {
+            warning(FSCK, "storage lost: %s\n", p->c_str());
         }
     }
 
-    if (missing_files.size() > 0) {
-        UI::output("Warning! %d missing files!\n", missing_files.size());
-        for (auto& f : missing_files) {
-            verbose(CHECK, "Missing: %s\n", f->c_str());
-        }
-    } else {
-        UI::output("OK\n");
-    }
-
-    */
     return rc;
 }
 

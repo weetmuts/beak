@@ -80,8 +80,7 @@ RC Index::loadIndex(vector<char> &v,
 
     const char *dtp = "";
     if (dir_to_prepend) dtp = dir_to_prepend->c_str();
-    debug(INDEX, "loading gz for %s with %s and %d files.\n", dtp, config.c_str(), num_files);
-
+    debug(INDEX, "loading gz for %s with %s and %d files prepend \"%s\".\n", dtp, config.c_str(), num_files, dtp);
     eof = false;
     while (i != v.end() && !eof && num_files > 0)
     {

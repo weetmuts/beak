@@ -61,13 +61,13 @@ struct RestoreFileSystem : FileSystem
         rev_->loadDirContents(point_, d->path);
 
         // Recurse depth first.
-        for (auto e : d->dir) {
+        for (auto e : d->dir()) {
             if (e->fs.isDirectory()) {
                 recurseInto(e, cb);
                 cb(e->path, &e->fs);
             }
         }
-        for (auto e : d->dir) {
+        for (auto e : d->dir()) {
             if (!e->fs.isDirectory()) {
                 cb(e->path, &e->fs);
             }
@@ -217,6 +217,11 @@ Restore::Restore(FileSystem *backup_fs)
     contents_fs_ = unique_ptr<FileSystem>(new RestoreFileSystem(this));
 }
 
+Restore::~Restore() {
+    delete fuse_api_;
+    fuse_api_ = 0;
+}
+
 // The gz file to load, and the dir to populate with its contents.
 bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
 {
@@ -235,7 +240,7 @@ bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
     gunzipit(&buf, &contents);
     auto i = contents.begin();
 
-    debug(RESTORE, "parsing %s for files in %s\n", gz->c_str(), dir_to_prepend->c_str());
+    debug(RESTORE, "parsing %s for files in \"%s\"\n", gz->c_str(), dir_to_prepend?dir_to_prepend->c_str():"");
     struct IndexEntry index_entry;
     struct IndexTar index_tar;
 
@@ -243,9 +248,9 @@ bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
     bool parsed_tars_already = point->hasGzFiles();
 
     rc = Index::loadIndex(contents, i, &index_entry, &index_tar, dir_to_prepend,
-             [point,&es,dir_to_prepend](IndexEntry *ie){
+             [point,&es,dir_to_prepend](IndexEntry *ie) {
                          if (!point->hasPath(ie->path)) {
-                             debug(RESTORE, "adding entry for >%s< %p\n", ie->path->c_str());
+                             debug(RESTORE, "adding entry for >%s<\n", ie->path->c_str());
                              // Trigger storage of entry.
                              point->addPath(ie->path);
                          } else {
@@ -257,7 +262,11 @@ bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
                          if (ie->is_hard_link) {
                              // A Hard link as stored in the beakfs >must< point to a file
                              // in the same directory or to a file in subdirectory.
-                             e->fs.hard_link = dir_to_prepend->append(ie->link);
+                             if (dir_to_prepend) {
+                                 e->fs.hard_link = dir_to_prepend->append(ie->link);
+                             } else {
+                                 e->fs.hard_link = Path::lookup(ie->link);
+                             }
                          }
                          es.push_back(e);
                      },
@@ -265,7 +274,7 @@ bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
                           {
                               if (!parsed_tars_already)
                               {
-                                  Path *p = it->path->prepend(Path::lookupRoot());
+                                  Path *p = it->path;
                                   if (p->name()->c_str()[0] == REG_FILE_CHAR)
                                   {
                                       point->addGzFile(p->parent(), p);
@@ -285,8 +294,8 @@ bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
         // Now iterate over the files found.
         // Some of them might be in subdirectories.
         Path *p = i->path;
-        if (!p->parent()) continue;
         Path *pp = p->parent();
+        if (!pp) pp = Path::lookupRoot();
         RestoreEntry *d = point->getPath(pp);
         if (d == NULL)
         {
@@ -294,7 +303,7 @@ bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
             d->path = pp;
         }
         debug(RESTORE, "added %s %p to dir >%s< %p\n", i->path->c_str(), i, pp->c_str(), d);
-        d->dir.push_back(i);
+        d->addEntryToDir(i);
         d->loaded = true;
     }
 
@@ -315,7 +324,7 @@ Path *Restore::loadDirContents(PointInTime *point, Path *path)
         debug(RESTORE, "%s --- rc=%d %d\n", gz->c_str(), rc.toInteger(), stat.isRegularFile());
         if (rc.isOk() && stat.isRegularFile()) {
             // Found a gz file!
-            debug(RESTORE, "found a gz file %s for %s\n", gz->c_str(), path->c_str());
+            debug(RESTORE, "found a gz file %s for \"%s\"\n", gz->c_str(), path->c_str());
             loadGz(point, gz, path);
         }
     }
@@ -346,7 +355,7 @@ void Restore::loadCache(PointInTime *point, Path *path)
         {
             if (point->hasPath(path))
             {
-                if (path == Path::lookupRoot())
+                if (path == NULL)
                 {
                     debug(RESTORE, "reached root\n");
                     return;
@@ -357,7 +366,7 @@ void Restore::loadCache(PointInTime *point, Path *path)
             }
             // Can we terminate this search early?
         }
-        if (path->isRoot()) {
+        if (path == NULL) {
             // No gz file found anywhere! This filesystem should not have been mounted!
             debug(RESTORE, "no index file found anywhere!\n");
             return;
@@ -394,6 +403,7 @@ struct RestoreFuseAPI : FuseAPI
 
     int getattrCB(const char *path_char_string, struct stat *stbuf)
     {
+        path_char_string++; // Skip leading slash
         debug(RESTORE, "getattr '%s'\n", path_char_string);
 
         LOCK(&restore_->global);
@@ -403,7 +413,7 @@ struct RestoreFuseAPI : FuseAPI
         RestoreEntry *e;
         PointInTime *point;
 
-        if (path->depth() == 1)
+        if (path == Path::lookupRoot())
         {
             memset(stbuf, 0, sizeof(struct stat));
             stbuf->st_mode = S_IFDIR | S_IRUSR | S_IXUSR;
@@ -431,10 +441,10 @@ struct RestoreFuseAPI : FuseAPI
 
         point = restore_->singlePointInTime();
         if (!point) {
-            Path *root = path->subpath(1,1);
+            Path *root = path->subpath(0,1);
             point = restore_->findPointInTime(root->str());
             if (!point) goto err;
-            if (path->depth() == 2) {
+            if (path->depth() == 1) {
                 // We are getting the attributes for the virtual point_in_time directory.
                 memset(stbuf, 0, sizeof(struct stat));
                 stbuf->st_mode = S_IFDIR | S_IRUSR | S_IXUSR;
@@ -458,8 +468,8 @@ struct RestoreFuseAPI : FuseAPI
 #endif
                 goto ok;
             }
-            if (path->depth() > 2) {
-                path = path->subpath(2)->prepend(Path::lookupRoot());
+            if (path->depth() > 1) {
+                path = path->subpath(1);
             }
         }
 
@@ -528,6 +538,8 @@ struct RestoreFuseAPI : FuseAPI
     int readdirCB(const char *path_char_string, void *buf,
                   fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
     {
+        assert(path_char_string[0] == '/');
+        path_char_string++; // Skip leading slash
         debug(RESTORE, "readdir '%s'\n", path_char_string);
 
         LOCK(&restore_->global);
@@ -538,11 +550,11 @@ struct RestoreFuseAPI : FuseAPI
         PointInTime *point = restore_->singlePointInTime();
 
         if (!point) {
-            if (path->depth() == 1) {
+            if (path == Path::lookupRoot()) {
                 filler(buf, ".", NULL, 0);
                 filler(buf, "..", NULL, 0);
 
-                for (auto &p : restore_->history())
+                for (auto &p : restore_->historyOldToNew())
                 {
                     char filename[256];
                     memset(filename, 0, 256);
@@ -552,10 +564,10 @@ struct RestoreFuseAPI : FuseAPI
                 goto ok;
             }
 
-            Path *pnt_dir = path->subpath(1,1);
+            Path *pnt_dir = path->subpath(0,1);
             point = restore_->findPointInTime(pnt_dir->str());
             if (!point) goto err;
-            path = path->subpath(2)->prepend(Path::lookupRoot());
+            path = path->subpath(1);
         }
 
         e = restore_->findEntry(point, path);
@@ -570,7 +582,7 @@ struct RestoreFuseAPI : FuseAPI
         filler(buf, ".", NULL, 0);
         filler(buf, "..", NULL, 0);
 
-        for (auto i : e->dir)
+        for (auto i : e->dir())
         {
             char filename[256];
             memset(filename, 0, 256);
@@ -592,6 +604,7 @@ struct RestoreFuseAPI : FuseAPI
 
     int readlinkCB(const char *path_char_string, char *buf, size_t s)
     {
+        path_char_string++; // Skip leading slash
         debug(RESTORE, "readlink %s\n", path_char_string);
 
         LOCK(&restore_->global);
@@ -602,10 +615,10 @@ struct RestoreFuseAPI : FuseAPI
         RestoreEntry *e;
         PointInTime *point = restore_->singlePointInTime();
         if (!point) {
-            Path *pnt_dir = path->subpath(1,1);
+            Path *pnt_dir = path->subpath(0,1);
             point = restore_->findPointInTime(pnt_dir->c_str());
             if (!point) goto err;
-            path = path->subpath(2)->prepend(Path::lookupRoot());
+            path = path->subpath(1);
         }
         e = restore_->findEntry(point, path);
         if (!e) goto err;
@@ -633,6 +646,7 @@ struct RestoreFuseAPI : FuseAPI
     int readCB(const char *path_char_string, char *buf,
                size_t size, off_t offset_, struct fuse_file_info *fi)
     {
+        path_char_string++; // Skip leading slash
         debug(RESTORE, "read '%s' offset=%ju size=%ju\n", path_char_string, offset_, size);
 
         LOCK(&restore_->global);
@@ -648,10 +662,10 @@ struct RestoreFuseAPI : FuseAPI
         PointInTime *point = restore_->singlePointInTime();
         if (!point)
         {
-            Path *pnt_dir = path->subpath(1,1);
+            Path *pnt_dir = path->subpath(0,1);
             point = restore_->findPointInTime(pnt_dir->str());
             if (!point) goto err;
-            path = path->subpath(2)->prepend(Path::lookupRoot());
+            path = path->subpath(1);
         }
 
         e = restore_->findEntry(point, path);
@@ -753,24 +767,25 @@ RC Restore::lookForPointsInTime(PointInTimeFormat f, Path *path)
             p.ago = timeAgo(p.ts());
             p.datetime = datetime;
             p.filename = f->str();
-            history_.push_back(p);
+            history_old_to_new_.push_back(p);
             debug(RESTORE, "found index file %s\n", f->c_str());
         }
     }
 
-    if (history_.size() == 0) {
+    if (history_old_to_new_.size() == 0) {
         return RC::ERR;
     }
-    sort(history_.begin(), history_.end(),
+    sort(history_old_to_new_.begin(), history_old_to_new_.end(),
               [](PointInTime &a, PointInTime &b)->bool {
-                  return (b.ts()->tv_sec < a.ts()->tv_sec) ||
+                  return (b.ts()->tv_sec > a.ts()->tv_sec) ||
                       (b.ts()->tv_sec == a.ts()->tv_sec &&
-                       b.ts()->tv_nsec < a.ts()->tv_nsec);
+                       b.ts()->tv_nsec > a.ts()->tv_nsec);
                       });
 
-    most_recent_point_in_time_ = &history_[0];
+    most_recent_point_in_time_ = &history_old_to_new_.back();
     int i = 0;
-    for (auto &point : history_) {
+    map<string,int> points;
+    for (auto &point : history_old_to_new_) {
         point.key = i;
         string de = string("@")+to_string(i)+" ";
         i++;
@@ -783,6 +798,16 @@ RC Restore::lookForPointsInTime(PointInTimeFormat f, Path *path)
             de += point.datetime+" "+point.ago;
         }
         point.direntry = de;
+        int c = points.count(de);
+        if (c == 0) {
+            points[de] = 1;
+        } else {
+            // When there are more than one backup within the same
+            // second, suffix a counter to differentiate between the
+            // backups.
+            points[de]++;
+            point.direntry = de+"_"+to_string(c);
+        }
         points_in_time_[point.direntry] = &point;
         FileStat fs;
         fs.st_mode = S_IFDIR | S_IRUSR | S_IXUSR;
@@ -812,10 +837,10 @@ PointInTime *Restore::setPointInTime(string g) {
     }
     g = g.substr(1);
     size_t gg = atoi(g.c_str());
-    if (gg >= history_.size()) {
+    if (gg >= history_old_to_new_.size()) {
         return NULL;
     }
-    single_point_in_time_ = &history_[gg];
+    single_point_in_time_ = &history_old_to_new_[gg];
     return single_point_in_time_;
 }
 
@@ -823,7 +848,7 @@ RC Restore::loadBeakFileSystem(Argument *storage)
 {
     setRootDir(storage->storage->storage_location);
 
-    for (auto &point : history()) {
+    for (auto &point : historyOldToNew()) {
         string name = point.filename;
         debug(RESTORE,"found backup for %s filename %s\n", point.ago.c_str(), name.c_str());
 
@@ -838,7 +863,9 @@ RC Restore::loadBeakFileSystem(Argument *storage)
         }
 
         // Populate the list of all tars from the root index file.
-        bool ok = loadGz(&point, gz, Path::lookupRoot());
+        bool ok = loadGz(&point, gz, NULL);
+        point.addGzFile(Path::lookupRoot(), Path::lookup(name));
+
         if (!ok) {
             error(RESTORE, "Could not load index file for backup %s!\n", point.ago.c_str());
         }
@@ -853,7 +880,7 @@ RC Restore::loadBeakFileSystem(Argument *storage)
         // be used as the timestamp for the root directory.
         // The root directory is by definition not defined inside gz file.
         time_t youngest_secs = 0, youngest_nanos = 0;
-        for (auto i : e->dir)
+        for (auto i : e->dir())
         {
             if (i->fs.st_mtim.tv_sec > youngest_secs ||
                 (i->fs.st_mtim.tv_sec == youngest_secs &&
@@ -871,7 +898,8 @@ RC Restore::loadBeakFileSystem(Argument *storage)
 
 FuseAPI *Restore::asFuseAPI()
 {
-    return new RestoreFuseAPI(this);
+    if (!fuse_api_) fuse_api_ = new RestoreFuseAPI(this);
+    return fuse_api_;
 }
 
 unique_ptr<Restore> newRestore(ptr<FileSystem> backup_fs)

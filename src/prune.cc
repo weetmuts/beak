@@ -75,7 +75,7 @@ uint64_t to_weeks_since_epoch(uint64_t p)
 
 uint64_t to_month_identifier_since_epoch(uint64_t p)
 {
-    // This is not the exact nr of month since the epoch.
+    // This is not the exact nr of months since the epoch.
     // Instead we take the year*100 + month to calculate
     // a unique increasing identifier.
 

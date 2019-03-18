@@ -41,6 +41,7 @@ struct IndexEntry {
 
 struct IndexTar {
     Path *path;
+    TarFileName from, to;
 };
 
 struct Index {

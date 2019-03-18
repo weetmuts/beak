@@ -839,18 +839,19 @@ RC FileSystem::listFilesBelow(Path *p, std::vector<pair<Path*,FileStat>> *files,
     vector<pair<Path*,FileStat>> found;
     RC rc = RC::OK;
     rc = recurse(p,
-                 [&found](Path *path, FileStat *stat)
+                 [&found,p,depth](Path *path, FileStat *stat)
                  {
+                     Path *pp = path->subpath(depth);
                      if (stat->isRegularFile()) {
-                         found.push_back({ path, *stat });
+                         found.push_back({ pp, *stat });
                      }
                      return RecurseContinue;
                  });
 
     sortOn(so, found);
-    for (auto& f : found)
+    for (auto& p : found)
     {
-        files->push_back( { f.first->subpath(depth)->prepend(Path::lookupRoot()), f.second } );
+        files->push_back( p );
     }
     return rc;
 }

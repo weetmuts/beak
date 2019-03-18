@@ -54,7 +54,7 @@ Backup::Backup(ptr<FileSystem> origin_fs)
 RecurseOption Backup::addTarEntry(Path *abspath, FileStat *st)
 {
     Path *path = abspath->subpath(root_dir_path->depth());
-    path = path->prepend(Path::lookup(""));
+    path = path->prepend(Path::lookupRoot());
 
     #ifdef PLATFORM_POSIX
     // Sockets cannot be stored.

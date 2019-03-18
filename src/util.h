@@ -47,6 +47,7 @@ std::string getLengthOfTime(time_t t);
 time_t getTimeZoneOffset();
 std::string getTimeZoneOffsetAsString(time_t t);
 std::string timeToString(uint64_t t);
+std::string timeToString(time_t t);
 size_t basepos(std::string& s);
 std::wstring to_wstring(std::string const& s);
 std::string wto_string(std::wstring const& s);

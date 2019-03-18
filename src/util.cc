@@ -879,3 +879,13 @@ string timeToString(uint64_t t)
     strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &tid);
     return buf;
 }
+
+string timeToString(time_t pp)
+{
+    char buf[256];
+    memset(buf, 0, sizeof(buf));
+    struct tm tid;
+    localtime_r(&pp, &tid);
+    strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &tid);
+    return buf;
+}

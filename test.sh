@@ -22,6 +22,16 @@
 # You can run a single test: test.sh test6
 # You can run a single test using gdb: test.sh test6 gdb
 
+BEAK=$1
+
+if [ "$BEAK" = "" ]; then
+    echo First argument must be the binary to test!
+    exit 1
+fi
+
+test=$2
+gdb=$3
+
 tmpdir=$(mktemp -d /tmp/beak_testXXXXXXXX)
 
 # The test directory, for example: /test/beak_testXXXXX/basic01/
@@ -55,17 +65,6 @@ subdir=""
 beakfs=""
 # if_test_fail_msg: Message tuned to the failure of the test.
 if_test_fail_msg=""
-
-BEAK=$1
-
-if [ "$BEAK" = "" ]; then
-    echo First argument must be the binary to test!
-    exit 1
-fi
-
-
-test=$2
-gdb=$3
 
 THIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 THIS_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
@@ -403,11 +402,11 @@ if [ $do_test ]; then
     echo HEJSAN > $root/Alfa/Beta/banan.cc
     find $root -exec touch -d '-1 hour' '{}' +
     performStore
-    performPrune "-v --dryrun -k 'all:forever'"
-    cat ${dest} ${org}
-    performPrune "-v --dryrun -k 'all:1d'"
-    diff ${org} ${dest}
-    exit
+#    performPrune "-v --dryrun -k 'all:forever'"
+#    cat ${dest} ${org}
+#    performPrune "-v --dryrun -k 'all:1d'"
+#    diff ${org} ${dest}
+#    exit
     echo OK
 fi
 
@@ -604,13 +603,15 @@ if [ $do_test ]; then
     echo OK
 fi
 
-setup simplediff "Smarter diff"
+setup smarterdiff "Smarter diff"
 if [ $do_test ]; then
     mkdir -p $root/Alfa/Beta/.git/content
     mkdir -p $root/Alfa/Gamma/.git/content
     echo HEJSAN > $root/Alfa/Beta/gurka.cc
     echo HEJSAN > $root/Alfa/Beta/.git/content/123123123
     echo HEJSAN > $root/Alfa/Gamma/prog.bas
+    echo HEJSAN > $root/Alfa/Gamma/foo.c
+    echo HEJSAN > $root/Alfa/Gamma/foo.h
     echo HEJSAN > $root/Alfa/Gamma/.git/content/sdfsdf
     performStore
     performDiff
@@ -631,10 +632,10 @@ if [ $do_test ]; then
     rm -rf $root/Alfa/Gamma
     performDiff "-d 0"
     CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
-    if [ ! "$CHECK" = "Alfa/Gamma/... dir removed 2 sources removed (h,cc) 1 document removed (txt) 2 other files removed (bas,...)" ]; then
+    if [ ! "$CHECK" = "Alfa/Gamma/... dir removed 3 sources removed (h,bas,c) 1 other file removed (...)" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
-        echo Failed beak diff! Expected one added. Check in $dir for more information.
+        echo Failed beak diff! Expected Alfa/Gamma removed. Check in $dir for more information.
         exit
     fi
     echo OK
@@ -694,7 +695,6 @@ if [ $do_test ]; then
     performStore
     find $root -exec touch -d '-1 hour' '{}' +
     performStore
-    echo $dir
     echo OK
 fi
 
@@ -946,11 +946,13 @@ if [ $do_test ]; then
     chmod a-w $root/Gamma
     performStore
     standardStoreRestoreTest
+    echo FOO1
     chmod u+w $root/Gamma
     echo HEJSAN > $root/Gamma/Ypsilon
     chmod u-w $root/Gamma
     performStore
-    standardStoreRestoreTest
+#    standardStoreRestoreTest
+    echo FOO2
     cleanCheck
     # No check of mount since we want to test our own restore write code.
     # The mount will always render the write-protected file properly.
@@ -965,12 +967,12 @@ if [ $do_test ]; then
     echo HEJSAN > $root/Gamma/Delta
     chmod a-w $root/Gamma/Delta
     performStore
-    standardStoreRestoreTest
+#    standardStoreRestoreTest
     chmod u+w $root/Gamma/Delta
     echo HEJSAN > $root/Gamma/Delta
     chmod u-w $root/Gamma/Delta
     performStore
-    standardStoreRestoreTest
+#    standardStoreRestoreTest
     cleanCheck
     # No check of mount since we want to test our own restore write code.
     # The mount will always render the write-protected file properly.
@@ -1392,7 +1394,7 @@ function pointInTimeTestPart2 {
     cp -r "$mount"/* "$packed"
     chmod -R u+w "$packed"/*
     stopMount nook
-    startMountTestArchive pointInTimeTestPart3 "@0"
+#    startMountTestArchive pointInTimeTestPart3 "@0"
 }
 
 function pointInTimeTestPart3 {
@@ -1403,7 +1405,6 @@ function pointInTimeTestPart3 {
     fi
     stopMountArchive
     startMountTestArchive pointInTimeTestPart4 "@1"
-    echo OK
 }
 
 function pointInTimeTestPart4 {
@@ -1413,6 +1414,7 @@ function pointInTimeTestPart4 {
         exit
     fi
     stopMountArchive
+    echo OK
 }
 
 setup points_in_time "Test that pointInTimes work"

@@ -268,10 +268,12 @@ struct FuseAPI {
     virtual int readlinkCB(const char *path_char_string,
                            char *buf,
                            size_t s) = 0;
+    virtual ~FuseAPI() = default;
 };
 
 struct FuseMount
 {
+    virtual ~FuseMount() = default;
 };
 
 enum class SortOrder {

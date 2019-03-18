@@ -360,6 +360,30 @@ RC SystemImplementation::invokeShell(Path *init_file)
     return RC::OK;
 }
 
+struct FuseMountImplementationPosix : FuseMount
+{
+    Path *dir {};
+    struct fuse_chan *chan {};
+    struct fuse *fuse {};
+    pid_t loop_pid {};
+    fuse_operations *ops {};
+    struct fuse_args args {};
+
+    virtual ~FuseMountImplementationPosix()
+    {
+        dir = NULL;
+        //delete chan; // FIX?
+        chan = NULL;
+        // delete fuse; // FIX?
+        fuse = NULL;
+        delete ops;
+        ops = NULL;
+        free(args.argv);
+        args.argv = 0;
+        args.argc = 0;
+    }
+};
+
 RC SystemImplementation::mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground, bool debug)
 {
     unique_ptr<FuseMount> fm;
@@ -413,18 +437,13 @@ static int staticOpenDispatch_(const char *path, struct fuse_file_info *fi)
     return 0;
 }
 
-struct FuseMountImplementationPosix : FuseMount
-{
-    Path *dir;
-    struct fuse_chan *chan;
-    struct fuse *fuse;
-    pid_t loop_pid;
-};
-
 RC SystemImplementation::mountInternal(Path *dir, FuseAPI *fuseapi,
                                        bool daemon, unique_ptr<FuseMount> &fm,
                                        bool foreground, bool debug)
 {
+    auto *fuse_mount_info = new FuseMountImplementationPosix;
+    fm = unique_ptr<FuseMount>(fuse_mount_info);
+
     vector<string> fuse_args;
     fuse_args.push_back("beak");
     if (foreground) fuse_args.push_back("-f");
@@ -440,35 +459,34 @@ RC SystemImplementation::mountInternal(Path *dir, FuseAPI *fuseapi,
     }
     fuse_argv[j] = 0;
 
-    fuse_operations *ops = new fuse_operations;
-    memset(ops, 0, sizeof(*ops));
-    ops->getattr = staticGetattrDispatch_;
-    ops->open = staticOpenDispatch_;
-    ops->read = staticReadDispatch_;
-    ops->readdir = staticReaddirDispatch_;
-    ops->readlink = staticReadlinkDispatch_;
+
+    fuse_mount_info->args.argc = fuse_argc;
+    fuse_mount_info->args.argv = fuse_argv;
+    fuse_mount_info->args.allocated = 0;
+
+    fuse_mount_info->ops = new fuse_operations;
+    memset(fuse_mount_info->ops, 0, sizeof(*fuse_mount_info->ops));
+    fuse_mount_info->ops->getattr = staticGetattrDispatch_;
+    fuse_mount_info->ops->open = staticOpenDispatch_;
+    fuse_mount_info->ops->read = staticReadDispatch_;
+    fuse_mount_info->ops->readdir = staticReaddirDispatch_;
+    fuse_mount_info->ops->readlink = staticReadlinkDispatch_;
 
     if (daemon) {
         // The fuse daemon gracefully handles its own exit.
         // No need to track it here.
-        int rc = fuse_main(fuse_argc, fuse_argv, ops, fuseapi);
+        int rc = fuse_main(fuse_argc, fuse_argv, fuse_mount_info->ops, fuseapi);
         if (rc) return RC::ERR;
         return RC::OK;
     }
 
-    auto *fuse_mount_info = new FuseMountImplementationPosix;
-
-    struct fuse_args args;
-    args.argc = fuse_argc;
-    args.argv = fuse_argv;
-    args.allocated = 0;
     fuse_mount_info->dir = dir;
-    fuse_mount_info->chan = fuse_mount(dir->c_str(), &args);
+    fuse_mount_info->chan = fuse_mount(dir->c_str(), &fuse_mount_info->args);
     fuse_mount_info->fuse = fuse_new(fuse_mount_info->chan,
-                                &args,
-                                ops,
-                                sizeof(*ops),
-                                fuseapi);
+                                     &fuse_mount_info->args,
+                                     fuse_mount_info->ops,
+                                     sizeof(*fuse_mount_info->ops),
+                                     fuseapi);
 
     fuse_mount_info->loop_pid = fork();
 
@@ -499,8 +517,6 @@ RC SystemImplementation::mountInternal(Path *dir, FuseAPI *fuseapi,
                          kill(running_shell_pid_, SIGTERM);
                      }
                  });
-    fm = unique_ptr<FuseMount>(fuse_mount_info);
-
     return RC::OK;
 }
 

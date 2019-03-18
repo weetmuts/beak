@@ -47,7 +47,6 @@ struct RestoreEntry
     FileStat fs;
     Path *path {};
     Path *tar {};
-    std::vector<RestoreEntry*> dir;
     bool is_sym_link {};
     // A symbolic link can be anything! Must not point to a real file.
     std::string symlink;
@@ -62,12 +61,18 @@ struct RestoreEntry
     UpdateDisk disk_update {};
 
     RestoreEntry() {}
-    RestoreEntry(FileStat s, size_t o, Path *p) : fs(s), path(p), offset_(o) {}
+    RestoreEntry(FileStat s, size_t o, Path *p) : fs(s), path(p), offset_(o) { printf("%s\n", p->c_str()); }
     void loadFromIndex(IndexEntry *ie);
     bool findPartContainingOffset(size_t file_offset, uint *partnr, size_t *offset_inside_part);
     size_t lengthOfPart(uint partnr);
     ssize_t readParts(off_t file_offset, char *buffer, size_t length,
                    std::function<ssize_t(uint partnr, off_t offset_inside_part, char *buffer, size_t length)> cb);
+
+    void addEntryToDir(RestoreEntry *re) { dir_.push_back(re); }
+    std::vector<RestoreEntry*> &dir() { return dir_; }
+private:
+
+    std::vector<RestoreEntry*> dir_;
 
 };
 
@@ -109,6 +114,7 @@ struct PointInTime {
         ts_.tv_nsec = nsec;
         point_ = 1000000000ull*sec + nsec;
     }
+
 private:
 
     struct timespec ts_;
@@ -143,7 +149,7 @@ struct Restore
     PointInTime *singlePointInTime() { return single_point_in_time_; }
     PointInTime *mostRecentPointInTime() { return most_recent_point_in_time_; }
     RC lookForPointsInTime(PointInTimeFormat f, Path *src);
-    std::vector<PointInTime> &history() { return history_; }
+    std::vector<PointInTime> &historyOldToNew() { return history_old_to_new_; }
     PointInTime *findPointInTime(std::string s);
     PointInTime *setPointInTime(std::string g);
 
@@ -156,20 +162,22 @@ struct Restore
     FuseAPI *asFuseAPI();
     FileSystem *backupFileSystem() { return backup_fs_; }
 
+    ~Restore();
+
     private:
 
-    Path *root_dir_;
+    Path *root_dir_ {};
 
-    std::vector<PointInTime> history_;
+    std::vector<PointInTime> history_old_to_new_;
     std::map<std::string,PointInTime*> points_in_time_;
-    PointInTime *single_point_in_time_;
-    PointInTime *most_recent_point_in_time_;
+    PointInTime *single_point_in_time_ {};
+    PointInTime *most_recent_point_in_time_ {};
 
     // This is the file system where the backup containing beak files are stored.
     // It can point directly to the default OS file system or to a cached
     // storage tool file system.
-    FileSystem *backup_fs_;
-
+    FileSystem *backup_fs_ {};
+    FuseAPI *fuse_api_ {};
     std::unique_ptr<FileSystem> contents_fs_;
 };
 

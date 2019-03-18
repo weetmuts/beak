@@ -83,6 +83,7 @@ py
 sh
 vb
 asm
+bas
 bat
 cpp
 dtd

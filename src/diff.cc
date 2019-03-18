@@ -170,6 +170,7 @@ unique_ptr<Diff> newDiff(bool detailed, int depth)
 void DiffImplementation::addStats(Action a, Path *p, FileStat *stat)
 {
     Path *dir = p->parent();
+    if (!dir) dir = Path::lookupRoot();
     DirSummary *dir_summary = &dirs[dir]; // Remember, [] will add missing entry automatically.
     FileInfo fi = fileInfo(p);
     dir_summary->add(a, fi, stat, p, detailed_);
@@ -236,41 +237,49 @@ RC DiffImplementation::diff(FileSystem *old_fs, Path *old_path,
                             ProgressStatistics *progress)
 {
     RC rc = RC::OK;
-    int depth = old_path->depth();
+    int old_depth = old_path ? old_path->depth() : 0;
+    int curr_depth = curr_path ? curr_path->depth() : 0;
     Atom *dotbeak = Atom::lookup(".beak");
 
     // Recurse the old file system
     rc = old_fs->recurse(old_path,
                          [&](Path *path, FileStat *stat)
                          {
-                             if (path->depth() > depth) {
-                                 if (path->name() == dotbeak) {
-                                     // Ignore .beak directories and their contents.
-                                     debug(DIFF, "Skipping in old: \"%s\"\n", path->c_str());
-                                     return RecurseSkipSubTree;
-                                 }
-                                 Path *p = path->subpath(depth)->prepend(Path::lookupRoot());
-                                 old[p] = *stat;
-                                 debug(DIFF, "Old \"%s\"\n", p->c_str());
+                             assert(path->depth() >= old_depth);
+                             if (path->depth() == old_depth) return RecurseContinue;
+                             if (path->name() == dotbeak) {
+                                 // Ignore .beak directories and their contents.
+                                 debug(DIFF, "Skipping in old: \"%s\"\n", path->c_str());
+                                 return RecurseSkipSubTree;
+                             }
+                             Path *p = path->subpath(old_depth);
+                             old[p] = *stat;
+                             if (logLevel() >= DEBUG) {
+                                 string time = timeToString(stat->st_mtim.tv_sec);
+                                 debug(DIFF, "Old %s %zu \"%s\" \n", time.c_str(),
+                                       stat->st_size, p->c_str());
                              }
                              return RecurseContinue;
                          }
         );
 
     // Recurse the new file system
-    depth = curr_path->depth();
     rc = curr_fs->recurse(curr_path,
                             [&](Path *path, FileStat *stat)
                             {
-                                if (path->depth() > depth) {
-                                    if (path->name() == dotbeak) {
-                                        // Ignore .beak directories and their contents.
-                                        debug(DIFF, "Skipping \"%s\"\n", path->c_str());
-                                        return RecurseSkipSubTree;
-                                    }
-                                    Path *p = path->subpath(depth)->prepend(Path::lookupRoot());
-                                    curr[p] = *stat;
-                                    debug(DIFF, "Curr \"%s\"\n", p->c_str());
+                                assert(path->depth() >= curr_depth);
+                                if (path->depth() == curr_depth) return RecurseContinue;
+                                if (path->name() == dotbeak) {
+                                    // Ignore .beak directories and their contents.
+                                    debug(DIFF, "Skipping \"%s\"\n", path->c_str());
+                                    return RecurseSkipSubTree;
+                                }
+                                Path *p = path->subpath(curr_depth);
+                                curr[p] = *stat;
+                                if (logLevel() >= DEBUG) {
+                                    string time = timeToString(stat->st_mtim.tv_sec);
+                                    debug(DIFF, "Curr %s %zu \"%s\" \n", time.c_str(),
+                                          stat->st_size, p->c_str());
                                 }
                                 return RecurseContinue;
                             }
@@ -301,10 +310,13 @@ RC DiffImplementation::diff(FileSystem *old_fs, Path *old_path,
                         debug(DIFF, "Followed old hard link\n");
                     }
                 }
-                if (!newstat->sameSize(oldstat) ||
-                    !newstat->sameMTime(oldstat))
+                bool size_same = newstat->sameSize(oldstat);
+                bool mtime_same = newstat->sameMTime(oldstat);
+                if (!size_same || !mtime_same)
                 {
-                    debug(DIFF, "content diff %s\n", p.first->c_str());
+                    debug(DIFF, "content diff (%s %s) %s\n",
+                          size_same?"":"size", mtime_same?"":"mtime",
+                          p.first->c_str());
                     addToDirSummary(Action::Changed, p.first, newstat);
                 }
                 if (!newstat->samePermissions(oldstat))
