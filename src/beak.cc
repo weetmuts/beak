@@ -688,6 +688,9 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
             case yesorigin_option:
                 settings->yesorigin = true;
                 break;
+            case yesprune_option:
+                settings->yesprune = true;
+                break;
             case nosuch_option:
                 if ((*i)[0] == '-' && !options_completed) {
                     // It looks like an option, but we could not find it!
@@ -987,7 +990,6 @@ RC BeakImplementation::prune(Settings *settings)
     set<Path*> set_of_existing_beak_files;
     for (auto& p : existing_beak_files)
     {
-        printf("EXISTING %s\n", p.first->c_str());
         set_of_existing_beak_files.insert(p.first);
     }
 
@@ -1053,7 +1055,12 @@ RC BeakImplementation::prune(Settings *settings)
 
     if (settings->dryrun == false)
     {
-        auto proceed = UI::yesOrNo("Proceed?");
+        auto proceed = UIYes;
+
+        if (!settings->yesprune)
+        {
+            proceed = UI::yesOrNo("Proceed?");
+        }
 
         if (proceed == UIYes)
         {
@@ -1165,11 +1172,36 @@ RC BeakImplementation::fsck(Settings *settings)
         }
     }
 
+    bool lost_file = false;
     for (auto p : required_beak_files)
     {
         if (set_of_existing_beak_files.count(p) == 0)
         {
             warning(FSCK, "storage lost: %s\n", p->c_str());
+            lost_file = true;
+        }
+    }
+
+    if (lost_file) {
+        // Ouch, a backup file was lost. Are there any ok points in time?
+        for (auto& i : restore->historyOldToNew())
+        {
+            Path *p = Path::lookup(i.filename);
+            bool missing = 0 == set_of_existing_beak_files.count(p);
+            if (!missing) {
+                for (auto& t : *(i.tars()))
+                {
+                    if (set_of_existing_beak_files.count(t) == 0) {
+                        missing = true;
+                        break;
+                    }
+                }
+            }
+            if (missing) {
+                warning(FSCK, "Broken %s\n", i.datetime.c_str());
+            } else {
+                warning(FSCK, "OK     %s\n", i.datetime.c_str());
+            }
         }
     }
 

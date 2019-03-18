@@ -161,6 +161,20 @@ function performPrune {
     fi
 }
 
+function performFsck {
+    extra="$1"
+    if [ -z "$test" ]; then
+        # Normal test execution, execute the prune
+        eval "${BEAK} fsck $extra ${store} > $dest"
+    else
+        if [ -z "$gdb" ]; then
+            ${BEAK} fsck --log=all $extra ${store} 2>&1 | tee $dest
+        else
+            gdb -ex=r --args ${BEAK} fsck -f $extra ${store}
+        fi
+    fi
+}
+
 function performDiffInsideBackup {
     extra="$1"
     if [ -z "$test" ]; then
@@ -402,11 +416,8 @@ if [ $do_test ]; then
     echo HEJSAN > $root/Alfa/Beta/banan.cc
     find $root -exec touch -d '-1 hour' '{}' +
     performStore
-#    performPrune "-v --dryrun -k 'all:forever'"
-#    cat ${dest} ${org}
-#    performPrune "-v --dryrun -k 'all:1d'"
-#    diff ${org} ${dest}
-#    exit
+    performPrune "-v --yesprune -k 'all:forever'"
+    performPrune "-v --yesprune -k 'all:1w'"
     echo OK
 fi
 
@@ -636,6 +647,31 @@ if [ $do_test ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff! Expected Alfa/Gamma removed. Check in $dir for more information.
+        exit
+    fi
+    echo OK
+fi
+
+setup simplefsck "Fsck storage"
+if [ $do_test ]; then
+    mkdir -p $root/Alfa/
+    echo HEJSAN > $root/Alfa/gurka.c
+    performStore
+    mkdir -p $root/Beta/
+    echo HEJSAN > $root/Beta/prog.h
+    performStore
+    rm $root/Alfa/gurka.c
+    performStore
+    rm -f $store/Alfa/s0*.tar
+    echo SVEJSAN > $store/Alfa/xyzzy
+    performFsck
+    CHECK=$(cat $dest | grep -o -E 'Broken|OK' | tr -d '\n' | tr -s ' ')
+    if [ ! "$CHECK" = "BrokenBrokenOK" ]; then
+        echo ----------------
+        cat $dest
+        echo ----------------
+        echo "CHECK=\"$CHECK\""
+        echo Failed beak fsck! Expected two broken and one ok. Check in $dir for more information.
         exit
     fi
     echo OK

@@ -159,6 +159,7 @@ LIST_OF_COMMANDS
     X(v,verbose,bool,false,"More detailed information.")            \
     X(x,exclude,std::vector<std::string>,true,"Paths matching glob are excluded. E.g. -exclude='beta/**'") \
     X(,yesorigin,bool,false,"The origin directory contains beak files and this is intended.")            \
+    X(,yesprune,bool,false,"Respond yes to question if prune should be done.")            \
     X(nso,nosuch,bool,false,"No such option")
 
 enum Option {
