@@ -946,13 +946,11 @@ if [ $do_test ]; then
     chmod a-w $root/Gamma
     performStore
     standardStoreRestoreTest
-    echo FOO1
     chmod u+w $root/Gamma
     echo HEJSAN > $root/Gamma/Ypsilon
     chmod u-w $root/Gamma
     performStore
-#    standardStoreRestoreTest
-    echo FOO2
+    standardStoreRestoreTest
     cleanCheck
     # No check of mount since we want to test our own restore write code.
     # The mount will always render the write-protected file properly.
@@ -1394,7 +1392,7 @@ function pointInTimeTestPart2 {
     cp -r "$mount"/* "$packed"
     chmod -R u+w "$packed"/*
     stopMount nook
-#    startMountTestArchive pointInTimeTestPart3 "@0"
+    startMountTestArchive pointInTimeTestPart3 "@0"
 }
 
 function pointInTimeTestPart3 {
@@ -1414,7 +1412,6 @@ function pointInTimeTestPart4 {
         exit
     fi
     stopMountArchive
-    echo OK
 }
 
 setup points_in_time "Test that pointInTimes work"
