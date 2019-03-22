@@ -843,7 +843,8 @@ PointInTime *Restore::setPointInTime(string g) {
     if (gg >= history_old_to_new_.size()) {
         return NULL;
     }
-    gg = history_old_to_new_.size()-gg;
+    gg = history_old_to_new_.size()-gg-1;
+    assert(gg >= 0 && gg < history_old_to_new_.size());
     single_point_in_time_ = &history_old_to_new_[gg];
     return single_point_in_time_;
 }
