@@ -261,7 +261,7 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
         Path *rp = dir->realpath();
         if (!rp)
         {
-            error(COMMANDLINE, "Expected directory. Got \"%s\" instead.\n", arg.c_str());
+            usageError(COMMANDLINE, "Expected directory. Got \"%s\" instead.\n", arg.c_str());
         }
         argument.dir = rp;
         argument.type = ArgDir;
@@ -274,7 +274,7 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
         Path *rp = file->realpath();
         if (!rp)
         {
-            error(COMMANDLINE, "Expected file. Got \"%s\" instead.\n", arg.c_str());
+            usageError(COMMANDLINE, "Expected file. Got \"%s\" instead.\n", arg.c_str());
         }
         argument.file = rp;
         argument.type = ArgFile;
@@ -304,7 +304,7 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
         }
 
         if (expected_type == ArgStorage) {
-            error(COMMANDLINE, "Expected storage, but \"%s\" is not a storage location.\n", arg.c_str());
+            usageError(COMMANDLINE, "Expected storage, but \"%s\" is not a storage location.\n", arg.c_str());
         }
 
         // ArgORS will pass through here.
@@ -324,7 +324,7 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
 
         if (expected_type == ArgRule) {
             // We expected a rule, but there was none....
-            error(COMMANDLINE, "Expected a rule. Got \"%s\" instead.\n", arg.c_str());
+            usageError(COMMANDLINE, "Expected a rule. Got \"%s\" instead.\n", arg.c_str());
         }
 
         // If there is no rule, then we expect an origin directory.
@@ -342,13 +342,13 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
 
         if (expected_type == ArgOrigin)
         {
-            error(COMMANDLINE, "Expected rule or origin directory. Got \"%s\" instead.\n", arg.c_str());
+            usageError(COMMANDLINE, "Expected rule or origin directory. Got \"%s\" instead.\n", arg.c_str());
         }
 
         // ArgORS will pass through here.
     }
 
-    error(COMMANDLINE, "Expected rule, origin directory or storage location. Got \"%s\" instead.\n", arg.c_str());
+    usageError(COMMANDLINE, "Expected rule, origin directory or storage location. Got \"%s\" instead.\n", arg.c_str());
 
     return argument;
 }
@@ -1066,7 +1066,7 @@ RC BeakImplementation::prune(Settings *settings)
 
     if (num_lost > 0)
     {
-        UI::output("Warning! Lost %d backup files! Maybe fsck instead?\n", num_lost);
+        usageError(PRUNE, "Warning! Lost %d backup files! First run fsck.\n", num_lost);
     }
 
     if (settings->dryrun == false)
