@@ -315,13 +315,9 @@ void TarEntry::copyEntryToNewParent(TarEntry *entry, TarEntry *parent) {
  * Update the mtim argument with this entry's mtim, if this entry is younger.
  */
 void TarEntry::updateMtim(struct timespec *mtim) {
-    if (isInTheFuture(&fs_.st_mtim)) {
-        warning(TARENTRY, "Entry %s has a future timestamp! Ignoring the timstamp.\n", path()->c_str());
-    } else {
-        if (fs_.st_mtim.tv_sec > mtim->tv_sec ||
-            (fs_.st_mtim.tv_sec == mtim->tv_sec && fs_.st_mtim.tv_nsec > mtim->tv_nsec)) {
-            memcpy(mtim, &fs_.st_mtim, sizeof(*mtim));
-        }
+    if (fs_.st_mtim.tv_sec > mtim->tv_sec ||
+        (fs_.st_mtim.tv_sec == mtim->tv_sec && fs_.st_mtim.tv_nsec > mtim->tv_nsec)) {
+        memcpy(mtim, &fs_.st_mtim, sizeof(*mtim));
     }
 }
 

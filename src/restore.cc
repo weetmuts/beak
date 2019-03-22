@@ -237,7 +237,11 @@ bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
     if (rc.isErr()) return false;
 
     vector<char> contents;
-    gunzipit(&buf, &contents);
+    rc = gunzipit(&buf, &contents);
+    if (rc.isErr() || contents.size() < 50) {
+        warning(RESTORE, "could not decompress %s\n", gz->c_str());
+        return false;
+    }
     auto i = contents.begin();
 
     debug(RESTORE, "parsing %s for files in \"%s\"\n", gz->c_str(), dir_to_prepend?dir_to_prepend->c_str():"");
@@ -815,7 +819,6 @@ RC Restore::lookForPointsInTime(PointInTimeFormat f, Path *path)
         RestoreEntry *re = point.getPath(Path::lookupRoot());
         *re = RestoreEntry(fs, 0, Path::lookupRoot());
     }
-
     if (i > 0) {
         return RC::OK;
     }

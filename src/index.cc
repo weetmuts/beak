@@ -138,13 +138,14 @@ RC Index::loadIndex(vector<char> &v,
             TarFileName fromfile, tofile;
             string from = name.substr(0,dots);
             string to = name.substr(dots+5);
+            Path *dir = Path::lookup(from)->parent();
             fromfile.parseFileName(from);
             tofile.parseFileName(to);
             fromfile.last_size = tofile.size;
             for (uint i=0; i<fromfile.num_parts; ++i) {
                 char buf[1024];
                 fromfile.part_nr = i;
-                fromfile.writeTarFileNameIntoBuffer(buf, sizeof(buf), Path::lookupRoot());
+                fromfile.writeTarFileNameIntoBuffer(buf, sizeof(buf), dir);
                 Path *pp = Path::lookup(buf);
                 it->path = pp;
                 on_tar(it);

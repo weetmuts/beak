@@ -38,8 +38,11 @@ void useSyslog(bool sl);
 ComponentId registerLogComponent(const char *component);
 void listLogComponents();
 
-// A fatal program terminating error
+// A fatal internal program terminating error
 void error(ComponentId ci, const char* fmt, ...);
+
+// A fatal error due to external factors.
+void usageError(ComponentId ci, const char* fmt, ...);
 
 // A serious failure that is always logged
 void failure(ComponentId ci, const char* fmt, ...);

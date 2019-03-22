@@ -61,7 +61,7 @@ struct RestoreEntry
     UpdateDisk disk_update {};
 
     RestoreEntry() {}
-    RestoreEntry(FileStat s, size_t o, Path *p) : fs(s), path(p), offset_(o) { printf("%s\n", p->c_str()); }
+    RestoreEntry(FileStat s, size_t o, Path *p) : fs(s), path(p), offset_(o) { }
     void loadFromIndex(IndexEntry *ie);
     bool findPartContainingOffset(size_t file_offset, uint *partnr, size_t *offset_inside_part);
     size_t lengthOfPart(uint partnr);

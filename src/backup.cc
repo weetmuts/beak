@@ -61,6 +61,11 @@ RecurseOption Backup::addTarEntry(Path *abspath, FileStat *st)
     if(S_ISSOCK(st->st_mode)) { return RecurseContinue; }
     #endif
 
+    if (isInTheFuture(&st->st_mtim)) {
+        warning(BACKUP, "Found future dated file %s\n", path->c_str());
+        found_future_dated_file_ = true;
+    }
+
     // Ignore any directory that has a subdir named .beak
     if(S_ISDIR(st->st_mode) && abspath->depth() > root_dir_path->depth())
     {
@@ -1112,6 +1117,10 @@ RC Backup::scanFileSystem(Argument *origin, Settings *settings)
 
     origin_fs_->recurse(root_dir_path, [this](Path *p, FileStat *st) { return this->addTarEntry(p, st); });
 
+    if (found_future_dated_file_ && settings->relaxtimechecks == false) {
+        usageError(BACKUP, "Cowardly refusing to backup file system with files from the future.\n"
+                   "Add --relaxtimechecks if you really want to backup anyway.\n");
+    }
     uint64_t stop = clockGetTimeMicroSeconds();
     uint64_t scan_time = stop - start;
     start = stop;

@@ -129,7 +129,7 @@ bool PruneImplementation::isMonthlyMax(uint64_t p)
 
 void PruneImplementation::addPointInTime(uint64_t p)
 {
-    assert(p < now_);
+    assert(p <= now_);
     assert(p >= prev_);
     prev_ = p;
     points_[p] = false;
@@ -173,7 +173,8 @@ void PruneImplementation::prune(std::map<uint64_t,bool> *result)
     for (auto& e : weekly_max_) { points_[e.second] = true; }
     for (auto& e : monthly_max_) { points_[e.second] = true; }
 
-    // Print the pruning process....
+    // Print the pruning descisions...
+    verbose(PRUNE, "Action     Date       Time      Daynr  Weeknr     Monthnr\n");
     for (auto& e : points_)
     {
         uint64_t p = e.first;
@@ -186,18 +187,18 @@ void PruneImplementation::prune(std::map<uint64_t,bool> *result)
 
         uint64_t monthid = to_month_identifier_since_epoch(p);
         if (keep) {
-            info(PRUNE, "keeping    %s ", s.c_str());
+            verbose(PRUNE, "keeping    %s ", s.c_str());
         } else {
-            info(PRUNE, "discarding %s ", s.c_str());
+            verbose(PRUNE, "discarding %s ", s.c_str());
         }
-        info(PRUNE, " %5zu %4zu(%s) %6zu(%s)", days, weeknr, weekday_names[weekday], monthid,
+        verbose(PRUNE, " %5zu  %4zu(%s)  %6zu(%s)", days, weeknr, weekday_names[weekday], monthid,
             month_names[monthid%100-1]);
-        if (latest_ == p) info(PRUNE, " LATEST");
-        if (isAll(p)) info(PRUNE, " ALL");
-        if (isDailyMax(p)) info(PRUNE, " DAY");
-        if (isWeeklyMax(p)) info(PRUNE, " WEEK");
-        if (isMonthlyMax(p)) info(PRUNE, " MONTH");
-        info(PRUNE, " \n");
+        if (latest_ == p) verbose(PRUNE, " LATEST");
+        if (isAll(p)) verbose(PRUNE, " ALL");
+        if (isDailyMax(p)) verbose(PRUNE, " DAY");
+        if (isWeeklyMax(p)) verbose(PRUNE, " WEEK");
+        if (isMonthlyMax(p)) verbose(PRUNE, " MONTH");
+        verbose(PRUNE, " \n");
     }
 
     *result = points_;

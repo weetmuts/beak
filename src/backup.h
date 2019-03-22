@@ -114,6 +114,7 @@ private:
 
     FileSystem* origin_fs_;
 
+    bool found_future_dated_file_ {};
 };
 
 std::unique_ptr<Backup> newBackup(ptr<FileSystem> fs);

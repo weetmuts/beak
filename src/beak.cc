@@ -610,6 +610,9 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
                     error(COMMANDLINE, "No such progress display type \"%s\".", value.c_str());
                 }
                 break;
+            case relaxtimechecks_option:
+                settings->relaxtimechecks = true;
+                break;
             case robot_option:
                 settings->robot = true;
                 break;
@@ -805,14 +808,14 @@ unique_ptr<Restore> BeakImplementation::accessBackup_(Argument *storage,
                                       storage->storage->storage_location);
 
     if (rc.isErr()) {
-        error(COMMANDLINE, "No points in time found!\n");
+        error(COMMANDLINE, "no points in time found in storage: %s\n", storage->storage->storage_location->c_str());
         return NULL;
     }
 
     if (pointintime != "") {
         auto point = restore->setPointInTime(pointintime);
         if (!point) {
-            error(STORE, "No such point in time!\n");
+            error(STORE, "no such point in time!\n");
             return NULL;
         }
     }
@@ -949,7 +952,6 @@ RC BeakImplementation::prune(Settings *settings)
     FileSystem *backup_fs;
     Path *root;
     auto restore = accessBackup_(&settings->from, "", progress.get(), &backup_fs, &root);
-
     Keep keep("all:2d daily:2w weekly:2m monthly:2y");
     if (settings->keep_supplied) {
         bool ok = keep.parse(settings->keep);
@@ -957,14 +959,21 @@ RC BeakImplementation::prune(Settings *settings)
             error(PRUNE, "Not a valid keep rule: \"%s\"\n", settings->keep.c_str());
         }
     }
-    auto prune = newPrune(clockGetUnixTimeNanoSeconds(), keep);
+
+    uint64_t now_nanos = clockGetUnixTimeNanoSeconds();
+    auto prune = newPrune(now_nanos, keep);
 
     set<Path*> required_beak_files;
+    int num_existing_points_in_time = 0;
 
     // Iterate over the points in time, from the oldest to the newest!
     for (auto &i : restore->historyOldToNew())
     {
+        if (i.point() > now_nanos) {
+            usageError(PRUNE, "Cowardly refusing to prune a storage with files from the future!\n");
+        }
         prune->addPointInTime(i.point());
+        num_existing_points_in_time++;
     }
 
     map<uint64_t,bool> keeps;
@@ -972,10 +981,13 @@ RC BeakImplementation::prune(Settings *settings)
     // Perform the prune calculation
     prune->prune(&keeps);
 
+    int num_kept_points_in_time = 0;
+
     for (auto& i : restore->historyOldToNew())
     {
         if (keeps[i.point()]) {
             // We should keep this point in time, lets remember all the tars required.
+            num_kept_points_in_time++;
             for (auto& t : *(i.tars())) {
                 required_beak_files.insert(t);
             }
@@ -1001,7 +1013,6 @@ RC BeakImplementation::prune(Settings *settings)
     // Check that all expected tars actually exist in the storage location.
     for (auto p : required_beak_files)
     {
-        printf("Has? (%zu) %s\n", set_of_existing_beak_files.count(p), p->c_str());
         if (set_of_existing_beak_files.count(p) == 0)
         {
             warning(PRUNE, "storage lost: %s\n", p->c_str());
@@ -1011,7 +1022,6 @@ RC BeakImplementation::prune(Settings *settings)
 
     for (auto &p : existing_beak_files)
     {
-        printf("Keep? (%zu) %s\n", required_beak_files.count(p.first), p.first->c_str());
         // Should we delete this file, check if the file is found in required_beak_files...
         if (required_beak_files.count(p.first) > 0)
         {
@@ -1035,17 +1045,23 @@ RC BeakImplementation::prune(Settings *settings)
     string removed_size = humanReadableTwoDecimals(total_size_removed);
     string kept_size = humanReadableTwoDecimals(total_size_kept);
 
-    assert( (total_size_removed == 0 && beak_files_to_delete.size() == 0) ||
-            (total_size_removed > 0 && beak_files_to_delete.size() > 0));
+    /*assert( (total_size_removed == 0 && beak_files_to_delete.size() == 0) ||
+      (total_size_removed > 0 && beak_files_to_delete.size() > 0));*/
 
     if (total_size_removed == 0)
     {
-        UI::output("No pruning needed, everything was up to date. Total size %s.\n", kept_size.c_str());
+        UI::output("No pruning needed. Total size of backup %s (%d points in time).\n",
+                   kept_size.c_str(),
+                   num_kept_points_in_time);
         return RC::OK;
     }
     else
     {
-        UI::output("Prune will delete %s and keep %s.\n", removed_size.c_str(), kept_size.c_str());
+        UI::output("Prune will delete %s (%d points in time) and keep %s (%d).\n",
+                   removed_size.c_str(),
+                   num_existing_points_in_time - num_kept_points_in_time,
+                   kept_size.c_str(),
+                   num_kept_points_in_time);
     }
 
     if (num_lost > 0)
@@ -1067,6 +1083,7 @@ RC BeakImplementation::prune(Settings *settings)
             storage_tool_->removeBackupFiles(settings->from.storage,
                                              beak_files_to_delete,
                                              progress.get());
+            UI::output("Backup is now pruned.\n");
         }
     }
 
@@ -1203,6 +1220,8 @@ RC BeakImplementation::fsck(Settings *settings)
                 warning(FSCK, "OK     %s\n", i.datetime.c_str());
             }
         }
+    } else {
+        info(FSCK, "OK\n");
     }
 
     return rc;

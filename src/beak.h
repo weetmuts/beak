@@ -144,6 +144,7 @@ LIST_OF_COMMANDS
       "                           E.g. absolute,relative or both. Default is both.")    \
     X(pr,progress,ProgressDisplayType,true,"How to present the progress of the backup or restore.\n" \
       "                           E.g. none,plain,ansi,os. Default is ansi.") \
+    X(,relaxtimechecks,bool,false,"Accept future dated files.") \
     X(,robot,bool,false,"Switch to a terminal output format that suitable for parsing by another program.\n") \
     X(,tarheader,TarHeaderStyle,true,"Style of tar headers used. E.g. --tarheader=simple\n"   \
       "                           Alternatives are: none,simple,full Default is simple.")    \

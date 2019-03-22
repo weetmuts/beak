@@ -777,20 +777,20 @@ RC decompress_memory(char *in, size_t len, std::vector<char> *to)
     strm.avail_out = CHUNK_SIZE;
 
     int rci = inflateInit2(&strm, MAX_WBITS + 16);
-    assert(rci == Z_OK);
+    if (rci != Z_OK) {
+        return RC::ERR;
+    }
 
     do {
         strm.avail_out = CHUNK_SIZE;
         strm.next_out = (unsigned char*)chunk;
         rci = inflate(&strm, Z_NO_FLUSH);
-        assert(rci != Z_STREAM_ERROR);
         if (rci == Z_STREAM_ERROR) rc = RC::ERR;
-
         size_t have = CHUNK_SIZE-strm.avail_out;
         to->insert(to->end(), chunk, chunk+have);
     } while (strm.avail_out == 0);
 
-    assert(rci == Z_STREAM_END);
+    //assert(rci == Z_STREAM_END);
     inflateEnd(&strm);
     return rc;
 }

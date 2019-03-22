@@ -162,14 +162,9 @@ void TarFile::calculateSHA256Hash(vector<pair<TarFile*,TarEntry*>> &tars, string
 }
 
 void TarFile::updateMtim(struct timespec *mtim) {
-    if (isInTheFuture(&mtim_)) {
-        fprintf(stderr, "Virtual tarfile %s has a future timestamp! Ignoring the timstamp.\n",
-                "PATHHERE");
-    } else {
-        if (mtim_.tv_sec > mtim->tv_sec ||
-            (mtim_.tv_sec == mtim->tv_sec && mtim_.tv_nsec > mtim->tv_nsec)) {
-            memcpy(mtim, &mtim_, sizeof(*mtim));
-        }
+    if (mtim_.tv_sec > mtim->tv_sec ||
+        (mtim_.tv_sec == mtim->tv_sec && mtim_.tv_nsec > mtim->tv_nsec)) {
+        memcpy(mtim, &mtim_, sizeof(*mtim));
     }
 }
 

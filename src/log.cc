@@ -188,13 +188,26 @@ void error(ComponentId ci, const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
     if (use_syslog) {
-        syslog(LOG_ERR, "Fatal error in %s: ", all_components_[ci]);
+        syslog(LOG_ERR, "beak: (%s) ", all_components_[ci]);
         vsyslog(LOG_ERR, fmt, args);
     }
     va_end(args);
     va_start(args, fmt);
-    fprintf(stderr, "Fatal error in %s: ", all_components_[ci]);
+    fprintf(stderr, "beak: (%s) ", all_components_[ci]);
     vfprintf(stderr, fmt, args);
+    va_end(args);
+    exit(1);
+}
+
+void usageError(ComponentId ci, const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    if (use_syslog) {
+        vsyslog(LOG_ERR, fmt, args);
+    }
+    va_end(args);
+    va_start(args, fmt);
+    vfprintf(stdout, fmt, args);
     va_end(args);
     exit(1);
 }

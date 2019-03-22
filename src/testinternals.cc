@@ -262,8 +262,6 @@ void testGzip()
 
     string r(out.begin(), out.end());
 
-//    printf("FROM \"%s\"\n", w.c_str());
-//    printf("TO   \"%s\"\n", r.c_str());
     if (w != r) {
         verbose(TEST_GZIP, "Gzip Gunzip fail!\n");
         err_found_ = true;

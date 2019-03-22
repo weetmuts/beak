@@ -119,6 +119,28 @@ function performStore {
     fi
 }
 
+function performFsckExpectOK {
+    extra="$1"
+    if [ -z "$test" ]; then
+        # Normal test execution, execute the store
+        eval "${BEAK} fsck $extra $store > $log"
+        FSCK_LOG=$(cat $log | tr -d '\n' | tr -s ' ')
+        if [ ! "$FSCK_LOG" = "OK" ]; then
+            echo -------------------
+            cat $log
+            echo -------------------
+            echo Expected fsck to be OK! Check $dir for information.
+            exit 1
+        fi
+    else
+        if [ -z "$gdb" ]; then
+            ${BEAK} fsck --log=all $extra $store 2>&1 | tee $log
+        else
+            gdb -ex=r --args ${BEAK} fsck -f $extra $store
+        fi
+    fi
+}
+
 function performReStore {
     extra="$1"
     if [ -z "$test" ]; then
@@ -151,10 +173,10 @@ function performPrune {
     extra="$1"
     if [ -z "$test" ]; then
         # Normal test execution, execute the prune
-        eval "${BEAK} prune $extra ${store} > $dest"
+        eval "${BEAK} prune $extra ${store} > $log"
     else
         if [ -z "$gdb" ]; then
-            ${BEAK} prune --log=all $extra ${store} 2>&1 | tee $dest
+            ${BEAK} prune --log=all $extra ${store} 2>&1 | tee $log
         else
             gdb -ex=r --args ${BEAK} prune -f $extra ${store}
         fi
@@ -165,10 +187,10 @@ function performFsck {
     extra="$1"
     if [ -z "$test" ]; then
         # Normal test execution, execute the prune
-        eval "${BEAK} fsck $extra ${store} > $dest"
+        eval "${BEAK} fsck $extra ${store} > $log"
     else
         if [ -z "$gdb" ]; then
-            ${BEAK} fsck --log=all $extra ${store} 2>&1 | tee $dest
+            ${BEAK} fsck --log=all $extra ${store} 2>&1 | tee $log
         else
             gdb -ex=r --args ${BEAK} fsck -f $extra ${store}
         fi
@@ -407,21 +429,7 @@ function cleanCheck {
     mkdir -p "$check"
 }
 
-setup basicprune "Prune small backup"
-if [ $do_test ]; then
-    mkdir -p $root/Alfa/Beta
-    echo HEJSAN > $root/Alfa/Beta/gurka.c
-    find $root -exec touch -d '-720 days' '{}' +
-    performStore
-    echo HEJSAN > $root/Alfa/Beta/banan.cc
-    find $root -exec touch -d '-1 hour' '{}' +
-    performStore
-    performPrune "-v --yesprune -k 'all:forever'"
-    performPrune "-v --yesprune -k 'all:1w'"
-    echo OK
-fi
-
-setup basic01 "Short simple file (fits in 100 char name)"
+setup short_simple_file "Short simple file"
 if [ $do_test ]; then
     echo HEJSAN > $root/hello.txt
     chmod 400 $root/hello.txt
@@ -438,7 +446,7 @@ if [ $do_test ]; then
     echo OK
 fi
 
-setup basic02 "Medium path name"
+setup medium_path_name "Medium path name"
 if [ $do_test ]; then
     tmp=$root/aaaa/bbbb/cccc/dddd/eeee/ffff/gggg/hhhh/iiii/jjjj/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
     mkdir -p $tmp
@@ -455,7 +463,7 @@ if [ $do_test ]; then
     echo OK
 fi
 
-setup basic03 "Long file name"
+setup long_file_name "Long file name"
 if [ $do_test ]; then
     mkdir -p $root/workspace/InvokeDynamic/opts
     echo HEJSAN > $root'/workspace/InvokeDynamic/opts/sun_nio_cs_UTF_8$Encoder_encodeArrayLoop_Ljava_nio_CharBuffer;Ljava_nio_ByteBuffer;_Ljava_nio_charset_CoderResult;.xml'
@@ -474,7 +482,7 @@ if [ $do_test ]; then
     echo OK
 fi
 
-setup basic04 "Exactly 100 char file name"
+setup eactly_100char_file_name "Exactly 100 char file name"
 if [ $do_test ]; then
     tmp=$root/test/test
     mkdir -p $tmp
@@ -491,7 +499,7 @@ if [ $do_test ]; then
     echo OK
 fi
 
-setup basic05 "Long paths cause problems"
+setup long_paths_might_cause_problems "Long paths might cause problems"
 if [ $do_test ]; then
     mkdir -p $root/BhlcuNTyTvLedMdLYqDeSySKkGCajOLG/JelKMOzorxaHRRYilhHCH/zGtUkDjJrpaYruHVsh
     echo Hejsan > $root/BhlcuNTyTvLedMdLYqDeSySKkGCajOLG/JelKMOzorxaHRRYilhHCH/zGtUkDjJrpaYruHVsh/zTeEgnbHEROQBZhnLzfkSOWkAu
@@ -505,6 +513,30 @@ if [ $do_test ]; then
     startMountTest standardTest
     compareStoreAndMount
     stopMount
+    echo OK
+fi
+
+setup check_store_future_files "Beak should block when trying to store files dated in the future"
+if [ $do_test ]; then
+    mkdir -p $root/Alfa
+    echo HEJSAN > $root/Alfa/file_from_the_future
+    touch -d '2030-01-01' $root/Alfa/file_from_the_future
+    performStore
+    CHECK=$(cat $log | tr -d '\n' | tr -s ' ' | grep -o "Cowardly refusing")
+    if [ ! "$CHECK" = "Cowardly refusing" ]; then
+        echo ---------------------
+        cat $log
+        echo ---------------------
+        echo Expected beak to refuse to store backup with future dated files.
+    fi
+    performStore "--relaxtimechecks"
+    CHECK=$(cat $log | tr -d '\n' | tr -s ' ' | grep -o "Full store:")
+    if [ ! "$CHECK" = "Full store:" ]; then
+        echo ---------------------
+        cat $log
+        echo ---------------------
+        echo Expected beak to store backup with future dated files.
+    fi
     echo OK
 fi
 
@@ -665,7 +697,7 @@ if [ $do_test ]; then
     rm -f $store/Alfa/s0*.tar
     echo SVEJSAN > $store/Alfa/xyzzy
     performFsck
-    CHECK=$(cat $dest | grep -o -E 'Broken|OK' | tr -d '\n' | tr -s ' ')
+    CHECK=$(cat $log | grep -o -E 'Broken|OK' | tr -d '\n' | tr -s ' ')
     if [ ! "$CHECK" = "BrokenBrokenOK" ]; then
         echo ----------------
         cat $dest
@@ -677,7 +709,102 @@ if [ $do_test ]; then
     echo OK
 fi
 
-setup simpleprune "Prune backup storage"
+setup basicprune "Prune small simple backup"
+if [ $do_test ]; then
+    mkdir -p $root/Alfa/Beta
+    echo HEJSAN > $root/Alfa/Beta/gurka.c
+    find $root -exec touch -d '-720 days' '{}' +
+    performStore
+    echo HEJSAN > $root/Alfa/Beta/banan.cc
+    find $root -exec touch -d '-1 hour' '{}' +
+    performStore
+    performPrune "--yesprune -k 'all:forever'"
+    CHECK=$(cat $log | tr -d '\n' | tr -s ' ' | grep -o "No pruning needed.")
+    if [ ! "$CHECK" = "No pruning needed." ]; then
+        echo ------------------
+        cat $log
+        echo ------------------
+        echo CHECK=\"${CHECK}\"
+        echo Failed beak prune! Expected no pruning. Check in $dir for more information.
+        exit
+    fi
+    performFsckExpectOK
+    COUNTBEFORE=$(ls $store/z*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    if [ ! "$COUNTBEFORE" = "2" ]
+    then
+        echo Oups! Expected there to be two points in time!
+        exit
+    fi
+    performPrune "--yesprune -k 'all:1w'"
+    CHECK=$(cat $log | tr -d '\n' | tr -s ' ' | grep -o "Backup is now pruned.")
+    if [ ! "$CHECK" = "Backup is now pruned." ]; then
+        echo ------------------
+        cat $dest
+        echo ------------------
+        echo CHECK=\"${CHECK}\"
+        echo Failed beak prune! Expected a single prune. Check in $dir for more information.
+        exit
+    fi
+    performFsckExpectOK
+    COUNTAFTER=$(ls $store/z*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    if [ ! "$COUNTAFTER" = "1" ]
+    then
+        echo One point in time should have been pruned leaving 1!
+        echo But there are $COUNTAFTER points in time now.
+        exit
+    fi
+    echo OK
+fi
+
+setup basicpsplitrune "Prune backup with split files"
+if [ $do_test ]; then
+    mkdir -p $root/Alfa/Beta
+    dd if=/dev/urandom of=$root'/Alfa/largefile' count=71 bs=1000000 > /dev/null 2>&1
+    find $root -exec touch -d '-720 days' '{}' +
+    performStore
+    performFsckExpectOK
+    echo HEJSAN > $root/Alfa/largefile
+    find $root -exec touch -d '-1 minutes' '{}' +
+    performStore
+    performPrune "--yesprune -k 'all:forever'"
+    CHECK=$(cat $log | tr -d '\n' | tr -s ' ' | grep -o "No pruning needed.")
+    if [ ! "$CHECK" = "No pruning needed." ]; then
+        echo ------------------
+        cat $log
+        echo ------------------
+        echo CHECK=\"${CHECK}\"
+        echo Failed beak prune! Expected no pruning. Check in $dir for more information.
+        exit
+    fi
+    performFsckExpectOK
+    COUNTBEFORE=$(ls $store/z*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    if [ ! "$COUNTBEFORE" = "2" ]
+    then
+        echo Oups! Expected there to be two points in time in dir: $store
+        exit
+    fi
+    performPrune "--yesprune -k 'all:1w'"
+    CHECK=$(cat $log | tr -d '\n' | tr -s ' ' | grep -o "Backup is now pruned.")
+    if [ ! "$CHECK" = "Backup is now pruned." ]; then
+        echo ------------------
+        cat $log
+        echo ------------------
+        echo CHECK=\"${CHECK}\"
+        echo Failed beak prune! Expected a single prune. Check in $dir for more information.
+        exit
+    fi
+    performFsckExpectOK
+    COUNTAFTER=$(ls $store/z*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    if [ ! "$COUNTAFTER" = "1" ]
+    then
+        echo One point in time should have been pruned leaving 1!
+        echo But there are $COUNTAFTER points in time now.
+        exit
+    fi
+    echo OK
+fi
+
+setup multipleprunes "Prune multiple times"
 if [ $do_test ]; then
     mkdir -p $root/Alfa/Beta
     echo HEJSAN > $root/Alfa/Beta/gurka
@@ -717,11 +844,11 @@ if [ $do_test ]; then
     performStore
     find $root -exec touch -d '-3 days' '{}' +
     performStore
+    find $root -exec touch -d '-51 hours' '{}' +
+    performStore
     find $root -exec touch -d '-50 hours' '{}' +
     performStore
     find $root -exec touch -d '-49 hours' '{}' +
-    performStore
-    find $root -exec touch -d '-48 hours' '{}' +
     performStore
     find $root -exec touch -d '-47 hours' '{}' +
     performStore
@@ -731,6 +858,117 @@ if [ $do_test ]; then
     performStore
     find $root -exec touch -d '-1 hour' '{}' +
     performStore
+    performFsckExpectOK
+    COUNTBEFORE=$(ls $store/z*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    if [ ! "$COUNTBEFORE" = "25" ]
+    then
+        echo Oups! Expected there to be 25 points in time, but found $COUNTBEFORE
+        exit 1
+    fi
+    performPrune "--yesprune"
+    CHECK0=$(cat $log | grep -o "Backup is now pruned.")
+    CHECK1=$(cat $log | grep -o "(10 points in time)")
+    CHECK2=$(cat $log | grep -o "(15)")
+    if [ ! "$CHECK0" = "Backup is now pruned." ] ||
+       [ ! "$CHECK1" = "(10 points in time)" ] ||
+       [ ! "$CHECK2" = "(15)" ]
+    then
+        echo -------------------
+        cat $log
+        echo -------------------
+        echo Expected the prune to report 10 deleted and 15 kept points in time.
+        exit 1
+    fi
+    performFsckExpectOK
+    COUNTAFTER=$(ls $store/z*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    if [ ! "$COUNTAFTER" = "15" ]
+    then
+        echo Oups! Expected there to be 15 points in time after prune, but found $COUNTAFTER
+        exit
+    fi
+    performPrune "--yesprune -v -k 'weekly:2m'"
+    CHECK0=$(cat $log | grep -o "Backup is now pruned.")
+    CHECK1=$(cat $log | grep -o "(10 points in time)")
+    CHECK2=$(cat $log | grep -o "(5)")
+    if [ ! "$CHECK0" = "Backup is now pruned." ] ||
+       [ ! "$CHECK1" = "(10 points in time)" ] ||
+       [ ! "$CHECK2" = "(5)" ]
+    then
+        echo -------------------
+        cat $log
+        echo -------------------
+        echo Expected the prune to report 10 deleted and 5 kept points in time.
+        exit 1
+    fi
+    performFsckExpectOK
+    COUNTAFTER=$(ls $store/z*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    if [ ! "$COUNTAFTER" = "5" ]
+    then
+        echo Oups! Expected there to be 5 points in time after prune, but found $COUNTAFTER
+        exit
+    fi
+
+    performPrune "--yesprune -v -k 'daily:1w'"
+    CHECK0=$(cat $log | grep -o "Backup is now pruned.")
+    CHECK1=$(cat $log | grep -o "(3 points in time)")
+    CHECK2=$(cat $log | grep -o "(2)")
+    if [ ! "$CHECK0" = "Backup is now pruned." ] ||
+       [ ! "$CHECK1" = "(3 points in time)" ] ||
+       [ ! "$CHECK2" = "(2)" ]
+    then
+        echo -------------------
+        cat $log
+        echo -------------------
+        echo Expected the prune to report 3 deleted and 2 kept points in time.
+        exit 1
+    fi
+    performFsckExpectOK
+    COUNTAFTER=$(ls $store/z*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    if [ ! "$COUNTAFTER" = "2" ]
+    then
+        echo Oups! Expected there to be 2 points in time after prune, but found $COUNTAFTER
+        exit
+    fi
+
+    performPrune "--yesprune -v -k 'all:1d'"
+    CHECK0=$(cat $log | grep -o "Backup is now pruned.")
+    CHECK1=$(cat $log | grep -o "(1 points in time)")
+    CHECK2=$(cat $log | grep -o "(1)")
+    if [ ! "$CHECK0" = "Backup is now pruned." ] ||
+       [ ! "$CHECK1" = "(1 points in time)" ] ||
+       [ ! "$CHECK2" = "(1)" ]
+    then
+        echo -------------------
+        cat $log
+        echo -------------------
+        echo Expected the prune to report 1 deleted and 1 kept points in time.
+        exit 1
+    fi
+    performFsckExpectOK
+    COUNTAFTER=$(ls $store/z*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    if [ ! "$COUNTAFTER" = "1" ]
+    then
+        echo Oups! Expected there to be 1 points in time after prune, but found $COUNTAFTER
+        exit
+    fi
+
+    echo OK
+fi
+
+setup prune_with_future_date_files "Check that prune gracefully fails when storage contains future date files"
+if [ $do_test ]; then
+    mkdir -p $root/Alfa
+    echo HEJSAN > $root/Alfa/largefile
+    find $root -exec touch -d '+10 days minutes' '{}' +
+    performStore "--relaxtimechecks"
+    performPrune "--yesprune -k 'all:forever'"
+    CHECK=$(cat $log | tr -d '\n' | tr -s ' ' | grep -o "Cowardly refusing")
+    if [ ! "$CHECK" = "Cowardly refusing" ]; then
+        echo ---------------------
+        cat $log
+        echo ---------------------
+        echo Expected beak to refuse to prune backup with future dated files.
+    fi
     echo OK
 fi
 
