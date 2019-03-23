@@ -104,7 +104,7 @@ if test "x$ENABLE_ASAN" = xyes; then
     ASAN_CFLAGS="-ggdb -fsanitize=address -fno-omit-frame-pointer"
     ASAN_LDFLAGS="-fsanitize=address -static-libasan"
     ASAN_LIBS="-lasan"
-    AC_MSG_RESULT([using ${with_fuse}])
+    AC_MSG_RESULT([using ${with_asan}])
 else
     AC_MSG_RESULT([explicitly disabled])
 fi
@@ -130,8 +130,11 @@ AC_ARG_WITH(fuse, [AS_HELP_STRING([--with-fuse],
       (expecting the libraries under PATH and the headers under PATH/include)])])
 
 if test "x$ENABLE_FUSE" = xyes; then
+   echo Steg1
    if test "x${with_fuse}" = "x"; then
+      echo Steg2
        if $PKG_CONFIG fuse; then
+           echo Steg3
            FUSE_CFLAGS="-DFUSE_USE_VERSION=26 $($PKG_CONFIG --cflags fuse)"
            FUSE_LIBS="$($PKG_CONFIG --libs fuse)"
            AC_MSG_RESULT([found])
@@ -139,10 +142,12 @@ if test "x$ENABLE_FUSE" = xyes; then
            AC_MSG_ERROR(Please install fuse-dev, for example using: sudo apt install libfuse-dev)
        fi
    else
+       echo Steg4
        with_fuse=$(realpath ${with_fuse})
        if test ! -d "$with_fuse" ; then
            AC_MSG_ERROR(No such directory "$with_fuse")
        fi
+       echo Steg5
        FUSE_CFLAGS="-DFUSE_USE_VERSION=26 -D_FILE_OFFSET_BITS=64 -I${with_fuse}/include"
        FUSE_LIBS="$(find "${with_fuse}" -name libfuse.a) -ldl"
        AC_MSG_RESULT([using ${with_fuse}])
