@@ -207,9 +207,13 @@ RC rcloneFetchFiles(Storage *storage,
 
     string files_to_fetch;
     for (auto& p : *files) {
-        files_to_fetch.append(p->c_str_nls()); // Drop the leading slash
+        // Drop the leading storage location (eg s3_work_crypt:).
+        // Rclone is only interested in the actual file name, without
+        // a leading slash.
+        Path *pp = p->subpath(1);
+        files_to_fetch.append(pp->c_str());
         files_to_fetch.append("\n");
-        debug(RCLONE, "fetch \"%s\"\n", p->c_str_nls());
+        debug(RCLONE, "fetch \"%s\"\n", pp->c_str());
     }
 
     Path *tmp = local_fs->mkTempFile("beak_fetching_", files_to_fetch);
