@@ -60,3 +60,9 @@ uint64_t clockGetTimeMicroSeconds()
 pid_t fork() {
     return 0;
 }
+
+// Nanoseconds since 1970-01-01 Z timezone.
+uint64_t clockGetUnixTimeNanoSeconds()
+{
+    return 1000000000ull * time(NULL);
+}

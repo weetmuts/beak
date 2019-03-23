@@ -159,6 +159,7 @@ const char *actionName(Action a)
     case Action::Removed: return "removed";
     };
     assert(0);
+    return NULL;
 }
 
 unique_ptr<Diff> newDiff(bool detailed, int depth)

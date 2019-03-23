@@ -28,6 +28,7 @@ using namespace std;
 
 void splitContent(Path *file, vector<ContentChunk> *chunks, size_t preferred_chunk_size)
 {
+    /*
     size_t bufsize = sizeof(uint32_t)*(LOAD_CHUNK_SIZE+SPLIT_REGION_SIZE);
     uint32_t *buffer = (uint32_t*)malloc(bufsize);
     memset(buffer, 0, bufsize);
@@ -58,4 +59,5 @@ void splitContent(Path *file, vector<ContentChunk> *chunks, size_t preferred_chu
     }
 
     close(fd);
+    */
 }

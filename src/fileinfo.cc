@@ -80,4 +80,5 @@ LIST_OF_FILETYPES
     };
 
     assert(0);
+    return NULL;
 }
