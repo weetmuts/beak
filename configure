@@ -4055,7 +4055,7 @@ if test "x$ENABLE_FUSE" = xyes; then
 $as_echo "found" >&6; }
        else
            echo Steg4
-           as_fn_error for example using: sudo apt install libfuse-dev "Please install fuse-dev" "$LINENO" 5
+           as_fn_error $? "Please install fuse-dev, for example using: sudo apt install libfuse-dev" "$LINENO" 5
        fi
        echo Steg5
    else

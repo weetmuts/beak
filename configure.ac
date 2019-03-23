@@ -143,7 +143,7 @@ if test "x$ENABLE_FUSE" = xyes; then
            AC_MSG_RESULT([found])
        else
            echo Steg4
-           AC_MSG_ERROR(Please install fuse-dev, for example using: sudo apt install libfuse-dev)
+           AC_MSG_ERROR([Please install fuse-dev, for example using: sudo apt install libfuse-dev])
        fi
        echo Steg5
    else
@@ -151,7 +151,7 @@ if test "x$ENABLE_FUSE" = xyes; then
        with_fuse=$(realpath ${with_fuse})
        echo Steg7
        if test ! -d "$with_fuse" ; then
-           AC_MSG_ERROR(No such directory "$with_fuse")
+           AC_MSG_ERROR([No such directory "$with_fuse"])
        fi
        echo Steg8
        FUSE_CFLAGS="-DFUSE_USE_VERSION=26 -D_FILE_OFFSET_BITS=64 -I${with_fuse}/include"
