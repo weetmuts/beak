@@ -62,6 +62,7 @@ else
 fi
 
 PKG_CONFIG="$(which pkg-config)"
+echo PKG_CONFIG=$PKG_CONFIG
 if test "$PKG_CONFIG" = ""; then
     PKG_CONFIG=/bin/false
     AC_MSG_ERROR([You need pkg-config to build. Please install.])
