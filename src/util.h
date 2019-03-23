@@ -42,6 +42,7 @@ size_t roundoffHumanReadable(size_t s);
 RC parseHumanReadable(std::string s, size_t *out);
 std::string keepDigits(std::string &s);
 bool parseTimeZoneOffset(std::string o, time_t *out);
+RC parseDateTime(std::string dt, time_t *out);
 bool parseLengthOfTime(std::string s, time_t *out);
 std::string getLengthOfTime(time_t t);
 time_t getTimeZoneOffset();

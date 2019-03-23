@@ -80,6 +80,8 @@ struct UI
     static YesOrNo yesOrNo(std::string msg);
     static KeepOrChange keepOrChange();
     static KeepOrChange keepOrChangeOrDiscard();
+
+    static bool isatty();
 };
 
 #endif

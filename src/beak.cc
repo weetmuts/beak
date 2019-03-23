@@ -593,6 +593,10 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
                 listLogComponents();
                 exit(0);
                 break;
+            case now_option:
+                settings->now = value;
+                settings->now_supplied = true;
+                break;
             case pointintimeformat_option:
                 if (value == "absolute") settings->pointintimeformat = absolute_point;
                 else if (value == "relative") settings->pointintimeformat = relative_point;
@@ -961,6 +965,15 @@ RC BeakImplementation::prune(Settings *settings)
     }
 
     uint64_t now_nanos = clockGetUnixTimeNanoSeconds();
+    if (settings->now_supplied) {
+        time_t nowt;
+        RC rc = parseDateTime(settings->now, &nowt);
+        if (rc.isErr()) {
+            usageError(PRUNE, "Cannot parse date time \"%s\"\n", settings->now.c_str());
+        }
+        now_nanos = ((uint64_t)nowt)*1000000000ull;
+    }
+
     auto prune = newPrune(now_nanos, keep);
 
     set<Path*> required_beak_files;
@@ -970,7 +983,8 @@ RC BeakImplementation::prune(Settings *settings)
     for (auto &i : restore->historyOldToNew())
     {
         if (i.point() > now_nanos) {
-            usageError(PRUNE, "Cowardly refusing to prune a storage with files from the future!\n");
+            verbose(PRUNE, "Found point in time \"%s\" which is in the future.\n", i.datetime.c_str());
+            usageError(PRUNE, "Cowardly refusing to prune a storage with point in times from the future!\n");
         }
         prune->addPointInTime(i.point());
         num_existing_points_in_time++;
@@ -1071,10 +1085,9 @@ RC BeakImplementation::prune(Settings *settings)
 
     if (settings->dryrun == false)
     {
-        auto proceed = UIYes;
+        auto proceed = settings->yesprune ? UIYes : UINo;
 
-        if (!settings->yesprune)
-        {
+        if (UI::isatty()) {
             proceed = UI::yesOrNo("Proceed?");
         }
 
@@ -1168,6 +1181,7 @@ RC BeakImplementation::fsck(Settings *settings)
     set<Path*> required_beak_files;
     vector<pair<Path*,FileStat>> existing_beak_files;
     set<Path*> set_of_existing_beak_files;
+    size_t total_files_size = 0;
 
     for (auto& i : restore->historyOldToNew())
     {
@@ -1179,13 +1193,22 @@ RC BeakImplementation::fsck(Settings *settings)
         }
     }
 
+    vector<Path*> superfluous_files;
+    size_t superfluous_files_size = 0;
+    //vector<Path*> lost_files;
+    //size_t lost_files_size = 0;
+    vector<Path*> broken_points_in_time;
+
     backup_fs->listFilesBelow(root, &existing_beak_files, SortOrder::Unspecified);
     for (auto& p : existing_beak_files)
     {
         set_of_existing_beak_files.insert(p.first);
+        total_files_size += p.second.st_size;
         if (required_beak_files.count(p.first) == 0)
         {
-            warning(FSCK, "superfluous storage: %s\n", p.first->c_str());
+            verbose(FSCK, "superfluous: %s\n", p.first->c_str());
+            superfluous_files.push_back(p.first);
+            superfluous_files_size += p.second.st_size;
         }
     }
 
@@ -1194,8 +1217,10 @@ RC BeakImplementation::fsck(Settings *settings)
     {
         if (set_of_existing_beak_files.count(p) == 0)
         {
-            warning(FSCK, "storage lost: %s\n", p->c_str());
+            verbose(FSCK, "lost: %s\n", p->c_str());
             lost_file = true;
+            //lost_files.push_back(p);
+            //lost_files_size += p.second.st_size;
         }
     }
 
@@ -1205,7 +1230,8 @@ RC BeakImplementation::fsck(Settings *settings)
         {
             Path *p = Path::lookup(i.filename);
             bool missing = 0 == set_of_existing_beak_files.count(p);
-            if (!missing) {
+            if (!missing)
+            {
                 for (auto& t : *(i.tars()))
                 {
                     if (set_of_existing_beak_files.count(t) == 0) {
@@ -1216,12 +1242,51 @@ RC BeakImplementation::fsck(Settings *settings)
             }
             if (missing) {
                 warning(FSCK, "Broken %s\n", i.datetime.c_str());
+                broken_points_in_time.push_back(Path::lookup(i.filename));
             } else {
                 warning(FSCK, "OK     %s\n", i.datetime.c_str());
             }
         }
     } else {
-        info(FSCK, "OK\n");
+        string kept_size = humanReadableTwoDecimals(total_files_size);
+        UI::output("OK Total size of backup %s (%d points in time).\n",
+                   kept_size.c_str(),
+                   restore->historyOldToNew().size());
+    }
+
+    int sn = superfluous_files.size();
+    if (sn > 0) {
+        string ss = humanReadableTwoDecimals(superfluous_files_size);
+        UI::output("Found %d superfluous file(s) with a total size of %s \n", sn, ss.c_str());
+        auto proceed = UINo;
+        if (UI::isatty()) {
+            proceed = UI::yesOrNo("Delete?");
+        }
+
+        if (proceed == UIYes)
+        {
+            storage_tool_->removeBackupFiles(settings->from.storage,
+                                             superfluous_files,
+                                             progress.get());
+            UI::output("Superflous files are now deleted.\n");
+        }
+    }
+    int bn = broken_points_in_time.size();
+    if (bn > 0) {
+        //string ss = humanReadableTwoDecimals(superfluous_files_size);
+        UI::output("Found %d broken points in time\n", bn);
+        auto proceed = UINo;
+        if (UI::isatty()) {
+            proceed = UI::yesOrNo("Delete?");
+        }
+
+        if (proceed == UIYes)
+        {
+            storage_tool_->removeBackupFiles(settings->from.storage,
+                                             broken_points_in_time,
+                                             progress.get());
+            UI::output("Broken points in time are now deleted. Run fsck again.\n");
+        }
     }
 
     return rc;

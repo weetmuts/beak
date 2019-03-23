@@ -21,6 +21,7 @@
 
 #include <assert.h>
 #include <stdarg.h>
+#include <unistd.h>
 
 using namespace std;
 
@@ -204,4 +205,9 @@ KeepOrChange UI::keepOrChangeOrDiscard()
             return UIDiscard;
         }
     }
+}
+
+bool UI::isatty()
+{
+    return ::isatty (1);
 }

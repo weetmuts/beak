@@ -200,6 +200,8 @@ void PruneImplementation::prune(std::map<uint64_t,bool> *result)
         if (isMonthlyMax(p)) verbose(PRUNE, " MONTH");
         verbose(PRUNE, " \n");
     }
+    string nows = timeToString(now_);
+    verbose(PRUNE, "now        %s\n", nows.c_str());
 
     *result = points_;
 }

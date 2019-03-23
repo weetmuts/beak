@@ -124,7 +124,7 @@ function performFsckExpectOK {
     if [ -z "$test" ]; then
         # Normal test execution, execute the store
         eval "${BEAK} fsck $extra $store > $log"
-        FSCK_LOG=$(cat $log | tr -d '\n' | tr -s ' ')
+        FSCK_LOG=$(cat $log | tr -d '\n' | tr -s ' ' | grep -o "OK")
         if [ ! "$FSCK_LOG" = "OK" ]; then
             echo -------------------
             cat $log
@@ -808,55 +808,55 @@ setup multipleprunes "Prune multiple times"
 if [ $do_test ]; then
     mkdir -p $root/Alfa/Beta
     echo HEJSAN > $root/Alfa/Beta/gurka
-    find $root -exec touch -d '-720 days' '{}' +
+    find $root -exec touch -d '2017-04-01 12:32' '{}' +
     performStore
-    find $root -exec touch -d '-719 days' '{}' +
+    find $root -exec touch -d '2017-04-02 11:33' '{}' +
     performStore
-    find $root -exec touch -d '-600 days' '{}' +
+    find $root -exec touch -d '2017-05-29 07:00' '{}' +
     performStore
-    find $root -exec touch -d '-300 days' '{}' +
+    find $root -exec touch -d '2018-01-02 22:32' '{}' +
     performStore
-    find $root -exec touch -d '-299 days' '{}' +
+    find $root -exec touch -d '2018-02-16 08:20' '{}' +
     performStore
-    find $root -exec touch -d '-298 days' '{}' +
+    find $root -exec touch -d '2018-03-20 16:00' '{}' +
     performStore
-    find $root -exec touch -d '-42 days' '{}' +
+    find $root -exec touch -d '2018-12-12 17:30' '{}' +
     performStore
-    find $root -exec touch -d '-41 days' '{}' +
+    find $root -exec touch -d '2019-01-01 01:01' '{}' +
     performStore
-    find $root -exec touch -d '-35 days' '{}' +
+    find $root -exec touch -d '2019-01-02 13:33' '{}' +
     performStore
-    find $root -exec touch -d '-34 days' '{}' +
+    find $root -exec touch -d '2019-01-15 11:20' '{}' +
     performStore
-    find $root -exec touch -d '-33 days' '{}' +
+    find $root -exec touch -d '2019-02-23 12:10' '{}' +
     performStore
-    find $root -exec touch -d '-21 days' '{}' +
+    find $root -exec touch -d '2019-02-27 10:02' '{}' +
     performStore
-    find $root -exec touch -d '-20 days' '{}' +
+    find $root -exec touch -d '2019-03-01 07:07' '{}' +
     performStore
-    find $root -exec touch -d '-7 days' '{}' +
+    find $root -exec touch -d '2019-03-12 03:21' '{}' +
     performStore
-    find $root -exec touch -d '-6 days' '{}' +
+    find $root -exec touch -d '2019-03-15 17:32' '{}' +
     performStore
-    find $root -exec touch -d '-5 days' '{}' +
+    find $root -exec touch -d '2019-03-16 17:33' '{}' +
     performStore
-    find $root -exec touch -d '-4 days' '{}' +
+    find $root -exec touch -d '2019-03-17 16:00' '{}' +
     performStore
-    find $root -exec touch -d '-3 days' '{}' +
+    find $root -exec touch -d '2019-03-18 14:22' '{}' +
     performStore
-    find $root -exec touch -d '-51 hours' '{}' +
+    find $root -exec touch -d '2019-03-19 10:00' '{}' +
     performStore
-    find $root -exec touch -d '-50 hours' '{}' +
+    find $root -exec touch -d '2019-03-19 12:00' '{}' +
     performStore
-    find $root -exec touch -d '-49 hours' '{}' +
+    find $root -exec touch -d '2019-03-19 22:00' '{}' +
     performStore
-    find $root -exec touch -d '-47 hours' '{}' +
+    find $root -exec touch -d '2019-03-20 01:01' '{}' +
     performStore
-    find $root -exec touch -d '-20 hours' '{}' +
+    find $root -exec touch -d '2019-03-20 02:02' '{}' +
     performStore
-    find $root -exec touch -d '-12 hours' '{}' +
+    find $root -exec touch -d '2019-03-20 03:03' '{}' +
     performStore
-    find $root -exec touch -d '-1 hour' '{}' +
+    find $root -exec touch -d '2019-03-20 10:10' '{}' +
     performStore
     performFsckExpectOK
     COUNTBEFORE=$(ls $store/z*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
@@ -865,61 +865,61 @@ if [ $do_test ]; then
         echo Oups! Expected there to be 25 points in time, but found $COUNTBEFORE
         exit 1
     fi
-    performPrune "--yesprune"
+    performPrune "-v --yesprune --now='2019-03-20 11:00'"
     CHECK0=$(cat $log | grep -o "Backup is now pruned.")
-    CHECK1=$(cat $log | grep -o "(10 points in time)")
-    CHECK2=$(cat $log | grep -o "(15)")
+    CHECK1=$(cat $log | grep -o "(3 points in time)")
+    CHECK2=$(cat $log | grep -o "(22)")
     if [ ! "$CHECK0" = "Backup is now pruned." ] ||
-       [ ! "$CHECK1" = "(10 points in time)" ] ||
-       [ ! "$CHECK2" = "(15)" ]
+       [ ! "$CHECK1" = "(3 points in time)" ] ||
+       [ ! "$CHECK2" = "(22)" ]
     then
         echo -------------------
         cat $log
         echo -------------------
-        echo Expected the prune to report 10 deleted and 15 kept points in time.
+        echo Expected the prune to report 3 deleted and 22 kept points in time.
         exit 1
     fi
     performFsckExpectOK
     COUNTAFTER=$(ls $store/z*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
-    if [ ! "$COUNTAFTER" = "15" ]
+    if [ ! "$COUNTAFTER" = "22" ]
     then
         echo Oups! Expected there to be 15 points in time after prune, but found $COUNTAFTER
         exit
     fi
-    performPrune "--yesprune -v -k 'weekly:2m'"
+    performPrune "--yesprune -v --now='2019-03-20 11:01' -k 'weekly:2m'"
     CHECK0=$(cat $log | grep -o "Backup is now pruned.")
-    CHECK1=$(cat $log | grep -o "(10 points in time)")
-    CHECK2=$(cat $log | grep -o "(5)")
+    CHECK1=$(cat $log | grep -o "(18 points in time)")
+    CHECK2=$(cat $log | grep -o "(4)")
     if [ ! "$CHECK0" = "Backup is now pruned." ] ||
-       [ ! "$CHECK1" = "(10 points in time)" ] ||
-       [ ! "$CHECK2" = "(5)" ]
+       [ ! "$CHECK1" = "(18 points in time)" ] ||
+       [ ! "$CHECK2" = "(4)" ]
     then
         echo -------------------
         cat $log
         echo -------------------
-        echo Expected the prune to report 10 deleted and 5 kept points in time.
+        echo Expected the prune to report 18 deleted and 4 kept points in time.
         exit 1
     fi
     performFsckExpectOK
     COUNTAFTER=$(ls $store/z*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
-    if [ ! "$COUNTAFTER" = "5" ]
+    if [ ! "$COUNTAFTER" = "4" ]
     then
-        echo Oups! Expected there to be 5 points in time after prune, but found $COUNTAFTER
+        echo Oups! Expected there to be 4 points in time after prune, but found $COUNTAFTER
         exit
     fi
 
-    performPrune "--yesprune -v -k 'daily:1w'"
+    performPrune "--yesprune -v --now='2019-03-20 11:02' -k 'daily:1w'"
     CHECK0=$(cat $log | grep -o "Backup is now pruned.")
-    CHECK1=$(cat $log | grep -o "(3 points in time)")
+    CHECK1=$(cat $log | grep -o "(2 points in time)")
     CHECK2=$(cat $log | grep -o "(2)")
     if [ ! "$CHECK0" = "Backup is now pruned." ] ||
-       [ ! "$CHECK1" = "(3 points in time)" ] ||
+       [ ! "$CHECK1" = "(2 points in time)" ] ||
        [ ! "$CHECK2" = "(2)" ]
     then
         echo -------------------
         cat $log
         echo -------------------
-        echo Expected the prune to report 3 deleted and 2 kept points in time.
+        echo Expected the prune to report 2 deleted and 2 kept points in time.
         exit 1
     fi
     performFsckExpectOK
@@ -930,7 +930,7 @@ if [ $do_test ]; then
         exit
     fi
 
-    performPrune "--yesprune -v -k 'all:1d'"
+    performPrune "--yesprune -v --now='2019-03-20 11:03' -k 'all:1d'"
     CHECK0=$(cat $log | grep -o "Backup is now pruned.")
     CHECK1=$(cat $log | grep -o "(1 points in time)")
     CHECK2=$(cat $log | grep -o "(1)")

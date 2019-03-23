@@ -148,6 +148,7 @@ LIST_OF_COMMANDS
     X(,robot,bool,false,"Switch to a terminal output format that suitable for parsing by another program.\n") \
     X(,tarheader,TarHeaderStyle,true,"Style of tar headers used. E.g. --tarheader=simple\n"   \
       "                           Alternatives are: none,simple,full Default is simple.")    \
+    X(,now,std::string,true,"When pruning use this date time as now.\n") \
     X(ta,targetsize,size_t,true,"Tar target size. E.g. --targetsize=20M\n" \
       "                           Default is 10M.")    \
     X(tr,triggersize,size_t,true,"Trigger tar generation in dir at size. E.g. -tr 40M\n" \

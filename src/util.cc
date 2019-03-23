@@ -889,3 +889,20 @@ string timeToString(time_t pp)
     strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &tid);
     return buf;
 }
+
+RC parseDateTime(string dt, time_t *out)
+{
+    struct tm tp {};
+    // 2019-03-20 15:32:12
+    int n = sscanf(dt.c_str(), "%d-%d-%d %d:%d:%d",
+                   &tp.tm_year, &tp.tm_mon, &tp.tm_mday,
+                   &tp.tm_hour, &tp.tm_min, &tp.tm_sec);
+    if (n<3) {
+        return RC::ERR;
+    }
+    tp.tm_year -= 1900;
+    tp.tm_mon -= 1;
+
+    *out = mktime(&tp);
+    return RC::OK;
+}
