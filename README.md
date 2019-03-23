@@ -5,6 +5,10 @@ to co-exist with the cloud/remote storage (rclone, rsync) of your
 choice. Beak enables push/pull-merge to share the remotely
 stored backups between multiple client computers.
 
+| OS           | Status           |
+| ------------ |:-------------:|
+|GNU/Linux & MacOSX| [![Build Status](https://travis-ci.org/weetmuts/beak.svg?branch=master)](https://travis-ci.org/weetmuts/beak) |
+
 ## Summary
 
 beak is the tool for the impatient who wants to initiate a backup
