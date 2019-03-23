@@ -18,6 +18,7 @@
 
 #include"contentsplit.h"
 
+#include<fcntl.h>
 #include<unistd.h>
 
 using namespace std;

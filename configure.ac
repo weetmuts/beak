@@ -131,41 +131,31 @@ AC_ARG_WITH(fuse, [AS_HELP_STRING([--with-fuse],
       (expecting the libraries under PATH and the headers under PATH/include)])])
 
 if test "x$ENABLE_FUSE" = xyes; then
-   echo Steg1 test "x${with_fuse}" = "x"
    if test "x${with_fuse}" = "x"; then
-      echo Steg2 $PKG_CONFIG fuse
        if $PKG_CONFIG fuse; then
-           echo Steg3
            FUSE_CFLAGS="-DFUSE_USE_VERSION=26 $($PKG_CONFIG --cflags fuse)"
-           echo Steg3.1
            FUSE_LIBS="$($PKG_CONFIG --libs fuse)"
-           echo Steg3.2
            AC_MSG_RESULT([found])
        else
-           echo Steg4
-           AC_MSG_ERROR([Please install fuse-dev, for example using: sudo apt install libfuse-dev])
+           FUSE_CFLAGS=""
+           FUSE_LIBS=""
+           AC_MSG_RESULT([implicitly disabled])
+           AC_MSG_RESULT([Please install fuse-dev, for example using: sudo apt install libfuse-dev])
        fi
-       echo Steg5
    else
-       echo Steg6
        with_fuse=$(realpath ${with_fuse})
-       echo Steg7
        if test ! -d "$with_fuse" ; then
            AC_MSG_ERROR([No such directory "$with_fuse"])
        fi
-       echo Steg8
        FUSE_CFLAGS="-DFUSE_USE_VERSION=26 -D_FILE_OFFSET_BITS=64 -I${with_fuse}/include"
        FUSE_LIBS="$(find "${with_fuse}" -name libfuse.a) -ldl"
        AC_MSG_RESULT([using ${with_fuse}])
    fi
-   echo Steg9
 else
-    echo Steg10
     FUSE_CFLAGS=""
     FUSE_LIBS=""
     AC_MSG_RESULT([explicitly disabled])
 fi
-echo Steg11
 
 AC_MSG_CHECKING([for openssl])
 AC_ARG_WITH(openssl, [AS_HELP_STRING([--with-openssl],
