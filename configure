@@ -4042,36 +4042,44 @@ fi
 
 
 if test "x$ENABLE_FUSE" = xyes; then
-   echo Steg1
+   echo Steg1 test "x${with_fuse}" = "x"
    if test "x${with_fuse}" = "x"; then
-      echo Steg2
+      echo Steg2 $PKG_CONFIG fuse
        if $PKG_CONFIG fuse; then
            echo Steg3
            FUSE_CFLAGS="-DFUSE_USE_VERSION=26 $($PKG_CONFIG --cflags fuse)"
+           echo Steg3.1
            FUSE_LIBS="$($PKG_CONFIG --libs fuse)"
+           echo Steg3.2
            { $as_echo "$as_me:${as_lineno-$LINENO}: result: found" >&5
 $as_echo "found" >&6; }
        else
+           echo Steg4
            as_fn_error for example using: sudo apt install libfuse-dev "Please install fuse-dev" "$LINENO" 5
        fi
+       echo Steg5
    else
-       echo Steg4
+       echo Steg6
        with_fuse=$(realpath ${with_fuse})
+       echo Steg7
        if test ! -d "$with_fuse" ; then
            as_fn_error $? "No such directory \"$with_fuse\"" "$LINENO" 5
        fi
-       echo Steg5
+       echo Steg8
        FUSE_CFLAGS="-DFUSE_USE_VERSION=26 -D_FILE_OFFSET_BITS=64 -I${with_fuse}/include"
        FUSE_LIBS="$(find "${with_fuse}" -name libfuse.a) -ldl"
        { $as_echo "$as_me:${as_lineno-$LINENO}: result: using ${with_fuse}" >&5
 $as_echo "using ${with_fuse}" >&6; }
    fi
+   echo Steg9
 else
+    echo Steg10
     FUSE_CFLAGS=""
     FUSE_LIBS=""
     { $as_echo "$as_me:${as_lineno-$LINENO}: result: explicitly disabled" >&5
 $as_echo "explicitly disabled" >&6; }
 fi
+echo Steg11
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for openssl" >&5
 $as_echo_n "checking for openssl... " >&6; }
