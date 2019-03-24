@@ -352,6 +352,7 @@ struct CacheFS : ReadOnlyCacheFileSystemBaseImplementation
     }
 
     void refreshCache();
+    void addDirToParent(std::map<Path*,CacheEntry> *entries, Path *dir);
     RC loadDirectoryStructure(std::map<Path*,CacheEntry> *entries);
     RC fetchFile(Path *file);
     RC fetchFiles(vector<Path*> *files);
@@ -364,6 +365,31 @@ protected:
 
 void CacheFS::refreshCache() {
     loadDirectoryStructure(&entries_);
+}
+
+// Add the dir to the parent and check that all parents to the parent
+// are added as well.
+void CacheFS::addDirToParent(std::map<Path*,CacheEntry> *entries, Path *dir)
+{
+    assert(dir);
+    Path *parent = dir->parent();
+    if (parent == NULL) return;
+    // The dir must have been added to the cache entries.
+    assert(entries->count(dir) == 1);
+    if (entries->count(parent) == 0) {
+        // The parent is not yet added to the cache entries. Add it!
+        FileStat dir_stat;
+        dir_stat.setAsDirectory();
+        (*entries)[parent] = CacheEntry(dir_stat, parent, true);
+    }
+    CacheEntry *dir_entry = &(*entries)[dir];
+    CacheEntry *parent_entry = &(*entries)[parent];
+    if (parent_entry->direntries.count(dir) == 0) {
+        // Add dir to its parent.
+        parent_entry->direntries[dir] = dir_entry;
+    }
+
+    addDirToParent(entries, parent);
 }
 
 RC CacheFS::loadDirectoryStructure(map<Path*,CacheEntry> *entries)
@@ -404,9 +430,12 @@ RC CacheFS::loadDirectoryStructure(map<Path*,CacheEntry> *entries)
                 // Create a new directory cache entry.
                 // Directories cache entries are always marked as cached.
                 (*entries)[dir] = CacheEntry(dir_stat, dir, true);
+                // Add this dir to its parent directory.
+                addDirToParent(entries, dir);
             }
             dir_entry = prev_dir_cache_entry = &(*entries)[dir];
         }
+        prev_dir = dir;
         // Create a new file cache entry.
         // Initially the cache entry is marked as not cached.
         (*entries)[p.first] = CacheEntry(p.second, p.first, false);
@@ -418,7 +447,7 @@ RC CacheFS::loadDirectoryStructure(map<Path*,CacheEntry> *entries)
             debug(CACHE, "needs index %s\n", p.first->c_str());
         }
         // Add this file to its directory.
-        dir_entry->direntries.push_back(ce);
+        dir_entry->direntries[p.first] = ce;
     }
 
     if (index_files.size() > 0) {

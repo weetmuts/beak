@@ -79,7 +79,7 @@ struct CacheEntry
     FileStat stat;
     Path *path {};
     bool cached {}; // Have we a cached version of this file/dir?
-    std::vector<CacheEntry*> direntries; // If this is a directory, list its contents here.
+    std::map<Path*,CacheEntry*> direntries; // If this is a directory, list its contents here.
 
     CacheEntry() { }
     CacheEntry(FileStat s, Path *p, bool c) : stat(s), path(p), cached(c) { }

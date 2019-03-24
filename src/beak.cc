@@ -1202,6 +1202,7 @@ RC BeakImplementation::fsck(Settings *settings)
     backup_fs->listFilesBelow(root, &existing_beak_files, SortOrder::Unspecified);
     for (auto& p : existing_beak_files)
     {
+        debug(FSCK, "existing: %s\n", p.first->c_str());
         set_of_existing_beak_files.insert(p.first);
         total_files_size += p.second.st_size;
         if (required_beak_files.count(p.first) == 0)

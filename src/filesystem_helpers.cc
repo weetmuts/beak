@@ -179,8 +179,8 @@ bool ReadOnlyCacheFileSystemBaseImplementation::readdir(Path *p, vector<Path*> *
         return false;
     }
     CacheEntry *ce = &entries_[p];
-    for (CacheEntry *e : ce->direntries) {
-        vec->push_back(e->path->subpath(drop_prefix_depth_));
+    for (auto& p : ce->direntries) {
+        vec->push_back(p.first->subpath(drop_prefix_depth_));
     }
     return true;
 }
@@ -233,22 +233,20 @@ ssize_t ReadOnlyCacheFileSystemBaseImplementation::pread(Path *p, char *buf, siz
 RecurseOption ReadOnlyCacheFileSystemBaseImplementation::recurse_helper_(Path *p,
                                                                          std::function<RecurseOption(Path *path, FileStat *stat)> cb)
 {
-    printf("FGOO\n");
     CacheEntry *ce = &entries_[p];
     assert(ce);
     RecurseOption ro = cb(ce->path, &ce->stat);
     if (ro == RecurseSkipSubTree || ro == RecurseStop) {
         return ro;
     }
-
-    for (CacheEntry *e : ce->direntries) {
-        if (e->stat.isDirectory()) {
-            ro = recurse_helper_(e->path, cb);
+    for (auto& p : ce->direntries) {
+        if (p.second->stat.isDirectory()) {
+            ro = recurse_helper_(p.second->path, cb);
             if (ro == RecurseStop) {
                 return ro;
             }
         } else {
-            ro = cb(ce->path, &ce->stat);
+            ro = cb(p.second->path, &p.second->stat);
         }
     }
     return RecurseContinue;
