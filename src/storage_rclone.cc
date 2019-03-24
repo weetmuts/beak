@@ -166,12 +166,12 @@ RC rcloneSendFiles(Storage *storage,
                    ptr<System> sys,
                    ProgressStatistics *st)
 {
-    string files_to_fetch;
+    string files_to_send;
     for (auto& p : *files) {
-        files_to_fetch.append(p->c_str_nls()); // Drop the leading slash
-        files_to_fetch.append("\n");
+        files_to_send.append(p->c_str());
+        files_to_send.append("\n");
     }
-    Path *tmp = local_fs->mkTempFile("beak_sending_", files_to_fetch);
+    Path *tmp = local_fs->mkTempFile("beak_sending_", files_to_send);
 
     vector<string> args;
     args.push_back("copy");
@@ -247,9 +247,9 @@ RC rcloneDeleteFiles(Storage *storage,
 {
     string files_to_delete;
     for (auto& p : *files) {
-        files_to_delete.append(p->c_str_nls()); // Drop the leading slash
+        files_to_delete.append(p->c_str());
         files_to_delete.append("\n");
-        debug(RCLONE, "delete \"%s\"\n", p->c_str_nls());
+        debug(RCLONE, "delete \"%s\"\n", p->c_str());
     }
 
     Path *tmp = local_fs->mkTempFile("beak_deleting_", files_to_delete);
@@ -261,16 +261,15 @@ RC rcloneDeleteFiles(Storage *storage,
     args.push_back(tmp->c_str());
     args.push_back(storage->storage_location->c_str());
     vector<char> output;
-/*    rc = sys->invoke("rclone", args, &output, CaptureBoth,
+    rc = sys->invoke("rclone", args, &output, CaptureBoth,
                      [&progress, storage](char *buf, size_t len) {
-                         printf("RCLONEDEL %*s\n", (int)len, buf);
                          parse_rclone_verbose_output(progress,
                                                      storage,
                                                      buf,
                                                      len);
                      });
-*/
-    //local_fs->deleteFile(tmp);
+
+    local_fs->deleteFile(tmp);
 
     return rc;
 }
