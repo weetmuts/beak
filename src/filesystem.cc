@@ -839,7 +839,7 @@ RC FileSystem::listFilesBelow(Path *p, std::vector<pair<Path*,FileStat>> *files,
     vector<pair<Path*,FileStat>> found;
     RC rc = RC::OK;
     rc = recurse(p,
-                 [&found,p,depth](Path *path, FileStat *stat)
+                 [&found,depth](Path *path, FileStat *stat)
                  {
                      Path *pp = path->subpath(depth);
                      if (stat->isRegularFile()) {

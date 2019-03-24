@@ -164,7 +164,7 @@ const char *actionName(Action a)
 
 unique_ptr<Diff> newDiff(bool detailed, int depth)
 {
-    return unique_ptr<Diff>(new DiffImplementation(detailed, depth));
+    return unique_ptr<Diff>(new DiffImplementation(detailed, depth-1));
 }
 
 
