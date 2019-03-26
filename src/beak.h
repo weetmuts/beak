@@ -98,6 +98,7 @@ enum ArgumentType
     ArgStorage,
     ArgDir,
     ArgFile,
+    ArgFileOrNone,
     ArgORS,  // Origin, Rule or Storage
     ArgNORS, // None, Origin, Rule or Storage
 };
@@ -109,7 +110,7 @@ enum ArgumentType
     X(config,"Configure backup rules.",ArgNone,ArgNone) \
     X(diff,"Show differences between backups and/or origins.",ArgORS,ArgORS) \
     X(fsck,"Check the integrity of your backup.",ArgStorage,ArgNone) \
-    X(genautocomplete,"Output bash completion script for beak.",ArgFile,ArgNone) \
+    X(genautocomplete,"Output bash completion script for beak.",ArgFileOrNone,ArgNone) \
     X(genmounttrigger,"Output systemd rule to trigger backup when USB drive is mounted.",ArgFile,ArgNone) \
     X(help,"Show help. Also: beak push help",ArgORS,ArgNone) \
     X(prune,"Discard old backups according to the keep rule.",ArgStorage,ArgNone) \

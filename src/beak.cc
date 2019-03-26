@@ -269,7 +269,7 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
         return argument;
     }
 
-    if (expected_type == ArgFile) {
+    if (expected_type == ArgFile || expected_type == ArgFileOrNone) {
         Path *file = Path::lookup(arg);
         Path *rp = file->realpath();
         if (!rp)
@@ -465,6 +465,8 @@ const char *arg_name_(ArgumentType at) {
         return "dir";
     case ArgFile:
         return "file";
+    case ArgFileOrNone:
+        return "file or none";
     case ArgORS:
         return "origin, rule or storage";
     case ArgNORS:
@@ -734,7 +736,7 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
     }
 
 
-    if (cmde->expected_from != ArgNone)
+    if (cmde->expected_from != ArgNone && cmde->expected_from != ArgFileOrNone)
     {
         if (settings->from.type == ArgUnspecified)
         {

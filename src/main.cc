@@ -94,12 +94,12 @@ int run(int argc, char *argv[])
         break;
 
     case genautocomplete_cmd:
-        if (settings.from.dir == NULL) {
+        if (settings.from.file == NULL) {
             beak->genAutoComplete("/etc/bash_completion.d/beak");
             printf("Wrote /etc/bash_completion.d/beak\n");
         } else {
-            beak->genAutoComplete(settings.from.dir->str());
-            printf("Wrote %s\n", settings.from.dir->c_str());
+            beak->genAutoComplete(settings.from.file->str());
+            printf("Wrote %s\n", settings.from.file->c_str());
         }
         break;
 

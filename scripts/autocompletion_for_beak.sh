@@ -14,13 +14,19 @@ _beakusermounts()
 _beakorigins()
 {
   local cur=${COMP_WORDS[COMP_CWORD]}
-  local rules=$(grep -o \\[.*\\] ~/.config/beak/beak.conf | tr -d '[' | tr ']' ':' | sort)
+  local rules=""
+  if [ -f ~/.config/beak/beak.conf ]; then
+      rules=$(grep -o \\[.*\\] ~/.config/beak/beak.conf | tr -d '[' | tr ']' ':' | sort)
+  fi
   if [ "$rules" != "" ]; then
       COMPREPLY=($(compgen -W "$rules" -- $cur))
       if [ -z "$COMPREPLY" ]; then
           # No match for configured source trees. Try directories instead.
           _filedir -d
       fi
+  else
+      # No rules found, use directories.
+      _filedir -d
   fi
   return 0
 }
@@ -30,13 +36,19 @@ _beakstorages()
   local cur=${COMP_WORDS[COMP_CWORD]}
   local prev=${COMP_WORDS[COMP_CWORD-1]}
   if [ "$prev" = ":" ]; then prev=${COMP_WORDS[COMP_CWORD-2]}; fi
-  local remotes=$(cat ~/.config/beak/beak.conf | grep -e 'remote\ *=' | sed 's/remote.*= \?//g' | sort | uniq)
+  local remotes="";
+  if [ -f ~/.config/beak/beak.conf ]; then
+      remotes=$(cat ~/.config/beak/beak.conf | grep -e 'remote\ *=' | sed 's/remote.*= \?//g' | sort | uniq)
+  fi
   if [ "$remotes" != "" ]; then
       COMPREPLY=($(compgen -W "$remotes" -- $cur))
       if [ -z "$COMPREPLY" ]; then
           # No match for configured remotes trees. Try directories instead.
           _filedir -d
       fi
+  else
+      # No storages found, use directories.
+      _filedir -d
   fi
   return 0
 }
@@ -59,6 +71,8 @@ _beak()
         push) _beakorigins ;;
         restore) _beakstorages ;;
         shell) _beakstorages ;;
+        fsck) _beakstorages ;;
+        prune) _beakstorages ;;
         store) _beakstorages ;;
         umount) _beakusermounts ;;
         diff) _beakorigins ;;
@@ -66,9 +80,6 @@ _beak()
 
     case "$prevprev" in
         mount) _filedir -d ;;
-        prune) _beakstorages ;;
-        pull) _beakstorages ;;
-        push) _beakstorages ;;
         restore) _beakorigins ;;
         store) _beakstorages ;;
         diff) _beakstorages ;;
