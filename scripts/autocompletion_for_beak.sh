@@ -11,6 +11,20 @@ _beakusermounts()
     return 0
 }
 
+_beakrules()
+{
+  COMPREPLY=""
+  local cur=${COMP_WORDS[COMP_CWORD]}
+  local rules=""
+  if [ -f ~/.config/beak/beak.conf ]; then
+      rules=$(grep -o \\[.*\\] ~/.config/beak/beak.conf | tr -d '[' | tr ']' ':' | sort)
+      if [ "$rules" != "" ]; then
+          COMPREPLY=($(compgen -W "$rules" -- $cur))
+      fi
+  fi
+  return 0
+}
+
 _beakorigins()
 {
   local cur=${COMP_WORDS[COMP_CWORD]}
@@ -47,7 +61,7 @@ _beakstorages()
           _filedir -d
       fi
   else
-      # No storages found, use directories.
+      # No remotes found, use directories.
       _filedir -d
   fi
   return 0
@@ -65,24 +79,26 @@ _beak()
     if [ "$prev" = ":" ]; then prev="$prevprev" ; prevprev="$prevprevprev"; fi
 
     case "$prev" in
-        mount) _beakorigins ;;
-        prune) _beakorigins ;;
-        pull) _beakorigins ;;
-        push) _beakorigins ;;
+        bmount) _beakorigins ;;
+        diff) _beakorigins ;;
+        fsck) _beakstorages ;;
+        mount) _beakstorages ;;
+        prune) _beakstorages ;;
+        pull) _beakrules ;;
+        push) _beakrules ;;
         restore) _beakstorages ;;
         shell) _beakstorages ;;
-        fsck) _beakstorages ;;
-        prune) _beakstorages ;;
+        status) _beakorigins ;;
         store) _beakstorages ;;
         umount) _beakusermounts ;;
-        diff) _beakorigins ;;
     esac
 
     case "$prevprev" in
+        bmount) _filedir -d ;;
+        diff) _beakstorages ;;
         mount) _filedir -d ;;
         restore) _beakorigins ;;
         store) _beakstorages ;;
-        diff) _beakstorages ;;
     esac
 
     if [ -z "$COMPREPLY" ]; then
