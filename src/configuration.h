@@ -27,8 +27,6 @@
 #include<string>
 #include<vector>
 
-#define DEFAULT_KEEP "all:2d daily:2w weekly:2m monthly:2y"
-
 #define LIST_OF_TYPES \
     X(LocalThenRemoteBackup,"Store locally then remotely")           \
     X(RemoteBackup,"Store remotely")                                 \

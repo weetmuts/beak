@@ -548,14 +548,14 @@ if [ $do_test ]; then
     echo HEJSAN > $root/Alfa/Gamma/banan.txt
     echo HEJSAN > $root/Alfa/Gamma/toppen.h
     performStore
-    performDiff "-d 0"
+    performDiff "-d 1"
     CHECK=$(cat $diff)
     if [ ! "$CHECK" = "" ]; then
         echo Failed beak diff! Expected no change. Check in $dir for more information.
         exit
     fi
     echo SVEJSAN > $root/Alfa/Gamma/gurka.cc
-    performDiff "-d 0"
+    performDiff "-d 1"
     CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
     if [ ! "$CHECK" = "Alfa/Gamma/ 1 source added (cc)" ]; then
         cat $diff
@@ -564,7 +564,7 @@ if [ $do_test ]; then
         exit
     fi
     echo SVEJSAN > $root/Alfa/Gamma/banan.txt
-    performDiff "-d 0"
+    performDiff "-d 1"
     CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
     if [ ! "$CHECK" = "Alfa/Gamma/ 1 source added (cc) 1 document changed (txt)" ]; then
         cat $diff
@@ -573,7 +573,7 @@ if [ $do_test ]; then
         exit
     fi
     rm $root/Alfa/Beta/gurka.cc
-    performDiff "-d 0"
+    performDiff "-d 1"
     CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
     if [ ! "$CHECK" = "Alfa/Beta/ 1 source removed (cc)Alfa/Gamma/ 1 source added (cc) 1 document changed (txt)" ]; then
         cat $diff
@@ -582,7 +582,7 @@ if [ $do_test ]; then
         exit
     fi
     chmod a-w $root/Alfa/Gamma/toppen.h
-    performDiff "-d 0"
+    performDiff "-d 1"
     CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
     if [ ! "$CHECK" = "Alfa/Beta/ 1 source removed (cc)Alfa/Gamma/ 1 source permission changed (h) 1 source added (cc) 1 document changed (txt)" ]; then
         cat $diff
@@ -600,14 +600,14 @@ if [ $do_test ]; then
     echo HEJSAN > $root/Alfa/Beta/gurka.pdf
     ln $root/Alfa/Beta/gurka.pdf $root/Alfa/Gamma/banana.pdf
     performStore
-    performDiff "-d 0"
+    performDiff "-d 1"
     CHECK=$(cat $diff)
     if [ ! "$CHECK" = "" ]; then
         echo Failed beak diff! Expected no change. Check in $dir for more information.
         exit
     fi
     echo SVEJSAN > $root/Alfa/Gamma/banana.pdf
-    performDiff "-d 0"
+    performDiff "-d 1"
     CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
     if [ ! "$CHECK" = "Alfa/Beta/ 1 document changed (pdf)Alfa/Gamma/ 1 document changed (pdf)" ]; then
         cat $diff
@@ -617,7 +617,7 @@ if [ $do_test ]; then
     fi
     performReStore
     (cd "$root"; cp -a $check/* .)
-    performDiff "-d 0"
+    performDiff "-d 1"
     CHECK=$(cat $diff)
     if [ ! "$CHECK" = "" ]; then
         cat $diff
@@ -626,7 +626,7 @@ if [ $do_test ]; then
     fi
     rm $root/Alfa/Gamma/banana.pdf
     echo SVEJSAN > $root/Alfa/Gamma/banana.pdf
-    performDiff "-d 0"
+    performDiff "-d 1"
     CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
     if [ ! "$CHECK" = "Alfa/Gamma/ 1 document changed (pdf)" ]; then
         cat $diff
@@ -635,7 +635,7 @@ if [ $do_test ]; then
         exit
     fi
     performStore
-    performDiffInsideBackup "-d 0"
+    performDiffInsideBackup "-d 1"
     CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
     if [ ! "$CHECK" = "Alfa/Gamma/ 1 document changed (pdf)" ]; then
         cat $diff
@@ -664,7 +664,7 @@ if [ $do_test ]; then
         exit
     fi
     echo SVEJSAN > $root/Alfa/Gamma/.git/content/sxkxkxkx
-    performDiff "-d 0"
+    performDiff "-d 1"
     CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
     if [ ! "$CHECK" = "Alfa/Gamma/.git/... 1 other file added (...)" ]; then
         cat $diff
@@ -673,7 +673,7 @@ if [ $do_test ]; then
         exit
     fi
     rm -rf $root/Alfa/Gamma
-    performDiff "-d 0"
+    performDiff "-d 1"
     CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
     if [ ! "$CHECK" = "Alfa/Gamma/... dir removed 3 sources removed (h,bas,c) 1 other file removed (...)" ]; then
         cat $diff

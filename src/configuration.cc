@@ -15,6 +15,7 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "beak.h"
 #include "filesystem.h"
 #include "log.h"
 #include "configuration.h"
@@ -416,7 +417,7 @@ void Rule::generateDefaultSettingsBasedOnPath()
     cache_path = Path::lookup(".beak/cache");
     cache_size = 10ul+1024*1024*1024;
 
-    string keep = getTimeZoneOffsetAsString(getTimeZoneOffset())+" "+DEFAULT_KEEP;
+    string keep = DEFAULT_LOCAL_KEEP_RULE;
 
     storages[Path::lookupRoot()] = { FileSystemStorage, Path::lookup(".beak/local"), keep };
     local = &storages[Path::lookupRoot()];
@@ -961,12 +962,12 @@ bool ConfigurationImplementation::editRemoteTarget(Storage *s)
 void ConfigurationImplementation::editRemoteKeep(Storage *s)
 {
     for (;;) {
-        UI::output("Empty keep string means => tz:+0100 all:2d daily:2w weekly:2m monthly:2y\n");
+        UI::output("Empty keep string means => all:2d daily:2w weekly:2m monthly:2y\n");
         UI::outputPrompt("remote keep>");
         string k = UI::inputString();
         if (k == "") {
-            UI::output("Using default keep: tz:+0100 all:2d daily:2w weekly:2m monthly:2y\n");
-            k = "tz:+0100 all:2d daily:2w weekly:2m monthly:2y";
+            UI::output("Using default keep: all:2d daily:2w weekly:2m monthly:2y\n");
+            k = "all:2d daily:2w weekly:2m monthly:2y";
         }
         bool ok = s->keep.parse(k);
         if (ok) break;

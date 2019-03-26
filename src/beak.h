@@ -28,8 +28,11 @@
 #include<string>
 #include<vector>
 
+// The default settings is to assume the subdirectories on the
+// toplevel are independent projects. Thus force tars inside each subdir.
 #define DEFAULT_DEPTH_TO_FORCE_TARS 2
-#define DEFAULT_KEEP_RULE "all:2d daily:2w weekly:2m monthly:forever"
+#define DEFAULT_REMOTE_KEEP_RULE "all:2d daily:2w weekly:2m monthly:2y"
+#define DEFAULT_LOCAL_KEEP_RULE "all:2d daily:2w"
 
 enum Command : short;
 enum PointInTimeFormat : short;
