@@ -640,10 +640,37 @@ size_t Backup::groupFilesIntoTars()
             gids.insert(entry->stat()->st_gid);
         }
 
+        vector<pair<TarFile*,TarEntry*>> tars;
+        for (auto & st : tar_storage_directories) {
+            TarEntry *ste = st.second;
+            bool b = ste->path()->isBelowOrEqual(te->path());
+            if (b) {
+                for (auto & tf : ste->tars()) {
+                    if (tf->totalSize() > 0 ) {
+                        tars.push_back({tf,ste});
+                        // Make sure the gzfile timestamp is the latest
+                        // of all subtars as well.
+                        tf->updateMtim(te->gzFile()->mtim());
+                    }
+                }
+            }
+        }
+        // Finally update with the latest mtime of the current storage directory!
+        te->updateMtim(te->gzFile()->mtim());
+
+        size_t backup_size = 0;
+        for (auto & p : tars) {
+            backup_size += p.first->totalSize();
+        }
+
         string gzfile_contents;
+
         gzfile_contents.append("#beak 0.8\n");
         gzfile_contents.append("#config ");
         gzfile_contents.append(config_);
+        gzfile_contents.append("\n");
+        gzfile_contents.append("#size ");
+        gzfile_contents.append(to_string(backup_size));
         gzfile_contents.append("\n");
         gzfile_contents.append("#uids");
         for (auto & x : uids) {
@@ -671,24 +698,6 @@ size_t Backup::groupFilesIntoTars()
             // changed timestamp of all included entries!
             entry->updateMtim(te->gzFile()->mtim());
         }
-
-        vector<pair<TarFile*,TarEntry*>> tars;
-        for (auto & st : tar_storage_directories) {
-            TarEntry *ste = st.second;
-            bool b = ste->path()->isBelowOrEqual(te->path());
-            if (b) {
-                for (auto & tf : ste->tars()) {
-                    if (tf->totalSize() > 0 ) {
-                        tars.push_back({tf,ste});
-                        // Make sure the gzfile timestamp is the latest
-                        // of all subtars as well.
-                        tf->updateMtim(te->gzFile()->mtim());
-                    }
-                }
-            }
-        }
-        // Finally update with the latest mtime of the current storage directory!
-        te->updateMtim(te->gzFile()->mtim());
 
         // Hash the hashes of all the other tar and gz files.
         te->gzFile()->calculateHash(tars, gzfile_contents);
@@ -730,7 +739,7 @@ size_t Backup::groupFilesIntoTars()
         gzfile_contents.append(to_string(num_content_splits));
         gzfile_contents.append("\n");
         gzfile_contents.append(separator_string);
-        // filename num_parts sha256 len sha256 len \n
+
         for (auto & t : tars) {
             TarFile *tf = t.first;
             if (tf->type() == CONTENT_SPLIT_LARGE_FILE_TAR)
@@ -743,6 +752,20 @@ size_t Backup::groupFilesIntoTars()
                 gzfile_contents.append(separator_string);
             }
         }
+        gzfile_contents.append(separator_string);
+        vector<char> sha256_hash;
+        string cont = gzfile_contents;
+        sha256_hash.resize(SHA256_DIGEST_LENGTH);
+        {
+            SHA256_CTX sha256ctx;
+            SHA256_Init(&sha256ctx);
+            SHA256_Update(&sha256ctx, cont.c_str(), cont.length());
+            SHA256_Final((unsigned char*)&sha256_hash[0], &sha256ctx);
+        }
+        gzfile_contents.append("#sha256 ");
+        gzfile_contents.append(toHex(sha256_hash));
+        gzfile_contents.append("\n");
+        gzfile_contents.append(separator_string);
 
         vector<char> compressed_gzfile_contents;
         gzipit(&gzfile_contents, &compressed_gzfile_contents);

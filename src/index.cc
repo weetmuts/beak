@@ -66,13 +66,21 @@ RC Index::loadIndex(vector<char> &v,
     // Config are beak command line switches that affect the configuration of the backup.
     // I.e. if these are changed, then the backup will be grouped differently.
     string config = eatTo(data, j, '\n', 1024, &eof, &err); // Command line switches can be 1024 bytes long
+    string size = eatTo(data, j, '\n', 1024, &eof, &err); // Total size of backup, excluding this index file.
     string uid = eatTo(data, j, '\n', 10 * 1024 * 1024, &eof, &err); // Accept up to a ~million uniq uids
     string gid = eatTo(data, j, '\n', 10 * 1024 * 1024, &eof, &err); // Accept up to a ~million uniq gids
     string files = eatTo(data, j, '\n', 64, &eof, &err);
     string columns = eatTo(data, j, '\n', 256, &eof, &err);
 
+    size_t backup_size = 0;
+    int n = sscanf(size.c_str(), "#size %zu", &backup_size);
+    if (n != 1) {
+        failure(INDEX, "File format error gz file. [%d]\n", __LINE__);
+        return RC::ERR;
+    }
+
     int num_files = 0;
-    int n = sscanf(files.c_str(), "#files %d", &num_files);
+    n = sscanf(files.c_str(), "#files %d", &num_files);
     if (n != 1) {
         failure(INDEX, "File format error gz file. [%d]\n", __LINE__);
         return RC::ERR;
@@ -201,5 +209,12 @@ RC Index::loadIndex(vector<char> &v,
         failure(INDEX, "File format error gz file. [%d]\n", __LINE__);
         return RC::ERR;
     }
+
+    string end = eatTo(v, i, separator, 4096, &eof, &err); // Max path names 4096 bytes
+    if (err) {
+        failure(INDEX, "Could not parse tarredfs-tars file!\n");
+        return RC::ERR;
+    }
+
     return RC::OK;
 };

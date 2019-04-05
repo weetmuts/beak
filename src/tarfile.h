@@ -65,6 +65,7 @@ struct TarFileName
     long nsec {};
     size_t size {};
     size_t last_size {};
+    size_t backup_size {};
     std::string header_hash {};
     uint part_nr {};
     uint num_parts {};
@@ -75,6 +76,7 @@ struct TarFileName
         sec(tfn.sec), nsec(tfn.nsec),
         size(tfn.size),
         last_size(tfn.last_size),
+        backup_size(tfn.backup_size),
         header_hash(tfn.header_hash),
         part_nr(tfn.part_nr),
         num_parts(tfn.num_parts) {};

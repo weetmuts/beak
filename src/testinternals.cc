@@ -41,7 +41,6 @@ static ComponentId TEST_HEXSTRING = registerLogComponent("test_hexstring");
 static ComponentId TEST_SPLIT = registerLogComponent("test_split");
 static ComponentId TEST_READSPLIT = registerLogComponent("test_readsplit");
 static ComponentId TEST_CONTENTSPLIT = registerLogComponent("test_contentsplit");
-static ComponentId TEST_PRUNE = registerLogComponent("test_prune");
 
 void testMatch(string pattern, const char *path, bool should_match);
 
@@ -63,7 +62,7 @@ void testFit();
 void testSplitLogic();
 void testContentSplit();
 void testReadSplitLogic();
-void testPrune();
+void testSHA256();
 
 void predictor(int argc, char **argv);
 
@@ -97,7 +96,7 @@ int main(int argc, char *argv[])
         testSplitLogic();
         testReadSplitLogic();
 //        testContentSplit();
-        testPrune();
+        testSHA256();
 
         if (!err_found_) {
             printf("OK\n");
@@ -568,7 +567,18 @@ void testContentSplit()
 
 }
 
-void testPrune()
+void testSHA256()
 {
-    error(TEST_PRUNE, "Prune failed\n");
+    string gzfile_contents = "ABC";
+    vector<char> sha256_hash;
+    sha256_hash.resize(SHA256_DIGEST_LENGTH);
+    {
+        SHA256_CTX sha256ctx;
+        SHA256_Init(&sha256ctx);
+        SHA256_Update(&sha256ctx, gzfile_contents.c_str(), gzfile_contents.length());
+        SHA256_Final((unsigned char*)&sha256_hash[0], &sha256ctx);
+    }
+    string hex = toHex(sha256_hash);
+    fprintf(stderr, "sha256sum of \"%s\" is %s\n", gzfile_contents.c_str(), hex.c_str());
+
 }

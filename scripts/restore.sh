@@ -160,8 +160,22 @@ else
     fi
 fi
 
+# Check the internal checksum of the index file.
+# (2373686132353620 is hex for "#sha256 ")
+CALC_CHECK=$(zcat "$generation" | xxd -p | tr -d '\n' | \
+                    sed 's/2373686132353620.*//' | xxd -r -p | sha256sum | cut -f 1 -d ' ')
+READ_CHECK=$(zcat "$generation" | tr -d '\0' | grep "#sha256" | cut -f 2 -d ' ')
+
+if [ ! "$CALC_CHECK" = "$READ_CHECK" ]
+then
+    echo The checksum of the index file $generation could not be verified!
+    echo "Stored in index: $READ_CHECK"
+    echo "Calculated:      $CALC_CHECK"
+    exit 1
+fi
 # Extract the list of tar files from the index file.
 gunzip -c "$generation" | tr -d '\0' | grep -A1000000 -m1 \#tars | grep -B1000000 -m1 \#parts | grep -v z02 | grep -v \#tars | grep -v \#parts | sed 's/^\///'  > "$dir/aa"
+
 cat "$dir/aa" | tr -c -d '/\n' | tr / a > "$dir/bb"
 # Sort them on the number of slashes, ie handle the
 # deepest directories first, finish with the root
