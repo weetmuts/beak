@@ -29,11 +29,11 @@ using namespace std;
 ComponentId INDEX = registerLogComponent("index");
 
 RC Index::loadIndex(vector<char> &v,
-                     vector<char>::iterator &i,
-                     IndexEntry *ie, IndexTar *it,
-                     Path *dir_to_prepend,
-                     function<void(IndexEntry*)> on_entry,
-                     function<void(IndexTar*)> on_tar)
+                    vector<char>::iterator &i,
+                    IndexEntry *ie, IndexTar *it,
+                    Path *dir_to_prepend,
+                    function<void(IndexEntry*)> on_entry,
+                    function<void(IndexTar*)> on_tar)
 {
     vector<char>::iterator ii = i;
 
@@ -210,11 +210,38 @@ RC Index::loadIndex(vector<char> &v,
         return RC::ERR;
     }
 
-    string end = eatTo(v, i, separator, 4096, &eof, &err); // Max path names 4096 bytes
+    auto endofcontent = i;
+    string sha256s = eatTo(v, i, separator, 4096, &eof, &err); // sha256
     if (err) {
         failure(INDEX, "Could not parse tarredfs-tars file!\n");
         return RC::ERR;
     }
 
+    char hex[65];
+    hex[64] = 0;
+    n = sscanf(sha256s.c_str(), "#sha256 %64s", hex);
+    if (n != 1) {
+        failure(INDEX, "File format error gz file. [%d]\n", __LINE__);
+        return RC::ERR;
+    }
+
+    string read_hexs = string(hex);
+    vector<char> sha256_hash;
+    sha256_hash.resize(SHA256_DIGEST_LENGTH);
+    {
+        SHA256_CTX sha256ctx;
+        SHA256_Init(&sha256ctx);
+        SHA256_Update(&sha256ctx, (unsigned char*)&v[0], endofcontent-v.begin());
+        SHA256_Final((unsigned char*)&sha256_hash[0], &sha256ctx);
+    }
+    string calc_hexs = toHex(sha256_hash);
+    debug(INDEX, "index checksum: %s calculated: %s\n",
+                read_hexs.c_str(), calc_hexs.c_str());
+
+    if (read_hexs != calc_hexs) {
+        failure(INDEX, "Index file checksum did not match!\nRead:       %s\nCalculated: %s\n",
+                read_hexs.c_str(), calc_hexs.c_str());
+        return RC::ERR;
+    }
     return RC::OK;
 };

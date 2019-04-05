@@ -752,7 +752,6 @@ size_t Backup::groupFilesIntoTars()
                 gzfile_contents.append(separator_string);
             }
         }
-        gzfile_contents.append(separator_string);
         vector<char> sha256_hash;
         string cont = gzfile_contents;
         sha256_hash.resize(SHA256_DIGEST_LENGTH);
