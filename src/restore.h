@@ -84,6 +84,7 @@ enum PointInTimeFormat : short {
 
 struct PointInTime {
     int key;
+    size_t size;
     std::string ago;
     std::string datetime;
     std::string direntry;

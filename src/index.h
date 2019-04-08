@@ -49,6 +49,7 @@ struct Index {
                          std::vector<char>::iterator &i,
                          IndexEntry *tmpentry, IndexTar *tmptar,
                          Path *dir_to_prepend,
+                         size_t *size,
                          std::function<void(IndexEntry*)> on_entry,
                          std::function<void(IndexTar*)> on_tar);
 };

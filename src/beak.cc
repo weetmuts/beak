@@ -1251,8 +1251,10 @@ RC BeakImplementation::fsck(Settings *settings)
             }
         }
     } else {
+        string last_size = humanReadableTwoDecimals(restore->historyOldToNew().back().size);
         string kept_size = humanReadableTwoDecimals(total_files_size);
-        UI::output("OK Total size of backup %s (%d points in time).\n",
+        UI::output("OK! Last backup %s, all backups %s (%d points in time).\n",
+                   last_size.c_str(),
                    kept_size.c_str(),
                    restore->historyOldToNew().size());
     }

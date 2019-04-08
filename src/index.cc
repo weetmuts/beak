@@ -32,6 +32,7 @@ RC Index::loadIndex(vector<char> &v,
                     vector<char>::iterator &i,
                     IndexEntry *ie, IndexTar *it,
                     Path *dir_to_prepend,
+                    size_t *size,
                     function<void(IndexEntry*)> on_entry,
                     function<void(IndexTar*)> on_tar)
 {
@@ -47,15 +48,17 @@ RC Index::loadIndex(vector<char> &v,
     string type = eatTo(data, j, '\n', 64, &eof, &err);
 
     int beak_version = 0;
-    string vers = type.substr(6);
-    if (type.length() < 9 || type.substr(0, 6) != "#beak ") {
-        failure(INDEX, "Not a proper \"#beak x.x\" header in index file. It was \"%s\"\n", type.c_str());
+    if (!startsWith(type, "#beak ")) {
+        failure(INDEX, "Not a proper \"#beak x.x\" header in index file. [%d]\n", __LINE__);
         return RC::ERR;
     }
+    string vers = type.substr(6);
     if (vers == "0.7") {
-        beak_version = 7;
+        beak_version = 70;
     } else if (vers == "0.8") {
-        beak_version = 8;
+        beak_version = 80;
+    } else if (vers == "0.81") {
+        beak_version = 81;
     } else {
         failure(INDEX,
                 "Version was \"%s\" which is not the supported 0.7 or 0.8\n",
@@ -63,27 +66,48 @@ RC Index::loadIndex(vector<char> &v,
         return RC::ERR;
     }
 
-    // Config are beak command line switches that affect the configuration of the backup.
-    // I.e. if these are changed, then the backup will be grouped differently.
-    string config = eatTo(data, j, '\n', 1024, &eof, &err); // Command line switches can be 1024 bytes long
-    string size = eatTo(data, j, '\n', 1024, &eof, &err); // Total size of backup, excluding this index file.
-    string uid = eatTo(data, j, '\n', 10 * 1024 * 1024, &eof, &err); // Accept up to a ~million uniq uids
-    string gid = eatTo(data, j, '\n', 10 * 1024 * 1024, &eof, &err); // Accept up to a ~million uniq gids
-    string files = eatTo(data, j, '\n', 64, &eof, &err);
-    string columns = eatTo(data, j, '\n', 256, &eof, &err);
-
-    size_t backup_size = 0;
-    int n = sscanf(size.c_str(), "#size %zu", &backup_size);
-    if (n != 1) {
-        failure(INDEX, "File format error gz file. [%d]\n", __LINE__);
-        return RC::ERR;
-    }
-
+    string config;
     int num_files = 0;
-    n = sscanf(files.c_str(), "#files %d", &num_files);
-    if (n != 1) {
-        failure(INDEX, "File format error gz file. [%d]\n", __LINE__);
-        return RC::ERR;
+
+    for (;;) {
+        string line = eatTo(data, j, '\n', 1024, &eof, &err); // Command line switches can be 1024 bytes long
+        if (err)
+        {
+            failure(INDEX, "Unexpected error reading index file. [%d]\n", __LINE__);
+            return RC::ERR;
+        }
+        debug(INDEX, "Read \"%s\"\n", line.c_str());
+        if (startsWith(line, "#config "))
+        {
+            config = line.substr(8);
+        }
+        else if (startsWith(line, "#size ")) {
+            int n = sscanf(line.c_str(), "#size %zu", size);
+            if (n != 1) {
+                failure(INDEX, "File format error gz file. [%d]\n", __LINE__);
+                return RC::ERR;
+            }
+        }
+        else if (startsWith(line, "#filecolumns ")) {
+            // Just ignore columns, it is for information only right now.
+        }
+        else if (startsWith(line, "#uids ")) {
+            // Ignore the uid info.
+        }
+        else if (startsWith(line, "#gids ")) {
+            // Ignore the uid info.
+        }
+        else if (startsWith(line, "#files ")) {
+            int n = sscanf(line.c_str(), "#files %d", &num_files);
+            if (n != 1) {
+                failure(INDEX, "File format error gz file. [%d]\n", __LINE__);
+                return RC::ERR;
+            }
+            break;
+        }
+        else {
+            debug(INDEX, "Ignoring unknown entry: %s\n", line.c_str());
+        }
     }
 
     const char *dtp = "";
@@ -121,7 +145,7 @@ RC Index::loadIndex(vector<char> &v,
     string tars = eatTo(data, j, '\n', 64, &eof, &err);
 
     int num_tars = 0;
-    n = sscanf(tars.c_str(), "#tars %d", &num_tars);
+    int n = sscanf(tars.c_str(), "#tars %d", &num_tars);
     if (n != 1) {
         failure(INDEX, "File format error gz file. [%d]\n", __LINE__);
         return RC::ERR;
@@ -217,31 +241,33 @@ RC Index::loadIndex(vector<char> &v,
         return RC::ERR;
     }
 
-    char hex[65];
-    hex[64] = 0;
-    n = sscanf(sha256s.c_str(), "#sha256 %64s", hex);
-    if (n != 1) {
-        failure(INDEX, "File format error gz file. [%d]\n", __LINE__);
-        return RC::ERR;
-    }
+    if (beak_version >= 81) {
+        char hex[65];
+        hex[64] = 0;
+        n = sscanf(sha256s.c_str(), "#end %64s", hex);
+        if (n != 1) {
+            failure(INDEX, "File format error gz file. [%d]\n", __LINE__);
+            return RC::ERR;
+        }
 
-    string read_hexs = string(hex);
-    vector<char> sha256_hash;
-    sha256_hash.resize(SHA256_DIGEST_LENGTH);
-    {
-        SHA256_CTX sha256ctx;
-        SHA256_Init(&sha256ctx);
-        SHA256_Update(&sha256ctx, (unsigned char*)&v[0], endofcontent-v.begin());
-        SHA256_Final((unsigned char*)&sha256_hash[0], &sha256ctx);
-    }
-    string calc_hexs = toHex(sha256_hash);
-    debug(INDEX, "index checksum: %s calculated: %s\n",
-                read_hexs.c_str(), calc_hexs.c_str());
+        string read_hexs = string(hex);
+        vector<char> sha256_hash;
+        sha256_hash.resize(SHA256_DIGEST_LENGTH);
+        {
+            SHA256_CTX sha256ctx;
+            SHA256_Init(&sha256ctx);
+            SHA256_Update(&sha256ctx, (unsigned char*)&v[0], endofcontent-v.begin());
+            SHA256_Final((unsigned char*)&sha256_hash[0], &sha256ctx);
+        }
+        string calc_hexs = toHex(sha256_hash);
+        debug(INDEX, "index checksum: %s calculated: %s\n",
+              read_hexs.c_str(), calc_hexs.c_str());
 
-    if (read_hexs != calc_hexs) {
-        failure(INDEX, "Index file checksum did not match!\nRead:       %s\nCalculated: %s\n",
-                read_hexs.c_str(), calc_hexs.c_str());
-        return RC::ERR;
+        if (read_hexs != calc_hexs) {
+            failure(INDEX, "Index file checksum did not match!\nRead:       %s\nCalculated: %s\n",
+                    read_hexs.c_str(), calc_hexs.c_str());
+            return RC::ERR;
+        }
     }
     return RC::OK;
 };

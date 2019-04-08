@@ -161,10 +161,10 @@ else
 fi
 
 # Check the internal checksum of the index file.
-# (2373686132353620 is hex for "#sha256 ")
+# (2373686132353620 is hex for "#end ")
 CALC_CHECK=$(zcat "$generation" | xxd -p | tr -d '\n' | \
-                    sed 's/2373686132353620.*//' | xxd -r -p | sha256sum | cut -f 1 -d ' ')
-READ_CHECK=$(zcat "$generation" | tr -d '\0' | grep "#sha256" | cut -f 2 -d ' ')
+                    sed 's/23656e6420.*//' | xxd -r -p | sha256sum | cut -f 1 -d ' ')
+READ_CHECK=$(zcat "$generation" | tr -d '\0' | grep "#end" | cut -f 2 -d ' ')
 
 if [ ! "$CALC_CHECK" = "$READ_CHECK" ]
 then

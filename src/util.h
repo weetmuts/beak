@@ -105,4 +105,6 @@ bool digitsOnly(char *buf, size_t len, std::string *s);
 // Extract the leading hex digits from buf and store into s.
 bool hexDigitsOnly(char *buf, size_t len, std::string *s);
 
+bool startsWith(std::string s, std::string prefix);
+
 #endif

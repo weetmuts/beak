@@ -906,3 +906,10 @@ RC parseDateTime(string dt, time_t *out)
     *out = mktime(&tp);
     return RC::OK;
 }
+
+bool startsWith(std::string s, std::string prefix)
+{
+    if (prefix.length() == 0) return true;
+    if (s.length() < prefix.length()) return false;
+    return !strncmp(s.c_str(), prefix.c_str(), prefix.length());
+}

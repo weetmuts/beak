@@ -665,7 +665,7 @@ size_t Backup::groupFilesIntoTars()
 
         string gzfile_contents;
 
-        gzfile_contents.append("#beak 0.8\n");
+        gzfile_contents.append("#beak 0.81\n");
         gzfile_contents.append("#config ");
         gzfile_contents.append(config_);
         gzfile_contents.append("\n");
@@ -684,11 +684,11 @@ size_t Backup::groupFilesIntoTars()
             gzfile_contents.append(to_string(x));
         }
         gzfile_contents.append("\n");
+        gzfile_contents.append("#filecolumns ");
+        gzfile_contents.append(cookColumns());
+        gzfile_contents.append("\n");
         gzfile_contents.append("#files ");
         gzfile_contents.append(to_string(te->entries().size()));
-        gzfile_contents.append("\n");
-        gzfile_contents.append("#columns ");
-        gzfile_contents.append(cookColumns());
         gzfile_contents.append("\n");
         gzfile_contents.append(separator_string);
 
@@ -706,7 +706,8 @@ size_t Backup::groupFilesIntoTars()
         gzfile_contents.append(to_string(tars.size()));
         gzfile_contents.append("\n");
         gzfile_contents.append(separator_string);
-        for (auto & p : tars) {
+        for (auto & p : tars)
+        {
             char filename[1024];
             TarFileName tfn(p.first, 0);
             Path *path = p.second != NULL ? p.second->path() : NULL;
@@ -761,7 +762,7 @@ size_t Backup::groupFilesIntoTars()
             SHA256_Update(&sha256ctx, cont.c_str(), cont.length());
             SHA256_Final((unsigned char*)&sha256_hash[0], &sha256ctx);
         }
-        gzfile_contents.append("#sha256 ");
+        gzfile_contents.append("#end ");
         gzfile_contents.append(toHex(sha256_hash));
         gzfile_contents.append("\n");
         gzfile_contents.append(separator_string);
