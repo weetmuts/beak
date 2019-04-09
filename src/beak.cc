@@ -1059,14 +1059,13 @@ RC BeakImplementation::prune(Settings *settings)
     }
 
     string removed_size = humanReadableTwoDecimals(total_size_removed);
+    string last_size = humanReadableTwoDecimals(restore->historyOldToNew().back().size);
     string kept_size = humanReadableTwoDecimals(total_size_kept);
-
-    /*assert( (total_size_removed == 0 && beak_files_to_delete.size() == 0) ||
-      (total_size_removed > 0 && beak_files_to_delete.size() > 0));*/
 
     if (total_size_removed == 0)
     {
-        UI::output("No pruning needed. Total size of backup %s (%d points in time).\n",
+        UI::output("No pruning needed. Last backup %s, all backups %s (%d points in time).\n",
+                   last_size.c_str(),
                    kept_size.c_str(),
                    num_kept_points_in_time);
         return RC::OK;

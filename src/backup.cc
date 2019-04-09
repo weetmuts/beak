@@ -684,11 +684,10 @@ size_t Backup::groupFilesIntoTars()
             gzfile_contents.append(to_string(x));
         }
         gzfile_contents.append("\n");
-        gzfile_contents.append("#filecolumns ");
-        gzfile_contents.append(cookColumns());
-        gzfile_contents.append("\n");
         gzfile_contents.append("#files ");
         gzfile_contents.append(to_string(te->entries().size()));
+        gzfile_contents.append(" ");
+        gzfile_contents.append(cookColumns());
         gzfile_contents.append("\n");
         gzfile_contents.append(separator_string);
 

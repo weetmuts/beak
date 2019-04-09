@@ -419,7 +419,7 @@ string cookColumns()
     s += "multipart(num,partoffset,size,last_size) "; i++; // eg 2,512,65536,238
     s += "path_size_ctime_hash "; i++;
 
-    return to_string(i)+": "+s;
+    return "with "+to_string(i)+" columns: "+s;
 }
 
 void cookEntry(string *listing, TarEntry *entry) {
