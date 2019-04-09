@@ -107,4 +107,6 @@ bool hexDigitsOnly(char *buf, size_t len, std::string *s);
 
 bool startsWith(std::string s, std::string prefix);
 
+long upToNearestMicros(long nsec);
+
 #endif

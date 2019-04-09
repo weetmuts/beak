@@ -314,10 +314,17 @@ void TarEntry::copyEntryToNewParent(TarEntry *entry, TarEntry *parent) {
 /**
  * Update the mtim argument with this entry's mtim, if this entry is younger.
  */
-void TarEntry::updateMtim(struct timespec *mtim) {
-    if (fs_.st_mtim.tv_sec > mtim->tv_sec ||
-        (fs_.st_mtim.tv_sec == mtim->tv_sec && fs_.st_mtim.tv_nsec > mtim->tv_nsec)) {
-        memcpy(mtim, &fs_.st_mtim, sizeof(*mtim));
+void TarEntry::updateMtim(struct timespec *mtim)
+{
+    time_t sec = mtim->tv_sec;
+    long nsec = upToNearestMicros(mtim->tv_nsec);
+    time_t mysec = fs_.st_mtim.tv_sec;
+    long mynsec = upToNearestMicros(fs_.st_mtim.tv_nsec);
+
+    if (mysec > sec ||
+        (mysec == sec && mynsec > nsec)) {
+        mtim->tv_sec = mysec;
+        mtim->tv_nsec = mynsec;
     }
 }
 

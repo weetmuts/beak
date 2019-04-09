@@ -913,3 +913,14 @@ bool startsWith(std::string s, std::string prefix)
     if (s.length() < prefix.length()) return false;
     return !strncmp(s.c_str(), prefix.c_str(), prefix.length());
 }
+
+long upToNearestMicros(long nsec)
+{
+    long us = nsec / 1000;
+    long ns = us*1000;
+    // nsec was an even multiple of micro seconds.
+    if (ns == nsec) return ns;
+    // nsec was truncated down. Now bump to the next
+    // micro second.
+    return ns+1000;
+}

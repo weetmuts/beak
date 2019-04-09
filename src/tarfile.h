@@ -145,11 +145,9 @@ struct TarFileName
 
 private:
 
-    bool parseFileNameVersion1_(std::string &name, size_t p0, size_t p1);
-    bool parseFileNameVersion2_(std::string &name, size_t p0, size_t p1);
+    bool parseFileNameVersion_(std::string &name, size_t p0, size_t p1);
 
-    void writeTarFileNameIntoBufferVersion1_(char *buf, size_t buf_len, Path *dir);
-    void writeTarFileNameIntoBufferVersion2_(char *buf, size_t buf_len, Path *dir);
+    void writeTarFileNameIntoBufferVersion_(char *buf, size_t buf_len, Path *dir);
 };
 
 struct TarFile
@@ -223,6 +221,7 @@ private:
     std::map<size_t, TarEntry*> contents_;
     std::vector<size_t> offsets;
     size_t current_tar_offset_ = 0;
+    // The mtim_->tv_nsec is always moved up to nearest microsecond boundary in the future.
     struct timespec mtim_;
     UpdateDisk disk_update;
 
