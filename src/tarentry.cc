@@ -401,7 +401,7 @@ void TarEntry::calculateSHA256Hash()
 
     // Hash the last modification time in seconds and nanoseconds.
     time_t secs  = fs_.st_mtim.tv_sec;
-    long   nanos = fs_.st_mtim.tv_nsec;
+    long   nanos = 1000*(fs_.st_mtim.tv_nsec/1000); // Truncate to micro seconds.
 
     SHA256_Update(&sha256ctx, &secs, sizeof(secs));
     SHA256_Update(&sha256ctx, &nanos, sizeof(nanos));
