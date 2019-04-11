@@ -279,7 +279,7 @@ bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
                               if (!parsed_tars_already)
                               {
                                   Path *p = it->path;
-                                  if (p->name()->c_str()[0] == REG_FILE_CHAR)
+                                  if (TarFileName::isIndexFile(p))
                                   {
                                       point->addGzFile(p->parent(), p);
                                   }

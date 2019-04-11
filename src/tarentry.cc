@@ -350,7 +350,7 @@ void TarEntry::registerParent(TarEntry *p) {
 void TarEntry::secsAndNanos(char *buf, size_t len)
 {
     memset(buf, 0, len);
-    snprintf(buf, len, "%012" PRINTF_TIME_T "u.%09lu", fs_.st_mtim.tv_sec, fs_.st_mtim.tv_nsec);
+    snprintf(buf, len, "%" PRINTF_TIME_T "u.%06lu", fs_.st_mtim.tv_sec, fs_.st_mtim.tv_nsec);
 }
 
 void TarEntry::addChildrenSize(size_t s)
@@ -459,7 +459,7 @@ void cookEntry(string *listing, TarEntry *entry) {
     */
     char secs_and_nanos[32];
     memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
-    snprintf(secs_and_nanos, 32, "%012" PRINTF_TIME_T "u.%09lu",
+    snprintf(secs_and_nanos, 32, "%" PRINTF_TIME_T "u.%09lu",
              entry->fs_.st_mtim.tv_sec, entry->fs_.st_mtim.tv_nsec);
     listing->append(secs_and_nanos);
     listing->append(separator_string);

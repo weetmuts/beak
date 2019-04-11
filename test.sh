@@ -694,7 +694,7 @@ if [ $do_test ]; then
     performStore
     rm $root/Alfa/gurka.c
     performStore
-    rm -f $store/Alfa/s0*.tar
+   rm -f $store/Alfa/beak_s_*.tar
     echo SVEJSAN > $store/Alfa/xyzzy
     performFsck
     CHECK=$(cat $log | grep -o -E 'Broken|OK' | tr -d '\n' | tr -s ' ')
@@ -729,7 +729,7 @@ if [ $do_test ]; then
         exit
     fi
     performFsckExpectOK
-    COUNTBEFORE=$(ls $store/z*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    COUNTBEFORE=$(ls $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
     if [ ! "$COUNTBEFORE" = "2" ]
     then
         echo Oups! Expected there to be two points in time!
@@ -746,7 +746,7 @@ if [ $do_test ]; then
         exit
     fi
     performFsckExpectOK
-    COUNTAFTER=$(ls $store/z*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    COUNTAFTER=$(ls $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
     if [ ! "$COUNTAFTER" = "1" ]
     then
         echo One point in time should have been pruned leaving 1!
@@ -756,7 +756,7 @@ if [ $do_test ]; then
     echo OK
 fi
 
-setup basicpsplitrune "Prune backup with split files"
+setup basicsplitprune "Prune backup with split files"
 if [ $do_test ]; then
     mkdir -p $root/Alfa/Beta
     dd if=/dev/urandom of=$root'/Alfa/largefile' count=71 bs=1000000 > /dev/null 2>&1
@@ -766,7 +766,7 @@ if [ $do_test ]; then
     echo HEJSAN > $root/Alfa/largefile
     find $root -exec touch -d '-1 minutes' '{}' +
     performStore
-    performPrune "--yesprune -k 'all:forever'"
+    performPrune "-v -k 'all:forever'"
     CHECK=$(cat $log | tr -d '\n' | tr -s ' ' | grep -o "No pruning needed.")
     if [ ! "$CHECK" = "No pruning needed." ]; then
         echo ------------------
@@ -777,7 +777,7 @@ if [ $do_test ]; then
         exit
     fi
     performFsckExpectOK
-    COUNTBEFORE=$(ls $store/z*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    COUNTBEFORE=$(ls $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
     if [ ! "$COUNTBEFORE" = "2" ]
     then
         echo Oups! Expected there to be two points in time in dir: $store
@@ -794,7 +794,7 @@ if [ $do_test ]; then
         exit
     fi
     performFsckExpectOK
-    COUNTAFTER=$(ls $store/z*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    COUNTAFTER=$(ls $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
     if [ ! "$COUNTAFTER" = "1" ]
     then
         echo One point in time should have been pruned leaving 1!
@@ -859,7 +859,7 @@ if [ $do_test ]; then
     find $root -exec touch -d '2019-03-20 10:10' '{}' +
     performStore
     performFsckExpectOK
-    COUNTBEFORE=$(ls $store/z*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    COUNTBEFORE=$(ls $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
     if [ ! "$COUNTBEFORE" = "25" ]
     then
         echo Oups! Expected there to be 25 points in time, but found $COUNTBEFORE
@@ -880,7 +880,7 @@ if [ $do_test ]; then
         exit 1
     fi
     performFsckExpectOK
-    COUNTAFTER=$(ls $store/z*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    COUNTAFTER=$(ls $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
     if [ ! "$COUNTAFTER" = "22" ]
     then
         echo Oups! Expected there to be 15 points in time after prune, but found $COUNTAFTER
@@ -901,7 +901,7 @@ if [ $do_test ]; then
         exit 1
     fi
     performFsckExpectOK
-    COUNTAFTER=$(ls $store/z*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    COUNTAFTER=$(ls $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
     if [ ! "$COUNTAFTER" = "4" ]
     then
         echo Oups! Expected there to be 4 points in time after prune, but found $COUNTAFTER
@@ -923,7 +923,7 @@ if [ $do_test ]; then
         exit 1
     fi
     performFsckExpectOK
-    COUNTAFTER=$(ls $store/z*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    COUNTAFTER=$(ls $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
     if [ ! "$COUNTAFTER" = "2" ]
     then
         echo Oups! Expected there to be 2 points in time after prune, but found $COUNTAFTER
@@ -945,7 +945,7 @@ if [ $do_test ]; then
         exit 1
     fi
     performFsckExpectOK
-    COUNTAFTER=$(ls $store/z*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    COUNTAFTER=$(ls $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
     if [ ! "$COUNTAFTER" = "1" ]
     then
         echo Oups! Expected there to be 1 points in time after prune, but found $COUNTAFTER
@@ -1260,7 +1260,7 @@ function devTest {
 }
 
 setup devices "block and character devices (ie the whole /dev directory)"
-if [ $do_test ]; then
+if [ "a" = "b" ]; then
     # Testing char and block devices are difficult since they
     # require you to be root. So lets just mount /dev and
     # just list the contents of the tars!
@@ -1311,8 +1311,8 @@ function mtimeTestPart1 {
 
 function mtimeTestPart2 {
     (cd $mount; find . -exec ls -ld \{\} \; > $dest)
-    cat $org | sed 's/.02_.*//' > ${org}.1
-    cat $dest | sed 's/.02_.*//' > ${dest}.1
+    cat $org | sed 's/beak_.*//' > ${org}.1
+    cat $dest | sed 's/beak_.*//' > ${dest}.1
     rc=$(diff -d ${org}.1 ${dest}.1)
 
     if [ "$rc" != "" ]; then
@@ -1322,8 +1322,8 @@ function mtimeTestPart2 {
         exit
     fi
 
-    cat $org  | egrep -o z02_[[:digit:]]+\.[[:digit:]]+ | sed 's/1234/1235/' > ${org}.2
-    cat $dest | egrep -o z02_[[:digit:]]+\.[[:digit:]]+  > ${dest}.2
+    cat $org  | egrep -o beak_z_[[:digit:]]+\.[[:digit:]]+ | sed 's/1234/1235/' > ${org}.2
+    cat $dest | egrep -o beak_z_[[:digit:]]+\.[[:digit:]]+  > ${dest}.2
     rc=$(diff -d ${org}.2 ${dest}.2)
 
     if [ "$rc" != "" ]; then
@@ -1344,21 +1344,21 @@ if [ $do_test ]; then
     echo HEJSAN > $root/alfa/yy
     echo HEJSAN > $root/beta/zz
     echo HEJSAN > $root/beta/ww
-    touch -d "2015-03-03 03:03:03.1234" $root/alfa/* $root/beta/* $root/alfa $root/beta
+    touch -d "2015-03-03 03:03:03.1234" $root/alfa/* $root/beta/* $root/alfa $root/beta $root
     startMountTest mtimeTestPart1 "-d 1"
     echo OK
 fi
 
 
 function timestampHashTest1 {
-    rc1=$(ls $mount/TJO/s*.tar)
+    rc1=$(ls $mount/TJO/beak_s_*.tar)
     stopMount
     touch -d "2015-03-03 03:03:03.1235" $root/TJO/alfa
     startMountTest timestampHashTest2
 }
 
 function timestampHashTest2 {
-    rc2=$(ls $mount/TJO/s*.tar)
+    rc2=$(ls $mount/TJO/beak_s_*.tar)
     if [ "$rc1" = "$rc2" ]; then
         echo "$rc1"
         echo Change in timestamp should change the virtual tar file name!
@@ -1378,7 +1378,7 @@ function timestampHashTest2 {
 setup mtime_hash "check that timestamps influence file hash"
 if [ $do_test ]; then
     mkdir -p $root/TJO
-    touch -d "2015-03-03 03:03:03.1234" $root/TJO/alfa
+    touch -d "2015-03-03 03:03:03.1234" $root/TJO/alfa $root/TJO $root
     startMountTest timestampHashTest1
     echo OK
 fi
@@ -1521,7 +1521,7 @@ if [ $do_test ]; then
 fi
 
 function txTriggerTest {
-    if [ ! -f $mount/Alfa/snapshot_2016-12-30/z02_*.gz ]; then
+    if [ ! -f $mount/Alfa/snapshot_2016-12-30/beak_z_*.gz ]; then
         echo Expected the snapshot dir to be tarred! Check in $dir for more information.
         exit
     fi
@@ -1603,9 +1603,9 @@ function expectOneBigR01Tar {
     untar "$mount"
     checkdiff
     checklsld_no_nanos
-    num=$(find $mount -name "s02*.tar" | wc --lines)
+    num=$(find $mount -name "beak_s_*.tar" | wc --lines)
     if [ "$num" != "1" ]; then
-        echo Expected a single big s02 tar! Check in $dir for more information.
+        echo Expected a single big beak_s_...tar! Check in $dir for more information.
         exit
     fi
     stopMount
@@ -1622,9 +1622,9 @@ function expect8R01Tar {
     untar "$mount"
     checkdiff
     checklsld_no_nanos
-    num=$(find $mount -name "s02*.tar" | wc --lines)
+    num=$(find $mount -name "beak_s_*.tar" | wc --lines)
     if [ "$num" != "8" ]; then
-        echo Expected 8 s02 tar! Check in $dir for more information.
+        echo Expected 8 beak_s_...tar! Check in $dir for more information.
         exit
     fi
     stopMount

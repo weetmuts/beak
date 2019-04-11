@@ -145,7 +145,7 @@ struct TarFileName
 
 private:
 
-    bool parseFileNameVersion_(std::string &name, size_t p0, size_t p1);
+    bool parseFileNameVersion_(std::string &name, size_t p1);
 
     void writeTarFileNameIntoBufferVersion_(char *buf, size_t buf_len, Path *dir);
 };

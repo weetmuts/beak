@@ -164,7 +164,6 @@ RC Index::loadIndex(vector<char> &v,
         name.pop_back();
         if (name.length()==0) continue;
         auto dots = name.find(" ... ");
-
         if (dots != string::npos)
         {
             TarFileName fromfile, tofile;
@@ -172,6 +171,9 @@ RC Index::loadIndex(vector<char> &v,
             string to = name.substr(dots+5);
             Path *dir = Path::lookup(from)->parent();
             fromfile.parseFileName(from);
+            //) {
+            //    failure(INDEX, "Could not parse from tar file name.\n");
+            //}
             tofile.parseFileName(to);
             fromfile.last_size = tofile.size;
             for (uint i=0; i<fromfile.num_parts; ++i) {

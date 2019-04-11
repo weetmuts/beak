@@ -918,9 +918,10 @@ long upToNearestMicros(long nsec)
 {
     long us = nsec / 1000;
     long ns = us*1000;
+    return ns;
     // nsec was an even multiple of micro seconds.
-    if (ns == nsec) return ns;
+    //if (ns == nsec) return ns;
     // nsec was truncated down. Now bump to the next
     // micro second.
-    return ns+1000;
+    //return ns+1000;
 }

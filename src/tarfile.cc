@@ -190,13 +190,9 @@ TarFileName::TarFileName(TarFile *tf, uint partnr)
 
 bool TarFileName::isIndexFile(Path *p)
 {
-    // Example file name:
-    // foo/bar/dir/z01_(001501080787).(579054757)_(0)_(3b5e4ec7fe38d0f9846947207a0ea44c)_(0).gz
-
     size_t len = p->name()->str().length();
     const char *s = p->name()->c_str();
-    bool b = (0==strncmp(s, "z02_", 3) || 0==strncmp(s, "z01_", 3))
-              && 0==strncmp(s+len-3, ".gz", 3);
+    bool b = 0==strncmp(s, "beak_z_", 7) && 0==strncmp(s+len-3, ".gz", 3);
     return b;
 }
 
@@ -212,16 +208,18 @@ bool TarFileName::parseFileName(string &name, string *dir)
     if (dir) {
         *dir = name.substr(0, p0);
     }
-    if (!startsWith(name, "beak_")) return false;
-    k = typeFromChar(name[p0+5], &type);
+    string prefix = name.substr(p0, 7);
+
+    if (!startsWith(prefix, "beak_")) return false;
+    if (prefix[6] != '_') return false;
+    k = typeFromChar(prefix[5], &type);
     if (!k) return false;
 
-    size_t p1 = name.find('_', p0+5); if (p1 == string::npos) return false;
-
-    return parseFileNameVersion_(name, p0, p1);
+    size_t p1 = p0+7;
+    return parseFileNameVersion_(name, p1);
 }
 
-bool TarFileName::parseFileNameVersion_(string &name, size_t p0, size_t p1)
+bool TarFileName::parseFileNameVersion_(string &name, size_t p1)
 {
     bool k;
     size_t p2 = name.find('.', p1+1); if (p2 == string::npos) return false;
@@ -232,14 +230,14 @@ bool TarFileName::parseFileNameVersion_(string &name, size_t p0, size_t p1)
     size_t p7 = name.find('.', p6+1); if (p7 == string::npos) return false;
 
     string secss;
-    k = digitsOnly(&name[p1+1], p2-p1-1, &secss);
+    k = digitsOnly(&name[p1], p2-p1, &secss);
     if (!k) return false;
     sec = atol(secss.c_str());
 
-    string nsecss;
-    k = digitsOnly(&name[p2+1], p3-p2-1, &nsecss);
+    string usecss;
+    k = digitsOnly(&name[p2+1], p3-p2-1, &usecss);
     if (!k) return false;
-    nsec = atol(nsecss.c_str());
+    nsec = 1000*atol(usecss.c_str());
 
     k = hexDigitsOnly(&name[p3+1], p4-p3-1, &header_hash);
     if (!k) return false;
@@ -263,7 +261,6 @@ bool TarFileName::parseFileNameVersion_(string &name, size_t p0, size_t p1)
     if (suffixtype(type) != suffix) {
         return false;
     }
-
     return true;
 }
 
@@ -271,7 +268,6 @@ void TarFileName::writeTarFileNameIntoBuffer(char *buf, size_t buf_len, Path *di
 {
     writeTarFileNameIntoBufferVersion_(buf, buf_len, dir);
 }
-
 
 void TarFileName::writeTarFileNameIntoBufferVersion_(char *buf, size_t buf_len, Path *dir)
 {
@@ -282,17 +278,17 @@ void TarFileName::writeTarFileNameIntoBufferVersion_(char *buf, size_t buf_len, 
     } else {
         snprintf(sizes, 32, "%zu", size);
     }
-    char secs_and_nanos[32];
-    memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
-    snprintf(secs_and_nanos, 32, "%" PRINTF_TIME_T "u.%06lu", sec, nsec/1000);
-
+    char secs_and_micros[32];
+    memset(secs_and_micros, 0, sizeof(secs_and_micros));
+    long usec = nsec/1000;
+    snprintf(secs_and_micros, 32, "%" PRINTF_TIME_T "u.%06lu", sec, usec);
     string partnr = toHex(part_nr, num_parts);
     const char *suffix = suffixtype(type);
 
     if (dir == NULL) {
         snprintf(buf, buf_len, "beak_%c_%s_%s_%s-%x_%s.%s",
                  TarFileName::chartype(type),
-                 secs_and_nanos,
+                 secs_and_micros,
                  header_hash.c_str(),
                  partnr.c_str(),
                  num_parts,
@@ -304,7 +300,7 @@ void TarFileName::writeTarFileNameIntoBufferVersion_(char *buf, size_t buf_len, 
                  dir->c_str(),
                  slashornot,
                  TarFileName::chartype(type),
-                 secs_and_nanos,
+                 secs_and_micros,
                  header_hash.c_str(),
                  partnr.c_str(),
                  num_parts,
