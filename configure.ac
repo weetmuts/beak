@@ -24,6 +24,7 @@ AC_CANONICAL_HOST
 SRC_ROOT="$(pwd -L)"
 
 CONF_NAME="${host_cpu}-${host_vendor}-${host_os}"
+BUILD_ROOT="$SRC_ROOT/build"
 OUTPUT_ROOT="$SRC_ROOT/build/${CONF_NAME}"
 
 AC_CONFIG_HEADERS(${OUTPUT_ROOT}/config.h:autoconf/config.h.in)
@@ -76,6 +77,7 @@ fi
 AC_SUBST(CONF_NAME)
 AC_SUBST(SRC_ROOT)
 AC_SUBST(OUTPUT_ROOT)
+AC_SUBST(BUILD_ROOT)
 
 AC_HEADER_STDC
 AC_HEADER_STAT
@@ -251,8 +253,8 @@ fi
 
 CXXFLAGS="-DPLATFORM_${PLATFORM} -D${MNEMONIC} -Wall -Werror -fmessage-length=0 -std=c++11 $GCC_EXTRA_CXXFLAGS -Wno-unused-function"
 
-CXXFLAGS_debug="-O0 -g ${ASAN_CFLAGS}"
-CXXFLAGS_release="-Os"
+CXXFLAGS_debug="-O0 -g ${ASAN_CFLAGS}
+CXXFLAGS_release="-Os
 
 LDFLAGS=""
 LDFLAGS_debug="-g ${ASAN_LDFLAGS}"

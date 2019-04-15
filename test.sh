@@ -675,7 +675,7 @@ if [ $do_test ]; then
     rm -rf $root/Alfa/Gamma
     performDiff "-d 1"
     CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
-    if [ ! "$CHECK" = "Alfa/Gamma/... dir removed 3 sources removed (h,bas,c) 1 other file removed (...)" ]; then
+    if [ ! "$CHECK" = "Alfa/Gamma/... dir removed 3 sources removed (c,h,bas) 1 other file removed (...)" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff! Expected Alfa/Gamma removed. Check in $dir for more information.

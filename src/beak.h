@@ -112,7 +112,7 @@ enum ArgumentType
     X(fsck,"Check the integrity of your backup.",ArgStorage,ArgNone) \
     X(genautocomplete,"Output bash completion script for beak.",ArgFileOrNone,ArgNone) \
     X(genmounttrigger,"Output systemd rule to trigger backup when USB drive is mounted.",ArgFile,ArgNone) \
-    X(help,"Show help. Also: beak push help",ArgORS,ArgNone) \
+    X(help,"Show help. Also: beak push help",ArgNone,ArgNone) \
     X(prune,"Discard old backups according to the keep rule.",ArgStorage,ArgNone) \
     X(mount,"Mount your backup as a file system.",ArgStorage,ArgDir) \
     X(pull,"Merge the most recent backup for the given rule.",ArgRule,ArgNone) \

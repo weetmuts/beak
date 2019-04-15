@@ -656,6 +656,7 @@ CPPFLAGS
 LDFLAGS
 CFLAGS
 CC
+BUILD_ROOT
 OUTPUT_ROOT
 SRC_ROOT
 CONF_NAME
@@ -2289,6 +2290,7 @@ case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
 SRC_ROOT="$(pwd -L)"
 
 CONF_NAME="${host_cpu}-${host_vendor}-${host_os}"
+BUILD_ROOT="$SRC_ROOT/build"
 OUTPUT_ROOT="$SRC_ROOT/build/${CONF_NAME}"
 
 ac_config_headers="$ac_config_headers ${OUTPUT_ROOT}/config.h:autoconf/config.h.in"
@@ -2338,6 +2340,7 @@ mkdir -p "$OUTPUT_ROOT"
 if test ! -d "$OUTPUT_ROOT"; then
     as_fn_error $? "Could not create build directory $OUTPUT_ROOT" "$LINENO" 5
 fi
+
 
 
 
@@ -4579,8 +4582,8 @@ fi
 
 CXXFLAGS="-DPLATFORM_${PLATFORM} -D${MNEMONIC} -Wall -Werror -fmessage-length=0 -std=c++11 $GCC_EXTRA_CXXFLAGS -Wno-unused-function"
 
-CXXFLAGS_debug="-O0 -g ${ASAN_CFLAGS}"
-CXXFLAGS_release="-Os"
+CXXFLAGS_debug="-O0 -g ${ASAN_CFLAGS}
+CXXFLAGS_release="-Os
 
 LDFLAGS=""
 LDFLAGS_debug="-g ${ASAN_LDFLAGS}"

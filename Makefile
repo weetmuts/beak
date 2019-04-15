@@ -1,4 +1,4 @@
-# Copyright (C) 2017 Fredrik Öhrström
+# Copyright (C) 2017-2019 Fredrik Öhrström
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -13,6 +13,42 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
+
+$(shell mkdir -p build)
+
+COMMIT_HASH:=$(shell git log --pretty=format:'%H' -n 1)
+TAG:=$(shell git describe --tags)
+CHANGES:=$(shell git status -s | grep -v '?? ')
+TAG_COMMIT_HASH:=$(shell git show-ref --tags | grep $(TAG) | cut -f 1 -d ' ')
+
+ifeq ($(COMMIT),$(TAG_COMMIT))
+  # Exactly on the tagged commit. The version is the tag!
+  VERSION:=$(TAG)
+  DEBVERSION:=$(TAG)
+else
+  VERSION:=$(TAG)++
+  DEBVERSION:=$(TAG)++
+endif
+
+ifneq ($(strip $(CHANGES)),)
+  # There are changes, signify that with a +changes
+  VERSION:=$(VERSION) with local changes
+  COMMIT_HASH:=$(COMMIT_HASH) with local changes
+  DEBVERSION:=$(DEBVERSION)l
+endif
+
+$(info Building $(VERSION))
+
+$(shell echo "#define BEAK_VERSION \"$(VERSION)\"" > build/version.h.tmp)
+$(shell echo "#define BEAK_COMMIT \"$(COMMIT_HASH)\"" >> build/version.h.tmp)
+
+PREV_VERSION=$(shell cat -n build/version.h 2> /dev/null)
+CURR_VERSION=$(shell cat -n build/version.h.tmp 2>/dev/null)
+ifneq ($(PREV_VERSION),$(CURR_VERSION))
+$(shell mv build/version.h.tmp build/version.h)
+else
+$(shell rm build/version.h.tmp)
+endif
 
 all: release
 

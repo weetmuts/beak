@@ -32,6 +32,7 @@
 #include "tarfile.h"
 #include "ui.h"
 #include "util.h"
+#include "version.h"
 
 const char *autocomplete =
 #include"generated_autocomplete.h"
@@ -1478,7 +1479,7 @@ void BeakImplementation::printHelp(Command cmd)
         fprintf(stdout,"\n");
         printSettings();
         fprintf(stdout,"\n");
-        fprintf(stdout,"Beak is licensed to you under the GPLv3. For details do: "
+        fprintf(stdout,"Beak " XSTR(BEAK_VERSION) " is licensed to you under the GPLv3. For details do: "
                 "beak help --license\n");
         break;
     default:
@@ -1494,16 +1495,18 @@ void BeakImplementation::printVersion()
 
 void BeakImplementation::printLicense()
 {
-    fprintf(stdout, "Beak contains software developed:\n"
-            "by Fredrik Öhrström Copyright (C) 2016-2018\n"
-            "licensed to you under the GPLv3 or later.\n"
-            "https://github.com/weetmuts/beak\n\n"
+    fprintf(stdout, "\n"
+            "Copyright (C) 2016-2018 Fredrik Öhrström\n\n"
+            "Licensed to you under the GPLv3 or later.\n"
+            "https://github.com/weetmuts/beak\n"
+            BEAK_COMMIT "\n"
+
+            #ifdef PLATFORM_WINAPI
             "This build of beak also includes third party code:\n"
             "openssl-1.0.2l - Many authors, see https://www.openssl.org/community/thanks.html\n"
             "https://github.com/openssl/openssl\n\n"
             "zlib-1.2.11 - Jean-loup Gailly and Mark Adler\n"
             "https://www.zlib.net/\n\n"
-            #ifdef PLATFORM_WINAPI
             "WinFsp - Windows File System Proxy, Copyright (C) Bill Zissimopoulos\n"
             "https://github.com/billziss-gh/winfsp\n"
             #endif
