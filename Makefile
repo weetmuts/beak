@@ -32,8 +32,8 @@ endif
 
 ifneq ($(strip $(CHANGES)),)
   # There are changes, signify that with a +changes
-  VERSION:=$(VERSION) with local changes
-  COMMIT_HASH:=$(COMMIT_HASH) with local changes
+  VERSION:=$(VERSION) with uncommitted changes
+  COMMIT_HASH:=$(COMMIT_HASH) but with uncommitted changes
   DEBVERSION:=$(DEBVERSION)l
 endif
 

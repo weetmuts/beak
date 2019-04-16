@@ -76,8 +76,8 @@ struct BeakImplementation : Beak {
                        ptr<StorageTool> storage_tool,
                        ptr<OriginTool> origin_tool);
 
-    void printCommands();
-    void printSettings();
+    void printCommands(CommandType cmdtype);
+    void printSettings(CommandType cmdtype);
 
     void captureStartTime() {  ::captureStartTime(); }
     Command parseCommandLine(int argc, char **argv, Settings *settings);
@@ -155,18 +155,20 @@ unique_ptr<Beak> newBeak(ptr<Configuration> configuration,
 
 struct CommandEntry {
     const char *name;
+    CommandType cmdtype;
     Command cmd;
     const char *info;
     ArgumentType expected_from, expected_to;
 };
 
 CommandEntry command_entries_[] = {
-#define X(name,info,expfrom,expto) { #name, name##_cmd, info, expfrom, expto } ,
+#define X(name,cmdtype,info,expfrom,expto) { #name, cmdtype, name##_cmd, info, expfrom, expto } ,
 LIST_OF_COMMANDS
 #undef X
 };
 
 struct OptionEntry {
+    CommandType cmdtype;
     const char *shortname;
     const char *name;
     Option option;
@@ -175,7 +177,7 @@ struct OptionEntry {
 };
 
 OptionEntry option_entries_[] = {
-#define X(shortname,name,type,requiresvalue,info) { #shortname, #name, name##_option, requiresvalue, info} ,
+#define X(cmdtype,shortname,name,type,requiresvalue,info) { cmdtype, #shortname, #name, name##_option, requiresvalue, info} ,
 LIST_OF_OPTIONS
 #undef X
 };
@@ -354,18 +356,20 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
     return argument;
 }
 
-void BeakImplementation::printCommands()
+void BeakImplementation::printCommands(CommandType cmdtype)
 {
     fprintf(stdout, "Available Commands:\n");
 
     size_t max = 0;
     for (auto &e : command_entries_) {
+        if (e.cmdtype != cmdtype) continue;
         size_t l = strlen(e.name);
         if (l > max) max = l;
     }
 
     for (auto &e : command_entries_) {
         if (e.cmd == nosuch_cmd) continue;
+        if (e.cmdtype != cmdtype) continue;
         size_t l = strlen(e.name);
         fprintf(stdout, "  %s%-.*s%s\n",
                 e.name,
@@ -387,13 +391,14 @@ bool isExperimental(OptionEntry &e)
     return false;
 }
 
-void BeakImplementation::printSettings()
+void BeakImplementation::printSettings(CommandType cmdtype)
 {
     fprintf(stdout, "Settings:\n");
 
     size_t max = 0;
     for (auto &e : option_entries_)
     {
+        if (e.cmdtype != cmdtype) continue;
         if (isExperimental(e)) continue;
         size_t l = strlen(e.name);
         if (l > max) max = l;
@@ -402,6 +407,7 @@ void BeakImplementation::printSettings()
     for (auto &e : option_entries_)
     {
         if (e.option == nosuch_option) continue;
+        if (e.cmdtype != cmdtype) continue;
         if (isExperimental(e)) continue;
 
         string sn = e.shortname;
@@ -583,9 +589,6 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
             case keep_option:
                 settings->keep = value;
                 settings->keep_supplied = true;
-                break;
-            case license_option:
-                settings->license = true;
                 break;
             case log_option:
                 settings->log = value;
@@ -1475,12 +1478,11 @@ void BeakImplementation::printHelp(Command cmd)
                 "Usage:\n"
                 "  beak [command] [options] [from] [to]\n"
                 "\n");
-        printCommands();
+        printCommands(CommandType::PRIMARY);
         fprintf(stdout,"\n");
-        printSettings();
+        printSettings(CommandType::PRIMARY);
         fprintf(stdout,"\n");
-        fprintf(stdout,"Beak " XSTR(BEAK_VERSION) " is licensed to you under the GPLv3. For details do: "
-                "beak help --license\n");
+        fprintf(stdout,"Beak " XSTR(BEAK_VERSION) " is licensed to you under the GPLv3.\n");
         break;
     default:
         fprintf(stdout, "Sorry, no help for that command yet.\n");
@@ -1496,10 +1498,10 @@ void BeakImplementation::printVersion()
 void BeakImplementation::printLicense()
 {
     fprintf(stdout, "\n"
-            "Copyright (C) 2016-2018 Fredrik Öhrström\n\n"
-            "Licensed to you under the GPLv3 or later.\n"
-            "https://github.com/weetmuts/beak\n"
-            BEAK_COMMIT "\n"
+            "Copyright (C) 2016-2019 Fredrik Öhrström\n\n"
+            "Licensed to you under the GPLv3 or later (https://www.gnu.org/licenses/gpl-3.0.txt)\n\n"
+            "This binary (" BEAK_VERSION ") is built from the source:\n"
+            "https://github.com/weetmuts/beak " BEAK_COMMIT "\n"
 
             #ifdef PLATFORM_WINAPI
             "This build of beak also includes third party code:\n"
