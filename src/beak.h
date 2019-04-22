@@ -107,8 +107,6 @@ enum ArgumentType
     ArgNC    // None or Command
 };
 
-// ArgORS will match ArgOrigin, ArgRule or ArgStorage.
-
 #define LIST_OF_COMMANDS \
     X(bmount,CommandType::SECONDARY,"Mount your file system as a backup.",ArgOrigin,ArgDir) \
     X(config,CommandType::PRIMARY,"Configure backup rules.",ArgNone,ArgNone)               \

@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2016-2018 Fredrik Öhrström
+ Copyright (C) 2016-2019 Fredrik Öhrström
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -16,6 +16,7 @@
  */
 
 #include "beak.h"
+#include "beak_implementation.h"
 
 #include "backup.h"
 #include "configuration.h"
@@ -66,85 +67,6 @@ static ComponentId FUSE = registerLogComponent("fuse");
 static ComponentId PRUNE = registerLogComponent("prune");
 static ComponentId FSCK = registerLogComponent("fsck");
 
-struct CommandEntry;
-struct OptionEntry;
-
-struct BeakImplementation : Beak {
-
-    BeakImplementation(ptr<Configuration> configuration,
-                       ptr<System> sys,
-                       ptr<FileSystem> local_fs,
-                       ptr<StorageTool> storage_tool,
-                       ptr<OriginTool> origin_tool);
-
-    void printCommands(CommandType cmdtype);
-    void printSettings(Command cmd);
-
-    void captureStartTime() {  ::captureStartTime(); }
-    Command parseCommandLine(int argc, char **argv, Settings *settings);
-
-    void printHelp(bool verbose, Command cmd);
-    void printVersion(bool verbose);
-
-    RC configure(Settings *settings);
-    RC diff(Settings *settings);
-    RC fsck(Settings *settings);
-    RC push(Settings *settings);
-    RC pull(Settings *settings);
-    RC prune(Settings *settings);
-
-    RC umountDaemon(Settings *settings);
-
-    RC mountBackupDaemon(Settings *settings);
-    RC mountBackup(Settings *settings, ProgressStatistics *progress = NULL);
-    RC umountBackup(Settings *settings);
-
-    RC mountRestoreDaemon(Settings *settings);
-    RC mountRestore(Settings *settings, ProgressStatistics *progress = NULL);
-    RC umountRestore(Settings *settings);
-
-    RC shell(Settings *settings);
-
-    RC status(Settings *settings);
-    RC store(Settings *settings);
-    RC restore(Settings *settings);
-
-    void genAutoComplete(string filename);
-
-    private:
-
-    string argsToVector_(int argc, char **argv, vector<string> *args);
-    unique_ptr<Restore> accessBackup_(Argument *storage,
-                                      string pointintime,
-                                      ProgressStatistics *progress,
-                                      FileSystem **out_backup_fs = NULL,
-                                      Path **out_root = NULL);
-    RC mountRestoreInternal_(Settings *settings, bool daemon, ProgressStatistics *progress);
-    bool hasPointsInTime_(Path *path, FileSystem *fs);
-
-    map<string,CommandEntry*> commands_;
-    map<Command,CommandEntry*> commands_from_cmd_;
-    map<string,OptionEntry*> short_options_;
-    map<string,OptionEntry*> long_options_;
-
-    OptionEntry *nosuch_option_;
-
-    vector<PointInTime> history_;
-
-    CommandEntry *parseCommand(string s);
-    OptionEntry *parseOption(string s, bool *has_value, string *value);
-    Argument parseArgument(std::string arg, ArgumentType expected_type, Settings *settings, Command cmd);
-
-    unique_ptr<FuseMount> backup_fuse_mount_;
-    unique_ptr<FuseMount> restore_fuse_mount_;
-
-    ptr<Configuration> configuration_;
-    ptr<System> sys_;
-    ptr<FileSystem> local_fs_;
-    ptr<StorageTool> storage_tool_;
-    ptr<OriginTool> origin_tool_;
-};
-
 unique_ptr<Beak> newBeak(ptr<Configuration> configuration,
                          ptr<System> sys,
                          ptr<FileSystem> local_fs,
@@ -154,54 +76,21 @@ unique_ptr<Beak> newBeak(ptr<Configuration> configuration,
     return unique_ptr<Beak>(new BeakImplementation(configuration, sys, local_fs, storage_tool, origin_tool));
 }
 
-const char *argName(ArgumentType at) {
-    switch (at)
-    {
-    case ArgUnspecified:
-    case ArgNone: return "";
-    case ArgOrigin: return "<origin>";
-    case ArgRule: return "<rule>";
-    case ArgStorage: return "<storage>";
-    case ArgDir: return "<dir>";
-    case ArgFile: return "<file>";
-    case ArgFileOrNone: return "[<file>]";
-    case ArgORS: return "<origin|rule|store>";
-    case ArgNORS: return "[<origin|rule|store>]";
-    case ArgCommand: return "<command>";
-    case ArgNC: return "[<command>]";
-    }
-    return "?";
-}
-
-struct CommandEntry {
-    const char *name;
-    CommandType cmdtype;
-    Command cmd;
-    const char *info;
-    ArgumentType expected_from, expected_to;
-};
-
-CommandEntry command_entries_[] = {
+CommandEntry command_entries_bootstrap_[] = {
 #define X(name,cmdtype,info,expfrom,expto) { #name, cmdtype, name##_cmd, info, expfrom, expto } ,
 LIST_OF_COMMANDS
 #undef X
 };
 
-struct OptionEntry {
-    OptionType type;
-    const char *shortname;
-    const char *name;
-    Option option;
-    bool requires_value;
-    const char *info;
-};
+vector<CommandEntry> command_entries_;
 
-OptionEntry option_entries_[] = {
+OptionEntry option_entries_bootstrap_[] = {
 #define X(optiontype,shortname,name,type,requiresvalue,info) { optiontype, #shortname, #name, name##_option, requiresvalue, info} ,
 LIST_OF_OPTIONS
 #undef X
 };
 
+vector<OptionEntry> option_entries_;
 vector<CommandOption> command_options_;
 
 void CommandOption::add_(int count, ...)
@@ -276,14 +165,16 @@ BeakImplementation::BeakImplementation(ptr<Configuration> configuration,
     storage_tool_(storage_tool),
     origin_tool_(origin_tool)
 {
-    for (auto &e : command_entries_) {
+    for (auto &e : command_entries_bootstrap_) {
+        command_entries_.push_back(e);
         if (e.cmd != nosuch_cmd) {
             commands_[e.name] = &e;
             commands_from_cmd_[e.cmd] = &e;
         }
     }
     string m = "-";
-    for (auto &e : option_entries_) {
+    for (auto &e : option_entries_bootstrap_) {
+        option_entries_.push_back(e);
         if (e.option != nosuch_option) {
             short_options_[m+e.shortname] = &e;
             long_options_[m+m+e.name] = &e;
@@ -453,106 +344,6 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
     return argument;
 }
 
-
-void BeakImplementation::printCommands(CommandType cmdtype)
-{
-    fprintf(stdout, "Available Commands:\n");
-
-    size_t max = 0;
-    for (auto &e : command_entries_)
-    {
-        if (e.cmdtype != cmdtype) continue;
-        size_t l = strlen(e.name);
-        if (l > max) max = l;
-    }
-
-    for (auto &e : command_entries_)
-    {
-        if (e.cmd == nosuch_cmd) continue;
-        if (e.cmdtype != cmdtype) continue;
-        size_t l = strlen(e.name);
-        fprintf(stdout, "  %s%-.*s%s\n",
-                e.name,
-                (int)(max-l+4),
-                "                                        ",
-                e.info);
-    }
-}
-
-bool isExperimental(OptionEntry &e)
-{
-    const char *exp = "Experimental!";
-    size_t len = strlen(e.info);
-    size_t explen = strlen(exp);
-
-    if (len > strlen(exp)) {
-        return 0 == strncmp(exp, e.info+len-explen, explen);
-    }
-    return false;
-}
-
-void BeakImplementation::printSettings(Command cmd)
-{
-    OptionType ot = OptionType::LOCAL;
-
-    if (cmd == nosuch_cmd) {
-        ot = OptionType::GLOBAL;
-        fprintf(stdout, "Common options for all commands:\n");
-    } else {
-        fprintf(stdout, "Options:\n");
-    }
-
-    size_t max = 0;
-    for (auto &e : option_entries_)
-    {
-        if (e.option == nosuch_option) continue;
-        if (e.type != ot) continue;
-        if (cmd != nosuch_cmd && !hasCommandOption(cmd, e.option)) continue;
-        if (isExperimental(e)) continue;
-        size_t l = strlen(e.name);
-        if (l > max) max = l;
-    }
-
-    for (auto &e : option_entries_)
-    {
-        if (e.option == nosuch_option) continue;
-        if (e.type != ot) continue;
-        if (cmd != nosuch_cmd && !hasCommandOption(cmd, e.option)) continue;
-        if (isExperimental(e)) continue;
-
-        string sn = e.shortname;
-        size_t sl = strlen(e.shortname);
-        if (sl > 0) {
-            sn = string("-")+e.shortname;
-            sl++;
-        }
-
-        string n = e.name;
-        size_t l = strlen(e.name);
-        if (n[n.length()-1] == '_')
-        {
-            n = "";
-            l = 0;
-        }
-        else
-        {
-            n = string("--")+e.name;
-            l += 2;
-        }
-        fprintf(stdout, "  %s"
-                        "%-.*s"
-                        "%s"
-                        "%-.*s"
-                        "%s\n",
-                sn.c_str(),
-                (int)(4-sl),
-                "                                        ",
-                n.c_str(),
-                (int)(max-l+4),
-                "                                        ",
-                e.info);
-    }
-}
 
 string BeakImplementation::argsToVector_(int argc, char **argv, vector<string> *args)
 {
@@ -1571,70 +1362,6 @@ RC BeakImplementation::status(Settings *settings)
     info(COMMANDLINE, "mtime=%s ctime=%s\n", most_recent_mtime, most_recent_ctime);
 
     return rc;
-}
-
-void BeakImplementation::printHelp(bool verbose, Command cmd)
-{
-    if (cmd == nosuch_cmd)
-    {
-        fprintf(stdout,
-                "usage: beak <command> [options] [<args>]\n"
-                "\n");
-        printCommands(CommandType::PRIMARY);
-        fprintf(stdout,"\n");
-    }
-    else
-    {
-        CommandEntry *ce = commands_from_cmd_[cmd];
-        int num_args = 0;
-        string help = ce->name;
-        if (ce->expected_from != ArgNone) {
-            num_args++;
-            help += " ";
-            help += argName(ce->expected_from);
-        }
-        if (ce->expected_to != ArgNone) {
-            num_args++;
-            help += " ";
-            help += argName(ce->expected_to);
-        }
-
-        fprintf(stdout, "usage: beak %s\n\n", help.c_str());
-    }
-    switch (cmd) {
-    case config_cmd:
-        fprintf(stdout, "Configure backup rules. A rule designates an origin directory and the\n"
-                "storage locations and their prune rules.\n\n");
-        break;
-    default:
-        break;
-    }
-    printSettings(cmd);
-    fprintf(stdout,"\n");
-}
-
-void BeakImplementation::printVersion(bool verbose)
-{
-    fprintf(stdout, "beak version " BEAK_VERSION "\n");
-
-    if (!verbose) return;
-
-    fprintf(stdout, "\n"
-            "Copyright (C) 2016-2019 Fredrik Öhrström\n"
-            "Licensed to you under the GPLv3 or later (https://www.gnu.org/licenses/gpl-3.0.txt)\n\n"
-            "This binary (" BEAK_VERSION ") is built from the source:\n"
-            "https://github.com/weetmuts/beak " BEAK_COMMIT "\n"
-
-            #ifdef PLATFORM_WINAPI
-            "This build of beak also includes third party code:\n"
-            "openssl-1.0.2l - Many authors, see https://www.openssl.org/community/thanks.html\n"
-            "https://github.com/openssl/openssl\n\n"
-            "zlib-1.2.11 - Jean-loup Gailly and Mark Adler\n"
-            "https://www.zlib.net/\n\n"
-            "WinFsp - Windows File System Proxy, Copyright (C) Bill Zissimopoulos\n"
-            "https://github.com/billziss-gh/winfsp\n"
-            #endif
-            "\n");
 }
 
 void BeakImplementation::genAutoComplete(string filename)
