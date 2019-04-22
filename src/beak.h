@@ -135,7 +135,7 @@ LIST_OF_COMMANDS
 
 #define LIST_OF_OPTIONS \
     X(OptionType::LOCAL,c,cache,std::string,true,"Directory to store cached files when mounting a remote storage.") \
-    X(OptionType::LOCAL,,contentsplit,std::vector<std::string>,true,"Split matching files based on content. E.g. -cs '*.vdi'") \
+    X(OptionType::LOCAL,,contentsplit,std::vector<std::string>,true,"Split matching files based on content. E.g. --contentsplit='*.vdi'") \
     X(OptionType::LOCAL,d,depth,int,true,"Force all dirs at this depth to contain tars.\n" \
       "                           1 is the root, 2 is the first subdir. The default is 2.")    \
     X(OptionType::LOCAL,,dryrun,bool,false,"Print what would be done, do not actually perform the prune/store.\n") \

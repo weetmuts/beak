@@ -62,7 +62,6 @@ const char *autocomplete =
 using namespace std;
 
 static ComponentId COMMANDLINE = registerLogComponent("commandline");
-static ComponentId STORE = registerLogComponent("store");
 static ComponentId FUSE = registerLogComponent("fuse");
 static ComponentId PRUNE = registerLogComponent("prune");
 static ComponentId FSCK = registerLogComponent("fsck");
@@ -195,42 +194,6 @@ string BeakImplementation::argsToVector_(int argc, char **argv, vector<string> *
     return argv[0];
 }
 
-RC BeakImplementation::store(Settings *settings)
-{
-    RC rc = RC::OK;
-
-    assert(settings->from.type == ArgOrigin || settings->from.type == ArgRule);
-    assert(settings->to.type == ArgStorage);
-
-    unique_ptr<ProgressStatistics> progress = newProgressStatistics(settings->progress);
-
-    // Watch the origin file system to detect if it is being changed while doing the store.
-    origin_tool_->fs()->enableWatch();
-
-    unique_ptr<Backup> backup  = newBackup(origin_tool_->fs());
-
-    // This command scans the origin file system and builds
-    // an in memory representation of the backup file system,
-    // with tar files,index files and directories.
-    rc = backup->scanFileSystem(&settings->from, settings);
-
-    // Now store the beak file system into the selected storage.
-    storage_tool_->storeBackupIntoStorage(backup.get(),
-                                          settings->to.storage,
-                                          settings,
-                                          progress.get());
-
-    int unpleasant_modifications = origin_tool_->fs()->endWatch();
-    if (progress->stats.num_files_stored == 0 && progress->stats.num_dirs_updated == 0) {
-        info(STORE, "No stores needed, everything was up to date.\n");
-    }
-    if (unpleasant_modifications > 0) {
-        warning(STORE, "Warning! Origin directory modified while doing backup!\n");
-    }
-
-    return rc;
-}
-
 unique_ptr<Restore> BeakImplementation::accessBackup_(Argument *storage,
                                                       string pointintime,
                                                       ProgressStatistics *progress,
@@ -261,85 +224,18 @@ unique_ptr<Restore> BeakImplementation::accessBackup_(Argument *storage,
     if (pointintime != "") {
         auto point = restore->setPointInTime(pointintime);
         if (!point) {
-            error(STORE, "no such point in time!\n");
+            error(COMMANDLINE, "no such point in time!\n");
             return NULL;
         }
     }
 
     rc = restore->loadBeakFileSystem(storage);
     if (rc.isErr()) {
-        error(STORE, "Could not load beak file system.\n");
+        error(COMMANDLINE, "Could not load beak file system.\n");
         return NULL;
     }
 
     return restore;
-}
-
-RC BeakImplementation::restore(Settings *settings)
-{
-    uint64_t start = clockGetTimeMicroSeconds();
-    auto progress = newProgressStatistics(settings->progress);
-    progress->startDisplayOfProgress();
-
-    umask(0);
-    RC rc = RC::OK;
-
-    auto restore  = accessBackup_(&settings->from, settings->to.point_in_time, progress.get());
-    if (!restore) {
-        return RC::ERR;
-    }
-
-    auto point = restore->singlePointInTime();
-    if (!point) {
-        // The settings did not specify a point in time, lets use the most recent for the restore.
-        point = restore->setPointInTime("@0");
-    }
-
-    FileSystem *backup_fs = restore->backupFileSystem(); // Access the archive files storing content.
-    FileSystem *backup_contents_fs = restore->asFileSystem(); // Access the files inside archive files.
-
-    backup_contents_fs->recurse(Path::lookupRoot(),
-                                [&restore,this,point,settings,&progress]
-                                (Path *path, FileStat *stat) {
-                                    origin_tool_->addRestoreWork(progress.get(),
-                                                                 path,
-                                                                 stat,
-                                                                 settings,
-                                                                 restore.get(),
-                                                                 point);
-                                    return RecurseContinue; });
-
-    debug(STORE, "work to be done: num_files=%ju num_hardlinks=%ju num_symlinks=%ju num_nodes=%ju num_dirs=%ju\n",
-          progress->stats.num_files, progress->stats.num_hard_links, progress->stats.num_symbolic_links,
-          progress->stats.num_nodes, progress->stats.num_dirs);
-
-    origin_tool_->restoreFileSystem(backup_fs, backup_contents_fs, restore.get(), point, settings, progress.get());
-
-    uint64_t stop = clockGetTimeMicroSeconds();
-    uint64_t store_time = stop - start;
-
-    progress->finishProgress();
-
-    if (progress->stats.num_files_stored == 0 && progress->stats.num_symbolic_links_stored == 0 &&
-        progress->stats.num_dirs_updated == 0) {
-        info(STORE, "No stores needed, everything was up to date.\n");
-    } else {
-        if (progress->stats.num_files_stored > 0) {
-            string file_sizes = humanReadable(progress->stats.size_files_stored);
-            info(STORE, "Stored %ju files for a total size of %s.\n", progress->stats.num_files_stored, file_sizes.c_str());
-        }
-        if (progress->stats.num_symbolic_links_stored > 0) {
-            info(STORE, "Stored %ju symlinks.\n", progress->stats.num_symbolic_links_stored);
-        }
-        if (progress->stats.num_hard_links_stored > 0) {
-            info(STORE, "Stored %ju hard links.\n", progress->stats.num_hard_links_stored);
-        }
-        if (progress->stats.num_dirs_updated > 0) {
-            info(STORE, "Updated %ju dirs.\n", progress->stats.num_dirs_updated);
-        }
-        info(STORE, "Time to store %jdms.\n", store_time / 1000);
-    }
-    return rc;
 }
 
 RC BeakImplementation::shell(Settings *settings)
@@ -797,7 +693,7 @@ RC BeakImplementation::umountBackup(Settings *settings)
     ptr<FileSystem> fs = origin_tool_->fs();
     int unpleasant_modifications = fs->endWatch();
     if (unpleasant_modifications > 0) {
-        warning(STORE, "Warning! Origin directory modified while being mounted for backup!\n");
+        warning(COMMANDLINE, "Warning! Origin directory modified while being mounted for backup!\n");
     }
     sys_->umount(backup_fuse_mount_);
     return RC::OK;
