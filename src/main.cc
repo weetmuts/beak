@@ -118,10 +118,6 @@ int run(int argc, char *argv[])
         rc = beak->pull(&settings);
         break;
 
-    case license_cmd:
-        beak->printLicense();
-        break;
-
     case mount_cmd:
         rc = beak->mountRestoreDaemon(&settings);
         break;
@@ -147,11 +143,11 @@ int run(int argc, char *argv[])
         break;
 
     case version_cmd:
-        beak->printVersion();
+        beak->printVersion(settings.verbose);
         break;
 
     case help_cmd:
-        beak->printHelp(settings.help_me_on_this_cmd);
+        beak->printHelp(settings.verbose, settings.help_me_on_this_cmd);
         break;
 
     case nosuch_cmd:

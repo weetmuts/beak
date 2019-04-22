@@ -47,6 +47,7 @@ struct StorageTool;
 struct OriginTool;
 
 enum class CommandType { PRIMARY, SECONDARY };
+enum class OptionType { GLOBAL, LOCAL };
 
 struct Beak
 {
@@ -75,11 +76,10 @@ struct Beak
     virtual RC mountRestore(Settings *settings, ProgressStatistics *progress = NULL) = 0;
     virtual RC umountRestore(Settings *settings) = 0;
 
-    virtual void printHelp(Command cmd) = 0;
-    virtual void printVersion() = 0;
-    virtual void printLicense() = 0;
+    virtual void printHelp(bool verbose, Command cmd) = 0;
+    virtual void printVersion(bool verbose) = 0;
     virtual void printCommands(CommandType cmdtype) = 0;
-    virtual void printSettings(CommandType cmdtype) = 0;
+    virtual void printSettings(Command cmd) = 0;
 
     virtual void genAutoComplete(std::string filename) = 0;
 
@@ -103,6 +103,8 @@ enum ArgumentType
     ArgFileOrNone,
     ArgORS,  // Origin, Rule or Storage
     ArgNORS, // None, Origin, Rule or Storage
+    ArgCommand, // Command
+    ArgNC    // None or Command
 };
 
 // ArgORS will match ArgOrigin, ArgRule or ArgStorage.
@@ -114,8 +116,7 @@ enum ArgumentType
     X(fsck,CommandType::PRIMARY,"Check the integrity of your backup.",ArgStorage,ArgNone) \
     X(genautocomplete,CommandType::SECONDARY,"Output bash completion script for beak.",ArgFileOrNone,ArgNone) \
     X(genmounttrigger,CommandType::SECONDARY,"Output systemd rule to trigger backup when USB drive is mounted.",ArgFile,ArgNone) \
-    X(help,CommandType::PRIMARY,"Show help. Also: beak push help",ArgNone,ArgNone) \
-    X(license,CommandType::PRIMARY,"Display license and notices.",ArgNone,ArgNone) \
+    X(help,CommandType::PRIMARY,"Show help. Add -v for more commands. beak help <command>",ArgNC,ArgNone) \
     X(mount,CommandType::PRIMARY,"Mount your backup as a file system.",ArgStorage,ArgDir) \
     X(prune,CommandType::PRIMARY,"Discard old backups according to the keep rule.",ArgStorage,ArgNone) \
     X(pull,CommandType::PRIMARY,"Merge the most recent backup for the given rule.",ArgRule,ArgNone) \
@@ -135,45 +136,61 @@ LIST_OF_COMMANDS
 };
 
 #define LIST_OF_OPTIONS \
-    X(CommandType::SECONDARY,c,cache,std::string,true,"Directory to store cached files when mounting a remote storage.") \
-    X(CommandType::SECONDARY,,contentsplit,std::vector<std::string>,true,"Split matching files based on content. E.g. -cs '*.vdi'") \
-    X(CommandType::SECONDARY,d,depth,int,true,"Force all dirs at this depth to contain tars.\n" \
+    X(OptionType::LOCAL,c,cache,std::string,true,"Directory to store cached files when mounting a remote storage.") \
+    X(OptionType::LOCAL,,contentsplit,std::vector<std::string>,true,"Split matching files based on content. E.g. -cs '*.vdi'") \
+    X(OptionType::LOCAL,d,depth,int,true,"Force all dirs at this depth to contain tars.\n" \
       "                           1 is the root, 2 is the first subdir. The default is 2.")    \
-    X(CommandType::SECONDARY,,dryrun,bool,false,"Print what would be done, do not actually perform the prune/store.\n") \
-    X(CommandType::SECONDARY,f,foreground,bool,false,"When mounting do not spawn a daemon.")   \
-    X(CommandType::SECONDARY,fd,fusedebug,bool,false,"Enable fuse debug mode, this also triggers foreground.") \
-    X(CommandType::SECONDARY,i,include,std::vector<std::string>,true,"Only matching paths are inluded. E.g. -i '*.c'") \
-    X(CommandType::SECONDARY,k,keep,std::string,true,"Keep rule for prune.") \
-    X(CommandType::SECONDARY,l,log,std::string,true,"Log debug messages for these parts. E.g. --log=backup,hashing --log=all,-lock") \
-    X(CommandType::SECONDARY,ll,listlog,bool,false,"List all log parts available.") \
-    X(CommandType::SECONDARY,pf,pointintimeformat,PointInTimeFormat,true,"How to present the point in time.\n" \
+    X(OptionType::LOCAL,,dryrun,bool,false,"Print what would be done, do not actually perform the prune/store.\n") \
+    X(OptionType::LOCAL,f,foreground,bool,false,"When mounting do not spawn a daemon.")   \
+    X(OptionType::LOCAL,fd,fusedebug,bool,false,"Enable fuse debug mode, this also triggers foreground.") \
+    X(OptionType::LOCAL,i,include,std::vector<std::string>,true,"Only matching paths are inluded. E.g. -i '*.c'") \
+    X(OptionType::LOCAL,k,keep,std::string,true,"Keep rule for prune.") \
+    X(OptionType::LOCAL,l,log,std::string,true,"Log debug messages for these parts. E.g. --log=backup,hashing --log=all,-lock") \
+    X(OptionType::LOCAL,ll,listlog,bool,false,"List all log parts available.") \
+    X(OptionType::LOCAL,pf,pointintimeformat,PointInTimeFormat,true,"How to present the point in time.\n" \
       "                           E.g. absolute,relative or both. Default is both.")    \
-    X(CommandType::SECONDARY,pr,progress,ProgressDisplayType,true,"How to present the progress of the backup or restore.\n" \
+    X(OptionType::GLOBAL,pr,progress,ProgressDisplayType,true,"How to present the progress of the backup or restore.\n" \
       "                           E.g. none,plain,ansi,os. Default is ansi.") \
-    X(CommandType::SECONDARY,,relaxtimechecks,bool,false,"Accept future dated files.") \
-    X(CommandType::SECONDARY,,robot,bool,false,"Switch to a terminal output format that suitable for parsing by another program.\n") \
-    X(CommandType::SECONDARY,,tarheader,TarHeaderStyle,true,"Style of tar headers used. E.g. --tarheader=simple\n"   \
+    X(OptionType::LOCAL,,relaxtimechecks,bool,false,"Accept future dated files.") \
+    X(OptionType::LOCAL,,tarheader,TarHeaderStyle,true,"Style of tar headers used. E.g. --tarheader=simple\n"   \
       "                           Alternatives are: none,simple,full Default is simple.")    \
-    X(CommandType::SECONDARY,,now,std::string,true,"When pruning use this date time as now.\n") \
-    X(CommandType::SECONDARY,ta,targetsize,size_t,true,"Tar target size. E.g. --targetsize=20M\n" \
+    X(OptionType::LOCAL,,now,std::string,true,"When pruning use this date time as now.\n") \
+    X(OptionType::LOCAL,ta,targetsize,size_t,true,"Tar target size. E.g. --targetsize=20M\n" \
       "                           Default is 10M.")    \
-    X(CommandType::SECONDARY,tr,triggersize,size_t,true,"Trigger tar generation in dir at size. E.g. -tr 40M\n" \
+    X(OptionType::LOCAL,tr,triggersize,size_t,true,"Trigger tar generation in dir at size. E.g. -tr 40M\n" \
       "                           Default is 20M.")    \
-    X(CommandType::SECONDARY,ts,splitsize,size_t,true,"Split large files into smaller chunks. E.g. -ts 40M\n" \
+    X(OptionType::LOCAL,ts,splitsize,size_t,true,"Split large files into smaller chunks. E.g. -ts 40M\n" \
       "                           Default is 50M.")    \
-    X(CommandType::SECONDARY,tx,triggerglob,std::vector<std::string>,true,"Trigger tar generation in matching dirs.\n" \
+    X(OptionType::LOCAL,tx,triggerglob,std::vector<std::string>,true,"Trigger tar generation in matching dirs.\n" \
       "                           E.g. -tx '/work/project_*'\n") \
-    X(CommandType::SECONDARY,q,quite,bool,false,"Silence information output.")             \
-    X(CommandType::PRIMARY,v,verbose,bool,false,"More detailed information.")            \
-    X(CommandType::SECONDARY,x,exclude,std::vector<std::string>,true,"Paths matching glob are excluded. E.g. -exclude='beta/**'") \
-    X(CommandType::SECONDARY,,yesorigin,bool,false,"The origin directory contains beak files and this is intended.")            \
-    X(CommandType::SECONDARY,,yesprune,bool,false,"Respond yes to question if prune should be done.")            \
-    X(CommandType::SECONDARY,nso,nosuch,bool,false,"No such option")
+    X(OptionType::GLOBAL,q,quite,bool,false,"Silence information output.")             \
+    X(OptionType::GLOBAL,v,verbose,bool,false,"More detailed information.") \
+    X(OptionType::LOCAL,x,exclude,std::vector<std::string>,true,"Paths matching glob are excluded. E.g. -exclude='beta/**'") \
+    X(OptionType::LOCAL,,yesorigin,bool,false,"The origin directory contains beak files and this is intended.")            \
+    X(OptionType::LOCAL,,yesprune,bool,false,"Respond yes to question if prune should be done.")            \
+    X(OptionType::LOCAL,nso,nosuch,bool,false,"No such option")
 
 enum Option {
 #define X(cmdtype,shortname,name,type,requirevalue,info) name##_option,
 LIST_OF_OPTIONS
 #undef X
+};
+
+#define LIST_OF_OPTIONS_PER_COMMAND \
+    X(config_cmd, (0) ) \
+    X(diff_cmd, (1, depth_option) ) \
+    X(store_cmd, (12, contentsplit_option, depth_option, splitsize_option, targetsize_option, triggersize_option, triggerglob_option, exclude_option, include_option, progress_option, relaxtimechecks_option, tarheader_option, yesorigin_option) ) \
+    X(bmount_cmd, (12, contentsplit_option, depth_option, splitsize_option, targetsize_option, triggersize_option, triggerglob_option, exclude_option, include_option, progress_option, relaxtimechecks_option, tarheader_option, yesorigin_option) ) \
+    X(mount_cmd, (2, progress_option) ) \
+    X(prune_cmd, (3, keep_option, now_option, yesprune_option) )
+
+
+struct CommandOption
+{
+    Command cmd;
+    std::vector<Option> options;
+
+    void add_(int count, ...);
 };
 
 struct Argument
@@ -185,6 +202,7 @@ struct Argument
     Path *dir {};
     Path *file {};
     std::string point_in_time;
+    Command command;
 };
 
 struct Settings
