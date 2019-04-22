@@ -56,7 +56,7 @@ struct BeakImplementation : Beak {
                        ptr<StorageTool> storage_tool,
                        ptr<OriginTool> origin_tool);
 
-    void printCommands(CommandType cmdtype);
+    void printCommands(bool verbose);
     void printSettings(Command cmd);
 
     void captureStartTime() {  ::captureStartTime(); }

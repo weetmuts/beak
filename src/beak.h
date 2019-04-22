@@ -78,7 +78,7 @@ struct Beak
 
     virtual void printHelp(bool verbose, Command cmd) = 0;
     virtual void printVersion(bool verbose) = 0;
-    virtual void printCommands(CommandType cmdtype) = 0;
+    virtual void printCommands(bool verbose) = 0;
     virtual void printSettings(Command cmd) = 0;
 
     virtual void genAutoComplete(std::string filename) = 0;

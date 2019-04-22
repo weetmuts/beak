@@ -38,14 +38,14 @@ const char *argName(ArgumentType at) {
     return "?";
 }
 
-void BeakImplementation::printCommands(CommandType cmdtype)
+void BeakImplementation::printCommands(bool verbose)
 {
     fprintf(stdout, "Available Commands:\n");
 
     size_t max = 0;
     for (auto &e : command_entries_)
     {
-        if (e.cmdtype != cmdtype) continue;
+        if (verbose == false && e.cmdtype != CommandType::PRIMARY) continue;
         size_t l = strlen(e.name);
         if (l > max) max = l;
     }
@@ -53,9 +53,12 @@ void BeakImplementation::printCommands(CommandType cmdtype)
     for (auto &e : command_entries_)
     {
         if (e.cmd == nosuch_cmd) continue;
-        if (e.cmdtype != cmdtype) continue;
+        if (verbose == false && e.cmdtype != CommandType::PRIMARY) continue;
         size_t l = strlen(e.name);
-        fprintf(stdout, "  %s%-.*s%s\n",
+        char verb = ' ';
+        if (e.cmdtype == CommandType::SECONDARY) verb = '*';
+        fprintf(stdout, "%c %s%-.*s%s\n",
+                verb,
                 e.name,
                 (int)(max-l+4),
                 "                                        ",
@@ -150,7 +153,7 @@ void BeakImplementation::printHelp(bool verbose, Command cmd)
         fprintf(stdout,
                 "usage: beak <command> [options] [<args>]\n"
                 "\n");
-        printCommands(CommandType::PRIMARY);
+        printCommands(verbose);
         fprintf(stdout,"\n");
     }
     else
