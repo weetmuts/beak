@@ -136,31 +136,24 @@ LIST_OF_COMMANDS
 #define LIST_OF_OPTIONS \
     X(OptionType::LOCAL,c,cache,std::string,true,"Directory to store cached files when mounting a remote storage.") \
     X(OptionType::LOCAL,,contentsplit,std::vector<std::string>,true,"Split matching files based on content. E.g. --contentsplit='*.vdi'") \
-    X(OptionType::LOCAL,d,depth,int,true,"Force all dirs at this depth to contain tars.\n" \
-      "                           1 is the root, 2 is the first subdir. The default is 2.")    \
-    X(OptionType::LOCAL,,dryrun,bool,false,"Print what would be done, do not actually perform the prune/store.\n") \
+    X(OptionType::LOCAL,,deepcheck,bool,false,"Do deep checking of backup integrity.") \
+    X(OptionType::LOCAL,d,depth,int,true,"Force all dirs at this depth to contain tars. 1 is the root, 2 is the first subdir. The default is 2.")    \
+    X(OptionType::LOCAL,,dryrun,bool,false,"Print what would be done, do not actually perform the prune/store.") \
     X(OptionType::LOCAL,f,foreground,bool,false,"When mounting do not spawn a daemon.")   \
     X(OptionType::LOCAL,fd,fusedebug,bool,false,"Enable fuse debug mode, this also triggers foreground.") \
     X(OptionType::LOCAL,i,include,std::vector<std::string>,true,"Only matching paths are inluded. E.g. -i '*.c'") \
     X(OptionType::LOCAL,k,keep,std::string,true,"Keep rule for prune.") \
     X(OptionType::LOCAL,l,log,std::string,true,"Log debug messages for these parts. E.g. --log=backup,hashing --log=all,-lock") \
     X(OptionType::LOCAL,ll,listlog,bool,false,"List all log parts available.") \
-    X(OptionType::LOCAL,pf,pointintimeformat,PointInTimeFormat,true,"How to present the point in time.\n" \
-      "                           E.g. absolute,relative or both. Default is both.")    \
-    X(OptionType::GLOBAL,pr,progress,ProgressDisplayType,true,"How to present the progress of the backup or restore.\n" \
-      "                           E.g. none,plain,ansi,os. Default is ansi.") \
+    X(OptionType::LOCAL,pf,pointintimeformat,PointInTimeFormat,true,"How to present the point in time. E.g. absolute,relative or both. Default is both.")    \
+    X(OptionType::GLOBAL,pr,progress,ProgressDisplayType,true,"How to present the progress of the backup or restore. E.g. none,plain,ansi,os. Default is ansi.") \
     X(OptionType::LOCAL,,relaxtimechecks,bool,false,"Accept future dated files.") \
-    X(OptionType::LOCAL,,tarheader,TarHeaderStyle,true,"Style of tar headers used. E.g. --tarheader=simple\n"   \
-      "                           Alternatives are: none,simple,full Default is simple.")    \
-    X(OptionType::LOCAL,,now,std::string,true,"When pruning use this date time as now.\n") \
-    X(OptionType::LOCAL,ta,targetsize,size_t,true,"Tar target size. E.g. --targetsize=20M\n" \
-      "                           Default is 10M.")    \
-    X(OptionType::LOCAL,tr,triggersize,size_t,true,"Trigger tar generation in dir at size. E.g. -tr 40M\n" \
-      "                           Default is 20M.")    \
-    X(OptionType::LOCAL,ts,splitsize,size_t,true,"Split large files into smaller chunks. E.g. -ts 40M\n" \
-      "                           Default is 50M.")    \
-    X(OptionType::LOCAL,tx,triggerglob,std::vector<std::string>,true,"Trigger tar generation in matching dirs.\n" \
-      "                           E.g. -tx '/work/project_*'\n") \
+    X(OptionType::LOCAL,,tarheader,TarHeaderStyle,true,"Style of tar headers used. E.g. --tarheader=simple Alternatives are: none,simple,full Default is simple.")    \
+    X(OptionType::LOCAL,,now,std::string,true,"When pruning use this date time as now.") \
+    X(OptionType::LOCAL,ta,targetsize,size_t,true,"Tar target size. E.g. --targetsize=20M and the default is 10M.")    \
+    X(OptionType::LOCAL,tr,triggersize,size_t,true,"Trigger tar generation in dir at size. E.g. -tr 40M and the default is 20M.")    \
+    X(OptionType::LOCAL,ts,splitsize,size_t,true,"Split large files into smaller chunks. E.g. -ts 40M and the default is 50M.")    \
+    X(OptionType::LOCAL,tx,triggerglob,std::vector<std::string>,true,"Trigger tar generation in matching dirs. E.g. -tx '/work/project_*'") \
     X(OptionType::GLOBAL,q,quite,bool,false,"Silence information output.")             \
     X(OptionType::GLOBAL,v,verbose,bool,false,"More detailed information.") \
     X(OptionType::LOCAL,x,exclude,std::vector<std::string>,true,"Paths matching glob are excluded. E.g. -exclude='beta/**'") \
@@ -177,6 +170,7 @@ LIST_OF_OPTIONS
 #define LIST_OF_OPTIONS_PER_COMMAND \
     X(config_cmd, (0) ) \
     X(diff_cmd, (1, depth_option) ) \
+    X(fsck_cmd, (1, deepcheck_option) ) \
     X(store_cmd, (12, contentsplit_option, depth_option, splitsize_option, targetsize_option, triggersize_option, triggerglob_option, exclude_option, include_option, progress_option, relaxtimechecks_option, tarheader_option, yesorigin_option) ) \
     X(bmount_cmd, (12, contentsplit_option, depth_option, splitsize_option, targetsize_option, triggersize_option, triggerglob_option, exclude_option, include_option, progress_option, relaxtimechecks_option, tarheader_option, yesorigin_option) ) \
     X(mount_cmd, (2, progress_option) ) \

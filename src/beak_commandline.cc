@@ -286,6 +286,9 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
             case contentsplit_option:
                 settings->contentsplit.push_back(value);
                 break;
+            case deepcheck_option:
+                settings->deepcheck = true;
+                break;
             case depth_option:
                 settings->depth = atoi(value.c_str());
                 settings->depth_supplied = true;

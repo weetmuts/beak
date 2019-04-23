@@ -21,7 +21,6 @@
 #include "log.h"
 #include "origintool.h"
 #include "storagetool.h"
-#include "version.h"
 
 static ComponentId RESTORE = registerLogComponent("restore");
 

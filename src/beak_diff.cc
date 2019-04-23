@@ -22,7 +22,6 @@
 #include "log.h"
 #include "origintool.h"
 #include "storagetool.h"
-#include "version.h"
 
 static ComponentId DIFF = registerLogComponent("diff");
 

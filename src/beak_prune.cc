@@ -21,7 +21,6 @@
 #include "log.h"
 #include "prune.h"
 #include "storagetool.h"
-#include "version.h"
 
 static ComponentId PRUNE = registerLogComponent("prune");
 

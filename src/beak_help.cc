@@ -148,6 +148,7 @@ void BeakImplementation::printSettings(Command cmd)
 
 void BeakImplementation::printHelp(bool verbose, Command cmd)
 {
+    CommandEntry *ce {};
     if (cmd == nosuch_cmd)
     {
         fprintf(stdout,
@@ -158,7 +159,7 @@ void BeakImplementation::printHelp(bool verbose, Command cmd)
     }
     else
     {
-        CommandEntry *ce = commands_from_cmd_[cmd];
+        ce = commands_from_cmd_[cmd];
         int num_args = 0;
         string help = ce->name;
         if (ce->expected_from != ArgNone) {
@@ -175,9 +176,26 @@ void BeakImplementation::printHelp(bool verbose, Command cmd)
         fprintf(stdout, "usage: beak %s\n\n", help.c_str());
     }
     switch (cmd) {
+    case bmount_cmd:
+        fprintf(stdout, "%s\n\nCreate a backup through a mount. The mounted virtual file system\n"
+                "contains the backup.\n\n",
+            ce->info);
+        break;
     case config_cmd:
-        fprintf(stdout, "Configure backup rules. A rule designates an origin directory and the\n"
-                "storage locations and their prune rules.\n\n");
+        fprintf(stdout, "%s\n\nA rule designates an origin directory, the storage locations\n"
+                "and their prune rules. Such a rule can then be used with the commands:\n"
+                "push, pull, prune, mount and shell.\n\n",
+            ce->info);
+        break;
+    case diff_cmd:
+        fprintf(stdout, "%s\n\nDisplay a summary of the differences between the two arguments.\n"
+                "The difference is by default grouped on the first subdirectory level.\n"
+                "Add -v to show all files.\n"
+                "Add -d 1 to do the summary on the root level.\n\n", ce->info);
+        break;
+    case fsck_cmd:
+        fprintf(stdout, "%s\n\n"
+                "Add -v to show all missing, superfluous and wrongly sized files.\n", ce->info);
         break;
     default:
         break;

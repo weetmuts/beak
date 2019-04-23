@@ -19,7 +19,6 @@
 #include "beak_implementation.h"
 #include "log.h"
 #include "system.h"
-#include "version.h"
 
 static ComponentId SHELL = registerLogComponent("shell");
 

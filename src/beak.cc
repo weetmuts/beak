@@ -27,11 +27,6 @@
 #include "tarfile.h"
 #include "ui.h"
 #include "util.h"
-#include "version.h"
-
-const char *autocomplete =
-#include"generated_autocomplete.h"
-    ;
 
 #include <algorithm>
 #include <assert.h>
@@ -57,7 +52,6 @@ using namespace std;
 
 static ComponentId COMMANDLINE = registerLogComponent("commandline");
 static ComponentId FUSE = registerLogComponent("fuse");
-static ComponentId FSCK = registerLogComponent("fsck");
 
 unique_ptr<Beak> newBeak(ptr<Configuration> configuration,
                          ptr<System> sys,
@@ -359,16 +353,6 @@ void update_mctim_maxes(const struct stat *sb)
         // Found a more recent timestamp for mtime.
         ctim_max = *ct;
     }
-}
-
-void BeakImplementation::genAutoComplete(string filename)
-{
-    FILE *f = fopen(filename.c_str(),"wb");
-    if (!f) {
-        error(COMMANDLINE, "Could not open %s\n", filename.c_str());
-    }
-    fwrite(autocomplete, 1, strlen(autocomplete), f);
-    fclose(f);
 }
 
 bool BeakImplementation::hasPointsInTime_(Path *path, FileSystem *fs)

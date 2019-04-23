@@ -89,7 +89,7 @@ $(OUTPUT_ROOT)/generated_filetypes.h: $(SRC_ROOT)/scripts/filetypes.inc
 BEAK_OBJS:=$($(PLATFORM)_BEAK_OBJS)
 TESTINTERNALS_OBJS:=$($(PLATFORM)_TESTINTERNALS_OBJS)
 
-$(OUTPUT_ROOT)/$(TYPE)/beak.o: $(OUTPUT_ROOT)/generated_autocomplete.h
+$(OUTPUT_ROOT)/$(TYPE)/beak_genautocomp.o: $(OUTPUT_ROOT)/generated_autocomplete.h
 $(OUTPUT_ROOT)/$(TYPE)/fileinfo.o: $(OUTPUT_ROOT)/generated_filetypes.h
 
 $(OUTPUT_ROOT)/$(TYPE)/%.o: $(SRC_ROOT)/src/%.cc
