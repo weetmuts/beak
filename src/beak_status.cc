@@ -32,7 +32,7 @@ RC BeakImplementation::status(Settings *settings)
     struct timespec mtim_max {};  /* time of last modification */
     struct timespec ctim_max {};  /* time of last meta data modification */
 
-    assert(settings->from.type == ArgRule);
+    assert(settings->from.type == ArgRule || settings->from.type == ArgNone);
 
     Rule *rule = settings->from.rule;
 

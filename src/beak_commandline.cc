@@ -129,7 +129,7 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
         // ArgORS will pass through here.
     }
 
-    if (expected_type == ArgORS || expected_type == ArgRule || expected_type == ArgOrigin) {
+    if (expected_type == ArgORS || expected_type == ArgRule || expected_type == ArgRuleOrNone || expected_type == ArgOrigin) {
         Rule *rule = configuration_->rule(arg);
 
         if (rule) {
@@ -196,6 +196,8 @@ const char *arg_name_(ArgumentType at) {
         return "origin";
     case ArgRule:
         return "rule";
+    case ArgRuleOrNone:
+        return "rule or none";
     case ArgStorage:
         return "storage";
     case ArgDir:
@@ -464,7 +466,10 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
         }
     }
 
-    if (cmde->expected_from != ArgNone && cmde->expected_from != ArgFileOrNone && cmde->expected_from != ArgNC)
+    if (cmde->expected_from != ArgNone
+        && cmde->expected_from != ArgFileOrNone
+        && cmde->expected_from != ArgRuleOrNone
+        && cmde->expected_from != ArgNC )
     {
         if (settings->from.type == ArgUnspecified)
         {

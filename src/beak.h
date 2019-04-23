@@ -97,6 +97,7 @@ enum ArgumentType
     ArgNone,
     ArgOrigin,
     ArgRule,
+    ArgRuleOrNone,
     ArgStorage,
     ArgDir,
     ArgFile,
@@ -121,7 +122,7 @@ enum ArgumentType
     X(push,CommandType::PRIMARY,"Backup a rule to a storage location.",ArgRule,ArgNone) \
     X(restore,CommandType::PRIMARY,"Restore from a backup into your file system.",ArgStorage,ArgOrigin) \
     X(shell,CommandType::PRIMARY,"Mount your backup(s) and spawn a shell. Exit the shell to unmount.",ArgStorage,ArgNone) \
-    X(status,CommandType::PRIMARY,"Show the status of your rule backups.",ArgRule,ArgNone) \
+    X(status,CommandType::PRIMARY,"Show the backup status of your configured rules.",ArgRuleOrNone,ArgNone) \
     X(store,CommandType::PRIMARY,"Store your file system into a backup.",ArgOrigin,ArgStorage) \
     X(umount,CommandType::PRIMARY,"Unmount a virtual file system.",ArgDir,ArgNone) \
     X(version,CommandType::PRIMARY,"Show version.",ArgNone,ArgNone) \

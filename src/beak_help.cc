@@ -26,12 +26,13 @@ const char *argName(ArgumentType at) {
     case ArgNone: return "";
     case ArgOrigin: return "<origin>";
     case ArgRule: return "<rule>";
+    case ArgRuleOrNone: return "[<rule>]";
     case ArgStorage: return "<storage>";
     case ArgDir: return "<dir>";
     case ArgFile: return "<file>";
     case ArgFileOrNone: return "[<file>]";
-    case ArgORS: return "<origin|rule|store>";
-    case ArgNORS: return "[<origin|rule|store>]";
+    case ArgORS: return "<origin>|<rule>|<store>";
+    case ArgNORS: return "[<origin|<rule>|store>]";
     case ArgCommand: return "<command>";
     case ArgNC: return "[<command>]";
     }
@@ -173,29 +174,26 @@ void BeakImplementation::printHelp(bool verbose, Command cmd)
             help += argName(ce->expected_to);
         }
 
-        fprintf(stdout, "usage: beak %s\n\n", help.c_str());
+        fprintf(stdout, "%s\n\nusage: beak %s\n\n", ce->info, help.c_str());
     }
     switch (cmd) {
     case bmount_cmd:
-        fprintf(stdout, "%s\n\nCreate a backup through a mount. The mounted virtual file system\n"
-                "contains the backup.\n\n",
-            ce->info);
+        fprintf(stdout, "Create a backup through a mount. The mounted virtual file system\n"
+                "contains the backup.\n\n");
         break;
     case config_cmd:
-        fprintf(stdout, "%s\n\nA rule designates an origin directory, the storage locations\n"
+        fprintf(stdout, "A rule designates an origin directory, the storage locations\n"
                 "and their prune rules. Such a rule can then be used with the commands:\n"
-                "push, pull, prune, mount and shell.\n\n",
-            ce->info);
+                "push, pull, prune, mount and shell.\n\n");
         break;
     case diff_cmd:
-        fprintf(stdout, "%s\n\nDisplay a summary of the differences between the two arguments.\n"
+        fprintf(stdout, "Display a summary of the differences between the two arguments.\n"
                 "The difference is by default grouped on the first subdirectory level.\n"
                 "Add -v to show all files.\n"
-                "Add -d 1 to do the summary on the root level.\n\n", ce->info);
+                "Add -d 1 to do the summary on the root level.\n\n");
         break;
     case fsck_cmd:
-        fprintf(stdout, "%s\n\n"
-                "Add -v to show all missing, superfluous and wrongly sized files.\n", ce->info);
+        fprintf(stdout, "Add -v to show all missing, superfluous and wrongly sized files.\n");
         break;
     default:
         break;
