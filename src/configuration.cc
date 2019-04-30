@@ -34,7 +34,6 @@ using namespace std;
 #define LIST_OF_RULE_KEYWORDS                                                       \
     X(origin,"Directory to be backed up.")                                            \
     X(type,"How to backup the directory, LocalAndRemote, RemoteOnly or MountOnly.") \
-    X(history,"Default mount for history command.")                                 \
     X(cache,"When mounting remote storages cache files here.")                      \
     X(cache_size,"Maximum size of cache.")                                          \
     X(local,"Local directory for storage of backups.")                              \
@@ -115,7 +114,6 @@ public:
     void editName(Rule *r);
     void editPath(Rule *r);
     void editType(Rule *r);
-    void editHistoryPath(Rule *r);
     void editCachePath(Rule *r);
     void editCacheSize(Rule *r);
     void editLocalPath(Rule *r);
@@ -216,9 +214,6 @@ bool ConfigurationImplementation::parseRow(string key, string value,
             if (!ok) error(CONFIGURATION, "No such rule type \"%s\"\n", value.c_str());
             current_rule->type = rt;
         }
-            break;
-        case history_key:
-            current_rule->history_path = realPath(current_rule->origin_path, value);
             break;
         case cache_key:
             current_rule->cache_path = realPath(current_rule->origin_path, value);
@@ -361,7 +356,6 @@ bool ConfigurationImplementation::save()
         conf += "[" + rule->name + "]\n";
         conf += "origin = " + rule->origin_path->str() + "\n";
         conf += "type = " + string(rule_type_names_[rule->type]) + "\n";
-        conf += "history = " + relativePathIfPossible(rule->origin_path, rule->history_path)->str() + "\n";
         conf += "cache = " + relativePathIfPossible(rule->origin_path, rule->cache_path)->str() + "\n";
         conf += "cache_size = " + humanReadable(rule->cache_size) + "\n";
         if (rule->type == LocalThenRemoteBackup) {
@@ -410,10 +404,8 @@ Storage* Rule::storage(Path *storage_location)
 
 void Rule::generateDefaultSettingsBasedOnPath()
 {
-    history_path = realPath(origin_path, ".beak/history");
     cache_path = realPath(origin_path, ".beak/cache");
 
-    Path::lookup(".beak/history");
     cache_path = Path::lookup(".beak/cache");
     cache_size = 10ul+1024*1024*1024;
 
@@ -450,14 +442,9 @@ void ConfigurationImplementation::editType(Rule *r)
     r->type = (RuleType)ce->index;
 }
 
-void ConfigurationImplementation::editHistoryPath(Rule *r)
-{
-    r->history_path = inputDirectory(fs_, "history path>");
-}
-
 void ConfigurationImplementation::editCachePath(Rule *r)
 {
-    r->history_path = inputDirectory(fs_, "history path>");
+    r->cache_path = inputDirectory(fs_, "cache path>");
 }
 
 void ConfigurationImplementation::editCacheSize(Rule *r)
@@ -553,10 +540,6 @@ void ConfigurationImplementation::outputRule(Rule *r, std::vector<ChoiceEntry> *
     strprintf(msg, "Type:         %s", rule_type_names_[r->type]);
     if (!buf) UI::outputln(msg);
     else buf->push_back(ChoiceEntry( msg, [=](){ editType(r); }));
-
-    strprintf(msg, "History path: %s", relativePathIfPossible(r->origin_path, r->history_path)->c_str());
-    if (!buf) UI::outputln(msg);
-    else buf->push_back(ChoiceEntry( msg, [=](){ editHistoryPath(r); }));
 
     strprintf(msg, "Cache path:   %s", relativePathIfPossible(r->origin_path, r->cache_path)->c_str());
     if (!buf) UI::outputln(msg);

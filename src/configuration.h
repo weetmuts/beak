@@ -112,10 +112,6 @@ struct Rule {
     // Additional arguments that affect how the tar files are choosen and sized.
     std::string args;
 
-    // After "beak history work:" the full backup history, from local and remote
-    // backup locations is mounted as a virtual file system on this path.
-    Path *history_path {};
-
     // When mounting a remote storage for direct access, the tar files are
     // temporarily cached here, to speed up access.
     Path *cache_path {};

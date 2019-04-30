@@ -28,11 +28,12 @@ const char *argName(ArgumentType at) {
     case ArgRule: return "<rule>";
     case ArgRuleOrNone: return "[<rule>]";
     case ArgStorage: return "<storage>";
+    case ArgStorageOrRule: return "<storage>|<rule>";
     case ArgDir: return "<dir>";
     case ArgFile: return "<file>";
     case ArgFileOrNone: return "[<file>]";
-    case ArgORS: return "<origin>|<rule>|<store>";
-    case ArgNORS: return "[<origin|<rule>|store>]";
+    case ArgORS: return "<origin>|<rule>|<storage>";
+    case ArgNORS: return "[<origin>|<rule>|<storage>]";
     case ArgCommand: return "<command>";
     case ArgNC: return "[<command>]";
     }

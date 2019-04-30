@@ -68,14 +68,19 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
         //            in: /media/you/USBDevice@0
         auto point = arg.substr(at);
         arg = arg.substr(0,at);
-        if (expected_type != ArgStorage && expected_type != ArgORS && expected_type != ArgNORS) {
-            error(COMMANDLINE, "A point in time must only be suffixed to a storage.\n");
+        if (expected_type != ArgStorage
+            && expected_type != ArgStorageOrRule
+            && expected_type != ArgORS
+            && expected_type != ArgNORS) {
+            error(COMMANDLINE, "A point in time must only be suffixed to a storage or rule.\n");
         }
         argument.point_in_time = point;
         debug(COMMANDLINE, "found point in time (%s) after storage %s\n", point.c_str(), arg.c_str());
     }
 
-    if (expected_type == ArgDir) {
+    // Check if the argument is a directory.
+    if (expected_type == ArgDir)
+    {
         Path *dir = Path::lookup(arg);
         Path *rp = dir->realpath();
         if (!rp)
@@ -88,7 +93,10 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
         return argument;
     }
 
-    if (expected_type == ArgFile || expected_type == ArgFileOrNone) {
+    // Check if the argument is a file.
+    if (expected_type == ArgFile
+        || expected_type == ArgFileOrNone)
+    {
         Path *file = Path::lookup(arg);
         Path *rp = file->realpath();
         if (!rp)
@@ -101,7 +109,11 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
         return argument;
     }
 
-    if (expected_type == ArgORS || expected_type == ArgStorage) {
+    // Check if the argument is a storage.
+    if (expected_type == ArgORS
+        || expected_type == ArgStorage
+        || expected_type == ArgStorageOrRule)
+    {
         Path *storage_location = Path::lookup(arg);
         Storage *storage = configuration_->findStorageFrom(storage_location);
         if (!storage && cmd == store_cmd) {
@@ -122,14 +134,20 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
             return argument;
         }
 
-        if (expected_type == ArgStorage) {
+        if (expected_type == ArgStorage)
+        {
             usageError(COMMANDLINE, "Expected storage, but \"%s\" is not a storage location.\n", arg.c_str());
         }
 
-        // ArgORS will pass through here.
+        // Not a storage, thus ArgORS will pass through here, to try origin and rule.
     }
 
-    if (expected_type == ArgORS || expected_type == ArgRule || expected_type == ArgRuleOrNone || expected_type == ArgOrigin) {
+    // Check if the argument is a rule.
+    if (expected_type == ArgORS
+        || expected_type == ArgStorageOrRule
+        || expected_type == ArgRule
+        || expected_type == ArgRuleOrNone)
+    {
         Rule *rule = configuration_->rule(arg);
 
         if (rule) {
@@ -141,11 +159,20 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
             return argument;
         }
 
-        if (expected_type == ArgRule) {
+        if (expected_type == ArgRule ||
+            expected_type == ArgRuleOrNone ||
+            expected_type == ArgStorageOrRule)
+        {
             // We expected a rule, but there was none....
             usageError(COMMANDLINE, "Expected a rule. Got \"%s\" instead.\n", arg.c_str());
         }
+    }
 
+
+    // Check if argument is an origin.
+    if (expected_type == ArgOrigin ||
+        expected_type == ArgORS)
+    {
         // If there is no rule, then we expect an origin directory.
         Path *origin = Path::lookup(arg);
         Path *rp = origin->realpath();
@@ -161,12 +188,13 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
 
         if (expected_type == ArgOrigin)
         {
-            usageError(COMMANDLINE, "Expected rule or origin directory. Got \"%s\" instead.\n", arg.c_str());
+            usageError(COMMANDLINE, "Expected an origin. Got \"%s\" instead.\n", arg.c_str());
         }
-
     }
 
-    if (expected_type == ArgNC) {
+    // Check if argument is a command name.
+    if (expected_type == ArgNC)
+    {
         CommandEntry *cmde = parseCommand(arg.c_str());
         Command cmd = nosuch_cmd;
         if (cmde != NULL) cmd = cmde->cmd;
@@ -178,7 +206,7 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
         return argument;
     }
 
-    usageError(COMMANDLINE, "Expected rule, origin directory or storage location. Got \"%s\" instead.\n", arg.c_str());
+    usageError(COMMANDLINE, "Not what I expected, got \"%s\".\n", arg.c_str());
 
     return argument;
 }
@@ -200,6 +228,8 @@ const char *arg_name_(ArgumentType at) {
         return "rule or none";
     case ArgStorage:
         return "storage";
+    case ArgStorageOrRule:
+        return "storage or rule";
     case ArgDir:
         return "dir";
     case ArgFile:

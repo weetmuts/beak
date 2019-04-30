@@ -99,6 +99,7 @@ enum ArgumentType
     ArgRule,
     ArgRuleOrNone,
     ArgStorage,
+    ArgStorageOrRule,
     ArgDir,
     ArgFile,
     ArgFileOrNone,
@@ -116,12 +117,12 @@ enum ArgumentType
     X(genautocomplete,CommandType::SECONDARY,"Output bash completion script for beak.",ArgFileOrNone,ArgNone) \
     X(genmounttrigger,CommandType::SECONDARY,"Output systemd rule to trigger backup when USB drive is mounted.",ArgFile,ArgNone) \
     X(help,CommandType::PRIMARY,"Show help. Add -v for more commands. beak help <command>",ArgNC,ArgNone) \
-    X(mount,CommandType::PRIMARY,"Mount your backup as a file system.",ArgStorage,ArgDir) \
+    X(mount,CommandType::PRIMARY,"Mount your backup as a file system.",ArgStorageOrRule,ArgDir) \
     X(prune,CommandType::PRIMARY,"Discard old backups according to the keep rule.",ArgStorage,ArgNone) \
     X(pull,CommandType::PRIMARY,"Merge the most recent backup for the given rule.",ArgRule,ArgNone) \
     X(push,CommandType::PRIMARY,"Backup a rule to a storage location.",ArgRule,ArgNone) \
     X(restore,CommandType::PRIMARY,"Restore from a backup into your file system.",ArgStorage,ArgOrigin) \
-    X(shell,CommandType::PRIMARY,"Mount your backup(s) and spawn a shell. Exit the shell to unmount.",ArgStorage,ArgNone) \
+    X(shell,CommandType::PRIMARY,"Mount your backup(s) and spawn a shell. Exit the shell to unmount.",ArgStorageOrRule,ArgNone) \
     X(status,CommandType::PRIMARY,"Show the backup status of your configured rules.",ArgRuleOrNone,ArgNone) \
     X(store,CommandType::PRIMARY,"Store your file system into a backup.",ArgOrigin,ArgStorage) \
     X(umount,CommandType::PRIMARY,"Unmount a virtual file system.",ArgDir,ArgNone) \
