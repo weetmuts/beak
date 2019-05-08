@@ -295,7 +295,9 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
             OptionEntry *ope = parseOption(*i, &contains_value, &value);
             Option op = ope->option;
             if (op != nosuch_option) {
-                if (ope->type == OptionType::LOCAL && !hasCommandOption(cmd, op)) {
+                if ((ope->type == OptionType::LOCAL_PRIMARY ||
+                     ope->type == OptionType::LOCAL_SECONDARY)
+                    && !hasCommandOption(cmd, op)) {
                     usageError(COMMANDLINE, "You cannot use option: --%s with the command: %s.\n",
                                ope->name, cmde->name);
                 }

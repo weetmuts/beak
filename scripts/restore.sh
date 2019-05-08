@@ -269,16 +269,16 @@ while IFS='' read tar_file; do
             cat > ${newvolumescript} <<EOF
 #!/bin/bash
 
-part=\$((TAR_VOLUME - 1))
+part=\$((TAR_VOLUME))
 
-if [ "\$part" = "$num" ]
+if [ "\$part" = "$((1+$num))" ]
 then
     exit 1
 fi
 
 format="$(printf "%%s%%0%dx-%s_%%s%%s" ${partnrwidth} ${numx})"
 
-if [ "\$TAR_VOLUME" = "$num" ]
+if [ "\$part" = "$num" ]
 then
     partsize="$lastsize"
 else

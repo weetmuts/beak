@@ -80,13 +80,13 @@ bool isExperimental(OptionEntry &e)
     return false;
 }
 
-void BeakImplementation::printSettings(Command cmd)
+void BeakImplementation::printSettings(bool verbose, Command cmd)
 {
-    OptionType ot = OptionType::LOCAL;
+    bool local = true;
 
     string option_header = "Options:\n";
     if (cmd == nosuch_cmd) {
-        ot = OptionType::GLOBAL;
+        local = false;
         option_header = "Common options for all commands:\n";
     }
     size_t max = 0;
@@ -94,7 +94,17 @@ void BeakImplementation::printSettings(Command cmd)
     for (auto &e : option_entries_)
     {
         if (e.option == nosuch_option) continue;
-        if (e.type != ot) continue;
+        if (!local) {
+            // If not verbose, then skip any secondary global option (as well as locals).
+            if (!verbose && e.type != OptionType::GLOBAL_PRIMARY) continue;
+            // If verbose, then show skip LOCALS, but show both primary and secondary GLOBAL options.
+            if (verbose && e.type != OptionType::GLOBAL_PRIMARY && e.type != OptionType::GLOBAL_SECONDARY) continue;
+        } else {
+            // If not verbose, then skip any secondary local option (as well as globals).
+            if (!verbose && e.type != OptionType::LOCAL_PRIMARY) continue;
+            // If verbose, then skip any GLOBALS, but show both primary and secondary LOCAL options.
+            if (!verbose && e.type != OptionType::LOCAL_PRIMARY && e.type != OptionType::LOCAL_SECONDARY) continue;
+        }
         if (cmd != nosuch_cmd && !hasCommandOption(cmd, e.option)) continue;
         if (isExperimental(e)) continue;
         size_t l = strlen(e.name);
@@ -110,10 +120,24 @@ void BeakImplementation::printSettings(Command cmd)
     for (auto &e : option_entries_)
     {
         if (e.option == nosuch_option) continue;
-        if (e.type != ot) continue;
+        if (!local) {
+            // If not verbose, then skip any secondary global option (as well as locals).
+            if (!verbose && e.type != OptionType::GLOBAL_PRIMARY) continue;
+            // If verbose, then show skip LOCALS, but show both primary and secondary GLOBAL options.
+            if (verbose && e.type != OptionType::GLOBAL_PRIMARY && e.type != OptionType::GLOBAL_SECONDARY) continue;
+        } else {
+            // If not verbose, then skip any secondary local option (as well as globals).
+            if (!verbose && e.type != OptionType::LOCAL_PRIMARY) continue;
+            // If verbose, then skip any GLOBALS, but show both primary and secondary LOCAL options.
+            if (verbose && e.type != OptionType::LOCAL_PRIMARY && e.type != OptionType::LOCAL_SECONDARY) continue;
+        }
         if (cmd != nosuch_cmd && !hasCommandOption(cmd, e.option)) continue;
         if (isExperimental(e)) continue;
-
+        char verbc = ' ';
+        if (e.type == OptionType::GLOBAL_SECONDARY || e.type == OptionType::LOCAL_SECONDARY)
+        {
+            verbc = '*';
+        }
         string sn = e.shortname;
         size_t sl = strlen(e.shortname);
         if (sl > 0) {
@@ -133,11 +157,12 @@ void BeakImplementation::printSettings(Command cmd)
             n = string("--")+e.name;
             l += 2;
         }
-        fprintf(stdout, "  %s"
+        fprintf(stdout, "%c %s"
                         "%-.*s"
                         "%s"
                         "%-.*s"
                         "%s\n",
+                verbc,
                 sn.c_str(),
                 (int)(4-sl),
                 "                                        ",
@@ -199,7 +224,7 @@ void BeakImplementation::printHelp(bool verbose, Command cmd)
     default:
         break;
     }
-    printSettings(cmd);
+    printSettings(verbose, cmd);
     fprintf(stdout,"\n");
 }
 

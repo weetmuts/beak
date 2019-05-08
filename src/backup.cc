@@ -831,16 +831,15 @@ TarEntry *Backup::findNearestStorageDirectory(Path *a, Path *b) {
     return te;
 }
 
-TarFile *Backup::findTarFromPath(Path *path, uint *partnr) {
+TarFile *Backup::findTarFromPath(Path *path, uint *partnr)
+{
     bool ok;
     string n = path->name()->str();
     string d = path->parent()->name()->str();
 
-    // File names:
-    // (s)01_(001501080787).(579054757)_(1119232)_(3b5e4ec7fe38d0f9846947207a0ea44c)_(13).(tar)
-
     TarEntry *te = directories[path->parent()];
-    if (!te) {
+    if (!te)
+    {
         debug(BACKUP,"Not a directory >%s<\n",d.c_str());
         return NULL;
     }

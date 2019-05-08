@@ -47,7 +47,7 @@ struct StorageTool;
 struct OriginTool;
 
 enum class CommandType { PRIMARY, SECONDARY };
-enum class OptionType { GLOBAL, LOCAL };
+enum class OptionType { GLOBAL_PRIMARY, LOCAL_PRIMARY, GLOBAL_SECONDARY, LOCAL_SECONDARY };
 
 struct Beak
 {
@@ -79,7 +79,7 @@ struct Beak
     virtual void printHelp(bool verbose, Command cmd) = 0;
     virtual void printVersion(bool verbose) = 0;
     virtual void printCommands(bool verbose) = 0;
-    virtual void printSettings(Command cmd) = 0;
+    virtual void printSettings(bool verbose, Command cmd) = 0;
 
     virtual void genAutoComplete(std::string filename) = 0;
 
@@ -116,7 +116,7 @@ enum ArgumentType
     X(fsck,CommandType::PRIMARY,"Check the integrity of your backup.",ArgStorage,ArgNone) \
     X(genautocomplete,CommandType::SECONDARY,"Output bash completion script for beak.",ArgFileOrNone,ArgNone) \
     X(genmounttrigger,CommandType::SECONDARY,"Output systemd rule to trigger backup when USB drive is mounted.",ArgFile,ArgNone) \
-    X(help,CommandType::PRIMARY,"Show help. Add -v for more commands. beak help <command>",ArgNC,ArgNone) \
+    X(help,CommandType::PRIMARY,"Usage: beak help [-v] [<command>]",ArgNC,ArgNone) \
     X(mount,CommandType::PRIMARY,"Mount your backup as a file system.",ArgStorageOrRule,ArgDir) \
     X(prune,CommandType::PRIMARY,"Discard old backups according to the keep rule.",ArgStorage,ArgNone) \
     X(pull,CommandType::PRIMARY,"Merge the most recent backup for the given rule.",ArgRule,ArgNone) \
@@ -136,32 +136,32 @@ LIST_OF_COMMANDS
 };
 
 #define LIST_OF_OPTIONS \
-    X(OptionType::LOCAL,c,cache,std::string,true,"Directory to store cached files when mounting a remote storage.") \
-    X(OptionType::LOCAL,,contentsplit,std::vector<std::string>,true,"Split matching files based on content. E.g. --contentsplit='*.vdi'") \
-    X(OptionType::LOCAL,,deepcheck,bool,false,"Do deep checking of backup integrity.") \
-    X(OptionType::LOCAL,d,depth,int,true,"Force all dirs at this depth to contain tars. 1 is the root, 2 is the first subdir. The default is 2.")    \
-    X(OptionType::LOCAL,,dryrun,bool,false,"Print what would be done, do not actually perform the prune/store.") \
-    X(OptionType::LOCAL,f,foreground,bool,false,"When mounting do not spawn a daemon.")   \
-    X(OptionType::LOCAL,fd,fusedebug,bool,false,"Enable fuse debug mode, this also triggers foreground.") \
-    X(OptionType::LOCAL,i,include,std::vector<std::string>,true,"Only matching paths are inluded. E.g. -i '*.c'") \
-    X(OptionType::LOCAL,k,keep,std::string,true,"Keep rule for prune.") \
-    X(OptionType::LOCAL,l,log,std::string,true,"Log debug messages for these parts. E.g. --log=backup,hashing --log=all,-lock") \
-    X(OptionType::LOCAL,ll,listlog,bool,false,"List all log parts available.") \
-    X(OptionType::LOCAL,pf,pointintimeformat,PointInTimeFormat,true,"How to present the point in time. E.g. absolute,relative or both. Default is both.")    \
-    X(OptionType::GLOBAL,pr,progress,ProgressDisplayType,true,"How to present the progress of the backup or restore. E.g. none,plain,ansi,os. Default is ansi.") \
-    X(OptionType::LOCAL,,relaxtimechecks,bool,false,"Accept future dated files.") \
-    X(OptionType::LOCAL,,tarheader,TarHeaderStyle,true,"Style of tar headers used. E.g. --tarheader=simple Alternatives are: none,simple,full Default is simple.")    \
-    X(OptionType::LOCAL,,now,std::string,true,"When pruning use this date time as now.") \
-    X(OptionType::LOCAL,ta,targetsize,size_t,true,"Tar target size. E.g. --targetsize=20M and the default is 10M.")    \
-    X(OptionType::LOCAL,tr,triggersize,size_t,true,"Trigger tar generation in dir at size. E.g. -tr 40M and the default is 20M.")    \
-    X(OptionType::LOCAL,ts,splitsize,size_t,true,"Split large files into smaller chunks. E.g. -ts 40M and the default is 50M.")    \
-    X(OptionType::LOCAL,tx,triggerglob,std::vector<std::string>,true,"Trigger tar generation in matching dirs. E.g. -tx '/work/project_*'") \
-    X(OptionType::GLOBAL,q,quite,bool,false,"Silence information output.")             \
-    X(OptionType::GLOBAL,v,verbose,bool,false,"More detailed information.") \
-    X(OptionType::LOCAL,x,exclude,std::vector<std::string>,true,"Paths matching glob are excluded. E.g. -exclude='beta/**'") \
-    X(OptionType::LOCAL,,yesorigin,bool,false,"The origin directory contains beak files and this is intended.")            \
-    X(OptionType::LOCAL,,yesprune,bool,false,"Respond yes to question if prune should be done.")            \
-    X(OptionType::LOCAL,nso,nosuch,bool,false,"No such option")
+    X(OptionType::LOCAL_PRIMARY,c,cache,std::string,true,"Directory to store cached files when mounting a remote storage.") \
+    X(OptionType::LOCAL_PRIMARY,,contentsplit,std::vector<std::string>,true,"Split matching files based on content. E.g. --contentsplit='*.vdi'") \
+    X(OptionType::LOCAL_PRIMARY,,deepcheck,bool,false,"Do deep checking of backup integrity.") \
+    X(OptionType::LOCAL_PRIMARY,d,depth,int,true,"Force all dirs at this depth to contain tars. 1 is the root, 2 is the first subdir. The default is 2.")    \
+    X(OptionType::LOCAL_PRIMARY,,dryrun,bool,false,"Print what would be done, do not actually perform the prune/store.") \
+    X(OptionType::LOCAL_SECONDARY,f,foreground,bool,false,"When mounting do not spawn a daemon.")   \
+    X(OptionType::LOCAL_SECONDARY,fd,fusedebug,bool,false,"Enable fuse debug mode, this also triggers foreground.") \
+    X(OptionType::LOCAL_PRIMARY,i,include,std::vector<std::string>,true,"Only matching paths are inluded. E.g. -i '*.c'") \
+    X(OptionType::LOCAL_PRIMARY,k,keep,std::string,true,"Keep rule for prune.") \
+    X(OptionType::GLOBAL_SECONDARY,l,log,std::string,true,"Log debug messages for these parts. E.g. --log=backup,hashing --log=all,-lock") \
+    X(OptionType::GLOBAL_SECONDARY,ll,listlog,bool,false,"List all log parts available.") \
+    X(OptionType::LOCAL_PRIMARY,pf,pointintimeformat,PointInTimeFormat,true,"How to present the point in time. E.g. absolute,relative or both. Default is both.")    \
+    X(OptionType::GLOBAL_PRIMARY,pr,progress,ProgressDisplayType,true,"How to present the progress of the backup or restore. E.g. none,plain,ansi,os. Default is ansi.") \
+    X(OptionType::LOCAL_SECONDARY,,relaxtimechecks,bool,false,"Accept future dated files.") \
+    X(OptionType::LOCAL_SECONDARY,,tarheader,TarHeaderStyle,true,"Style of tar headers used. E.g. --tarheader=simple Alternatives are: none,simple,full Default is simple.")    \
+    X(OptionType::LOCAL_PRIMARY,,now,std::string,true,"When pruning use this date time as now.") \
+    X(OptionType::LOCAL_SECONDARY,ta,targetsize,size_t,true,"Tar target size. E.g. --targetsize=20M and the default is 10M.") \
+    X(OptionType::LOCAL_SECONDARY,tr,triggersize,size_t,true,"Trigger tar generation in dir at size. E.g. -tr 40M and the default is 20M.")    \
+    X(OptionType::LOCAL_SECONDARY,ts,splitsize,size_t,true,"Split large files into smaller chunks. E.g. -ts 40M and the default is 50M.")    \
+    X(OptionType::LOCAL_SECONDARY,tx,triggerglob,std::vector<std::string>,true,"Trigger tar generation in matching dirs. E.g. -tx '/work/project_*'") \
+    X(OptionType::GLOBAL_PRIMARY,q,quite,bool,false,"Silence information output.")             \
+    X(OptionType::GLOBAL_PRIMARY,v,verbose,bool,false,"More detailed information.") \
+    X(OptionType::LOCAL_PRIMARY,x,exclude,std::vector<std::string>,true,"Paths matching glob are excluded. E.g. -exclude='beta/**'") \
+    X(OptionType::LOCAL_PRIMARY,,yesorigin,bool,false,"The origin directory contains beak files and this is intended.")            \
+    X(OptionType::LOCAL_PRIMARY,,yesprune,bool,false,"Respond yes to question if prune should be done.")            \
+    X(OptionType::LOCAL_PRIMARY,nso,nosuch,bool,false,"No such option")
 
 enum Option {
 #define X(cmdtype,shortname,name,type,requirevalue,info) name##_option,

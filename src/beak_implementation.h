@@ -57,7 +57,7 @@ struct BeakImplementation : Beak {
                        ptr<OriginTool> origin_tool);
 
     void printCommands(bool verbose);
-    void printSettings(Command cmd);
+    void printSettings(bool verbose, Command cmd);
 
     void captureStartTime() {  ::captureStartTime(); }
     Command parseCommandLine(int argc, char **argv, Settings *settings);

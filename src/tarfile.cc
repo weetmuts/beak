@@ -245,7 +245,8 @@ bool TarFileName::parseFileNameVersion_(string &name, size_t p1)
     string partnrs;
     k = hexDigitsOnly(&name[p4+1], p5-p4-1, &partnrs);
     if (!k) return false;
-    part_nr = strtol(partnrs.c_str(), NULL, 16);
+    // Subtract 1 from the part nr, to have it start with index 0, instead of 1.
+    part_nr = strtol(partnrs.c_str(), NULL, 16) - 1;
 
     string numparts;
     k = hexDigitsOnly(&name[p5+1], p6-p5-1, &numparts);
@@ -282,7 +283,8 @@ void TarFileName::writeTarFileNameIntoBufferVersion_(char *buf, size_t buf_len, 
     memset(secs_and_micros, 0, sizeof(secs_and_micros));
     long usec = nsec/1000;
     snprintf(secs_and_micros, 32, "%" PRINTF_TIME_T "u.%06lu", sec, usec);
-    string partnr = toHex(part_nr, num_parts);
+    // Add 1 to part_nr, to make the index count from 1 in the file names.
+    string partnr = toHex(part_nr+1, num_parts);
     const char *suffix = suffixtype(type);
 
     if (dir == NULL) {
