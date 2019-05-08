@@ -416,15 +416,16 @@ string cookColumns()
     string s;
 
     s += "permissions "; i++;
+    s += "acl "; i++;
     s += "uid/gid "; i++;
     s += "size "; i++;
-    s += "ctime "; i++;
+    s += "mtime "; i++;
     s += "path "; i++;
     s += "link "; i++;
     s += "tarprefix "; i++;
     s += "offset "; i++;
     s += "multipart(num,partoffset,size,last_size) "; i++; // eg 2,512,65536,238
-    s += "path_size_ctime_hash "; i++;
+    s += "path_size_mtime_hash "; i++;
 
     return "with "+to_string(i)+" columns: "+s;
 }
@@ -435,6 +436,8 @@ void cookEntry(string *listing, TarEntry *entry) {
     // drwxrwxr-x fredrik/fredrik   0 2016-11-25 00:52 autoconf/
     // -r-------- fredrik/fredrik   0 2016-11-25 11:23 libtar.so -> libtar.so.0.1
     listing->append(permissionString(&entry->fs_));
+    listing->append(separator_string);
+    listing->append(""); // acl string
     listing->append(separator_string);
     listing->append(to_string(entry->fs_.st_uid));
     listing->append("/");
@@ -450,30 +453,12 @@ void cookEntry(string *listing, TarEntry *entry) {
     }
     listing->append(separator_string);
 
-    /*
-    char datetime[20];
-    memset(datetime, 0, sizeof(datetime));
-    strftime(datetime, 20, "%Y-%m-%d %H:%M.%S", localtime(&entry->fs_.st_mtim.tv_sec));
-    listing->append(datetime);
-    listing->append(separator_string);
-    */
     char secs_and_nanos[32];
     memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
     snprintf(secs_and_nanos, 32, "%" PRINTF_TIME_T "u.%09lu",
              entry->fs_.st_mtim.tv_sec, entry->fs_.st_mtim.tv_nsec);
     listing->append(secs_and_nanos);
     listing->append(separator_string);
-
-    /*
-      memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
-      snprintf(secs_and_nanos, 32, "%012ju.%09ju", fs_.st_atim.tv_sec, fs_.st_atim.tv_nsec);
-      s.append(secs_and_nanos);
-      s.append(separator_string);
-
-      memset(secs_and_nanos, 0, sizeof(secs_and_nanos));
-      snprintf(secs_and_nanos, 32, "%012ju.%09ju", fs_.st_ctim.tv_sec, fs_.st_ctim.tv_nsec);
-      s.append(secs_and_nanos);
-    */
 
     listing->append(entry->tarpath()->str());
     listing->append(separator_string);
@@ -529,6 +514,9 @@ bool eatEntry(int beak_version, vector<char> &v, vector<char>::iterator &i, Path
         return false;
     }
 
+    string acl = eatTo(v, i, separator, 32, eof, err);
+    if (*err || *eof) return false;
+
     string uidgid = eatTo(v, i, separator, 32, eof, err);
     if (*err || *eof) return false;
     string uid = uidgid.substr(0,uidgid.find('/'));
@@ -563,37 +551,6 @@ bool eatEntry(int beak_version, vector<char> &v, vector<char>::iterator &i, Path
         fs->st_mtim.tv_nsec = atol(na.c_str());
     }
 
-    /*
-    secs_and_nanos = eatTo(v, i, separator, 64, eof, err);
-    if (*err || *eof) return false;
-
-    // Extract access time, secs and nanos from string.
-    {
-        vector<char> sn(secs_and_nanos.begin(), secs_and_nanos.end());
-        auto j = sn.begin();
-        string se = eatTo(sn, j, '.', 64, eof, err);
-        if (*err || *eof) return false;
-        string na = eatTo(sn, j, -1, 64, eof, err);
-        if (*err) return false; // Expect eof here!
-        fs->st_atim.tv_sec = atol(se.c_str());
-        fs->st_atim.tv_nsec = atol(na.c_str());
-    }
-
-    secs_and_nanos = eatTo(v, i, separator, 64, eof, err);
-    if (*err || *eof) return false;
-
-    // Extract change time, secs and nanos from string.
-    {
-        vector<char> sn(secs_and_nanos.begin(), secs_and_nanos.end());
-        auto j = sn.begin();
-        string se = eatTo(sn, j, '.', 64, eof, err);
-        if (*err || *eof) return false;
-        string na = eatTo(sn, j, -1, 64, eof, err);
-        if (*err) return false; // Expect eof here!
-        fs->st_ctim.tv_sec = atol(se.c_str());
-        fs->st_ctim.tv_nsec = atol(na.c_str());
-    }
-    */
     string filename;
     if (dir_to_prepend) {
         filename = dir_to_prepend->str() + "/" + eatTo(v, i, separator, 1024, eof, err);
