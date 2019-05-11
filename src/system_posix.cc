@@ -253,11 +253,11 @@ SystemImplementation::SystemImplementation()
     */
 }
 
-RC SystemImplementation::invoke(string program,
-                                 vector<string> args,
-                                 vector<char> *output,
-                                 Capture capture,
-                                 function<void(char *buf, size_t len)> cb)
+static RC invoke(string program,
+                 vector<string> args,
+                 vector<char> *output,
+                 Capture capture,
+                 function<void(char *buf, size_t len)> cb)
 {
     int link[2];
     const char **argv = new const char*[args.size()+2];
@@ -334,6 +334,15 @@ RC SystemImplementation::invoke(string program,
         }
     }
     return RC::OK;
+}
+
+RC SystemImplementation::invoke(string program,
+                                 vector<string> args,
+                                 vector<char> *output,
+                                 Capture capture,
+                                 function<void(char *buf, size_t len)> cb)
+{
+    return ::invoke(program, args, output, capture, cb);
 }
 
 RC SystemImplementation::invokeShell(Path *init_file)

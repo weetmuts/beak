@@ -314,6 +314,9 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
                 }
             }
             switch (op) {
+            case background_option:
+                settings->background = true;
+                break;
             case cache_option:
                 settings->cache = value;
                 break;
@@ -360,6 +363,9 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
             case listlog_option:
                 listLogComponents();
                 exit(0);
+                break;
+            case monitor_option:
+                settings->monitor = true;
                 break;
             case now_option:
                 settings->now = value;

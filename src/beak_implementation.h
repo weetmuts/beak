@@ -85,6 +85,7 @@ struct BeakImplementation : Beak {
     RC shell(Settings *settings);
 
     RC status(Settings *settings);
+    RC monitor(Settings *settings);
     RC store(Settings *settings);
     RC restore(Settings *settings);
 

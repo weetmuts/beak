@@ -64,6 +64,7 @@ struct Beak
     virtual RC configure(Settings *settings) = 0;
 
     virtual RC status(Settings *settings) = 0;
+    virtual RC monitor(Settings *settings) = 0;
     virtual RC push(Settings *settings) = 0;
     virtual RC pull(Settings *settings) = 0;
 
@@ -117,6 +118,7 @@ enum ArgumentType
     X(genautocomplete,CommandType::SECONDARY,"Output bash completion script for beak.",ArgFileOrNone,ArgNone) \
     X(genmounttrigger,CommandType::SECONDARY,"Output systemd rule to trigger backup when USB drive is mounted.",ArgFile,ArgNone) \
     X(help,CommandType::PRIMARY,"Usage: beak help [-v] [<command>]",ArgNC,ArgNone) \
+    X(monitor,CommandType::PRIMARY,"Monitor currently running backups.",ArgNone,ArgNone) \
     X(mount,CommandType::PRIMARY,"Mount your backup as a file system.",ArgStorageOrRule,ArgDir) \
     X(prune,CommandType::PRIMARY,"Discard old backups according to the keep rule.",ArgStorage,ArgNone) \
     X(pull,CommandType::PRIMARY,"Merge the most recent backup for the given rule.",ArgRule,ArgNone) \
@@ -143,10 +145,12 @@ LIST_OF_COMMANDS
     X(OptionType::LOCAL_PRIMARY,,dryrun,bool,false,"Print what would be done, do not actually perform the prune/store.") \
     X(OptionType::LOCAL_SECONDARY,f,foreground,bool,false,"When mounting do not spawn a daemon.")   \
     X(OptionType::LOCAL_SECONDARY,fd,fusedebug,bool,false,"Enable fuse debug mode, this also triggers foreground.") \
+    X(OptionType::LOCAL_SECONDARY,bg,background,bool,false,"Enter background mode, the progress can be monitored using \"beak monitor\".") \
     X(OptionType::LOCAL_PRIMARY,i,include,std::vector<std::string>,true,"Only matching paths are inluded. E.g. -i '*.c'") \
     X(OptionType::LOCAL_PRIMARY,k,keep,std::string,true,"Keep rule for prune.") \
     X(OptionType::GLOBAL_SECONDARY,l,log,std::string,true,"Log debug messages for these parts. E.g. --log=backup,hashing --log=all,-lock") \
     X(OptionType::GLOBAL_SECONDARY,ll,listlog,bool,false,"List all log parts available.") \
+    X(OptionType::LOCAL_PRIMARY,,monitor,bool,false,"Display download progress of cache downloads.") \
     X(OptionType::LOCAL_PRIMARY,pf,pointintimeformat,PointInTimeFormat,true,"How to present the point in time. E.g. absolute,relative or both. Default is both.")    \
     X(OptionType::GLOBAL_PRIMARY,pr,progress,ProgressDisplayType,true,"How to present the progress of the backup or restore. E.g. none,plain,ansi,os. Default is ansi.") \
     X(OptionType::LOCAL_SECONDARY,,relaxtimechecks,bool,false,"Accept future dated files.") \
@@ -170,13 +174,14 @@ LIST_OF_OPTIONS
 };
 
 #define LIST_OF_OPTIONS_PER_COMMAND \
+    X(bmount_cmd, (12, contentsplit_option, depth_option, splitsize_option, targetsize_option, triggersize_option, triggerglob_option, exclude_option, include_option, progress_option, relaxtimechecks_option, tarheader_option, yesorigin_option) ) \
     X(config_cmd, (0) ) \
     X(diff_cmd, (1, depth_option) ) \
     X(fsck_cmd, (1, deepcheck_option) ) \
-    X(store_cmd, (12, contentsplit_option, depth_option, splitsize_option, targetsize_option, triggersize_option, triggerglob_option, exclude_option, include_option, progress_option, relaxtimechecks_option, tarheader_option, yesorigin_option) ) \
-    X(bmount_cmd, (12, contentsplit_option, depth_option, splitsize_option, targetsize_option, triggersize_option, triggerglob_option, exclude_option, include_option, progress_option, relaxtimechecks_option, tarheader_option, yesorigin_option) ) \
+    X(store_cmd, (12, background_option, contentsplit_option, depth_option, splitsize_option, targetsize_option, triggersize_option, triggerglob_option, exclude_option, include_option, progress_option, relaxtimechecks_option, tarheader_option, yesorigin_option) ) \
     X(mount_cmd, (2, progress_option) ) \
-    X(prune_cmd, (3, keep_option, now_option, yesprune_option) )
+    X(prune_cmd, (3, keep_option, now_option, yesprune_option) ) \
+    X(restore_cmd, (2, background_option, progress_option) )
 
 
 struct CommandOption

@@ -25,6 +25,24 @@
 
 using namespace std;
 
+struct UIImplementation
+{
+    string cursor_to_the_left;
+
+    UIImplementation();
+};
+
+
+static UIImplementation ui_imp;
+
+UIImplementation::UIImplementation()
+{
+    if (UI::isatty())
+    {
+
+    }
+}
+
 void UI::output(const char *fmt, ...)
 {
     va_list args;

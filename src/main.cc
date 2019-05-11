@@ -118,6 +118,10 @@ int run(int argc, char *argv[])
         rc = beak->pull(&settings);
         break;
 
+    case monitor_cmd:
+        rc = beak->monitor(&settings);
+        break;
+
     case mount_cmd:
         rc = beak->mountRestoreDaemon(&settings);
         break;

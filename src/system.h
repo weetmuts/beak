@@ -66,4 +66,10 @@ struct System
 
 std::unique_ptr<System> newSystem();
 
+static RC invoke(std::string program,
+                 std::vector<std::string> args,
+                 std::vector<char> *output,
+                 Capture capture,
+                 std::function<void(char *buf, size_t len)> cb);
+
 #endif
