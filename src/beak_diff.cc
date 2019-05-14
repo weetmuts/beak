@@ -25,14 +25,14 @@
 
 static ComponentId DIFF = registerLogComponent("diff");
 
-RC BeakImplementation::diff(Settings *settings)
+RC BeakImplementation::diff(Settings *settings, Monitor *monitor)
 {
     RC rc = RC::OK;
 
     assert(settings->from.type == ArgOrigin || settings->from.type == ArgRule || settings->from.type == ArgStorage);
     assert(settings->to.type == ArgOrigin || settings->to.type == ArgRule || settings->to.type == ArgStorage);
 
-    auto progress = newProgressStatistics(settings->progress);
+    auto progress = newProgressStatistics(settings->progress, monitor);
 
     FileSystem *curr_fs = NULL;
     FileSystem *old_fs = NULL;

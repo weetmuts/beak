@@ -24,14 +24,15 @@
 
 static ComponentId STORE = registerLogComponent("store");
 
-RC BeakImplementation::store(Settings *settings)
+RC BeakImplementation::store(Settings *settings, Monitor *monitor)
 {
     RC rc = RC::OK;
 
     assert(settings->from.type == ArgOrigin || settings->from.type == ArgRule);
     assert(settings->to.type == ArgStorage);
 
-    unique_ptr<ProgressStatistics> progress = newProgressStatistics(settings->progress);
+    unique_ptr<ProgressStatistics> progress = newProgressStatistics(settings->progress,
+                                                                    monitor);
 
     // Watch the origin file system to detect if it is being changed while doing the store.
     origin_tool_->fs()->enableWatch();

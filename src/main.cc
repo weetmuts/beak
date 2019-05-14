@@ -74,6 +74,10 @@ int run(int argc, char *argv[])
     Settings settings;
     Command cmd = beak->parseCommandLine(argc, argv, &settings);
 
+    // The monitor is used to display continuous updates on the terminal
+    // when beak is performing stores/restores/cache downloads.
+    auto monitor = newMonitor();
+
     // We now know the command the user intends to invoke.
     switch (cmd) {
 
@@ -86,11 +90,11 @@ int run(int argc, char *argv[])
         break;
 
     case diff_cmd:
-        rc = beak->diff(&settings);
+        rc = beak->diff(&settings, monitor.get());
         break;
 
     case fsck_cmd:
-        rc = beak->fsck(&settings);
+        rc = beak->fsck(&settings, monitor.get());
         break;
 
     case genautocomplete_cmd:
@@ -107,39 +111,39 @@ int run(int argc, char *argv[])
         break;
 
     case prune_cmd:
-        rc = beak->prune(&settings);
+        rc = beak->prune(&settings, monitor.get());
         break;
 
     case push_cmd:
-        rc = beak->push(&settings);
+        rc = beak->push(&settings, monitor.get());
         break;
 
     case pull_cmd:
-        rc = beak->pull(&settings);
+        rc = beak->pull(&settings, monitor.get());
         break;
 
     case monitor_cmd:
-        rc = beak->monitor(&settings);
+        rc = beak->monitor(&settings, monitor.get());
         break;
 
     case mount_cmd:
-        rc = beak->mountRestoreDaemon(&settings);
+        rc = beak->mountRestoreDaemon(&settings, monitor.get());
         break;
 
     case restore_cmd:
-        rc = beak->restore(&settings);
+        rc = beak->restore(&settings, monitor.get());
         break;
 
     case shell_cmd:
-        rc = beak->shell(&settings);
+        rc = beak->shell(&settings, monitor.get());
         break;
 
     case status_cmd:
-        rc = beak->status(&settings);
+        rc = beak->status(&settings, monitor.get());
         break;
 
     case store_cmd:
-        rc = beak->store(&settings);
+        rc = beak->store(&settings, monitor.get());
         break;
 
     case umount_cmd:

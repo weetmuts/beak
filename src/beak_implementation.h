@@ -66,11 +66,11 @@ struct BeakImplementation : Beak {
     void printVersion(bool verbose);
 
     RC configure(Settings *settings);
-    RC diff(Settings *settings);
-    RC fsck(Settings *settings);
-    RC push(Settings *settings);
-    RC pull(Settings *settings);
-    RC prune(Settings *settings);
+    RC diff(Settings *settings, Monitor *monitor);
+    RC fsck(Settings *settings, Monitor *monitor);
+    RC push(Settings *settings, Monitor *monitor);
+    RC pull(Settings *settings, Monitor *monitor);
+    RC prune(Settings *settings, Monitor *monitor);
 
     RC umountDaemon(Settings *settings);
 
@@ -78,16 +78,16 @@ struct BeakImplementation : Beak {
     RC mountBackup(Settings *settings, ProgressStatistics *progress = NULL);
     RC umountBackup(Settings *settings);
 
-    RC mountRestoreDaemon(Settings *settings);
+    RC mountRestoreDaemon(Settings *settings, Monitor *monitor);
     RC mountRestore(Settings *settings, ProgressStatistics *progress = NULL);
     RC umountRestore(Settings *settings);
 
-    RC shell(Settings *settings);
+    RC shell(Settings *settings, Monitor *monitor);
 
-    RC status(Settings *settings);
-    RC monitor(Settings *settings);
-    RC store(Settings *settings);
-    RC restore(Settings *settings);
+    RC status(Settings *settings, Monitor *monitor);
+    RC monitor(Settings *settings, Monitor *monitor);
+    RC store(Settings *settings, Monitor *monitor);
+    RC restore(Settings *settings, Monitor *monitor);
 
     void genAutoComplete(string filename);
 

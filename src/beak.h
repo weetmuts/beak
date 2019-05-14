@@ -21,6 +21,7 @@
 #include "always.h"
 #include "configuration.h"
 #include "filesystem.h"
+#include "monitor.h"
 #include "statistics.h"
 #include "util.h"
 
@@ -54,26 +55,26 @@ struct Beak
     virtual void captureStartTime() = 0;
     virtual Command parseCommandLine(int argc, char **argv, Settings *settings) = 0;
 
-    virtual RC store(Settings *settings) = 0;
-    virtual RC restore(Settings *settings) = 0;
-    virtual RC shell(Settings *settings) = 0;
-    virtual RC prune(Settings *settings) = 0;
+    virtual RC store(Settings *settings, Monitor *monitor) = 0;
+    virtual RC restore(Settings *settings, Monitor *monitor) = 0;
+    virtual RC shell(Settings *settings, Monitor *monitor) = 0;
+    virtual RC prune(Settings *settings, Monitor *monitor) = 0;
 
-    virtual RC diff(Settings *settings) = 0;
-    virtual RC fsck(Settings *settings) = 0;
+    virtual RC diff(Settings *settings, Monitor *monitor) = 0;
+    virtual RC fsck(Settings *settings, Monitor *monitor) = 0;
     virtual RC configure(Settings *settings) = 0;
 
-    virtual RC status(Settings *settings) = 0;
-    virtual RC monitor(Settings *settings) = 0;
-    virtual RC push(Settings *settings) = 0;
-    virtual RC pull(Settings *settings) = 0;
+    virtual RC status(Settings *settings, Monitor *monitor) = 0;
+    virtual RC monitor(Settings *settings, Monitor *monitor) = 0;
+    virtual RC push(Settings *settings, Monitor *monitor) = 0;
+    virtual RC pull(Settings *settings, Monitor *monitor) = 0;
 
     virtual RC umountDaemon(Settings *settings) = 0;
 
     virtual RC mountBackupDaemon(Settings *settings) = 0;
     virtual RC mountBackup(Settings *settings, ProgressStatistics *progress = NULL) = 0;
     virtual RC umountBackup(Settings *settings) = 0;
-    virtual RC mountRestoreDaemon(Settings *settings) = 0;
+    virtual RC mountRestoreDaemon(Settings *settings, Monitor *monitor) = 0;
     virtual RC mountRestore(Settings *settings, ProgressStatistics *progress = NULL) = 0;
     virtual RC umountRestore(Settings *settings) = 0;
 

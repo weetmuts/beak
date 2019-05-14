@@ -19,6 +19,7 @@
 
 #include "fit.h"
 #include "log.h"
+#include "monitor.h"
 #include "system.h"
 #include "util.h"
 
@@ -31,7 +32,7 @@ using namespace std;
 
 struct ProgressStatisticsImplementation : ProgressStatistics
 {
-    ProgressStatisticsImplementation() {}
+    ProgressStatisticsImplementation(Monitor *m) : monitor_(m) {}
     ~ProgressStatisticsImplementation() = default;
 
 private:
@@ -45,6 +46,7 @@ private:
     unique_ptr<ThreadCallback> regular_;
 
     int rotate_ {};
+    Monitor *monitor_ {};
 
     bool redrawLine();
     void startDisplayOfProgress();
@@ -156,7 +158,7 @@ void ProgressStatisticsImplementation::finishProgress()
     UI::output(" done.\n");
 }
 
-unique_ptr<ProgressStatistics> newProgressStatistics(ProgressDisplayType t)
+unique_ptr<ProgressStatistics> newProgressStatistics(ProgressDisplayType t, Monitor *monitor)
 {
-    return unique_ptr<ProgressStatisticsImplementation>(new ProgressStatisticsImplementation());
+    return unique_ptr<ProgressStatisticsImplementation>(new ProgressStatisticsImplementation(monitor));
 }

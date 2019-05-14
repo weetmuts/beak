@@ -26,7 +26,7 @@ static ComponentId STATUS = registerLogComponent("status");
 
 extern void update_mctim_maxes(const struct stat *sb);
 
-RC BeakImplementation::status(Settings *settings)
+RC BeakImplementation::status(Settings *settings, Monitor *monitor)
 {
     RC rc = RC::OK;
     struct timespec mtim_max {};  /* time of last modification */
@@ -41,7 +41,7 @@ RC BeakImplementation::status(Settings *settings)
     memset(&mtim_max, 0, sizeof(mtim_max));
     memset(&ctim_max, 0, sizeof(ctim_max));
     uint64_t start = clockGetTimeMicroSeconds();
-    auto progress = newProgressStatistics(settings->progress);
+    auto progress = newProgressStatistics(settings->progress, monitor);
     rc = origin_tool_->fs()->recurse(rule->origin_path,
                                      [=](const char *path, const struct stat *sb) {
                                          update_mctim_maxes(sb);

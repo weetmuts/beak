@@ -20,6 +20,7 @@
 
 #include "always.h"
 #include "filesystem.h"
+#include "monitor.h"
 
 #include <map>
 
@@ -73,6 +74,7 @@ enum ProgressDisplayType
     ProgressDisplayNotification   // Use the OS notification system
 };
 
-std::unique_ptr<ProgressStatistics> newProgressStatistics(ProgressDisplayType t);
+std::unique_ptr<ProgressStatistics> newProgressStatistics(ProgressDisplayType t,
+                                                          Monitor *monitor);
 
 #endif

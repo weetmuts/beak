@@ -24,10 +24,10 @@
 
 static ComponentId RESTORE = registerLogComponent("restore");
 
-RC BeakImplementation::restore(Settings *settings)
+RC BeakImplementation::restore(Settings *settings, Monitor *monitor)
 {
     uint64_t start = clockGetTimeMicroSeconds();
-    auto progress = newProgressStatistics(settings->progress);
+    auto progress = newProgressStatistics(settings->progress, monitor);
     progress->startDisplayOfProgress();
 
     umask(0);

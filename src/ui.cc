@@ -32,15 +32,15 @@ struct UIImplementation
     UIImplementation();
 };
 
+string blue_ = "\033[0;37;1m\033[44m";
+string save_crs_ = "\033[s";
+string rest_crs_ = "\033[u";
+string top_left_ = "\033[1;1H";
 
 static UIImplementation ui_imp;
 
 UIImplementation::UIImplementation()
 {
-    if (UI::isatty())
-    {
-
-    }
 }
 
 void UI::output(const char *fmt, ...)

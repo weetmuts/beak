@@ -230,12 +230,12 @@ RC BeakImplementation::configure(Settings *settings)
     return configuration_->configure();
 }
 
-RC BeakImplementation::push(Settings *settings)
+RC BeakImplementation::push(Settings *settings, Monitor *monitor)
 {
     return RC::ERR;
 }
 
-RC BeakImplementation::pull(Settings *settings)
+RC BeakImplementation::pull(Settings *settings, Monitor *monitor)
 {
     return RC::ERR;
 }
@@ -292,7 +292,7 @@ RC BeakImplementation::umountBackup(Settings *settings)
     return RC::OK;
 }
 
-RC BeakImplementation::mountRestoreDaemon(Settings *settings)
+RC BeakImplementation::mountRestoreDaemon(Settings *settings, Monitor *monitor)
 {
     return mountRestoreInternal_(settings, true, NULL);
 }

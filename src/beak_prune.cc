@@ -24,13 +24,13 @@
 
 static ComponentId PRUNE = registerLogComponent("prune");
 
-RC BeakImplementation::prune(Settings *settings)
+RC BeakImplementation::prune(Settings *settings, Monitor *monitor)
 {
     RC rc = RC::OK;
 
     assert(settings->from.type == ArgStorage);
 
-    auto progress = newProgressStatistics(settings->progress);
+    auto progress = newProgressStatistics(settings->progress, monitor);
     FileSystem *backup_fs;
     Path *root;
     auto restore = accessBackup_(&settings->from, "", progress.get(), &backup_fs, &root);

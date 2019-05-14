@@ -24,13 +24,13 @@
 
 static ComponentId FSCK = registerLogComponent("fsck");
 
-RC BeakImplementation::fsck(Settings *settings)
+RC BeakImplementation::fsck(Settings *settings, Monitor *monitor)
 {
     RC rc = RC::OK;
 
     assert(settings->from.type == ArgStorage);
 
-    auto progress = newProgressStatistics(settings->progress);
+    auto progress = newProgressStatistics(settings->progress, monitor);
     FileSystem *backup_fs;
     Path *root;
     auto restore = accessBackup_(&settings->from, "", progress.get(), &backup_fs, &root);

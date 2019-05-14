@@ -22,7 +22,7 @@
 
 static ComponentId SHELL = registerLogComponent("shell");
 
-RC BeakImplementation::shell(Settings *settings)
+RC BeakImplementation::shell(Settings *settings, Monitor *monitor)
 {
     RC rc = RC::OK;
 

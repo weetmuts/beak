@@ -21,6 +21,7 @@
 #include "filesystem.h"
 #include "index.h"
 #include "lock.h"
+#include "monitor.h"
 #include "tarfile.h"
 
 #include <algorithm>
