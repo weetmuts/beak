@@ -65,6 +65,12 @@ struct UI
     static void clearLine();
     // Clear line the output.
     static void redrawLineOutput(const char *fmt, ...);
+    // Remember cursor position.
+    static void storeCursor();
+    // Restore cursore back to where it was.
+    static void restoreCursor();
+    // Move to top left.
+    static void moveTopLeft();
     // Present a prompt message "name>" no newline/cr.
     static void outputPrompt(const char *msg);
     static void outputPrompt(std::string msg);

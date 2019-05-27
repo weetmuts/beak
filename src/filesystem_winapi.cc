@@ -271,7 +271,7 @@ Path *FileSystemImplementationWinapi::mkTempDir(string prefix)
     return tmp_dir;
 }
 
-Path *FileSystemImplementationWinapi::mkDir(Path *p, string name)
+Path *FileSystemImplementationWinapi::mkDir(Path *p, string name, int permissions)
 {
     Path *n = p->append(name);
     int rc = CreateDirectory(n->c_str(), NULL);

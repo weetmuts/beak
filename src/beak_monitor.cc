@@ -26,5 +26,6 @@ RC BeakImplementation::monitor(Settings *settings, Monitor *monitor)
 {
     RC rc = RC::OK;
 
+    for (;;) ;
     return rc;
 }

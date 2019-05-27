@@ -190,7 +190,7 @@ RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backup,
         // Present the listed files at the storage site as a read only file system
         // that can only be listed and stated. This is enough to determine if
         // the storage site files need to be updated.
-        fs = newStatOnlyFileSystem(contents);
+        fs = newStatOnlyFileSystem(sys_, contents);
         storage_fs = fs.get();
     }
     backup_fs->recurse(Path::lookupRoot(), [=,&files_to_backup]

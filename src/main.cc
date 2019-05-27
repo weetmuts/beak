@@ -37,7 +37,7 @@ int main(int argc, char *argv[])
         return run(argc, argv);
     }
     catch (...) {
-        fprintf(stderr, "Internal error due to C++ exception.\n");
+        fprintf(stderr, "beak: Internal error due to C++ exception.\n");
         // The catch/print is necessary for winapi hosts, since
         // a thrown exception is not necessarily printed! The program
         // just silently terminates. If only we could print the stack trace here...
@@ -53,7 +53,7 @@ int run(int argc, char *argv[])
     // Next create the interface to the local file system where we find:
     // the orgin files and directories, the beak configuration file, the rclone configuration file,
     // and the temporary/cache files.
-    auto local_fs = newDefaultFileSystem();
+    auto local_fs = newDefaultFileSystem(sys.get());
     // Then create the interface to hide the differences between different storages types:
     // ie rclone, rsync and local file system.
     auto storage_tool = newStorageTool(sys, local_fs);
@@ -76,10 +76,12 @@ int run(int argc, char *argv[])
 
     // The monitor is used to display continuous updates on the terminal
     // when beak is performing stores/restores/cache downloads.
-    auto monitor = newMonitor();
+    // It also stores the information in the directory /tmp/beak_user_monitor
+    auto monitor = newMonitor(sys.get(), local_fs.get());
 
     // We now know the command the user intends to invoke.
-    switch (cmd) {
+    switch (cmd)
+    {
 
     case bmount_cmd:
         rc = beak->mountBackupDaemon(&settings);

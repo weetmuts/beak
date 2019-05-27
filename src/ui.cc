@@ -71,6 +71,21 @@ void UI::clearLine()
     }
 }
 
+void UI::storeCursor()
+{
+    output("\x1B[s");
+}
+
+void UI::restoreCursor()
+{
+    output("\x1B[u");
+}
+
+void UI::moveTopLeft()
+{
+    output("\x1B[1;1H");
+}
+
 void UI::redrawLineOutput(const char *fmt, ...)
 {
     if (logLevel() <= INFO) {

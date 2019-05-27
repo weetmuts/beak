@@ -25,6 +25,7 @@
 
 #include <memory.h>
 #include <string.h>
+#include <unistd.h>
 
 static ComponentId STATISTICS = registerLogComponent("statistics");
 
@@ -43,8 +44,6 @@ private:
 
     vector<SecsBytes> secsbytes;
 
-    unique_ptr<ThreadCallback> regular_;
-
     int rotate_ {};
     Monitor *monitor_ {};
 
@@ -60,7 +59,7 @@ const char *spinner_[] = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧
 void ProgressStatisticsImplementation::startDisplayOfProgress()
 {
     start_time = clockGetTimeMicroSeconds();
-    regular_ = newRegularThreadCallback(1000, [this](){ return redrawLine();});
+    monitor_->startDisplay("", [this](){ return redrawLine();});
 }
 
 //Tar emot objekt: 100% (814178/814178), 669.29 MiB | 6.71 MiB/s, klart.
@@ -75,7 +74,7 @@ void ProgressStatisticsImplementation::updateProgress()
 {
     // Take a snapshot of the stats structure.
     // The snapshot is taken while the regular callback is blocked.
-    regular_->doWhileCallbackBlocked([this]() {
+    monitor_->doWhileCallbackBlocked([this]() {
             copy = stats;
             copy.latest_update = clockGetTimeMicroSeconds();
         });
@@ -141,20 +140,24 @@ bool ProgressStatisticsImplementation::redrawLine()
         // Do not show the estimate when all bytes are transferred.
         estimated_total = "";
     }
-    UI::redrawLineOutput("%s store: %s %d%% (%ju/%ju) %s/s | %s%s",
-                         msg.c_str(), mibs.c_str(),
-                         percentage, copy.num_files_stored, copy.num_files_to_store,
-                         average_speed.c_str(),
-                         elapsed.c_str(), estimated_total.c_str());
+    string info;
+    strprintf(info, "%s store: %s %d%% (%ju/%ju) %s/s | %s%s",
+              msg.c_str(), mibs.c_str(),
+              percentage, copy.num_files_stored, copy.num_files_to_store,
+              average_speed.c_str(),
+              elapsed.c_str(), estimated_total.c_str());
+
+    monitor_->updateJob(getpid(), info);
+
     return true;
 }
 
 void ProgressStatisticsImplementation::finishProgress()
 {
     if (stats.num_files == 0 || stats.num_files_to_store == 0) return;
-    regular_->stop();
     updateProgress();
     redrawLine();
+    UI::output(monitor_->lastUpdate(getpid()));
     UI::output(" done.\n");
 }
 

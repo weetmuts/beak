@@ -33,9 +33,10 @@ struct ReadOnlyFileSystem : FileSystem
 
     RC chmod(Path *p, FileStat *stat);
     RC utime(Path *p, FileStat *stat);
+    Path *tempDir();
     Path *mkTempFile(std::string prefix, std::string content);
     Path *mkTempDir(std::string prefix);
-    Path *mkDir(Path *path, std::string name);
+    Path *mkDir(Path *path, std::string name, int permissions);
     RC rmDir(Path *path);
     RC createFile(Path *file, std::vector<char> *buf);
     bool createFile(Path *path, FileStat *stat,
@@ -57,7 +58,7 @@ struct ReadOnlyFileSystem : FileSystem
 
 struct StatOnlyFileSystem : ReadOnlyFileSystem
 {
-    StatOnlyFileSystem(std::map<Path*,FileStat> &contents) : ReadOnlyFileSystem("StatOnlyFileSystem"), contents_(contents) { }
+StatOnlyFileSystem(System *sys, std::map<Path*,FileStat> &contents) : ReadOnlyFileSystem("StatOnlyFileSystem"), contents_(contents) { }
 
     bool readdir(Path *p, std::vector<Path*> *vec);
     ssize_t pread(Path *p, char *buf, size_t count, off_t offset);

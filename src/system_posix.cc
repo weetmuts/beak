@@ -22,6 +22,7 @@
 
 #include <memory.h>
 #include <pthread.h>
+#include <pwd.h>
 #include <sys/errno.h>
 #include <sys/types.h>
 #ifdef OSX64
@@ -213,11 +214,13 @@ struct SystemImplementation : System
               std::function<void(char *buf, size_t len)> output_cb = NULL);
 
     RC invokeShell(Path *init_file);
+    bool processExists(pid_t pid);
 
     RC mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground, bool debug);
     RC umountDaemon(Path *dir);
     std::unique_ptr<FuseMount> mount(Path *dir, FuseAPI *fuseapi, bool debug);
     RC umount(ptr<FuseMount> fuse_mount);
+    string userName();
 
     RC mountInternal(Path *dir, FuseAPI *fuseapi,
                      bool daemon, unique_ptr<FuseMount> &fm,
@@ -229,7 +232,7 @@ struct SystemImplementation : System
     private:
 
     pid_t running_shell_pid_ {};
-
+    string user_name_;
 };
 
 unique_ptr<System> newSystem()
@@ -245,6 +248,15 @@ string protect_(string arg)
 SystemImplementation::SystemImplementation()
 {
     handleSignals();
+    struct passwd pwd, *res;
+    char buf[1024];
+    uid_t uid = geteuid();
+    int err = getpwuid_r(uid, &pwd, buf, 1024, &res);
+    if (!err && res) {
+        user_name_ = "?";
+    }
+    user_name_ = buf;
+
     /*onExit("Main", [&](){
             fprintf(stderr, "Exiting!\n");
             Have to stop all threads and background processes here.
@@ -367,6 +379,11 @@ RC SystemImplementation::invokeShell(Path *init_file)
     debug(SYSTEM, "beak shell exited!\n");
 
     return RC::OK;
+}
+
+bool SystemImplementation::processExists(pid_t pid)
+{
+    return kill(pid, 0) == 0;
 }
 
 struct FuseMountImplementationPosix : FuseMount
@@ -536,4 +553,9 @@ RC SystemImplementation::umount(ptr<FuseMount> fuse_mount_info)
     fuse_exit(fmi->fuse);
     fuse_unmount (fmi->dir->c_str(), fmi->chan);
     return RC::OK;
+}
+
+string SystemImplementation::userName()
+{
+    return user_name_;
 }

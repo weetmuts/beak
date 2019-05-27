@@ -302,10 +302,11 @@ struct FileSystem
     virtual RC stat(Path *p, FileStat *fs) = 0;
     virtual RC chmod(Path *p, FileStat *stat) = 0;
     virtual RC utime(Path *p, FileStat *stat) = 0;
+    virtual Path *tempDir() = 0;
     virtual Path *mkTempFile(std::string prefix, std::string content) = 0;
     virtual Path *mkTempDir(std::string prefix) = 0;
             bool mkDirpWriteable(Path *p);
-    virtual Path *mkDir(Path *p, std::string name) = 0;
+    virtual Path *mkDir(Path *p, std::string name, int permissions = 0755) = 0;
     virtual RC rmDir(Path *p) = 0;
 
     virtual RC loadVector(Path *file, size_t blocksize, std::vector<char> *buf) = 0;
@@ -346,13 +347,14 @@ struct FileSystem
 };
 
 // The default file system for this computer/OS.
-std::unique_ptr<FileSystem> newDefaultFileSystem();
+struct System;
+std::unique_ptr<FileSystem> newDefaultFileSystem(System *sys);
 
 // A file system where you can only stat the files...
-std::unique_ptr<FileSystem> newStatOnlyFileSystem(std::map<Path*,FileStat> contents);
+std::unique_ptr<FileSystem> newStatOnlyFileSystem(System *sys, std::map<Path*,FileStat> contents);
 
 // Access a fuse exported file system as a FileSystem.
-FileSystem *newFileSystem(FuseAPI *api);
+FileSystem *newFileSystem(System *sys, FuseAPI *api);
 
 
 Path *configurationFile();

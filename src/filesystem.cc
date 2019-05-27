@@ -37,9 +37,10 @@ struct FileSystemFuseAPIImplementation : FileSystem
     RC stat(Path *p, FileStat *fs);
     RC chmod(Path *p, FileStat *stat);
     RC utime(Path *p, FileStat *stat);
+    Path *tempDir();
     Path *mkTempFile(string prefix, string content);
     Path *mkTempDir(string prefix);
-    Path *mkDir(Path *path, string name);
+    Path *mkDir(Path *path, string name, int permissions);
     RC rmDir(Path *path);
     RC loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
     RC createFile(Path *file, std::vector<char> *buf);
@@ -137,6 +138,11 @@ RC FileSystemFuseAPIImplementation::utime(Path *p, FileStat *fs)
     return RC::ERR;
 }
 
+Path *FileSystemFuseAPIImplementation::tempDir()
+{
+    return NULL;
+}
+
 Path *FileSystemFuseAPIImplementation::mkTempFile(string prefix, string content)
 {
     return NULL;
@@ -147,7 +153,7 @@ Path *FileSystemFuseAPIImplementation::mkTempDir(string prefix)
     return NULL;
 }
 
-Path *FileSystemFuseAPIImplementation::mkDir(Path *p, string name)
+Path *FileSystemFuseAPIImplementation::mkDir(Path *p, string name, int permissions)
 {
     return NULL;
 }
@@ -874,9 +880,9 @@ void FileStat::checkStat(FileSystem *dst, Path *target)
     disk_update = Store;
 }
 
-unique_ptr<FileSystem> newStatOnlyFileSystem(map<Path*,FileStat> contents)
+unique_ptr<FileSystem> newStatOnlyFileSystem(System *sys, map<Path*,FileStat> contents)
 {
-    return unique_ptr<FileSystem>(new StatOnlyFileSystem(contents));
+    return unique_ptr<FileSystem>(new StatOnlyFileSystem(sys, contents));
 }
 
 RC sortOn(SortOrder so, vector<pair<Path*,FileStat>> &files)

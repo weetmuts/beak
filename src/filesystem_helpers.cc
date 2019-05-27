@@ -36,6 +36,11 @@ RC ReadOnlyFileSystem::utime(Path *p, FileStat *fs)
     return RC::ERR;
 }
 
+Path *ReadOnlyFileSystem::tempDir()
+{
+    return NULL;
+}
+
 Path *ReadOnlyFileSystem::mkTempFile(string prefix, string content)
 {
     return NULL;
@@ -46,7 +51,7 @@ Path *ReadOnlyFileSystem::mkTempDir(string prefix)
     return NULL;
 }
 
-Path *ReadOnlyFileSystem::mkDir(Path *p, string name)
+Path *ReadOnlyFileSystem::mkDir(Path *p, string name, int permissions)
 {
     return NULL;
 }

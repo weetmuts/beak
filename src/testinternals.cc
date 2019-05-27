@@ -47,6 +47,7 @@ void testMatch(string pattern, const char *path, bool should_match);
 bool verbose_ = false;
 bool err_found_ = false;
 
+unique_ptr<System> sys;
 unique_ptr<FileSystem> fs;
 void testParsing();
 void testPaths();
@@ -81,7 +82,8 @@ int main(int argc, char *argv[])
         return 0;
     }
     try {
-        fs = newDefaultFileSystem();
+        sys = newSystem();
+        fs = newDefaultFileSystem(sys.get());
         testParsing();
         testPaths();
         testMatching();
@@ -415,7 +417,7 @@ void predictor(int argc, char **argv)
         error(TEST_FIT,"You must supply a log file with statistics.\n");
     }
     try {
-        fs = newDefaultFileSystem();
+        fs = newDefaultFileSystem(sys.get());
 
         Path *log = Path::lookup(argv[2]);
         vector<char> buf;

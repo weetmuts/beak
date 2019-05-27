@@ -115,6 +115,11 @@ struct RestoreFileSystem : FileSystem
         return RC::ERR;
     }
 
+    Path *tempDir()
+    {
+        return NULL;
+    }
+
     Path *mkTempFile(std::string prefix, std::string content)
     {
         return NULL;
@@ -125,7 +130,7 @@ struct RestoreFileSystem : FileSystem
         return NULL;
     }
 
-    Path *mkDir(Path *p, std::string name)
+    Path *mkDir(Path *p, std::string name, int permissions)
     {
         return NULL;
     }

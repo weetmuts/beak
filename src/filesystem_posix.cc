@@ -18,6 +18,8 @@
 #include "filesystem.h"
 
 #include "log.h"
+#include "system.h"
+#include "util.h"
 
 #include <assert.h>
 #include <dirent.h>
@@ -116,9 +118,10 @@ struct FileSystemImplementationPosix : FileSystem
     RC stat(Path *p, FileStat *fs);
     RC chmod(Path *p, FileStat *stat);
     RC utime(Path *p, FileStat *stat);
+    Path *tempDir();
     Path *mkTempFile(string prefix, string content);
     Path *mkTempDir(string prefix);
-    Path *mkDir(Path *p, string name);
+    Path *mkDir(Path *p, string name, int permissions);
     RC rmDir(Path *p);
     RC loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
     RC createFile(Path *file, std::vector<char> *buf);
@@ -134,10 +137,16 @@ struct FileSystemImplementationPosix : FileSystem
     RC addWatch(Path *dir);
     int endWatch();
 
-    FileSystemImplementationPosix() : FileSystem("FileSystemImplementationPosix") {}
+    FileSystemImplementationPosix(System *sys) : FileSystem("FileSystemImplementationPosix"), sys_(sys)
+    {
+    }
 
 private:
 
+    void initTempDir();
+
+    System *sys_ {};
+    Path *temp_dir_;
     //int inotify_fd_ {};
 };
 
@@ -159,7 +168,7 @@ Path *initConfigurationFile_()
     return home->append(".config/beak/beak.conf");
 }
 
-unique_ptr<FileSystem> newDefaultFileSystem()
+unique_ptr<FileSystem> newDefaultFileSystem(System *sys)
 {
     if (!cache_dir_) {
         cache_dir_ = initCacheDir_();
@@ -167,7 +176,7 @@ unique_ptr<FileSystem> newDefaultFileSystem()
     if (!configuration_file_) {
         configuration_file_ = initConfigurationFile_();
     }
-    default_file_system_ = new FileSystemImplementationPosix();
+    default_file_system_ = new FileSystemImplementationPosix(sys);
     return unique_ptr<FileSystem>(default_file_system_);
 }
 
@@ -314,6 +323,14 @@ RC FileSystemImplementationPosix::utime(Path *p, FileStat *fs)
     return RC::OK;
 }
 
+Path *FileSystemImplementationPosix::tempDir()
+{
+    if (temp_dir_ == NULL) {
+        initTempDir();
+    }
+    return temp_dir_;
+}
+
 Path *FileSystemImplementationPosix::mkTempFile(string prefix, string content)
 {
     string p = "/tmp/"+prefix+"XXXXXX";
@@ -343,10 +360,11 @@ Path *FileSystemImplementationPosix::mkTempDir(string prefix)
     return Path::lookup(mount);
 }
 
-Path *FileSystemImplementationPosix::mkDir(Path *p, string name)
+Path *FileSystemImplementationPosix::mkDir(Path *p, string name, int permissions)
 {
-    Path *n = p->append(name);
-    int rc = mkdir(n->c_str(), 0775);
+    Path *n = p;
+    if (name.length() > 0) n = p->append(name);
+    int rc = mkdir(n->c_str(), permissions);
     if (rc != 0) error(FILESYSTEM, "Could not create directory: \"%s\"\n", n->c_str());
     return n;
 }
@@ -388,7 +406,7 @@ RC FileSystemImplementationPosix::loadVector(Path *file, size_t blocksize, vecto
             if (errno == EINTR) {
                 continue;
             }
-            failure(FILESYSTEM,"Could not read from gzfile %s errno=%d\n", file->c_str(), errno);
+            failure(FILESYSTEM,"Could not read from file %s errno=%d\n", file->c_str(), errno);
             close(fd);
             return RC::ERR;
         }
@@ -534,6 +552,38 @@ bool FileSystemImplementationPosix::deleteFile(Path *file)
         error(FILESYSTEM, "Could not delete file \"%s\"\n", file->c_str());
     }
     return true;
+}
+
+void FileSystemImplementationPosix::initTempDir()
+{
+    Path *tmp = Path::lookup("/dev/shm");
+    string shd;
+    strprintf(shd, "beak_%s", sys_->userName().c_str());
+    temp_dir_ = tmp->append(shd);
+    FileStat stat;
+    RC rc = this->stat(temp_dir_, &stat);
+    if (rc.isErr())
+    {
+        // Directory does not exist, lets create it.
+        mkDir(temp_dir_, "", 0700);
+    }
+    else
+    {
+        // Something is there...
+        if (!stat.isDirectory())
+        {
+            error(FILESYSTEM, "Expected \"%s\" to be a directory or not exist!\n", temp_dir_->c_str());
+        }
+        if ((stat.st_mode & 0777) != 0700)
+        {
+            error(FILESYSTEM, "Expected \"%s\" to be accessible only by you!\n", temp_dir_->c_str());
+        }
+        // We ignore group sharing for the moment.
+        if (stat.st_uid != geteuid())
+        {
+            error(FILESYSTEM, "Expected \"%s\" to owned by you!\n", temp_dir_->c_str());
+        }
+    }
 }
 
 string ownergroupString(uid_t uid, gid_t gid)
