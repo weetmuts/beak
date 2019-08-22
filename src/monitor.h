@@ -88,6 +88,6 @@ struct Monitor
     virtual ~Monitor() = default;
 };
 
-std::unique_ptr<Monitor> newMonitor(System *sys, FileSystem *fs);
+std::unique_ptr<Monitor> newMonitor(System *sys, FileSystem *fs, ProgressDisplayType pdt);
 
 #endif

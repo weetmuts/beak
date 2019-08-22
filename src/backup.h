@@ -69,7 +69,7 @@ struct Backup
     // tars directly below the mount dir, ie no subdirs, only tars.
     int forced_tar_collection_dir_depth = 2;
 
-    std::map<Path*,TarEntry*,depthFirstSortPath> files;
+    std::map<Path*,TarEntry,depthFirstSortPath> files;
     std::map<Path*,TarEntry*,depthFirstSortPath> tar_storage_directories;
     std::map<Path*,TarEntry*> directories;
     std::map<ino_t,TarEntry*> hard_links; // Only inodes for which st_nlink > 1
@@ -115,6 +115,9 @@ private:
     FileSystem* origin_fs_;
 
     bool found_future_dated_file_ {};
+
+    std::unique_ptr<FileSystem> as_file_system_;
+    std::unique_ptr<FuseAPI> as_fuse_api_;
 };
 
 std::unique_ptr<Backup> newBackup(ptr<FileSystem> fs);

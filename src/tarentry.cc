@@ -42,6 +42,10 @@ static ComponentId HARDLINKS = registerLogComponent("hardlinks");
 
 bool sanityCheck(const char *x, const char *y);
 
+TarEntry::TarEntry()
+{
+}
+
 TarEntry::TarEntry(size_t size, TarHeaderStyle ths)
 {
     abspath_ = Path::lookupRoot();

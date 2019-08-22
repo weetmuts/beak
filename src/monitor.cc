@@ -46,7 +46,7 @@ struct MonitorImplementation : Monitor
     bool regularDisplay();
     void doWhileCallbackBlocked(std::function<void()> do_cb);
 
-    MonitorImplementation(System *sys, FileSystem *fs);
+    MonitorImplementation(System *sys, FileSystem *fs, ProgressDisplayType pdt);
     ~MonitorImplementation() = default;
 
 private:
@@ -61,13 +61,14 @@ private:
     // A list of functions to call before redrawing the monitor.
     vector<function<bool()>> redraws_;
     map<pid_t,string> updates_;
+    ProgressDisplayType pdt_;
 };
 
-unique_ptr<Monitor> newMonitor(System *sys, FileSystem *fs) {
-    return unique_ptr<Monitor>(new MonitorImplementation(sys, fs));
+unique_ptr<Monitor> newMonitor(System *sys, FileSystem *fs, ProgressDisplayType pdt) {
+    return unique_ptr<Monitor>(new MonitorImplementation(sys, fs, pdt));
 }
 
-MonitorImplementation::MonitorImplementation(System *s, FileSystem *fs) : sys_(s), fs_ (fs)
+MonitorImplementation::MonitorImplementation(System *s, FileSystem *fs, ProgressDisplayType pdt) : sys_(s), fs_(fs), pdt_(pdt)
 {
 }
 
@@ -184,10 +185,21 @@ bool MonitorImplementation::regularDisplay()
         }
     }
 
-    UI::storeCursor();
-    UI::moveTopLeft();
-    printf("\033[0;37;1m\033[44m%s", s.c_str());
-    UI::restoreCursor();
+    switch (pdt_) {
+    case ProgressDisplayType::None: break;
+        printf(".");
+        break;
+    case ProgressDisplayType::Plain: break;
+        UI::clearLine();
+        printf("\033[0;37;1m\033[44m%s", s.c_str());
+        break;
+    case ProgressDisplayType::Ansi:
+        UI::storeCursor();
+        UI::moveTopLeft();
+        printf("\033[0;37;1m\033[44m%s", s.c_str());
+        UI::restoreCursor();
+        break;
+    }
     return true;
 }
 

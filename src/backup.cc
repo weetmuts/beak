@@ -126,9 +126,9 @@ RecurseOption Backup::addTarEntry(Path *abspath, FileStat *st)
     }
 
     // Creation and storage of entry.
-    TarEntry *te = new TarEntry(abspath, path, st, tarheaderstyle_, should_content_split);
-    files[te->path()] = te;
 
+    files[path] = TarEntry(abspath, path, st, tarheaderstyle_, should_content_split);
+    TarEntry *te = &files[path];
     if (te->isDirectory()) {
         // Storing the path in the lookup
         directories[te->path()] = te;
@@ -142,7 +142,7 @@ void Backup::findTarCollectionDirs() {
     // Accumulate blocked sizes into children_size in the parent.
     // Set the parent pointer.
     for(auto & e : files) {
-        TarEntry *te = e.second;
+        TarEntry *te = &e.second;
         Path *dir = te->path()->parent();
         if (dir) {
             TarEntry *parent = directories[dir];
@@ -154,7 +154,7 @@ void Backup::findTarCollectionDirs() {
 
     // Find tar collection dirs
     for(auto & e : files) {
-        TarEntry *te = e.second;
+        TarEntry *te = &e.second;
 
         if (te->isDirectory()) {
             bool must_generate_tars = (te->path()->depth() <= 1 ||
@@ -208,7 +208,7 @@ void Backup::addDirsToDirectories() {
     // directories might not be tar collection dirs.
     for(auto & e : files) {
         Path *path = e.first;
-        TarEntry *te = e.second;
+        TarEntry *te = &e.second;
         if (!te->isDirectory() || path->isRoot() || !te->isStorageDir()) {
             // Ignore files
             // Ignore the root
@@ -235,7 +235,7 @@ void Backup::addEntriesToTarCollectionDirs() {
     for(auto & e : files) {
         Path *path = e.first;
         TarEntry *dir = NULL;
-        TarEntry *te = e.second;
+        TarEntry *te = &e.second;
 
         if (path->isRoot()) {
             // Ignore the root, since there is no tar_collection_dir to add it to.
@@ -398,7 +398,7 @@ void Backup::calculateNumTars(TarEntry *te,
 
 void Backup::findHardLinks() {
     for(auto & e : files) {
-        TarEntry *te = e.second;
+        TarEntry *te = &e.second;
 
         if (!te->isDirectory() && te->stat()->st_nlink > 1) {
             TarEntry *prev = hard_links[te->stat()->st_ino];
@@ -462,7 +462,7 @@ void Backup::fixHardLinks()
             // then it will touch the directories below. Therefore we need to
             // restore the directories utimes after the hardlinks is restored.
             Path *p = entry->path()->parent();
-            TarEntry *dir = files[p];
+            TarEntry *dir = &files[p];
             assert(dir);
             while (dir && dir->path()->depth() > storage_dir->path()->depth())  {
                 debug(HARDLINKS, "Copying >%s< from dir >%s< to >%s<\n",
@@ -508,7 +508,7 @@ size_t Backup::groupFilesIntoTars()
 
     for (auto & e : files)
     {
-        TarEntry *te = e.second;
+        TarEntry *te = &e.second;
         te->calculateHash();
     }
 
@@ -1316,12 +1316,18 @@ struct BeakFS : FileSystem
 
 FileSystem *Backup::asFileSystem()
 {
-    return new BeakFS(this);
+    if (as_file_system_ == NULL) {
+        as_file_system_ = unique_ptr<FileSystem>(new BeakFS(this));
+    }
+    return as_file_system_.get();
 }
 
 FuseAPI *Backup::asFuseAPI()
 {
-    return new BackupFuseAPI(this);
+    if (as_fuse_api_ == NULL) {
+        as_fuse_api_ = unique_ptr<FuseAPI>(new BackupFuseAPI(this));
+    }
+    return as_fuse_api_.get();
 }
 
 unique_ptr<Backup> newBackup(ptr<FileSystem> fs)

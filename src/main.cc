@@ -77,7 +77,7 @@ int run(int argc, char *argv[])
     // The monitor is used to display continuous updates on the terminal
     // when beak is performing stores/restores/cache downloads.
     // It also stores the information in the directory /tmp/beak_user_monitor
-    auto monitor = newMonitor(sys.get(), local_fs.get());
+    auto monitor = newMonitor(sys.get(), local_fs.get(), settings.progress);
 
     // We now know the command the user intends to invoke.
     switch (cmd)
