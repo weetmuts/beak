@@ -23,7 +23,7 @@
 #include "configuration.h"
 #include "restore.h"
 #include "tarfile.h"
-#include "statistics.h"
+#include "monitor.h"
 
 #include<memory>
 #include<string>

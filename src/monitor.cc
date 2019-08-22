@@ -18,6 +18,7 @@
 #include "beak.h"
 #include "beak_implementation.h"
 #include "filesystem.h"
+#include "fit.h"
 #include "log.h"
 #include "system.h"
 #include "monitor.h"
@@ -31,13 +32,16 @@
 #include <unistd.h>
 
 static ComponentId MONITOR = registerLogComponent("monitor");
+static ComponentId STATISTICS = registerLogComponent("statistics");
 
 struct MonitorImplementation : Monitor
 {
+    unique_ptr<ProgressStatistics> newProgressStatistics(string job);
     void updateJob(pid_t pid, string info);
     string lastUpdate(pid_t pid);
-    int startDisplay(string job, function<bool()> regular_cb);
+    int startDisplay(function<bool()> regular_cb);
     void stopDisplay(int id);
+    ProgressStatistics *getStats();
 
     bool regularDisplay();
     void doWhileCallbackBlocked(std::function<void()> do_cb);
@@ -65,6 +69,14 @@ unique_ptr<Monitor> newMonitor(System *sys, FileSystem *fs) {
 
 MonitorImplementation::MonitorImplementation(System *s, FileSystem *fs) : sys_(s), fs_ (fs)
 {
+}
+
+unique_ptr<ProgressStatistics> newwProgressStatistics(ProgressDisplayType t, Monitor *monitor, std::string job);
+
+unique_ptr<ProgressStatistics>
+MonitorImplementation::newProgressStatistics(string job)
+{
+    return newwProgressStatistics(ProgressDisplayType::Plain, this, job);
 }
 
 void MonitorImplementation::checkSharedDir()
@@ -122,7 +134,7 @@ string MonitorImplementation::lastUpdate(pid_t pid)
     return "";
 }
 
-int MonitorImplementation::startDisplay(string job, function<bool()> progress_cb)
+int MonitorImplementation::startDisplay(function<bool()> progress_cb)
 {
     checkSharedDir();
     redraws_.push_back(progress_cb);
@@ -189,4 +201,153 @@ void MonitorImplementation::doWhileCallbackBlocked(function<void()> do_cb)
     {
         regular_->doWhileCallbackBlocked(do_cb);
     }
+}
+
+using namespace std;
+
+struct ProgressStatisticsImplementation : ProgressStatistics
+{
+    ProgressStatisticsImplementation(ProgressDisplayType t, Monitor *m, string job) : pdt_(t), monitor_(m), job_(job) {}
+    ~ProgressStatisticsImplementation() = default;
+    void setProgress(string msg);
+
+private:
+
+    Stats copy;
+
+    uint64_t start_time {};
+
+    vector<SecsBytes> secsbytes;
+
+    int rotate_ {};
+    ProgressDisplayType pdt_ {};
+    Monitor *monitor_ {};
+    string job_;
+
+    bool redrawLine();
+    void startDisplayOfProgress();
+    void updateStatHint(size_t s);
+    void updateProgress();
+    void finishProgress();
+
+};
+
+const char *spinner_[] = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" };
+
+void ProgressStatisticsImplementation::startDisplayOfProgress()
+{
+    start_time = clockGetTimeMicroSeconds();
+    monitor_->startDisplay([this](){ return redrawLine();});
+}
+
+//Tar emot objekt: 100% (814178/814178), 669.29 MiB | 6.71 MiB/s, klart.
+//Analyserar delta: 100% (690618/690618), klart.
+void ProgressStatisticsImplementation::updateStatHint(size_t s)
+{
+    stats.stat_size_files_transferred = s;
+    stats.latest_stat = clockGetTimeMicroSeconds();
+}
+
+void ProgressStatisticsImplementation::updateProgress()
+{
+    // Take a snapshot of the stats structure.
+    // The snapshot is taken while the regular callback is blocked.
+    monitor_->doWhileCallbackBlocked([this]() {
+            copy = stats;
+            copy.latest_update = clockGetTimeMicroSeconds();
+        });
+}
+
+void ProgressStatisticsImplementation::setProgress(string msg)
+{
+    string info;
+    strprintf(info, "%s | %s", job_.c_str(), msg.c_str());
+    monitor_->updateJob(getpid(), info);
+}
+
+// Draw the progress line based on the snapshotted contents in the copy struct.
+bool ProgressStatisticsImplementation::redrawLine()
+{
+    if (copy.num_files == 0 || copy.num_files_to_store == 0) return true;
+    uint64_t now = clockGetTimeMicroSeconds();
+    double secs = ((double)((now-start_time)/1000))/1000.0;
+
+    double secs_latest_update = ((double)((copy.latest_update-start_time)/1000))/1000.0;
+    double bytes = (double)copy.size_files_stored;
+
+    /*
+    // The stats from rclone are not useful in the beginning, where they are needed....
+    if (stats.latest_stat > copy.latest_update) {
+        secs_latest_update = ((double)((stats.latest_stat-start_time)/1000))/1000.0;
+        bytes = (double)stats.stat_size_files_transferred;
+    }*/
+    secsbytes.push_back({secs_latest_update,bytes});
+
+    double bps = bytes/secs_latest_update;
+
+    int percentage = (int)(100.0*(double)copy.size_files_stored / (double)copy.size_files_to_store);
+    string mibs = humanReadableTwoDecimals(copy.size_files_to_store);
+    string average_speed = humanReadableTwoDecimals(bps);
+
+    if (bytes == 0) {
+        average_speed = spinner_[rotate_];
+        rotate_++;
+        if (rotate_>9) rotate_ = 0;
+    }
+    string msg = "Full";
+    if (copy.num_files > copy.num_files_to_store) {
+        msg = "Incr";
+    }
+    double max_bytes = (double)copy.size_files_to_store;
+    double eta_1s_speed, eta_immediate, eta_average; // estimated total time
+    predict_all(secsbytes, secsbytes.size()-1, max_bytes, &eta_1s_speed, &eta_immediate, &eta_average);
+
+    debug(STATISTICS, "stored(secs,bytes)\t"
+          "%.1f\t"
+          "%ju\t"
+          "%.0f\t"
+          "%.0f\t"
+          "%.0f\n",
+          secs,
+          copy.size_files_stored,
+          eta_1s_speed,
+          eta_immediate,
+          eta_average);
+
+    string elapsed = humanReadableTime(secs, true);
+    // Only show the seconds if we are closer than 2 minutes to ending the transfer.
+    // The estimate is too uncertain early on and bit silly to show that exact.
+    bool show_seconds = ((eta_immediate - secs) < 60*2);
+    string estimated_total = "/"+humanReadableTime(eta_immediate, show_seconds);
+
+    if (secs < 60 || percentage == 100) {
+        // Do not try to give an estimate until 60 seconds have passed.
+        // Do not show the estimate when all bytes are transferred.
+        estimated_total = "";
+    }
+    string info;
+    strprintf(info, "%s | %s store: %s %d%% (%ju/%ju) %s/s | %s%s",
+              job_.c_str(),
+              msg.c_str(), mibs.c_str(),
+              percentage, copy.num_files_stored, copy.num_files_to_store,
+              average_speed.c_str(),
+              elapsed.c_str(), estimated_total.c_str());
+
+    monitor_->updateJob(getpid(), info);
+
+    return true;
+}
+
+void ProgressStatisticsImplementation::finishProgress()
+{
+    if (stats.num_files == 0 || stats.num_files_to_store == 0) return;
+    updateProgress();
+    redrawLine();
+    UI::output(monitor_->lastUpdate(getpid()));
+    UI::output(" done.\n");
+}
+
+unique_ptr<ProgressStatistics> newwProgressStatistics(ProgressDisplayType t, Monitor *monitor, std::string job)
+{
+    return unique_ptr<ProgressStatisticsImplementation>(new ProgressStatisticsImplementation(t, monitor, job));
 }

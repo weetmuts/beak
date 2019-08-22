@@ -31,8 +31,7 @@ RC BeakImplementation::store(Settings *settings, Monitor *monitor)
     assert(settings->from.type == ArgOrigin || settings->from.type == ArgRule);
     assert(settings->to.type == ArgStorage);
 
-    unique_ptr<ProgressStatistics> progress = newProgressStatistics(settings->progress,
-                                                                    monitor);
+    unique_ptr<ProgressStatistics> progress = monitor->newProgressStatistics(buildJobName("store", settings));
 
     // Watch the origin file system to detect if it is being changed while doing the store.
     origin_tool_->fs()->enableWatch();
@@ -42,7 +41,8 @@ RC BeakImplementation::store(Settings *settings, Monitor *monitor)
     // This command scans the origin file system and builds
     // an in memory representation of the backup file system,
     // with tar files,index files and directories.
-    rc = backup->scanFileSystem(&settings->from, settings);
+    progress->startDisplayOfProgress();
+    rc = backup->scanFileSystem(&settings->from, settings, progress.get());
 
     // Now store the beak file system into the selected storage.
     storage_tool_->storeBackupIntoStorage(backup.get(),

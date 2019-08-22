@@ -18,7 +18,6 @@
 #include "storage_rclone.h"
 
 #include "log.h"
-#include "statistics.h"
 
 using namespace std;
 

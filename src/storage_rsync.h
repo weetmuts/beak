@@ -18,7 +18,7 @@
 #include "always.h"
 
 #include "configuration.h"
-#include "statistics.h"
+#include "monitor.h"
 #include "system.h"
 #include "tarfile.h"
 

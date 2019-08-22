@@ -27,13 +27,14 @@ static ComponentId RESTORE = registerLogComponent("restore");
 RC BeakImplementation::restore(Settings *settings, Monitor *monitor)
 {
     uint64_t start = clockGetTimeMicroSeconds();
-    auto progress = newProgressStatistics(settings->progress, monitor);
+    auto progress = monitor->newProgressStatistics(buildJobName("restore", settings));
     progress->startDisplayOfProgress();
 
     umask(0);
     RC rc = RC::OK;
 
-    auto restore  = accessBackup_(&settings->from, settings->to.point_in_time, progress.get());
+    auto restore  = accessBackup_(&settings->from, settings->to.point_in_time, monitor);
+
     if (!restore) {
         return RC::ERR;
     }

@@ -75,11 +75,11 @@ struct BeakImplementation : Beak {
     RC umountDaemon(Settings *settings);
 
     RC mountBackupDaemon(Settings *settings);
-    RC mountBackup(Settings *settings, ProgressStatistics *progress = NULL);
+    RC mountBackup(Settings *settings, Monitor *monitor);
     RC umountBackup(Settings *settings);
 
     RC mountRestoreDaemon(Settings *settings, Monitor *monitor);
-    RC mountRestore(Settings *settings, ProgressStatistics *progress = NULL);
+    RC mountRestore(Settings *settings, Monitor *monitor);
     RC umountRestore(Settings *settings);
 
     RC shell(Settings *settings, Monitor *monitor);
@@ -96,10 +96,10 @@ struct BeakImplementation : Beak {
     string argsToVector_(int argc, char **argv, vector<string> *args);
     unique_ptr<Restore> accessBackup_(Argument *storage,
                                       string pointintime,
-                                      ProgressStatistics *progress,
+                                      Monitor *monitor,
                                       FileSystem **out_backup_fs = NULL,
                                       Path **out_root = NULL);
-    RC mountRestoreInternal_(Settings *settings, bool daemon, ProgressStatistics *progress);
+    RC mountRestoreInternal_(Settings *settings, bool daemon, Monitor *monitor);
     bool hasPointsInTime_(Path *path, FileSystem *fs);
 
     map<string,CommandEntry*> commands_;

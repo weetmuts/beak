@@ -1036,7 +1036,7 @@ struct BackupFuseAPI : FuseAPI
     }
 };
 
-RC Backup::scanFileSystem(Argument *origin, Settings *settings)
+RC Backup::scanFileSystem(Argument *origin, Settings *settings, ProgressStatistics *progress)
 {
     if (origin->type == ArgOrigin && origin->origin) {
         root_dir_path = origin->origin;

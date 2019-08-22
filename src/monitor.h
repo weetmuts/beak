@@ -25,24 +25,66 @@
 #include <map>
 #include <string>
 
-
-enum class MonitorType
+struct Stats
 {
-    LAST_LINE, TOP_LINE
+    size_t num_files {};
+    size_t size_files {};
+
+    size_t num_dirs {};
+    size_t num_hard_links {};
+    size_t num_symbolic_links {};
+    size_t num_nodes {};
+
+    size_t num_files_to_store {};
+    size_t size_files_to_store {};
+
+    size_t num_files_stored {};
+    size_t size_files_stored {};
+    size_t num_hard_links_stored {};
+    size_t num_symbolic_links_stored {};
+    size_t num_device_nodes_stored {};
+
+    size_t num_dirs_updated {};
+
+    size_t num_total {};
+
+    uint64_t latest_update {};
+
+    size_t   stat_size_files_transferred {};
+    uint64_t latest_stat {};
+
+    std::map<Path*,size_t> file_sizes;
 };
 
-enum class MonitorFlair
+struct ProgressStatistics
 {
-    PLAIN, COLOR
+    Stats stats;
+
+    virtual void startDisplayOfProgress() = 0;
+    virtual void updateStatHint(size_t s) = 0;
+    virtual void updateProgress() = 0;
+    virtual void finishProgress() = 0;
+    virtual void setProgress(std::string msg) = 0;
+    virtual ~ProgressStatistics() {};
+};
+
+enum class ProgressDisplayType
+{
+    None,  // No progress at all
+    Plain, // Print on terminal
+    Ansi,  // Use ansi to move the cursor
 };
 
 struct Monitor
 {
+    virtual std::unique_ptr<ProgressStatistics> newProgressStatistics(std::string job) = 0;
+
     virtual void updateJob(pid_t pid, std::string info) = 0;
     virtual std::string lastUpdate(pid_t pid) = 0;
-    virtual int startDisplay(std::string job, std::function<bool()> regular_cb) = 0;
+    virtual int startDisplay(std::function<bool()> regular_cb) = 0;
     virtual void stopDisplay(int id) = 0;
     virtual void doWhileCallbackBlocked(std::function<void()> do_cb) = 0;
+
     virtual ~Monitor() = default;
 };
 

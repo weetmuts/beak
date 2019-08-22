@@ -20,7 +20,7 @@
 #include "backup.h"
 #include "filesystem_helpers.h"
 #include "log.h"
-#include "statistics.h"
+#include "monitor.h"
 #include "system.h"
 #include "storage_rclone.h"
 #include "storage_rsync.h"
@@ -39,17 +39,17 @@ struct StorageToolImplementation : public StorageTool
     RC storeBackupIntoStorage(Backup *backup,
                               Storage *storage,
                               Settings *settings,
-                              ProgressStatistics *st);
+                              ProgressStatistics *progress);
 
     RC listPointsInTime(Storage *storage, vector<pair<Path*,struct timespec>> *v,
-                        ProgressStatistics *st);
+                        ProgressStatistics *progress);
 
     RC removeBackupFiles(Storage *storage,
                          std::vector<Path*>& files,
                          ProgressStatistics *progress);
 
     FileSystem *asCachedReadOnlyFS(Storage *storage,
-                                   ProgressStatistics *progress);
+                                   Monitor *monitor);
 
     System *sys_;
     FileSystem *local_fs_;
@@ -68,7 +68,7 @@ StorageToolImplementation::StorageToolImplementation(ptr<System>sys,
 
 }
 
-void add_backup_work(ptr<ProgressStatistics> st,
+void add_backup_work(ProgressStatistics *progress,
                      vector<Path*> *files_to_backup,
                      Path *path, FileStat *stat,
                      Settings *settings,
@@ -83,8 +83,8 @@ void add_backup_work(ptr<ProgressStatistics> st,
         // Remember the size of this file. This is necessary to
         // know how many bytes has been transferred when
         // rclone/rsync later reports that a file has been successfully sent.
-        assert(st->stats.file_sizes.count(file_to_extract) == 0);
-        st->stats.file_sizes[file_to_extract] = stat->st_size;
+        assert(progress->stats.file_sizes.count(file_to_extract) == 0);
+        progress->stats.file_sizes[file_to_extract] = stat->st_size;
 
         // Compare our local file with the stats of the one stored remotely.
         stat->checkStat(to_fs, file_to_extract);
@@ -94,20 +94,20 @@ void add_backup_work(ptr<ProgressStatistics> st,
             // The remote might be missing, or it has the wrong size/date.
 
             // Accumulate the count/size of files to be uploaded.
-            st->stats.num_files_to_store++;
-            st->stats.size_files_to_store += stat->st_size;
+            progress->stats.num_files_to_store++;
+            progress->stats.size_files_to_store += stat->st_size;
             // Remember the files to be uploaded.
             files_to_backup->push_back(path);
         }
         // Accumulate the total count of files.
-        st->stats.num_files++;
-        st->stats.size_files+=stat->st_size;
+        progress->stats.num_files++;
+        progress->stats.size_files+=stat->st_size;
     }
     else if (stat->isDirectory())
     {
         // We count the directories, only for information.
         // Directories are created implicitly on the storage side anyway.
-        st->stats.num_dirs++;
+        progress->stats.num_dirs++;
     }
 }
 
@@ -118,7 +118,7 @@ void store_local_backup_file(Backup *backup,
                              Path *path,
                              FileStat *stat,
                              Settings *settings,
-                             ptr<ProgressStatistics> st)
+                             ProgressStatistics *progress)
 {
     if (!stat->isRegularFile()) return;
 
@@ -141,16 +141,16 @@ void store_local_backup_file(Backup *backup,
             storage_fs->deleteFile(file_name);
         }
         // The size gets incrementally update while the tar file is written!
-        auto func = [&st](size_t n){ st->stats.size_files_stored += n; };
+        auto func = [&progress](size_t n){ progress->stats.size_files_stored += n; };
         tar->createFile(file_name, stat, partnr, origin_fs, storage_fs, 0, func);
 
         storage_fs->utime(file_name, stat);
-        st->stats.num_files_stored++;
+        progress->stats.num_files_stored++;
         verbose(STORAGETOOL, "stored %s\n", file_name->c_str());
     }
 //    st->num_files_handled++;
 //    st->size_files_handled += stat->st_size;
-    st->updateProgress();
+    progress->updateProgress();
 }
 
 RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backup,
@@ -158,8 +158,6 @@ RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backup,
                                                      Settings *settings,
                                                      ProgressStatistics *progress)
 {
-    progress->startDisplayOfProgress();
-
     // The backup archive files (.tar .gz) are found here.
     FileSystem *backup_fs = backup->asFileSystem();
     // The where the origin files can be found.
@@ -199,7 +197,7 @@ RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backup,
                            return RecurseContinue;
                        });
 
-    debug(STORAGETOOL, "work to be done: num_files=%ju num_dirs=%ju\n", progress->stats.num_files, progress->stats.num_dirs);
+    //debug(STORAGETOOL, "work to be done: num_files=%ju num_dirs=%ju\n", progress->stats.num_files, progress->stats.num_dirs);
 
     switch (storage->type) {
     case FileSystemStorage:
@@ -267,7 +265,7 @@ RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backup,
 
 
 RC StorageToolImplementation::listPointsInTime(Storage *storage, vector<pair<Path*,struct timespec>> *v,
-                                               ProgressStatistics *st)
+                                               ProgressStatistics *progress)
 {
     switch (storage->type) {
     case FileSystemStorage:
@@ -293,8 +291,6 @@ RC StorageToolImplementation::removeBackupFiles(Storage *storage,
                                                 std::vector<Path*>& files_to_remove,
                                                 ProgressStatistics *progress)
 {
-    progress->startDisplayOfProgress();
-
     // This is the list of files to be sent to the storage.
 
     switch (storage->type) {
@@ -346,8 +342,8 @@ RC StorageToolImplementation::removeBackupFiles(Storage *storage,
 
 struct CacheFS : ReadOnlyCacheFileSystemBaseImplementation
 {
-    CacheFS(ptr<FileSystem> cache_fs, Path *cache_dir, Storage *storage, System *sys, ProgressStatistics *progress) :
-        ReadOnlyCacheFileSystemBaseImplementation("CacheFS", cache_fs, cache_dir, storage->storage_location->depth(), progress),
+    CacheFS(ptr<FileSystem> cache_fs, Path *cache_dir, Storage *storage, System *sys, Monitor *monitor) :
+        ReadOnlyCacheFileSystemBaseImplementation("CacheFS", cache_fs, cache_dir, storage->storage_location->depth(), monitor),
         sys_(sys), storage_(storage) {
     }
 
@@ -400,15 +396,17 @@ RC CacheFS::loadDirectoryStructure(map<Path*,CacheEntry> *entries)
     map<Path*,FileStat> contents;
     RC rc = RC::OK;
 
+    auto progress = monitor_->newProgressStatistics("Loading directory structure...");
+
     switch (storage_->type) {
     case NoSuchStorage:
     case FileSystemStorage:
         break;
     case RSyncStorage:
-        rc = rsyncListBeakFiles(storage_, &files, &bad_files, &other_files, &contents, sys_, progress_);
+        rc = rsyncListBeakFiles(storage_, &files, &bad_files, &other_files, &contents, sys_, progress.get());
         break;
     case RCloneStorage:
-        rc = rcloneListBeakFiles(storage_, &files, &bad_files, &other_files, &contents, sys_, progress_);
+        rc = rcloneListBeakFiles(storage_, &files, &bad_files, &other_files, &contents, sys_, progress.get());
         break;
     }
 
@@ -467,6 +465,7 @@ RC CacheFS::fetchFile(Path *file)
 
 RC CacheFS::fetchFiles(vector<Path*> *files)
 {
+    auto progress = monitor_->newProgressStatistics("Fetching files...");
     for (auto p : *files) {
         debug(CACHE, "fetch %s\n", p->c_str());
     }
@@ -478,22 +477,22 @@ RC CacheFS::fetchFiles(vector<Path*> *files)
     case RSyncStorage:
     {
         debug(CACHE, "fetching %d files from rsync %s\n", files->size(), storage_->storage_location->c_str());
-        return rsyncFetchFiles(storage_, files, cache_dir_, sys_, cache_fs_, progress_);
+        return rsyncFetchFiles(storage_, files, cache_dir_, sys_, cache_fs_, progress.get());
     }
     case RCloneStorage:
     {
         debug(CACHE, "fetching %d files from rclone %s\n", files->size(), storage_->storage_location->c_str());
-        return rcloneFetchFiles(storage_, files, cache_dir_, sys_, cache_fs_, progress_);
+        return rcloneFetchFiles(storage_, files, cache_dir_, sys_, cache_fs_, progress.get());
     }
     }
     return RC::ERR;
 }
 
-FileSystem *StorageToolImplementation::asCachedReadOnlyFS(Storage *storage, ProgressStatistics *progress)
+FileSystem *StorageToolImplementation::asCachedReadOnlyFS(Storage *storage, Monitor *monitor)
 {
     Path *cache_dir = cacheDir();
     local_fs_->mkDirpWriteable(cache_dir);
-    CacheFS *fs = new CacheFS(local_fs_, cache_dir, storage, sys_, progress);
+    CacheFS *fs = new CacheFS(local_fs_, cache_dir, storage, sys_, monitor);
     fs->refreshCache();
     return fs;
 }

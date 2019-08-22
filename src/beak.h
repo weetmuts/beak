@@ -22,7 +22,6 @@
 #include "configuration.h"
 #include "filesystem.h"
 #include "monitor.h"
-#include "statistics.h"
 #include "util.h"
 
 #include<memory>
@@ -72,10 +71,10 @@ struct Beak
     virtual RC umountDaemon(Settings *settings) = 0;
 
     virtual RC mountBackupDaemon(Settings *settings) = 0;
-    virtual RC mountBackup(Settings *settings, ProgressStatistics *progress = NULL) = 0;
+    virtual RC mountBackup(Settings *settings, Monitor *monitor) = 0;
     virtual RC umountBackup(Settings *settings) = 0;
     virtual RC mountRestoreDaemon(Settings *settings, Monitor *monitor) = 0;
-    virtual RC mountRestore(Settings *settings, ProgressStatistics *progress = NULL) = 0;
+    virtual RC mountRestore(Settings *settings, Monitor *monitor) = 0;
     virtual RC umountRestore(Settings *settings) = 0;
 
     virtual void printHelp(bool verbose, Command cmd) = 0;
@@ -146,14 +145,14 @@ LIST_OF_COMMANDS
     X(OptionType::LOCAL_PRIMARY,,dryrun,bool,false,"Print what would be done, do not actually perform the prune/store.") \
     X(OptionType::LOCAL_SECONDARY,f,foreground,bool,false,"When mounting do not spawn a daemon.")   \
     X(OptionType::LOCAL_SECONDARY,fd,fusedebug,bool,false,"Enable fuse debug mode, this also triggers foreground.") \
-    X(OptionType::LOCAL_SECONDARY,bg,background,bool,false,"Enter background mode, the progress can be monitored using \"beak monitor\".") \
+    X(OptionType::LOCAL_PRIMARY,bg,background,bool,false,"Enter background mode, the progress can be monitored using \"beak monitor\".") \
     X(OptionType::LOCAL_PRIMARY,i,include,std::vector<std::string>,true,"Only matching paths are inluded. E.g. -i '*.c'") \
     X(OptionType::LOCAL_PRIMARY,k,keep,std::string,true,"Keep rule for prune.") \
     X(OptionType::GLOBAL_SECONDARY,l,log,std::string,true,"Log debug messages for these parts. E.g. --log=backup,hashing --log=all,-lock") \
     X(OptionType::GLOBAL_SECONDARY,ll,listlog,bool,false,"List all log parts available.") \
     X(OptionType::LOCAL_PRIMARY,,monitor,bool,false,"Display download progress of cache downloads.") \
     X(OptionType::LOCAL_PRIMARY,pf,pointintimeformat,PointInTimeFormat,true,"How to present the point in time. E.g. absolute,relative or both. Default is both.")    \
-    X(OptionType::GLOBAL_PRIMARY,pr,progress,ProgressDisplayType,true,"How to present the progress of the backup or restore. E.g. none,plain,ansi,os. Default is ansi.") \
+    X(OptionType::GLOBAL_PRIMARY,pr,progress,ProgressDisplayType,true,"How to present the progress of the backup or restore. E.g. none,plain,ansi. Default is ansi.") \
     X(OptionType::LOCAL_SECONDARY,,relaxtimechecks,bool,false,"Accept future dated files.") \
     X(OptionType::LOCAL_SECONDARY,,tarheader,TarHeaderStyle,true,"Style of tar headers used. E.g. --tarheader=simple Alternatives are: none,simple,full Default is simple.")    \
     X(OptionType::LOCAL_PRIMARY,,now,std::string,true,"When pruning use this date time as now.") \
@@ -162,9 +161,9 @@ LIST_OF_COMMANDS
     X(OptionType::LOCAL_SECONDARY,ts,splitsize,size_t,true,"Split large files into smaller chunks. E.g. -ts 40M and the default is 50M.")    \
     X(OptionType::LOCAL_SECONDARY,tx,triggerglob,std::vector<std::string>,true,"Trigger tar generation in matching dirs. E.g. -tx '/work/project_*'") \
     X(OptionType::GLOBAL_PRIMARY,q,quite,bool,false,"Silence information output.")             \
-    X(OptionType::GLOBAL_PRIMARY,v,verbose,bool,false,"More detailed information.") \
+    X(OptionType::GLOBAL_PRIMARY,v,verbose,bool,false,"More detailed information. Works for help as well.") \
     X(OptionType::LOCAL_PRIMARY,x,exclude,std::vector<std::string>,true,"Paths matching glob are excluded. E.g. -exclude='beta/**'") \
-    X(OptionType::LOCAL_PRIMARY,,yesorigin,bool,false,"The origin directory contains beak files and this is intended.")            \
+    X(OptionType::LOCAL_SECONDARY,,yesorigin,bool,false,"The origin directory contains beak files and this is intended.")            \
     X(OptionType::LOCAL_PRIMARY,,yesprune,bool,false,"Respond yes to question if prune should be done.")            \
     X(OptionType::LOCAL_PRIMARY,nso,nosuch,bool,false,"No such option")
 
@@ -179,9 +178,11 @@ LIST_OF_OPTIONS
     X(config_cmd, (0) ) \
     X(diff_cmd, (1, depth_option) ) \
     X(fsck_cmd, (1, deepcheck_option) ) \
-    X(store_cmd, (12, background_option, contentsplit_option, depth_option, splitsize_option, targetsize_option, triggersize_option, triggerglob_option, exclude_option, include_option, progress_option, relaxtimechecks_option, tarheader_option, yesorigin_option) ) \
+    X(store_cmd, (13, background_option, contentsplit_option, depth_option, splitsize_option, targetsize_option, triggersize_option, triggerglob_option, exclude_option, include_option, progress_option, relaxtimechecks_option, tarheader_option, yesorigin_option) ) \
     X(mount_cmd, (2, progress_option) ) \
     X(prune_cmd, (3, keep_option, now_option, yesprune_option) ) \
+    X(pull_cmd, (2, background_option, progress_option) ) \
+    X(push_cmd, (2, background_option, progress_option) ) \
     X(restore_cmd, (2, background_option, progress_option) )
 
 
@@ -226,5 +227,6 @@ LIST_OF_OPTIONS
     ~Settings();
 };
 
+std::string buildJobName(const char *cmd, Settings *s);
 
 #endif

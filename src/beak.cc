@@ -183,7 +183,7 @@ string BeakImplementation::argsToVector_(int argc, char **argv, vector<string> *
 
 unique_ptr<Restore> BeakImplementation::accessBackup_(Argument *storage,
                                                       string pointintime,
-                                                      ProgressStatistics *progress,
+                                                      Monitor *monitor,
                                                       FileSystem **out_backup_fs,
                                                       Path **out_root)
 {
@@ -193,8 +193,7 @@ unique_ptr<Restore> BeakImplementation::accessBackup_(Argument *storage,
     FileSystem *backup_fs = local_fs_;
     if (storage->storage->type == RCloneStorage ||
         storage->storage->type == RSyncStorage) {
-        backup_fs = storage_tool_->asCachedReadOnlyFS(storage->storage,
-                                                      progress);
+        backup_fs = storage_tool_->asCachedReadOnlyFS(storage->storage, monitor);
     }
     unique_ptr<Restore> restore  = newRestore(backup_fs);
     if (out_backup_fs) { *out_backup_fs = backup_fs; }
@@ -257,7 +256,7 @@ RC BeakImplementation::mountBackupDaemon(Settings *settings)
     dir = settings->to.dir;
 
     unique_ptr<Backup> backup  = newBackup(origin_fs);
-    RC rc = backup->scanFileSystem(&settings->from, settings);
+    RC rc = backup->scanFileSystem(&settings->from, settings, NULL);
 
     if (rc.isErr()) {
         return RC::ERR;
@@ -266,12 +265,12 @@ RC BeakImplementation::mountBackupDaemon(Settings *settings)
     return sys_->mountDaemon(dir, backup->asFuseAPI(), settings->foreground, settings->fusedebug);
 }
 
-RC BeakImplementation::mountBackup(Settings *settings, ProgressStatistics *progress)
+RC BeakImplementation::mountBackup(Settings *settings, Monitor *monitor)
 {
     ptr<FileSystem> fs = origin_tool_->fs();
 
     unique_ptr<Backup> backup  = newBackup(fs);
-    RC rc = backup->scanFileSystem(&settings->from, settings);
+    RC rc = backup->scanFileSystem(&settings->from, settings, NULL);
 
     if (rc.isErr()) {
         return RC::ERR;
@@ -294,17 +293,17 @@ RC BeakImplementation::umountBackup(Settings *settings)
 
 RC BeakImplementation::mountRestoreDaemon(Settings *settings, Monitor *monitor)
 {
-    return mountRestoreInternal_(settings, true, NULL);
+    return mountRestoreInternal_(settings, true, monitor);
 }
 
-RC BeakImplementation::mountRestore(Settings *settings, ProgressStatistics *progress)
+RC BeakImplementation::mountRestore(Settings *settings, Monitor *monitor)
 {
-    return mountRestoreInternal_(settings, false, progress);
+    return mountRestoreInternal_(settings, false, monitor);
 }
 
-RC BeakImplementation::mountRestoreInternal_(Settings *settings, bool daemon, ProgressStatistics *progress)
+RC BeakImplementation::mountRestoreInternal_(Settings *settings, bool daemon, Monitor *monitor)
 {
-    auto restore  = accessBackup_(&settings->from, settings->from.point_in_time, progress);
+    auto restore  = accessBackup_(&settings->from, settings->from.point_in_time, monitor);
     if (!restore) {
         return RC::ERR;
     }
@@ -397,4 +396,36 @@ void Settings::updateFuseArgsArray()
 Settings::~Settings()
 {
     if (fuse_argv) { delete [] fuse_argv; }
+}
+
+string buildJobName(const char *cmd, Settings *s)
+{
+    string r = cmd;
+
+    if (s->from.type == ArgOrigin)
+    {
+        r += " ";
+        r += s->from.origin->str();
+    }
+    if (s->from.type == ArgStorage)
+    {
+        r += " ";
+        r += s->from.storage->storage_location->str();
+    }
+    if (s->from.type == ArgRule)
+    {
+        r += " ";
+        r += s->from.rule->name;
+    }
+    if (s->to.type == ArgOrigin)
+    {
+        r += " ";
+        r += s->to.origin->str();
+    }
+    if (s->to.type == ArgStorage)
+    {
+        r += " ";
+        r += s->to.storage->storage_location->str();
+    }
+    return r;
 }

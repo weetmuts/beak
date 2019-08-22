@@ -30,10 +30,10 @@ RC BeakImplementation::prune(Settings *settings, Monitor *monitor)
 
     assert(settings->from.type == ArgStorage);
 
-    auto progress = newProgressStatistics(settings->progress, monitor);
+    auto progress = monitor->newProgressStatistics(buildJobName("prune", settings));
     FileSystem *backup_fs;
     Path *root;
-    auto restore = accessBackup_(&settings->from, "", progress.get(), &backup_fs, &root);
+    auto restore = accessBackup_(&settings->from, "", monitor, &backup_fs, &root);
     Keep keep("all:2d daily:2w weekly:2m monthly:2y");
     if (settings->keep_supplied) {
         bool ok = keep.parse(settings->keep);

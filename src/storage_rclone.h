@@ -18,7 +18,7 @@
 #include "always.h"
 
 #include "configuration.h"
-#include "statistics.h"
+#include "monitor.h"
 #include "system.h"
 #include "tarfile.h"
 
@@ -32,24 +32,24 @@ RC rcloneListBeakFiles(Storage *storage,
                        std::vector<std::string> *other_files,
                        std::map<Path*,FileStat> *contents,
                        ptr<System> sys,
-                       ProgressStatistics *st);
+                       ProgressStatistics *progress);
 
 RC rcloneFetchFiles(Storage *storage,
                     std::vector<Path*> *files,
                     Path *local_dir,
                     System *sys,
                     FileSystem *local_fs,
-                    ProgressStatistics *st);
+                    ProgressStatistics *progress);
 
 RC rcloneSendFiles(Storage *storage,
                    std::vector<Path*> *files,
                    Path *local_dir,
                    FileSystem *local_fs,
                    ptr<System> sys,
-                   ProgressStatistics *st);
+                   ProgressStatistics *progress);
 
 RC rcloneDeleteFiles(Storage *storage,
                      std::vector<Path*> *files,
                      FileSystem *local_fs,
                      ptr<System> sys,
-                     ProgressStatistics *st);
+                     ProgressStatistics *progress);

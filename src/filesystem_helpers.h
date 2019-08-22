@@ -102,8 +102,8 @@ struct ReadOnlyCacheFileSystemBaseImplementation : ReadOnlyFileSystem
                                               ptr<FileSystem> cache_fs,
                                               Path *cache_dir,
                                               int depth,
-                                              ProgressStatistics *progress) :
-    ReadOnlyFileSystem(name), cache_fs_(cache_fs), cache_dir_(cache_dir),drop_prefix_depth_(depth) {}
+                                              Monitor *monitor) :
+    ReadOnlyFileSystem(name), cache_fs_(cache_fs), cache_dir_(cache_dir),drop_prefix_depth_(depth), monitor_(monitor) {}
 
     virtual void refreshCache() = 0;
 
@@ -136,7 +136,7 @@ struct ReadOnlyCacheFileSystemBaseImplementation : ReadOnlyFileSystem
     int drop_prefix_depth_ {};
     bool fileCached(Path *p);
     CacheEntry *cacheEntry(Path *p);
-    ProgressStatistics *progress_ {};
+    Monitor *monitor_ {};
 
     RecurseOption recurse_helper_(Path *root, std::function<RecurseOption(Path *path, FileStat *stat)> cb);
 };

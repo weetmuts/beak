@@ -376,16 +376,15 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
                 else if (value == "relative") settings->pointintimeformat = relative_point;
                 else if (value == "both") settings->pointintimeformat = both_point;
                 else {
-                    error(COMMANDLINE, "No such point in time format \"%s\".", value.c_str());
+                    error(COMMANDLINE, "No such point in time format \"%s\".\n", value.c_str());
                 }
                 break;
             case progress_option:
-                if (value == "none") settings->progress = ProgressDisplayNone;
-                else if (value == "terminal") settings->progress = ProgressDisplayTerminal;
-                else if (value == "ansi") settings->progress = ProgressDisplayTerminalAnsi;
-                else if (value == "notifications") settings->progress = ProgressDisplayNotification;
+                if (value == "none") settings->progress = ProgressDisplayType::None;
+                else if (value == "plain") settings->progress = ProgressDisplayType::Plain;
+                else if (value == "ansi") settings->progress = ProgressDisplayType::Ansi;
                 else {
-                    error(COMMANDLINE, "No such progress display type \"%s\".", value.c_str());
+                    error(COMMANDLINE, "No such progress display type \"%s\".\n", value.c_str());
                 }
                 break;
             case relaxtimechecks_option:
@@ -397,7 +396,7 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
                 else if (value == "simple") settings->tarheader = TarHeaderStyle::Simple;
                 else if (value == "full") settings->tarheader = TarHeaderStyle::Full;
                 else {
-                    error(COMMANDLINE, "No such tar header style \"%s\".", value.c_str());
+                    error(COMMANDLINE, "No such tar header style \"%s\".\n", value.c_str());
                 }
                 settings->tarheader_supplied = true;
             }
@@ -409,7 +408,7 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
                 if (rc.isErr())
                 {
                     error(COMMANDLINE,
-                          "Cannot set target size because \"%s\" is not a proper number (e.g. 1,2K,3M,4G,5T)\n",
+                          "Cannot set target size because \"%s\" is not a proper number (e.g. 1,2K,3M,4G,5T).\n",
                           value.c_str());
                 }
                 settings->targetsize = parsed_size;

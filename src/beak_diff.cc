@@ -32,7 +32,7 @@ RC BeakImplementation::diff(Settings *settings, Monitor *monitor)
     assert(settings->from.type == ArgOrigin || settings->from.type == ArgRule || settings->from.type == ArgStorage);
     assert(settings->to.type == ArgOrigin || settings->to.type == ArgRule || settings->to.type == ArgStorage);
 
-    auto progress = newProgressStatistics(settings->progress, monitor);
+    auto progress = monitor->newProgressStatistics(buildJobName("diff", settings));
 
     FileSystem *curr_fs = NULL;
     FileSystem *old_fs = NULL;
@@ -46,7 +46,7 @@ RC BeakImplementation::diff(Settings *settings, Monitor *monitor)
         curr_fs = origin_tool_->fs();
         curr_path = settings->from.origin;
     } else if (settings->from.type == ArgStorage) {
-        restore_curr = accessBackup_(&settings->from, settings->from.point_in_time, progress.get());
+        restore_curr = accessBackup_(&settings->from, settings->from.point_in_time, monitor);
         auto point = restore_curr->singlePointInTime();
         if (!point) {
             // The settings did not specify a point in time, lets use the most recent for the restore.
@@ -67,7 +67,7 @@ RC BeakImplementation::diff(Settings *settings, Monitor *monitor)
         old_fs = origin_tool_->fs();
         old_path = settings->to.origin;
     } else if (settings->to.type == ArgStorage) {
-        restore_old = accessBackup_(&settings->to, settings->to.point_in_time, progress.get());
+        restore_old = accessBackup_(&settings->to, settings->to.point_in_time, monitor);
         auto point = restore_old->singlePointInTime();
         if (!point) {
             // The settings did not specify a point in time, lets use the most recent for the restore.

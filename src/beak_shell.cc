@@ -20,7 +20,7 @@
 #include "log.h"
 #include "system.h"
 
-static ComponentId SHELL = registerLogComponent("shell");
+//static ComponentId SHELL = registerLogComponent("shell");
 
 RC BeakImplementation::shell(Settings *settings, Monitor *monitor)
 {
@@ -52,7 +52,9 @@ RC BeakImplementation::shell(Settings *settings, Monitor *monitor)
     settings->fuse_args.push_back(mount->str());
     settings->updateFuseArgsArray();
 
-    rc = mountRestore(settings);
+    auto progress = monitor->newProgressStatistics(buildJobName("shell", settings));
+
+    rc = mountRestore(settings, monitor);
     if (rc.isErr()) goto cleanup;
 
     rc = sys_->invokeShell(start);

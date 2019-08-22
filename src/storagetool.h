@@ -24,7 +24,7 @@
 #include "configuration.h"
 #include "restore.h"
 #include "tarfile.h"
-#include "statistics.h"
+#include "monitor.h"
 
 #include<memory>
 #include<string>
@@ -42,7 +42,7 @@ struct StorageTool
                                 ProgressStatistics *progress) = 0;
 
     virtual FileSystem *asCachedReadOnlyFS(Storage *storage,
-                                           ProgressStatistics *progress) = 0;
+                                           Monitor *monitor) = 0;
 
     virtual RC removeBackupFiles(Storage *storage,
                                  std::vector<Path*>& files,

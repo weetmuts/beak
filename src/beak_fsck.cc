@@ -30,10 +30,10 @@ RC BeakImplementation::fsck(Settings *settings, Monitor *monitor)
 
     assert(settings->from.type == ArgStorage);
 
-    auto progress = newProgressStatistics(settings->progress, monitor);
+    auto progress = monitor->newProgressStatistics(buildJobName("fsck", settings));
     FileSystem *backup_fs;
     Path *root;
-    auto restore = accessBackup_(&settings->from, "", progress.get(), &backup_fs, &root);
+    auto restore = accessBackup_(&settings->from, "", monitor, &backup_fs, &root);
 
     set<Path*> required_beak_files;
     vector<pair<Path*,FileStat>> existing_beak_files;
