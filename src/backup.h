@@ -70,6 +70,8 @@ struct Backup
     int forced_tar_collection_dir_depth = 2;
 
     std::map<Path*,TarEntry,depthFirstSortPath> files;
+    // Store dynamic allcations of tar entries for the destructor.
+    std::vector<std::unique_ptr<TarEntry>> dynamics;
     std::map<Path*,TarEntry*,depthFirstSortPath> tar_storage_directories;
     std::map<Path*,TarEntry*> directories;
     std::map<ino_t,TarEntry*> hard_links; // Only inodes for which st_nlink > 1

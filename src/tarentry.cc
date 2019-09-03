@@ -46,6 +46,15 @@ TarEntry::TarEntry()
 {
 }
 
+TarEntry::~TarEntry()
+{
+    for (auto & tf : tars_)
+    {
+        if (tf != NULL) delete tf;
+    }
+    tars_.clear();
+}
+
 TarEntry::TarEntry(size_t size, TarHeaderStyle ths)
 {
     abspath_ = Path::lookupRoot();

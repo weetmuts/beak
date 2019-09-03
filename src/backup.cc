@@ -772,6 +772,7 @@ size_t Backup::groupFilesIntoTars()
         TarEntry *dirs = new TarEntry(compressed_gzfile_contents.size(), tarheaderstyle_);
         dirs->setContent(compressed_gzfile_contents);
         te->gzFile()->addEntryLast(dirs);
+        dynamics.push_back(unique_ptr<TarEntry>(dirs));
         te->gzFile()->fixSize(tar_split_size, tarheaderstyle_);
 
         if (te->tazFile()->totalSize() > 0 ) {

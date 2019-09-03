@@ -154,6 +154,7 @@ struct TarFile
 {
     TarFile() : num_parts_(1), part_size_(0) { }
     TarFile(TarContents tc);
+    ~TarFile();
 
     TarContents type() { return tar_contents_; }
 

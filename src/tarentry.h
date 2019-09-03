@@ -39,7 +39,7 @@ struct TarEntry
     TarEntry();
     TarEntry(size_t size, TarHeaderStyle ths);
     TarEntry(Path *abspath, Path *path, FileStat *st, TarHeaderStyle ths, bool should_content_split);
-    ~TarEntry() = default;
+    ~TarEntry();
 
     Path *path()
     {

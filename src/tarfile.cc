@@ -45,6 +45,17 @@ TarFile::TarFile(TarContents tc)
     num_parts_ = 1;
 }
 
+TarFile::~TarFile()
+{
+/*    for (auto & a : contents_)
+    {
+//        TarEntry *te = a.second;
+//        if (te != NULL) delete te;
+//        a.second = NULL;
+    }
+*/
+}
+
 void TarFile::addEntryLast(TarEntry *entry)
 {
     entry->updateMtim(&mtim_);
