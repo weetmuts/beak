@@ -338,7 +338,7 @@ bool ProgressStatisticsImplementation::redrawLine()
         estimated_total = "";
     }
     string info;
-    strprintf(info, "%s | %s store: %s %d%% (%ju/%ju) %s/s | %s%s",
+    strprintf(info, "%s | %s store: %s %d" "P" " (%ju/%ju) %s/s | %s%s",
               job_.c_str(),
               msg.c_str(), mibs.c_str(),
               percentage, copy.num_files_stored, copy.num_files_to_store,

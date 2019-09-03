@@ -341,10 +341,12 @@ static RC invoke(string program,
             debug(SYSTEM,"%s: return code %d\n", program.c_str(), rc);
             if (rc != 0) {
                 warning(SYSTEM,"%s exited with non-zero return code: %d\n", program.c_str(), rc);
+                delete[] argv;
                 return RC::ERR;
             }
         }
     }
+    delete[] argv;
     return RC::OK;
 }
 
