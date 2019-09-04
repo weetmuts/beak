@@ -248,7 +248,6 @@ RC BeakImplementation::mountBackupDaemon(Settings *settings)
 {
     Path *dir;
     ptr<FileSystem> origin_fs = origin_tool_->fs();
-    origin_fs->enableWatch();
     if (settings->to.type == ArgOrigin) {
         dir = settings->to.origin;
     }

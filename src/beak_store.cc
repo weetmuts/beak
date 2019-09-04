@@ -33,9 +33,6 @@ RC BeakImplementation::store(Settings *settings, Monitor *monitor)
 
     unique_ptr<ProgressStatistics> progress = monitor->newProgressStatistics(buildJobName("store", settings));
 
-    // Watch the origin file system to detect if it is being changed while doing the store.
-    origin_tool_->fs()->enableWatch();
-
     unique_ptr<Backup> backup  = newBackup(origin_tool_->fs());
 
     // This command scans the origin file system and builds
@@ -50,10 +47,12 @@ RC BeakImplementation::store(Settings *settings, Monitor *monitor)
                                           settings,
                                           progress.get());
 
-    int unpleasant_modifications = origin_tool_->fs()->endWatch();
     if (progress->stats.num_files_stored == 0 && progress->stats.num_dirs_updated == 0) {
         info(STORE, "No stores needed, everything was up to date.\n");
     }
+
+    int unpleasant_modifications = backup->checkIfFilesHaveChanged();
+
     if (unpleasant_modifications > 0) {
         warning(STORE, "Warning! Origin directory modified while doing backup!\n");
     }

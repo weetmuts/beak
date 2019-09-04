@@ -138,6 +138,7 @@ RecurseOption Backup::addTarEntry(Path *abspath, FileStat *st)
     return RecurseContinue;
 }
 
+
 void Backup::findTarCollectionDirs() {
     // Accumulate blocked sizes into children_size in the parent.
     // Set the parent pointer.
@@ -1176,6 +1177,33 @@ RC Backup::scanFileSystem(Argument *origin, Settings *settings, ProgressStatisti
             scan_time / 1000, group_time / 1000);
 
     return RC::OK;
+}
+
+int Backup::checkIfFilesHaveChanged()
+{
+    int count = 0;
+
+    for(auto & e : files)
+    {
+        TarEntry *te = &e.second;
+        FileStat st;
+        RC rc = origin_fs_->stat(te->abspath(), &st);
+        if (rc.isErr())
+        {
+            count++;
+            warning(BACKUP, "File lost %s\n", te->abspath()->c_str());
+        }
+        else
+        {
+            if (!te->stat()->equal(&st))
+            {
+                count++;
+                warning(BACKUP, "File changed %s\n", te->abspath()->c_str());
+            }
+        }
+    }
+
+    return count;
 }
 
 struct BeakFS : FileSystem

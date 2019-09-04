@@ -45,6 +45,10 @@ struct TarEntry
     {
         return path_;
     }
+    Path *abspath()
+    {
+        return abspath_;
+    }
     Path *tarpath()
     {
         return tarpath_;

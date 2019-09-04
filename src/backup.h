@@ -50,6 +50,7 @@ struct Filter {
 struct Backup
 {
     RC scanFileSystem(Argument *origin, Settings *settings, ProgressStatistics *progress);
+    int checkIfFilesHaveChanged();
 
     pthread_mutex_t global;
     pthread_mutexattr_t global_attr;
