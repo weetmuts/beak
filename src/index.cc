@@ -133,7 +133,7 @@ RC Index::loadIndex(vector<char> &v,
     }
 
     if (num_files != 0) {
-        failure(INDEX, "Error in gz file format!");
+        failure(INDEX, "Error in gz file format! numfiles=%d\n", num_files);
         return RC::ERR;
     }
 

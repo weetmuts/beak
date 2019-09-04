@@ -878,7 +878,7 @@ RC Restore::loadBeakFileSystem(Argument *storage)
         point.addGzFile(Path::lookupRoot(), Path::lookup(name));
 
         if (!ok) {
-            error(RESTORE, "Could not load index file for backup %s!\n", point.ago.c_str());
+            failure(RESTORE, "Could not load index file for backup %s!\n", point.ago.c_str());
         }
 
         // Populate the root directory with its contents.

@@ -65,7 +65,7 @@ private:
 };
 
 unique_ptr<Monitor> newMonitor(System *sys, FileSystem *fs, ProgressDisplayType pdt) {
-    return unique_ptr<Monitor>(new MonitorImplementation(sys, fs, pdt));
+    return unique_ptr<Monitor>(new MonitorImplementation(sys, fs, ProgressDisplayType::Plain));
 }
 
 MonitorImplementation::MonitorImplementation(System *s, FileSystem *fs, ProgressDisplayType pdt) : sys_(s), fs_(fs), pdt_(pdt)

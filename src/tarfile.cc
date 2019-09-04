@@ -47,13 +47,6 @@ TarFile::TarFile(TarContents tc)
 
 TarFile::~TarFile()
 {
-/*    for (auto & a : contents_)
-    {
-//        TarEntry *te = a.second;
-//        if (te != NULL) delete te;
-//        a.second = NULL;
-    }
-*/
 }
 
 void TarFile::addEntryLast(TarEntry *entry)

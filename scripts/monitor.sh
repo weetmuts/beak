@@ -22,7 +22,7 @@ do
         do
             # Remove status files for non-existant proceses and
             # where the file was last modified more than 10 minutes ago.
-            # find /dev/shm/beak-$USER -name $x ! -mmin 10 -delete
+            find /dev/shm/beak-$USER -name $x ! -mmin 10 -delete
         done
     fi
     # script is executed every second
