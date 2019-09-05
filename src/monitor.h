@@ -70,9 +70,10 @@ struct ProgressStatistics
 
 enum class ProgressDisplayType
 {
-    None,  // No progress at all
-    Plain, // Print on terminal
-    Ansi,  // Use ansi to move the cursor
+    Normal, // Print on terminal, use cursor control to move and overwrite.
+    Top,    // Move to top and print in color.
+    Plain,  // Print on terminal, no cursor control, used for log files.
+    None    // No progress at all
 };
 
 struct Monitor

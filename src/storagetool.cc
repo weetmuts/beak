@@ -26,6 +26,7 @@
 #include "storage_rsync.h"
 
 #include <algorithm>
+#include <unistd.h>
 
 static ComponentId STORAGETOOL = registerLogComponent("storagetool");
 static ComponentId CACHE = registerLogComponent("cache");
@@ -122,6 +123,7 @@ void store_local_backup_file(Backup *backup,
 {
     if (!stat->isRegularFile()) return;
 
+    usleep(1000000);
     uint partnr;
     TarFile *tar = backup->findTarFromPath(path, &partnr);
     assert(tar);
@@ -135,7 +137,7 @@ void store_local_backup_file(Backup *backup,
         stat->sameSize(&old_stat) &&
         stat->sameMTime(&old_stat)) {
 
-        debug(STORAGETOOL, "skipping %s\n", file_name->c_str());
+        verbose(STORAGETOOL, "up to date %s\n", file_name->c_str());
     } else {
         if (rc.isOk()) {
             storage_fs->deleteFile(file_name);
@@ -146,11 +148,9 @@ void store_local_backup_file(Backup *backup,
 
         storage_fs->utime(file_name, stat);
         progress->stats.num_files_stored++;
+        progress->updateProgress();
         verbose(STORAGETOOL, "stored %s\n", file_name->c_str());
     }
-//    st->num_files_handled++;
-//    st->size_files_handled += stat->st_size;
-    progress->updateProgress();
 }
 
 RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backup,

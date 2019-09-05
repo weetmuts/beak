@@ -381,8 +381,9 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
                 break;
             case progress_option:
                 if (value == "none") settings->progress = ProgressDisplayType::None;
+                else if (value == "normal") settings->progress = ProgressDisplayType::Normal;
                 else if (value == "plain") settings->progress = ProgressDisplayType::Plain;
-                else if (value == "ansi") settings->progress = ProgressDisplayType::Ansi;
+                else if (value == "top") settings->progress = ProgressDisplayType::Top;
                 else {
                     error(COMMANDLINE, "No such progress display type \"%s\".\n", value.c_str());
                 }

@@ -65,7 +65,7 @@ private:
 };
 
 unique_ptr<Monitor> newMonitor(System *sys, FileSystem *fs, ProgressDisplayType pdt) {
-    return unique_ptr<Monitor>(new MonitorImplementation(sys, fs, ProgressDisplayType::Plain));
+    return unique_ptr<Monitor>(new MonitorImplementation(sys, fs, pdt));
 }
 
 MonitorImplementation::MonitorImplementation(System *s, FileSystem *fs, ProgressDisplayType pdt) : sys_(s), fs_(fs), pdt_(pdt)
@@ -77,7 +77,7 @@ unique_ptr<ProgressStatistics> newwProgressStatistics(ProgressDisplayType t, Mon
 unique_ptr<ProgressStatistics>
 MonitorImplementation::newProgressStatistics(string job)
 {
-    return newwProgressStatistics(ProgressDisplayType::Plain, this, job);
+    return newwProgressStatistics(pdt_, this, job);
 }
 
 void MonitorImplementation::checkSharedDir()
@@ -137,6 +137,7 @@ string MonitorImplementation::lastUpdate(pid_t pid)
 
 int MonitorImplementation::startDisplay(function<bool()> progress_cb)
 {
+    setbuf(stdout, NULL);
     checkSharedDir();
     redraws_.push_back(progress_cb);
     if (!regular_)
@@ -157,7 +158,7 @@ bool MonitorImplementation::regularDisplay()
     {
         cb();
     }
-
+    /*
     RC rc = RC::OK;
     vector<Path*> ps;
     bool ok = fs_->readdir(shared_dir_, &ps);
@@ -200,6 +201,7 @@ bool MonitorImplementation::regularDisplay()
         UI::restoreCursor();
         break;
     }
+    */
     return true;
 }
 
@@ -338,14 +340,38 @@ bool ProgressStatisticsImplementation::redrawLine()
         estimated_total = "";
     }
     string info;
-    strprintf(info, "%s | %s store: %s %d" "P" " (%ju/%ju) %s/s | %s%s",
-              job_.c_str(),
+    strprintf(info, "%s store: %s %2d" "%%" " (%ju/%ju) %s/s | %s%s",
               msg.c_str(), mibs.c_str(),
               percentage, copy.num_files_stored, copy.num_files_to_store,
               average_speed.c_str(),
               elapsed.c_str(), estimated_total.c_str());
 
-    monitor_->updateJob(getpid(), info);
+    string jobinfo;
+    strprintf(jobinfo, "%s | %s",
+              job_.c_str(),
+              info.c_str());
+
+    monitor_->updateJob(getpid(), jobinfo);
+
+    switch (pdt_) {
+    case ProgressDisplayType::None:
+        break;
+    case ProgressDisplayType::Normal:
+        UI::clearLine();
+        printf("%s", info.c_str());
+        break;
+    case ProgressDisplayType::Plain:
+        printf("%s\n", info.c_str());
+        break;
+    case ProgressDisplayType::Top:
+        UI::storeCursor();
+        UI::moveTopLeft();
+        printf("\033[0;37;1m\033[44m %s", info.c_str());
+        UI::restoreCursor();
+        break;
+    default:
+        assert(0);
+    }
 
     return true;
 }
@@ -355,8 +381,15 @@ void ProgressStatisticsImplementation::finishProgress()
     if (stats.num_files == 0 || stats.num_files_to_store == 0) return;
     updateProgress();
     redrawLine();
-    UI::output(monitor_->lastUpdate(getpid()));
-    UI::output(" done.\n");
+
+    switch (pdt_) {
+    case ProgressDisplayType::None:
+    case ProgressDisplayType::Top:
+        break;
+    case ProgressDisplayType::Plain:
+    case ProgressDisplayType::Normal:
+        UI::output(" done.\n");
+    }
 }
 
 unique_ptr<ProgressStatistics> newwProgressStatistics(ProgressDisplayType t, Monitor *monitor, std::string job)
