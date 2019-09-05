@@ -123,7 +123,6 @@ void store_local_backup_file(Backup *backup,
 {
     if (!stat->isRegularFile()) return;
 
-    usleep(1000000);
     uint partnr;
     TarFile *tar = backup->findTarFromPath(path, &partnr);
     assert(tar);

@@ -51,8 +51,14 @@ RC BeakImplementation::store(Settings *settings, Monitor *monitor)
         info(STORE, "No stores needed, everything was up to date.\n");
     }
 
+    uint64_t start = clockGetTimeMicroSeconds();
     int unpleasant_modifications = backup->checkIfFilesHaveChanged();
-
+    uint64_t stop = clockGetTimeMicroSeconds();
+    uint64_t scan_time = stop - start;
+    if (scan_time > 2000000)
+    {
+        info(STORE, "Time to rescan %jdms.\n", scan_time / 1000);
+    }
     if (unpleasant_modifications > 0) {
         warning(STORE, "Warning! Origin directory modified while doing backup!\n");
     }
