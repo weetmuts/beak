@@ -49,6 +49,8 @@ struct MonitorImplementation : Monitor
     MonitorImplementation(System *sys, FileSystem *fs, ProgressDisplayType pdt);
     ~MonitorImplementation() = default;
 
+    unique_ptr<ThreadCallback> regular_;
+
 private:
 
     void checkSharedDir();
@@ -57,11 +59,11 @@ private:
     FileSystem *fs_ {};
     Path *shared_dir_ {};
     map<int,string> jobs_;
-    unique_ptr<ThreadCallback> regular_;
     // A list of functions to call before redrawing the monitor.
     vector<function<bool()>> redraws_;
     map<pid_t,string> updates_;
     ProgressDisplayType pdt_;
+
 };
 
 unique_ptr<Monitor> newMonitor(System *sys, FileSystem *fs, ProgressDisplayType pdt) {
@@ -72,7 +74,7 @@ MonitorImplementation::MonitorImplementation(System *s, FileSystem *fs, Progress
 {
 }
 
-unique_ptr<ProgressStatistics> newwProgressStatistics(ProgressDisplayType t, Monitor *monitor, std::string job);
+unique_ptr<ProgressStatistics> newwProgressStatistics(ProgressDisplayType t, MonitorImplementation *monitor, std::string job);
 
 unique_ptr<ProgressStatistics>
 MonitorImplementation::newProgressStatistics(string job)
@@ -221,7 +223,7 @@ using namespace std;
 
 struct ProgressStatisticsImplementation : ProgressStatistics
 {
-    ProgressStatisticsImplementation(ProgressDisplayType t, Monitor *m, string job) : pdt_(t), monitor_(m), job_(job) {}
+    ProgressStatisticsImplementation(ProgressDisplayType t, MonitorImplementation *m, string job) : pdt_(t), monitor_(m), job_(job) {}
     ~ProgressStatisticsImplementation() = default;
     void setProgress(string msg);
 
@@ -235,7 +237,7 @@ private:
 
     int rotate_ {};
     ProgressDisplayType pdt_ {};
-    Monitor *monitor_ {};
+    MonitorImplementation *monitor_ {};
     string job_;
 
     bool redrawLine();
@@ -380,6 +382,7 @@ void ProgressStatisticsImplementation::finishProgress()
 {
     if (stats.num_files == 0 || stats.num_files_to_store == 0) return;
     updateProgress();
+    monitor_->regular_->stop();
     redrawLine();
 
     switch (pdt_) {
@@ -392,7 +395,7 @@ void ProgressStatisticsImplementation::finishProgress()
     }
 }
 
-unique_ptr<ProgressStatistics> newwProgressStatistics(ProgressDisplayType t, Monitor *monitor, std::string job)
+unique_ptr<ProgressStatistics> newwProgressStatistics(ProgressDisplayType t, MonitorImplementation *monitor, std::string job)
 {
     return unique_ptr<ProgressStatisticsImplementation>(new ProgressStatisticsImplementation(t, monitor, job));
 }
