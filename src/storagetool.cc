@@ -42,6 +42,13 @@ struct StorageToolImplementation : public StorageTool
                               Settings *settings,
                               ProgressStatistics *progress);
 
+    RC copyBackupIntoStorage(Backup *backup,
+                             Path *backup_dir,
+                             FileSystem *backup_fs,
+                             Storage *storage,
+                             Settings *settings,
+                             ProgressStatistics *progress);
+
     RC listPointsInTime(Storage *storage, vector<pair<Path*,struct timespec>> *v,
                         ProgressStatistics *progress);
 
@@ -71,11 +78,12 @@ StorageToolImplementation::StorageToolImplementation(ptr<System>sys,
 
 void add_backup_work(ProgressStatistics *progress,
                      vector<Path*> *files_to_backup,
-                     Path *path, FileStat *stat,
-                     Settings *settings,
+                     Path *path,
+                     FileStat *stat,
+                     Path *storage_location,
                      FileSystem *to_fs)
 {
-    Path *file_to_extract = path->prepend(settings->to.storage->storage_location);
+    Path *file_to_extract = path->prepend(storage_location);
 
     // The backup fs has already wrapped any non-regular files inside tars.
     // Thus we only want to send those to the cloud storage site.
@@ -113,7 +121,6 @@ void add_backup_work(ProgressStatistics *progress,
 }
 
 void store_local_backup_file(Backup *backup,
-                             FileSystem *backup_fs,
                              FileSystem *origin_fs,
                              FileSystem *storage_fs,
                              Path *path,
@@ -124,8 +131,8 @@ void store_local_backup_file(Backup *backup,
     if (!stat->isRegularFile()) return;
 
     uint partnr;
-    TarFile *tar = backup->findTarFromPath(path, &partnr);
-    assert(tar);
+    TarFile *tarr = backup->findTarFromPath(path, &partnr);
+    assert(tarr);
 
     Path *file_name = path->prepend(settings->to.storage->storage_location);
     storage_fs->mkDirpWriteable(file_name->parent());
@@ -134,16 +141,19 @@ void store_local_backup_file(Backup *backup,
     if (rc.isOk() &&
         stat->samePermissions(&old_stat) &&
         stat->sameSize(&old_stat) &&
-        stat->sameMTime(&old_stat)) {
-
+        stat->sameMTime(&old_stat))
+    {
         verbose(STORAGETOOL, "up to date %s\n", file_name->c_str());
-    } else {
-        if (rc.isOk()) {
+    }
+    else
+    {
+        if (rc.isOk())
+        {
             storage_fs->deleteFile(file_name);
         }
         // The size gets incrementally update while the tar file is written!
         auto func = [&progress](size_t n){ progress->stats.size_files_stored += n; };
-        tar->createFile(file_name, stat, partnr, origin_fs, storage_fs, 0, func);
+        tarr->createFile(file_name, stat, partnr, origin_fs, storage_fs, 0, func);
 
         storage_fs->utime(file_name, stat);
         progress->stats.num_files_stored++;
@@ -152,15 +162,68 @@ void store_local_backup_file(Backup *backup,
     }
 }
 
-RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backup,
+void copy_local_backup_file(Backup *backup,
+                            Path *relpath,
+                            Path *source_location,
+                            FileSystem *source_fs,
+                            FileStat *stat,
+                            Path *dest_location,
+                            FileSystem *dest_fs,
+                            ProgressStatistics *progress)
+{
+    debug(STORAGETOOL, "copy %s ## %s to %s ## %s\n",
+          source_location->c_str(),
+          relpath->c_str(),
+          dest_location->c_str(),
+          relpath->c_str());
+
+    if (!stat->isRegularFile()) return;
+
+    Path *from_file_name = relpath->prepend(source_location);
+    Path *to_file_name = relpath->prepend(dest_location);
+    dest_fs->mkDirpWriteable(to_file_name->parent());
+    FileStat old_stat;
+    RC rc = dest_fs->stat(to_file_name, &old_stat);
+    if (rc.isOk() &&
+        stat->samePermissions(&old_stat) &&
+        stat->sameSize(&old_stat) &&
+        stat->sameMTime(&old_stat))
+    {
+        verbose(STORAGETOOL, "up to date %s\n", to_file_name->c_str());
+    }
+    else
+    {
+        if (rc.isOk())
+        {
+            dest_fs->deleteFile(to_file_name);
+        }
+        // The size gets incrementally update while the tar file is written!
+        auto update_progress = [&progress](size_t n){ progress->stats.size_files_stored += n; };
+        dest_fs->createFile(to_file_name, stat,
+                            [&] (off_t offset, char *buffer, size_t len) {
+                                debug(STORAGETOOL,"Copy %ju bytes to file %s\n", len, to_file_name->c_str());
+                                size_t n = source_fs->pread(from_file_name, buffer, len, offset);
+                                debug(STORAGETOOL, "Copied %ju bytes from %ju.\n", n, offset);
+                                update_progress(n);
+                                return n;
+                               });
+
+        dest_fs->utime(to_file_name, stat);
+        progress->stats.num_files_stored++;
+        progress->updateProgress();
+        verbose(STORAGETOOL, "copied %s\n", to_file_name->c_str());
+    }
+}
+
+RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backupp,
                                                      Storage *storage,
                                                      Settings *settings,
                                                      ProgressStatistics *progress)
 {
     // The backup archive files (.tar .gz) are found here.
-    FileSystem *backup_fs = backup->asFileSystem();
+    FileSystem *backup_fs = backupp->asFileSystem();
     // The where the origin files can be found.
-    FileSystem *origin_fs = backup->originFileSystem();
+    FileSystem *origin_fs = backupp->originFileSystem();
     // Store the archive files here.
     FileSystem *storage_fs = NULL;
     // This is the list of files to be sent to the storage.
@@ -168,19 +231,26 @@ RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backup,
 
     map<Path*,FileStat> contents;
     unique_ptr<FileSystem> fs;
-    if (storage->type == FileSystemStorage) {
+    if (storage->type == FileSystemStorage)
+    {
         storage_fs = local_fs_;
-    } else
-    if (storage->type == RCloneStorage || storage->type == RSyncStorage) {
+    }
+    else
+    if (storage->type == RCloneStorage || storage->type == RSyncStorage)
+    {
         vector<TarFileName> files, bad_files;
         vector<string> other_files;
         RC rc = RC::OK;
-        if (storage->type == RCloneStorage) {
+        if (storage->type == RCloneStorage)
+       {
             rc = rcloneListBeakFiles(storage, &files, &bad_files, &other_files, &contents, sys_, progress);
-        } else {
+        }
+        else
+        {
             rc = rsyncListBeakFiles(storage, &files, &bad_files, &other_files, &contents, sys_, progress);
         }
-        if (rc.isErr()) {
+        if (rc.isErr())
+        {
             error(STORAGETOOL, "Could not list files in rclone storage %s\n", storage->storage_location->c_str());
         }
 
@@ -192,19 +262,20 @@ RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backup,
     }
     backup_fs->recurse(Path::lookupRoot(), [=,&files_to_backup]
                        (Path *path, FileStat *stat) {
-                           add_backup_work(progress, &files_to_backup, path, stat, settings, storage_fs);
+                           add_backup_work(progress, &files_to_backup, path, stat,
+                                           settings->to.storage->storage_location,
+                                           storage_fs);
                            return RecurseContinue;
                        });
 
-    //debug(STORAGETOOL, "work to be done: num_files=%ju num_dirs=%ju\n", progress->stats.num_files, progress->stats.num_dirs);
+    debug(STORAGETOOL, "work to be done: num_files=%ju num_dirs=%ju\n", progress->stats.num_files, progress->stats.num_dirs);
 
     switch (storage->type) {
     case FileSystemStorage:
     {
         backup_fs->recurse(Path::lookupRoot(), [=]
                            (Path *path, FileStat *stat) {
-                               store_local_backup_file(backup,
-                                                       backup_fs,
+                               store_local_backup_file(backupp,
                                                        origin_fs,
                                                        storage_fs,
                                                        path,
@@ -219,7 +290,7 @@ RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backup,
     {
         progress->updateProgress();
         Path *mount = local_fs_->mkTempDir("beak_send_");
-        unique_ptr<FuseMount> fuse_mount = sys_->mount(mount, backup->asFuseAPI(), settings->fusedebug);
+        unique_ptr<FuseMount> fuse_mount = sys_->mount(mount, backupp->asFuseAPI(), settings->fusedebug);
 
         if (!fuse_mount) {
             error(STORAGETOOL, "Could not mount beak filesystem for rclone/rsync.\n");
@@ -251,6 +322,110 @@ RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backup,
         }
         rc = local_fs_->rmDir(mount);
 
+        break;
+    }
+    case NoSuchStorage:
+        assert(0);
+    }
+
+    progress->finishProgress();
+
+    return RC::OK;
+}
+
+RC StorageToolImplementation::copyBackupIntoStorage(Backup  *backupp,
+                                                    Path *backup_dir,
+                                                    FileSystem *backup_fs,
+                                                    Storage *storage,
+                                                    Settings *settings,
+                                                    ProgressStatistics *progress)
+{
+    // Store the archive files here.
+    FileSystem *storage_fs = NULL;
+    // This is the list of files to be sent to the storage.
+    vector<Path*> files_to_backup;
+
+    map<Path*,FileStat> contents;
+    unique_ptr<FileSystem> fs;
+    if (storage->type == FileSystemStorage)
+    {
+        storage_fs = local_fs_;
+    }
+    else
+    if (storage->type == RCloneStorage || storage->type == RSyncStorage)
+    {
+        vector<TarFileName> files, bad_files;
+        vector<string> other_files;
+        RC rc = RC::OK;
+        if (storage->type == RCloneStorage)
+        {
+            rc = rcloneListBeakFiles(storage, &files, &bad_files, &other_files, &contents, sys_, progress);
+        }
+        else
+        {
+            rc = rsyncListBeakFiles(storage, &files, &bad_files, &other_files, &contents, sys_, progress);
+        }
+        if (rc.isErr())
+        {
+            error(STORAGETOOL, "Could not list files in rclone storage %s\n", storage->storage_location->c_str());
+        }
+
+        // Present the listed files at the storage site as a read only file system
+        // that can only be listed and stated. This is enough to determine if
+        // the storage site files need to be updated.
+        fs = newStatOnlyFileSystem(sys_, contents);
+        storage_fs = fs.get();
+    }
+    backup_fs->recurse(backup_dir, [=,&files_to_backup]
+                       (Path *path, FileStat *stat) {
+                           Path *pp = path->subpath(backup_dir->depth());
+                           add_backup_work(progress, &files_to_backup, pp, stat,
+                                           storage->storage_location, storage_fs);
+                           return RecurseContinue;
+                       });
+
+    debug(STORAGETOOL, "work to be done: num_files=%ju num_dirs=%ju\n", progress->stats.num_files, progress->stats.num_dirs);
+
+    switch (storage->type) {
+    case FileSystemStorage:
+    {
+        backup_fs->recurse(backup_dir, [=]
+                           (Path *path, FileStat *stat) {
+                               Path *pp = path->subpath(backup_dir->depth());
+                               copy_local_backup_file(backupp,
+                                                      pp,
+                                                      backup_dir,
+                                                      backup_fs,
+                                                      stat,
+                                                      storage->storage_location,
+                                                      storage_fs,
+                                                      progress);
+                               return RecurseContinue; });
+        break;
+    }
+    case RSyncStorage:
+    case RCloneStorage:
+    {
+        progress->updateProgress();
+
+        RC rc = RC::OK;
+        if (storage->type == RCloneStorage) {
+            rc = rcloneSendFiles(storage,
+                                 &files_to_backup,
+                                 backup_dir,
+                                 local_fs_,
+                                 sys_, progress);
+        } else {
+            rc = rsyncSendFiles(storage,
+                                &files_to_backup,
+                                backup_dir,
+                                local_fs_,
+                                sys_, progress);
+        }
+
+        if (rc.isErr()) {
+            error(STORAGETOOL, "Error when invoking rclone/rsync.\n");
+        }
         break;
     }
     case NoSuchStorage:

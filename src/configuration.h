@@ -126,7 +126,8 @@ struct Rule {
     // If modified by the configuration ui, and not yet saved,
     bool needs_saving {};
 
-    // All storages for this rule. Can be filesystems or rclone storages.
+    // All storages for this rule. Can be filesystem, rclone or rsync storages.
+    // Ie the path can be a proper filesystem path, or s3_work_crypt: or foo@host:/backup
     std::map<Path*,Storage> storages;
 
     void output(std::vector<ChoiceEntry> *buf = NULL);

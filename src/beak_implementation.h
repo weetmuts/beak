@@ -69,6 +69,8 @@ struct BeakImplementation : Beak {
     RC diff(Settings *settings, Monitor *monitor);
     RC fsck(Settings *settings, Monitor *monitor);
     RC push(Settings *settings, Monitor *monitor);
+    RC storeRuleLocallyThenRemotely(Rule *rule, Settings *settings, Monitor *monitor);
+    RC storeRuleRemotely(Rule *rule, Settings *settings, Monitor *monitor);
     RC pull(Settings *settings, Monitor *monitor);
     RC prune(Settings *settings, Monitor *monitor);
 

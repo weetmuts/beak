@@ -416,6 +416,10 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
                 settings->targetsize_supplied = true;
             }
             break;
+            case trace_option:
+                settings->trace = true;
+                setLogLevel(TRACE);
+                break;
             case triggersize_option:
             {
                 size_t parsed_size;

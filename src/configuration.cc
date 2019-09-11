@@ -383,8 +383,9 @@ bool ConfigurationImplementation::save()
 vector<Storage*> Rule::sortedStorages()
 {
     vector<Storage*> v;
-    for (auto & r : storages) {
-	v.push_back(&r.second);
+    for (auto & r : storages)
+    {
+        v.push_back(&r.second);
     }
     sort(v.begin(), v.end(),
               [](Storage *a, Storage *b)->bool {

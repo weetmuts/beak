@@ -373,7 +373,9 @@ size_t TarFile::readVirtualTar(char *buf, size_t bufsize, off_t offset, FileSyst
             buf += len;
             copied += len;
             from += len;
-        } else {
+        }
+        else
+        {
             size_t origin_from = calculateOriginTarOffset(partnr, from);
             pair<TarEntry*,size_t> r = findTarEntry(origin_from);
             TarEntry *te = r.first;

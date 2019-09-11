@@ -190,7 +190,7 @@ RC rcloneSendFiles(Storage *storage,
                                                         len);
                         });
 
-    local_fs->deleteFile(tmp);
+    // local_fs->deleteFile(tmp);
 
     return rc;
 }

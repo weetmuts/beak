@@ -37,6 +37,13 @@ struct StorageTool
                                       Settings *settings,
                                       ProgressStatistics *progress) = 0;
 
+    virtual RC copyBackupIntoStorage(Backup *backup,
+                                     Path *backup_dir,
+                                     FileSystem *backup_fs,
+                                     Storage *storage,
+                                     Settings *settings,
+                                     ProgressStatistics *progress) = 0;
+
     virtual RC listPointsInTime(Storage *storage,
                                 std::vector<std::pair<Path*,struct timespec>> *v,
                                 ProgressStatistics *progress) = 0;

@@ -158,6 +158,7 @@ LIST_OF_COMMANDS
     X(OptionType::LOCAL_PRIMARY,,now,std::string,true,"When pruning use this date time as now.") \
     X(OptionType::LOCAL_SECONDARY,ta,targetsize,size_t,true,"Tar target size. E.g. --targetsize=20M and the default is 10M.") \
     X(OptionType::LOCAL_SECONDARY,tr,triggersize,size_t,true,"Trigger tar generation in dir at size. E.g. -tr 40M and the default is 20M.")    \
+    X(OptionType::GLOBAL_SECONDARY,,trace,bool,true,"Log the most detailed trace information.") \
     X(OptionType::LOCAL_SECONDARY,ts,splitsize,size_t,true,"Split large files into smaller chunks. E.g. -ts 40M and the default is 50M.")    \
     X(OptionType::LOCAL_SECONDARY,tx,triggerglob,std::vector<std::string>,true,"Trigger tar generation in matching dirs. E.g. -tx '/work/project_*'") \
     X(OptionType::GLOBAL_PRIMARY,q,quite,bool,false,"Silence information output.")             \

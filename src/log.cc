@@ -46,8 +46,9 @@ static int num_components_ = 0;
 #define MAX_NUM_COMPONENTS 64
 static const char *all_components_[MAX_NUM_COMPONENTS];
 
-bool debug_logging_ = false;
 bool verbose_logging_ = false;
+bool debug_logging_ = false;
+bool trace_logging_ = false;
 
 #ifndef USE_SYSLOG
 #define LOG_INFO 1
@@ -126,6 +127,11 @@ void setLogLevel(LogLevel l) {
     if (log_level == DEBUG) {
         verbose_logging_ = true;
         debug_logging_ = true;
+    }
+    if (log_level == TRACE) {
+        verbose_logging_ = true;
+        debug_logging_ = true;
+        trace_logging_ = true;
     }
 }
 

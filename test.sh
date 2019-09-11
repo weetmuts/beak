@@ -540,6 +540,25 @@ if [ $do_test ]; then
     echo OK
 fi
 
+setup store_and_copy "Store and copy backup files"
+if [ $do_test ]; then
+    tmp=$root/alfa/beta
+    mkdir -p $tmp
+    echo HEJSAN > $tmp/xxx
+    echo SVEJSAN > $tmp/yyyy
+
+    performStore --tarheader=full
+    standardStoreUntarTest
+    cleanCheck
+    standardStoreRestoreTest
+    cleanCheck
+    beakfs="$mount"
+    startMountTest standardTest --tarheader=full
+    compareStoreAndMount
+    stopMount
+    echo OK
+fi
+
 setup simplediff "Simple diff"
 if [ $do_test ]; then
     mkdir -p $root/Alfa/Beta
