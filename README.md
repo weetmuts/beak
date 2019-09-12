@@ -406,11 +406,11 @@ or otherwise executing a beak command.
 ```
 beak store {origin} {storage}    beak restore {storage} {origin}
 
-beak shell {storage}
+beak shell [{rule}|{storage}]
 
 beak mount {storage} {dir}       beak bmount {origin} {dir}
 
-beak check {storage}
+beak fsck {storage}
 
 beak push {rule}                 beak pull {rule}
 
@@ -420,7 +420,7 @@ beak config
 
 beak status [{rule}|{storage}]
 
-beak prune {storage}             beak pack {storage}
+beak prune [{rule}|{storage}]    beak pack [{rule}|{storage}]
 ```
 
 ## Development
