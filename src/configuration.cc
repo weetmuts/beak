@@ -138,6 +138,10 @@ private:
 
     ptr<System> sys_;
     ptr<FileSystem> fs_;
+
+    // Unique identifier that is used to identify the local storage
+    // in the list of storages.
+    Path *local_storage_id_;
 };
 
 unique_ptr<Configuration> newConfiguration(ptr<System> sys, ptr<FileSystem> fs) {
@@ -145,7 +149,7 @@ unique_ptr<Configuration> newConfiguration(ptr<System> sys, ptr<FileSystem> fs) 
 }
 
 ConfigurationImplementation::ConfigurationImplementation(ptr<System> sys, ptr<FileSystem> fs)
-    : sys_(sys), fs_(fs)
+    : sys_(sys), fs_(fs), local_storage_id_(Path::lookup("LOCAL<LOCAL>LOCAL"))
 {
 }
 
@@ -226,17 +230,16 @@ bool ConfigurationImplementation::parseRow(string key, string value,
             break;
         case local_key:
             {
-                Storage *local = &current_rule->storages[Path::lookupRoot()];
-                current_rule->local = local;
-                local->storage_location = realPath(current_rule->origin_path, value);
-                local->type = FileSystemStorage;
+                current_rule->local.storage_location = realPath(current_rule->origin_path, value);
+                current_rule->local.type = FileSystemStorage;
             }
             break;
         case local_keep_key:
-            if (!current_rule->local) {
+            if (current_rule->local.type == StorageType::NoSuchStorage)
+            {
                 error(CONFIGURATION, "Local path must be specified before local keep rule.\n");
             }
-            if (!current_rule->local->keep.parse(value)) {
+            if (!current_rule->local.keep.parse(value)) {
                 error(CONFIGURATION, "Invalid keep rule \"%s\".\n", value.c_str());
             }
             break;
@@ -359,17 +362,15 @@ bool ConfigurationImplementation::save()
         conf += "cache = " + relativePathIfPossible(rule->origin_path, rule->cache_path)->str() + "\n";
         conf += "cache_size = " + humanReadable(rule->cache_size) + "\n";
         if (rule->type == LocalThenRemoteBackup) {
-            conf += "local = " + relativePathIfPossible(rule->origin_path, rule->local->storage_location)->str() + "\n";
-            conf += "local_keep = " + rule->local->keep.str() + "\n";
+            conf += "local = " + relativePathIfPossible(rule->origin_path, rule->local.storage_location)->str() + "\n";
+            conf += "local_keep = " + rule->local.keep.str() + "\n";
         }
 
         for (auto storage : rule->sortedStorages())
         {
-            if (storage != rule->local) {
-                conf += "remote = " + storage->storage_location->str() + "\n";
-                conf += "remote_type = " + string(storage_type_names_[storage->type]) + "\n";
-                conf += "remote_keep = " + storage->keep.str() + "\n";
-            }
+            conf += "remote = " + storage->storage_location->str() + "\n";
+            conf += "remote_type = " + string(storage_type_names_[storage->type]) + "\n";
+            conf += "remote_keep = " + storage->keep.str() + "\n";
         }
     }
     vector<char> buf(conf.begin(), conf.end());
@@ -385,7 +386,13 @@ vector<Storage*> Rule::sortedStorages()
     vector<Storage*> v;
     for (auto & r : storages)
     {
-        v.push_back(&r.second);
+        Storage *s1 = &r.second;
+        Storage *s2 = &storages[r.first];
+        assert(s1 == s2);
+        if (r.second.storage_location != Path::lookupRoot())
+        {
+            v.push_back(&r.second);
+        }
     }
     sort(v.begin(), v.end(),
               [](Storage *a, Storage *b)->bool {
@@ -412,8 +419,7 @@ void Rule::generateDefaultSettingsBasedOnPath()
 
     string keep = DEFAULT_LOCAL_KEEP_RULE;
 
-    storages[Path::lookupRoot()] = { FileSystemStorage, Path::lookup(".beak/local"), keep };
-    local = &storages[Path::lookupRoot()];
+    local = { FileSystemStorage, Path::lookup(".beak/local"), keep };
 }
 
 void ConfigurationImplementation::editName(Rule *r)
@@ -461,17 +467,15 @@ void ConfigurationImplementation::editCacheSize(Rule *r)
 
 void ConfigurationImplementation::editLocalPath(Rule *r)
 {
-    assert(r->local);
-    r->local->storage_location = inputDirectory(fs_, "local path>");
+    r->local.storage_location = inputDirectory(fs_, "local path>");
 }
 
 void ConfigurationImplementation::editLocalKeep(Rule *r)
 {
-    assert(r->local);
     for (;;) {
         UI::outputPrompt("local keep>");
         string k = UI::inputString();
-        bool ok = r->local->keep.parse(k);
+        bool ok = r->local.keep.parse(k);
         if (ok) break;
         UI::output("Invalid keep rule.\n");
     }
@@ -551,19 +555,17 @@ void ConfigurationImplementation::outputRule(Rule *r, std::vector<ChoiceEntry> *
     else buf->push_back(ChoiceEntry( msg, [=](){ editCacheSize(r); }));
 
     if (r->type == LocalThenRemoteBackup) {
-        strprintf(msg, "Local:        %s", relativePathIfPossible(r->origin_path, r->local->storage_location)->c_str());
+        strprintf(msg, "Local:        %s", relativePathIfPossible(r->origin_path, r->local.storage_location)->c_str());
         if (!buf) UI::outputln(msg);
         else buf->push_back(ChoiceEntry( msg, [=](){ editLocalPath(r); }));
 
-        strprintf(msg, "Keep:         %s", r->local->keep.str().c_str());
+        strprintf(msg, "Keep:         %s", r->local.keep.str().c_str());
         if (!buf) UI::outputln(msg);
         else buf->push_back(ChoiceEntry( msg, [=](){ editLocalKeep(r); }));
     }
 
     for (auto &s : r->sortedStorages()) {
-        if (s != r->local) {
-            outputStorage(s, buf);
-        }
+        outputStorage(s, buf);
     }
 }
 

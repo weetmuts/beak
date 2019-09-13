@@ -121,7 +121,7 @@ struct Rule {
 
     // Use this storage for local backups. Then this local backups is rcloned to remote storages.
     // It points to storages[""] if NULL, then type is RemoteBackupsOnly or RemoteMount.
-    Storage *local {};
+    Storage local;
 
     // If modified by the configuration ui, and not yet saved,
     bool needs_saving {};

@@ -60,7 +60,7 @@ RC BeakImplementation::storeRuleLocallyThenRemotely(Rule *rule, Settings *settin
 {
     RC rc = RC::OK;
     // Ah, first store locally.
-    info(PUSH, "Storing origin into %s\n", rule->local->storage_location->c_str());
+    info(PUSH, "Storing origin into %s\n", rule->local.storage_location->c_str());
 
     unique_ptr<ProgressStatistics> progress = monitor->newProgressStatistics(buildJobName("store", settings));
 
@@ -72,10 +72,10 @@ RC BeakImplementation::storeRuleLocallyThenRemotely(Rule *rule, Settings *settin
     progress->startDisplayOfProgress();
     rc = backup->scanFileSystem(&settings->from, settings, progress.get());
 
-    settings->to.storage = rule->local;
+    settings->to.storage = &rule->local;
     // Now store the beak file system into the selected storage.
     storage_tool_->storeBackupIntoStorage(backup.get(),
-                                          rule->local,
+                                          &rule->local,
                                           settings,
                                           progress.get());
 
@@ -99,19 +99,16 @@ RC BeakImplementation::storeRuleLocallyThenRemotely(Rule *rule, Settings *settin
 
     for (auto & p : rule->storages)
     {
-        if (&p.second != rule->local)
-        {
-            unique_ptr<ProgressStatistics> progress = monitor->newProgressStatistics(buildJobName("copy", settings));
-            info(PUSH, "Copying local backup into %s\n", p.second.storage_location->c_str());
-            storage_tool_->copyBackupIntoStorage(backup.get(),
-                                                 rule->local->storage_location, // copy from here
-                                                 local_fs_,
-                                                 &p.second, // copy to here
-                                                 settings,
-                                                 progress.get());
-            if (progress->stats.num_files_stored == 0 && progress->stats.num_dirs_updated == 0) {
-                info(PUSH, "No copying needed, remote backup is up to date.\n");
-            }
+        unique_ptr<ProgressStatistics> progress = monitor->newProgressStatistics(buildJobName("copy", settings));
+        info(PUSH, "Copying local backup into %s\n", p.second.storage_location->c_str());
+        storage_tool_->copyBackupIntoStorage(backup.get(),
+                                             rule->local.storage_location, // copy from here
+                                             local_fs_,
+                                             &p.second, // copy to here
+                                             settings,
+                                             progress.get());
+        if (progress->stats.num_files_stored == 0 && progress->stats.num_dirs_updated == 0) {
+            info(PUSH, "No copying needed, remote backup is up to date.\n");
         }
     }
     return rc;
