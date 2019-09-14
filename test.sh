@@ -21,4 +21,6 @@ for i in $testscripts; do
     if [ $? == "0" ]; then echo OK; fi
 done
 
-./test_basics.sh $builddir/beak
+if [[ "$OSTYPE" == "linux-gnu" ]]; then
+    ./test_basics.sh $builddir/beak
+fi
