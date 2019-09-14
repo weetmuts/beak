@@ -32,6 +32,12 @@ function finish {
 }
 trap finish EXIT
 
+
+# Replacement for realpath
+realpath() {
+    [[ $1 = /* ]] && echo "$1" || echo "$PWD/${1#./}"
+}
+
 function Help() {
     echo
     echo Usage: beak-restore {-d} {-c} [x\|t]{a}{v} [DirWithTars] {PathToExtract}
