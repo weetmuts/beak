@@ -171,9 +171,9 @@ fi
 
 # Check the internal checksum of the index file.
 # (2373686132353620 is hex for "#end ")
-CALC_CHECK=$(zcat < "$generation" | xxd -p | tr -d '\n' | \
+CALC_CHECK=$(zcat < "$generation" 2>/dev/null | xxd -p | tr -d '\n' | \
                     sed 's/23656e6420.*//' | xxd -r -p | sha256sum | cut -f 1 -d ' ')
-READ_CHECK=$(zcat < "$generation" | tr -d '\0' | grep "#end" | cut -f 2 -d ' ')
+READ_CHECK=$(zcat < "$generation" 2>/dev/null | tr -d '\0' | grep "#end" | cut -f 2 -d ' ')
 
 if [ ! "$CALC_CHECK" = "$READ_CHECK" ]
 then
