@@ -32,6 +32,9 @@ function finish {
 }
 trap finish EXIT
 
+if ! [ -x "$(command -v sha256sum)" ]; then
+    sha256sum() { shasum -a 256 "$@" ; }
+fi
 
 # Replacement for realpath
 realpath() {
