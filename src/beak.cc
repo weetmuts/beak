@@ -229,11 +229,6 @@ RC BeakImplementation::configure(Settings *settings)
     return configuration_->configure();
 }
 
-RC BeakImplementation::pull(Settings *settings, Monitor *monitor)
-{
-    return RC::ERR;
-}
-
 RC BeakImplementation::umountDaemon(Settings *settings)
 {
     return sys_->umountDaemon(settings->from.dir);

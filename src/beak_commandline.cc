@@ -248,6 +248,36 @@ const char *arg_name_(ArgumentType at) {
     return "?";
 }
 
+Path *findBeakConf(int argc, char **argv, Path *default_conf)
+{
+    for (int i=0; argv[i]; ++i)
+    {
+        const char *c = argv[i];
+        if (c == NULL) break;
+        if (!strcmp (c, "--")) break;
+        if (!strncmp(c, "--useconfig=", 12))
+        {
+            return Path::lookup(c+12);
+        }
+    }
+    return default_conf;
+}
+
+void findAndSetLogging(int argc, char **argv)
+{
+    for (int i=0; argv[i]; ++i)
+    {
+        const char *c = argv[i];
+        if (!strcmp (c, "--")) break;
+        if (!strncmp(c, "--log=", 6))
+        {
+            setLogComponents(c+6);
+            setLogLevel(DEBUG);
+            return;
+        }
+    }
+}
+
 Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *settings)
 {
     vector<string> args;
@@ -466,6 +496,9 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
                 break;
             case exclude_option:
                 settings->exclude.push_back(value);
+                break;
+            case useconfig_option:
+                settings->useconfig = value;
                 break;
             case yesorigin_option:
                 settings->yesorigin = true;

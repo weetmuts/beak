@@ -581,6 +581,6 @@ void testSHA256()
         SHA256_Final((unsigned char*)&sha256_hash[0], &sha256ctx);
     }
     string hex = toHex(sha256_hash);
-    fprintf(stderr, "sha256sum of \"%s\" is %s\n", gzfile_contents.c_str(), hex.c_str());
+    //fprintf(stderr, "sha256sum of \"%s\" is %s\n", gzfile_contents.c_str(), hex.c_str());
 
 }

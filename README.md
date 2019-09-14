@@ -34,9 +34,9 @@ then I simply mount the remote cloud to access it. To have a proper
 backup of the large data, it is of course imperative to have it stored
 in multiple independent cloud locations.
 
-## Short short manual....
+## Short short manual
 
-Local filesystem backups.
+Local filesystem backups:
 ```
 # Store whenever you feel the need to make a backup.
 >beak store /home/you/Work /home/backups
@@ -50,19 +50,22 @@ Exit shell to unmount backup.
 Unmounting backup /home/you/backups
 ```
 
-Remote rclone cloud storage backups, s3_work_crypt is an rclone config.
+Remote cloud backups:
 ```
+# Just replace your local backup directory with an rclone storage:
 >beak store /home/you/Work s3_work_crypt:
 >beak shell s3_work_crypt:
 ```
 
+Restoring is just as easy.
 ```
 # You can restore the third most recent backup. (0=latest 1=second latest 2=third latest)
 >beak restore s3_work_crypt:@2 /home/you/Work
 ```
 
-Configure a rule for /home/you/Work
+Add preconfigured rules for more complicated backup setups.
 ```
+# Add a beak rule named work: for /home/you/Work
 >beak config
 # Depending on the configuration push might store in multiple local and remote locations.
 >beak push work:
@@ -70,9 +73,19 @@ Configure a rule for /home/you/Work
 >beak pull work:
 ```
 
-## Details.....
+Now, you do not want to store backups forever.
+```
+# Prune the local backup
+>beak prune /home/backups
+# or the cloud backup
+>beak prune s3_work_crypt:
+# or the rule
+>beak work:
+```
 
-beak is the tool for the impatient who wants to initiate a backup
+## Longer manual
+
+Beak is the tool for the impatient who wants to initiate a backup
 manually and want to see it finished, quickly. In other words, after
 finishing some important work, you type:
 
@@ -90,7 +103,7 @@ _origin_ directory that was backed up. (I.e. it is not the time when
 the store was initiated.)
 
 `work:` a beak _rule_ that you have created to backup the _origin_ directory /home/you/Work to
-the remote cloud storage location s3_work_crypt:
+the local backup /home/you/Work/.beak/local and then to the remote cloud storage location s3_work_crypt:
 
 `s3_work_crypt:` is an rclone _storage location_ , for example an
 encrypted directory on S3 or your Google drive, or somewhere else. You
@@ -404,23 +417,25 @@ or otherwise executing a beak command.
 ## Command summary
 
 ```
-beak store {origin} {storage}    beak restore {storage} {origin}
+beak store <origin> <storage>    beak restore <storage> <origin>
 
-beak shell [{rule}|{storage}]
+beak shell {<rule>|<storage>}
 
-beak mount {storage} {dir}       beak bmount {origin} {dir}
+beak mount <storage> <dir>       beak bmount <origin> <dir>
 
-beak fsck {storage}
+beak fsck <storage>
 
-beak push {rule}                 beak pull {rule}
+beak push <rule>                 beak pull <rule>
 
-beak diff {storage/origin/rule} {storage/origin/rule}
+beak diff {<storage>|<origin>|<rule>} {<storage>|<origin>|<rule>}
 
 beak config
 
-beak status [{rule}|{storage}]
+beak status {<rule>|<storage>}
 
-beak prune [{rule}|{storage}]    beak pack [{rule}|{storage}]
+beak prune {<rule>|<storage>}
+
+beak pack {<rule>|<storage>}
 ```
 
 ## Development

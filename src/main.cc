@@ -61,8 +61,13 @@ int run(int argc, char *argv[])
     // Here we backup the local fs, but we could backup any virtual filesystem
     // for example one exported by a camera app.
     auto origin_tool = newOriginTool(sys, local_fs);
-    // Fetch the beak configuration from ~/.config/beak/beak.conf
-    auto configuration = newConfiguration(sys, local_fs);
+    // Lookup the config file early, if not specified use the default ~/.config/beak/beak.conf
+    Path *beak_conf = findBeakConf(argc, argv, configurationFile());
+    // Setup logging early, we can now debug command line parsing and configuration loading.
+    findAndSetLogging(argc, argv);
+
+    // Fetch the beak configuration from
+    auto configuration = newConfiguration(sys, local_fs, beak_conf);
     configuration->load();
 
     // Now create the beak backup software.

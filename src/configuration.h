@@ -156,6 +156,6 @@ struct Configuration
     virtual ~Configuration() = default;
 };
 
-std::unique_ptr<Configuration> newConfiguration(ptr<System> sys, ptr<FileSystem> fs);
+std::unique_ptr<Configuration> newConfiguration(ptr<System> sys, ptr<FileSystem> fs, Path *beak_conf);
 
 #endif

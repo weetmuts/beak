@@ -49,6 +49,9 @@ struct OriginTool;
 enum class CommandType { PRIMARY, SECONDARY };
 enum class OptionType { GLOBAL_PRIMARY, LOCAL_PRIMARY, GLOBAL_SECONDARY, LOCAL_SECONDARY };
 
+Path *findBeakConf(int argc, char **argv, Path *default_conf);
+void findAndSetLogging(int argc, char **argv);
+
 struct Beak
 {
     virtual void captureStartTime() = 0;
@@ -162,6 +165,7 @@ LIST_OF_COMMANDS
     X(OptionType::LOCAL_SECONDARY,ts,splitsize,size_t,true,"Split large files into smaller chunks. E.g. -ts 40M and the default is 50M.")    \
     X(OptionType::LOCAL_SECONDARY,tx,triggerglob,std::vector<std::string>,true,"Trigger tar generation in matching dirs. E.g. -tx '/work/project_*'") \
     X(OptionType::GLOBAL_PRIMARY,q,quite,bool,false,"Silence information output.")             \
+    X(OptionType::GLOBAL_SECONDARY,,useconfig,std::string,true,"Use this configuration file instead of the default.") \
     X(OptionType::GLOBAL_PRIMARY,v,verbose,bool,false,"More detailed information. Works for help as well.") \
     X(OptionType::LOCAL_PRIMARY,x,exclude,std::vector<std::string>,true,"Paths matching glob are excluded. E.g. -exclude='beta/**'") \
     X(OptionType::LOCAL_SECONDARY,,yesorigin,bool,false,"The origin directory contains beak files and this is intended.")            \

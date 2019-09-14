@@ -87,7 +87,7 @@ static ComponentId CONFIGURATION = registerLogComponent("configuration");
 class ConfigurationImplementation : public Configuration
 {
 public:
-    ConfigurationImplementation(ptr<System> sys, ptr<FileSystem> fs);
+    ConfigurationImplementation(ptr<System> sys, ptr<FileSystem> fs, Path *beak_conf);
 
     bool load();
     bool save();
@@ -139,17 +139,15 @@ private:
     ptr<System> sys_;
     ptr<FileSystem> fs_;
 
-    // Unique identifier that is used to identify the local storage
-    // in the list of storages.
-    Path *local_storage_id_;
+    Path *beak_conf_ {};
 };
 
-unique_ptr<Configuration> newConfiguration(ptr<System> sys, ptr<FileSystem> fs) {
-    return unique_ptr<Configuration>(new ConfigurationImplementation(sys, fs));
+unique_ptr<Configuration> newConfiguration(ptr<System> sys, ptr<FileSystem> fs, Path *beak_conf) {
+    return unique_ptr<Configuration>(new ConfigurationImplementation(sys, fs, beak_conf));
 }
 
-ConfigurationImplementation::ConfigurationImplementation(ptr<System> sys, ptr<FileSystem> fs)
-    : sys_(sys), fs_(fs), local_storage_id_(Path::lookup("LOCAL<LOCAL>LOCAL"))
+ConfigurationImplementation::ConfigurationImplementation(ptr<System> sys, ptr<FileSystem> fs, Path *beak_conf)
+    : sys_(sys), fs_(fs), beak_conf_(beak_conf)
 {
 }
 
@@ -296,7 +294,7 @@ bool ConfigurationImplementation::load()
     rules_.clear();
     paths_.clear();
     vector<char> buf;
-    Path *config = configurationFile();
+    Path *config = beak_conf_;
     RC rc = fs_->loadVector(config, 32768, &buf);
     if (rc.isOk()) {
         vector<char>::iterator i = buf.begin();
@@ -374,7 +372,7 @@ bool ConfigurationImplementation::save()
         }
     }
     vector<char> buf(conf.begin(), conf.end());
-    fs_->createFile(configurationFile(), &buf);
+    fs_->createFile(beak_conf_, &buf);
 
     UI::output("Configuration saved!\n\n");
     load();

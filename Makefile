@@ -95,11 +95,11 @@ test: test_release
 
 test_release:
 	@echo Running tests on release
-	@for x in $(BUILDDIRS); do echo; ./test.sh $$x/release/beak ; done
+	@for x in $(BUILDDIRS); do echo; ./test.sh $$x/release ; done
 
 test_debug:
 	@echo Running tests
-	@for x in $(BUILDDIRS); do echo; ./test.sh $$x/debug/beak ; done
+	@for x in $(BUILDDIRS); do echo; ./test.sh $$x/debug ; done
 
 clean:
 	@echo Removing release and debug builds

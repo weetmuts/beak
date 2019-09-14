@@ -42,10 +42,13 @@ RC BeakImplementation::diff(Settings *settings, Monitor *monitor)
     unique_ptr<Restore> restore_curr;
 
     // Setup the curr file system.
-    if (settings->from.type == ArgOrigin) {
+    if (settings->from.type == ArgOrigin)
+    {
         curr_fs = origin_tool_->fs();
         curr_path = settings->from.origin;
-    } else if (settings->from.type == ArgStorage) {
+    }
+    else if (settings->from.type == ArgStorage)
+    {
         restore_curr = accessBackup_(&settings->from, settings->from.point_in_time, monitor);
         auto point = restore_curr->singlePointInTime();
         if (!point) {
@@ -63,10 +66,13 @@ RC BeakImplementation::diff(Settings *settings, Monitor *monitor)
     unique_ptr<Restore> restore_old;
 
     // Setup the old file system.
-    if (settings->to.type == ArgOrigin) {
+    if (settings->to.type == ArgOrigin)
+    {
         old_fs = origin_tool_->fs();
         old_path = settings->to.origin;
-    } else if (settings->to.type == ArgStorage) {
+    }
+    else if (settings->to.type == ArgStorage)
+    {
         restore_old = accessBackup_(&settings->to, settings->to.point_in_time, monitor);
         auto point = restore_old->singlePointInTime();
         if (!point) {
