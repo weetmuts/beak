@@ -155,7 +155,7 @@ else
         echo Select a generation using -g
         n=0
         while IFS='' read i; do
-            msg=$(gunzip -c "$i" | head -2 | grep \#message | sed 's/#message //')
+            msg=$(gunzip -c "$i" 2>/dev/null | head -2 | grep \#message | sed 's/#message //')
             secs=$(echo "$i" | sed "s/.*beak_z_\([0-9]\+\).*/\1/")
             dat=$(date --date "@$secs")
             echo -e "@$n\t$dat\t$msg"
@@ -183,7 +183,7 @@ then
     exit 1
 fi
 # Extract the list of tar files from the index file.
-gunzip -c "$generation" | tr -d '\0' | grep -A1000000 -m1 \#tars | grep -B1000000 -m1 \#parts | grep -v beak_z_ | grep -v \#tars | grep -v \#parts | sed 's/^\///'  > "$dir/aa"
+gunzip -c "$generation" 2>/dev/null | tr -d '\0' | grep -A1000000 -m1 \#tars | grep -B1000000 -m1 \#parts | grep -v beak_z_ | grep -v \#tars | grep -v \#parts | sed 's/^\///'  > "$dir/aa"
 
 cat "$dir/aa" | tr -c -d '/\n' | tr / a > "$dir/bb"
 # Sort them on the number of slashes, ie handle the
