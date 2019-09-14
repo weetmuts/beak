@@ -31,6 +31,12 @@
 
 #include <unistd.h>
 
+#ifdef OSX64
+#define BEAK_SHARED_DIR "/tmp"
+#else
+#define BEAK_SHARED_DIR "/dev/shm"
+#endif
+
 static ComponentId MONITOR = registerLogComponent("monitor");
 static ComponentId STATISTICS = registerLogComponent("statistics");
 
@@ -84,7 +90,7 @@ MonitorImplementation::newProgressStatistics(string job)
 
 void MonitorImplementation::checkSharedDir()
 {
-    Path *tmp = Path::lookup("/dev/shm");
+    Path *tmp = Path::lookup(BEAK_SHARED_DIR);
     string shd;
     strprintf(shd, "beak-%s", sys_->userName().c_str());
     shared_dir_ = tmp->append(shd);

@@ -48,8 +48,12 @@
 #define FTW_STOP 2
 #define FTW_ACTIONRETVAL 3
 
+#define BEAK_SHARED_DIR "/tmp"
+
 #else
 #include<linux/kdev_t.h>
+
+#define BEAK_SHARED_DIR "/dev/shm"
 #endif
 
 using namespace std;
@@ -556,7 +560,7 @@ bool FileSystemImplementationPosix::deleteFile(Path *file)
 
 void FileSystemImplementationPosix::initTempDir()
 {
-    Path *tmp = Path::lookup("/dev/shm");
+    Path *tmp = Path::lookup(BEAK_SHARED_DIR);
     string shd;
     strprintf(shd, "beak_%s", sys_->userName().c_str());
     temp_dir_ = tmp->append(shd);
