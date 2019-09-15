@@ -99,9 +99,10 @@ struct FileSystemImplementationWinapi : FileSystem
     RC stat(Path *p, FileStat *fs);
     RC chmod(Path *p, FileStat *fs);
     RC utime(Path *p, FileStat *fs);
+    Path *tempDir();
     Path *mkTempFile(string prefix, string content);
     Path *mkTempDir(string prefix);
-    Path *mkDir(Path *p, string name);
+    Path *mkDir(Path *p, string name, int permissions);
     RC rmDir(Path *p);
 
     RC loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
@@ -122,6 +123,8 @@ struct FileSystemImplementationWinapi : FileSystem
     FileSystemImplementationWinapi() : FileSystem("FileSystemImplementationWinapi") {}
 
 private:
+
+    void initTempDir();
 
     Path *root;
     Path *cache;
@@ -165,7 +168,8 @@ Path *initConfigurationFile_()
     return homep->append(".config/beak/beak.conf");
 }
 
-unique_ptr<FileSystem> newDefaultFileSystem()
+
+unique_ptr<FileSystem> newDefaultFileSystem(System *sys)
 {
     if (!cache_dir_) {
         cache_dir_ = initCacheDir_();
@@ -236,6 +240,16 @@ RC FileSystemImplementationWinapi::chmod(Path *p, FileStat *fs)
 RC FileSystemImplementationWinapi::utime(Path *p, FileStat *fs)
 {
     return RC::ERR;
+}
+
+Path *FileSystemImplementationWinapi::tempDir()
+{
+    return Path::lookup("TEMP");
+    /*if (temp_dir_ == NULL) {
+        // initTempDir();
+        temp_dir_ = Path::lookup("TEMP");
+    }
+    return temp_dir_;*/
 }
 
 Path *FileSystemImplementationWinapi::mkTempFile(string prefix, string content)

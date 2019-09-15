@@ -33,11 +33,13 @@ struct SystemImplementationWinapi : System
                function<void(char *buffer, size_t len)> cb);
 
     RC invokeShell(Path *init_file);
+    bool processExists(pid_t pid);
 
     RC mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground, bool debug);
     RC umountDaemon(Path *dir);
     std::unique_ptr<FuseMount> mount(Path *dir, FuseAPI *fuseapi, bool debug);
     RC umount(ptr<FuseMount> fuse_mount);
+    string userName();
 
 private:
     int *rooot {};
@@ -68,6 +70,12 @@ RC SystemImplementationWinapi::invokeShell(Path *init_file)
     return RC::ERR;
 }
 
+bool SystemImplementationWinapi::processExists(pid_t pid)
+{
+    return false;
+}
+
+
 unique_ptr<ThreadCallback> newRegularThreadCallback(int millis, std::function<bool()> thread_cb)
 {
     return NULL;
@@ -91,4 +99,9 @@ std::unique_ptr<FuseMount> SystemImplementationWinapi::mount(Path *dir, FuseAPI 
 RC SystemImplementationWinapi::umount(ptr<FuseMount> fuse_mount)
 {
     return RC::ERR;
+}
+
+string SystemImplementationWinapi::userName()
+{
+    return "";
 }
