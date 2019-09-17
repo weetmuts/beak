@@ -41,7 +41,8 @@ using namespace std;
 
 #define LIST_OF_STORAGE_KEYWORDS \
     X(remote,"Remote directory or rclone target for bacup storage.")                \
-    X(remote_type,"FileSystemStorage or RCloneStorage.")                            \
+    X(remote_type,"FileSystemStorage, RCloneStorage or RSyncStorage.")              \
+    X(remote_usage,"Always,RoundRobin,IfAvailable,WhenRequested.")                  \
     X(remote_keep,"Keep rule for local storage.")                                   \
 
 enum RuleKeyWord : short {
@@ -77,6 +78,12 @@ LIST_OF_TYPES
 const char *storage_type_names_[] = {
 #define X(name,info) #name,
 LIST_OF_STORAGE_TYPES
+#undef X
+};
+
+const char *storage_usage_names_[] = {
+#define X(name,info) #name,
+LIST_OF_STORAGE_USAGES
 #undef X
 };
 
@@ -120,11 +127,13 @@ public:
     void editLocalKeep(Rule *r);
 
     bool editRemoteTarget(Storage *r);
+    void editRemoteUsage(Storage *r);
     void editRemoteKeep(Storage *r);
 
 private:
     bool parseRow(string key, string value,
-                  Rule *current_rule, Storage **current_storage);
+                  Rule *current_rule, Storage **current_storage,
+                  int line);
 
     bool isFileSystemStorage(Path *storage_location);
     bool isRCloneStorage(Path *storage_location, string *type = NULL);
@@ -140,6 +149,7 @@ private:
     ptr<FileSystem> fs_;
 
     Path *beak_conf_ {};
+    bool needs_saving_ {};
 };
 
 unique_ptr<Configuration> newConfiguration(ptr<System> sys, ptr<FileSystem> fs, Path *beak_conf) {
@@ -196,12 +206,13 @@ Path *relativePathIfPossible(Path *path, Path *curr)
 }
 
 bool ConfigurationImplementation::parseRow(string key, string value,
-                                           Rule *current_rule, Storage **current_storage)
+                                           Rule *current_rule, Storage **current_storage,
+                                           int line)
 {
     RuleKeyWord rkw;
     bool ok;
     debug(CONFIGURATION,"loading %s:%s for rule %s\n", key.c_str(), value.c_str(), current_rule->name.c_str());
-    lookupType(key,RuleKeyWord,rule_keywords_,rkw,ok);
+    lookupKeyword(key,RuleKeyWord,rule_keywords_,rkw,ok);
     if (ok) {
         switch (rkw) {
         case origin_key:
@@ -212,8 +223,8 @@ bool ConfigurationImplementation::parseRow(string key, string value,
         case type_key:
         {
             RuleType rt = LocalThenRemoteBackup;
-            lookupType(value,RuleType,rule_type_names_,rt,ok);
-            if (!ok) error(CONFIGURATION, "No such rule type \"%s\"\n", value.c_str());
+            lookupKeyword(value,RuleType,rule_type_names_,rt,ok);
+            if (!ok) error(CONFIGURATION, "No such rule type \"%s\" at line %d.\n", value.c_str(), line);
             current_rule->type = rt;
         }
             break;
@@ -223,7 +234,8 @@ bool ConfigurationImplementation::parseRow(string key, string value,
         case cache_size_key:
             {
                 RC rc = parseHumanReadable(value, &current_rule->cache_size);
-                if (rc.isErr()) error(CONFIGURATION, "Could not parse cache size \"%s\"\n", value.c_str());
+                if (rc.isErr()) error(CONFIGURATION, "Could not parse cache size \"%s\" at line %d\n",
+                                      value.c_str(), line);
             }
             break;
         case local_key:
@@ -235,10 +247,11 @@ bool ConfigurationImplementation::parseRow(string key, string value,
         case local_keep_key:
             if (current_rule->local.type == StorageType::NoSuchStorage)
             {
-                error(CONFIGURATION, "Local path must be specified before local keep rule.\n");
+                error(CONFIGURATION, "Local path must be specified before local keep rule, see line %d.\n",
+                    line);
             }
             if (!current_rule->local.keep.parse(value)) {
-                error(CONFIGURATION, "Invalid keep rule \"%s\".\n", value.c_str());
+                error(CONFIGURATION, "Invalid keep rule \"%s\" at line %d.\n", value.c_str(), line);
             }
             break;
         }
@@ -246,51 +259,67 @@ bool ConfigurationImplementation::parseRow(string key, string value,
     }
 
     StorageKeyWord skw;
-    lookupType(key,StorageKeyWord,storage_keywords_,skw,ok);
+    lookupKeyword(key,StorageKeyWord,storage_keywords_,skw,ok);
 
     if (ok) {
         switch (skw) {
         case remote_key:
         {
-            if (value == "") error(CONFIGURATION, "Remote storage cannot be empty.\n");
+            if (value == "") error(CONFIGURATION, "Remote storage cannot be empty, see line %d.\n", line);
             Path *storage_location = Path::lookup(value);
             Rule *rule = findRuleFromStorageLocation(storage_location);
             if (rule) {
-                error(CONFIGURATION, "The remote storage location \"%s\" is used in two rules!\n", value.c_str());
+                error(CONFIGURATION,
+                      "The remote storage location \"%s\" is used in two rules, see line %d\n",
+                      value.c_str(), line);
             }
             *current_storage = &current_rule->storages[storage_location];
             (*current_storage)->storage_location = storage_location;
             break;
         }
         case remote_type_key:
-            if (!current_storage) {
-                error(CONFIGURATION, "Remote must be specified before type.\n");
+            if (!current_storage)
+            {
+                error(CONFIGURATION, "Remote must be specified before type, see line %d.\n", line);
             }
             {
                 StorageType st {};
-                lookupType(value,StorageType,storage_type_names_,st,ok);
-                if (!ok) error(CONFIGURATION, "No such storage type \"%s\"\n", value.c_str());
+                lookupKeyword(value,StorageType,storage_type_names_,st,ok);
+                if (!ok) error(CONFIGURATION, "No such storage type \"%s\" at line %d.\n", value.c_str(), line);
                 (*current_storage)->type = st;
+            }
+            break;
+        case remote_usage_key:
+            if (!current_storage)
+            {
+                error(CONFIGURATION, "Remote must be specified before usage, see line %d.\n", line);
+            }
+            {
+                StorageUsage su {};
+                lookupKeyword(value,StorageUsage,storage_usage_names_,su,ok);
+                if (!ok) error(CONFIGURATION, "No such storage usage \"%s\" at line %d.\n", value.c_str(), line);
+                (*current_storage)->usage = su;
             }
             break;
         case remote_keep_key:
             if (!(*current_storage)) {
-                error(CONFIGURATION, "Remote must be specified before keep rule.\n");
+                error(CONFIGURATION, "Remote must be specified before keep rule, see line %d.\n", line);
             }
             if (!(*current_storage)->keep.parse(value)) {
-                error(CONFIGURATION, "Invalid keep rule \"%s\".\n", value.c_str());
+                error(CONFIGURATION, "Invalid keep rule \"%s\" at line %d.\n", value.c_str(), line);
             }
             break;
         }
         return true;
     }
 
-    error(CONFIGURATION, "Invalid key \"%s\".", key.c_str());
+    error(CONFIGURATION, "Unknown configuration key \"%s\" at line %d.\n", key.c_str(), line);
     return false;
 }
 
 bool ConfigurationImplementation::load()
 {
+    int line_nr = 0;
     rules_.clear();
     paths_.clear();
     vector<char> buf;
@@ -300,12 +329,13 @@ bool ConfigurationImplementation::load()
         vector<char>::iterator i = buf.begin();
         bool eof=false, err=false;
         Rule *current_rule = NULL;
-	Storage *current_storage = NULL;
+        Storage *current_storage = NULL;
 
         while (true) {
             eatWhitespace(buf,i,&eof);
             if (eof) break;
             string block = eatTo(buf,i,'\n', 1024*1024, &eof, &err);
+            line_nr++;
             if (err) break; // eof is ok here, the last line might not be terminated with a \n
             trimWhitespace(&block);
             // Ignore empty lines
@@ -342,7 +372,7 @@ bool ConfigurationImplementation::load()
                 string value = eatTo(line, i, -1, 1024*1024, &eof, &err);
                 trimWhitespace(&value);
                 if (err) break;
-                parseRow(key, value, current_rule, &current_storage);
+                parseRow(key, value, current_rule, &current_storage, line_nr);
             }
         }
     }
@@ -368,6 +398,7 @@ bool ConfigurationImplementation::save()
         {
             conf += "remote = " + storage->storage_location->str() + "\n";
             conf += "remote_type = " + string(storage_type_names_[storage->type]) + "\n";
+            conf += "remote_usage = " + string(storage_usage_names_[storage->usage]) + "\n";
             conf += "remote_keep = " + storage->keep.str() + "\n";
         }
     }
@@ -426,14 +457,16 @@ void ConfigurationImplementation::editName(Rule *r)
         UI::outputPrompt("name>");
         string old_name = r->name;
         r->name = UI::inputString();
-        if (r->name != old_name) r->needs_saving = true;
+        if (r->name != old_name) needs_saving_ = true;
         if (okRuleName(r->name)) break;
     }
 }
 
 void ConfigurationImplementation::editPath(Rule *r)
 {
+    Path *tmp = r->origin_path;
     r->origin_path = inputDirectory(fs_, "path>");
+    if (tmp != r->origin_path) needs_saving_ = true;
 }
 
 void ConfigurationImplementation::editType(Rule *r)
@@ -443,17 +476,22 @@ void ConfigurationImplementation::editType(Rule *r)
         { "Remote backups only" },
         { "Remote mount" }
     };
+    RuleType tmp = r->type;
     ChoiceEntry *ce = UI::inputChoice("Type of rule:", "type>", v);
     r->type = (RuleType)ce->index;
+    if (tmp != r->type) needs_saving_ = true;
 }
 
 void ConfigurationImplementation::editCachePath(Rule *r)
 {
+    Path *tmp = r->cache_path;
     r->cache_path = inputDirectory(fs_, "cache path>");
+    if (tmp != r->cache_path) needs_saving_ = true;
 }
 
 void ConfigurationImplementation::editCacheSize(Rule *r)
 {
+    size_t tmp = r->cache_size;
     for (;;) {
         UI::outputPrompt("cache size>");
         string s = UI::inputString();
@@ -461,15 +499,19 @@ void ConfigurationImplementation::editCacheSize(Rule *r)
         if (rc.isOk()) break;
         UI::output("Invalid cache size.\n");
     }
+    if (tmp != r->cache_size) needs_saving_ = true;
 }
 
 void ConfigurationImplementation::editLocalPath(Rule *r)
 {
+    Path *tmp = r->local.storage_location;
     r->local.storage_location = inputDirectory(fs_, "local path>");
+    if (tmp != r->local.storage_location) needs_saving_ = true;
 }
 
 void ConfigurationImplementation::editLocalKeep(Rule *r)
 {
+    Keep tmp = r->local.keep;
     for (;;) {
         UI::outputPrompt("local keep>");
         string k = UI::inputString();
@@ -477,6 +519,7 @@ void ConfigurationImplementation::editLocalKeep(Rule *r)
         if (ok) break;
         UI::output("Invalid keep rule.\n");
     }
+    if (!tmp.equals(r->local.keep)) needs_saving_ = true;
 }
 
 vector<Rule*> ConfigurationImplementation::sortedRules()
@@ -657,7 +700,7 @@ void ConfigurationImplementation::editRule()
         outputRule(r, &c);
         c.push_back({"a", "", "Add storage"});
         c.push_back({"e", "", "Erase storage"});
-        if (r->needs_saving) {
+        if (needs_saving_) {
             c.push_back({"s", "", "Save (unsaved data exists!)"});
             c.push_back({"d", "", "Discard changes"});
         } else {
@@ -732,6 +775,7 @@ void ConfigurationImplementation::createNewRule()
         Storage storage;
         bool b = editRemoteTarget(&storage);
         if (!b) break;
+        editRemoteUsage(&storage);
         editRemoteKeep(&storage);
         rule.storages[storage.storage_location] = storage;
     }
@@ -913,8 +957,12 @@ void ConfigurationImplementation::outputStorage(Storage *s, std::vector<ChoiceEn
     if (!buf) UI::outputln(msg);
     else {
         buf->push_back(ChoiceEntry(msg));
-        buf->back().available = false;
+        buf->back().available = false; // Disable editing the type, since it is calculated from the remote.
     }
+
+    strprintf(msg, "       Usage: %s", storage_usage_names_[s->usage]);
+    if (!buf) UI::outputln(msg);
+    else buf->push_back(ChoiceEntry(msg, [=](){ editRemoteUsage(s); }));
 
     strprintf(msg, "        Keep: %s", s->keep.str().c_str());
     if (!buf) UI::outputln(msg);
@@ -923,6 +971,7 @@ void ConfigurationImplementation::outputStorage(Storage *s, std::vector<ChoiceEn
 
 bool ConfigurationImplementation::editRemoteTarget(Storage *s)
 {
+    Path *tmp = s->storage_location;
     for (;;) {
         UI::outputPrompt("remote>");
         string storage = UI::inputString();
@@ -940,11 +989,27 @@ bool ConfigurationImplementation::editRemoteTarget(Storage *s)
         s->type = r.second;
         break;
     }
+    if (tmp != s->storage_location) needs_saving_ = true;
     return true;
+}
+
+void ConfigurationImplementation::editRemoteUsage(Storage *s)
+{
+    StorageUsage tmp = s->usage;
+    vector<ChoiceEntry> v = {
+        { "Always" },
+        { "Round robin" },
+        { "If available" },
+        { "When requested" }
+    };
+    ChoiceEntry *ce = UI::inputChoice("Storage usage:", "usage>", v);
+    s->usage = (StorageUsage)ce->index;
+    if (tmp != s->usage) needs_saving_ = true;
 }
 
 void ConfigurationImplementation::editRemoteKeep(Storage *s)
 {
+    Keep tmp = s->keep;
     for (;;) {
         UI::output("Empty keep string means => all:2d daily:2w weekly:2m monthly:2y\n");
         UI::outputPrompt("remote keep>");
@@ -957,6 +1022,7 @@ void ConfigurationImplementation::editRemoteKeep(Storage *s)
         if (ok) break;
         UI::output("Invalid keep rule.\n");
     }
+    if (!tmp.equals(s->keep)) needs_saving_ = true;
 }
 
 bool has_index_files_or_is_empty_(FileSystem *fs, Path *path)

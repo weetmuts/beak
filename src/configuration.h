@@ -67,6 +67,7 @@ struct Keep
     // Return true if a storage pruned with this keep rule is a subset of
     // the same storage pruned with the k rule.
     bool subsetOf(const Keep &k);
+    bool equals(Keep& k) { return all==k.all && daily==k.daily && weekly==k.weekly && monthly==k.monthly; }
 };
 
 #define LIST_OF_STORAGE_TYPES \
@@ -75,9 +76,22 @@ struct Keep
     X(RCloneStorage,     "Store using rclone")                           \
     X(RSyncStorage,      "Store using rsync")                            \
 
+#define LIST_OF_STORAGE_USAGES \
+    X(Always, "Always")                                  \
+    X(RoundRobin, "Round robin")                         \
+    X(IfAvailable, "If available")                       \
+    X(WhenRequested, "When requested")                   \
+
+
 enum StorageType : short {
 #define X(name,info) name,
 LIST_OF_STORAGE_TYPES
+#undef X
+};
+
+enum StorageUsage : short {
+#define X(name,info) name,
+LIST_OF_STORAGE_USAGES
 #undef X
 };
 
@@ -85,6 +99,9 @@ struct Storage
 {
     // Store or retrieve to/from local file system, rclone target, or rsync target.
     StorageType type {};
+    // How to use this storage, always store here, round robin between other rr storages,
+    // if available (typicall usb storage locations) or when requested (more expensive storage)
+    StorageUsage usage {};
     // Storage location is either a filesystem path, or an rclone target (eg s3_work_crypt: or s3:/prod/bar)
     // or an rsync target (eg backup@192.168.0.1:/backups/)
     Path *storage_location {};
@@ -122,9 +139,6 @@ struct Rule {
     // Use this storage for local backups. Then this local backups is rcloned to remote storages.
     // It points to storages[""] if NULL, then type is RemoteBackupsOnly or RemoteMount.
     Storage local;
-
-    // If modified by the configuration ui, and not yet saved,
-    bool needs_saving {};
 
     // All storages for this rule. Can be filesystem, rclone or rsync storages.
     // Ie the path can be a proper filesystem path, or s3_work_crypt: or foo@host:/backup

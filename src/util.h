@@ -89,7 +89,7 @@ RC gzipit(std::string *from, std::vector<char> *to);
 RC gunzipit(std::vector<char> *from, std::vector<char> *to);
 std::string randomUpperCaseCharacterString(int len);
 
-#define lookupType(key_in,Type,TypeNames,key_out,ok) \
+#define lookupKeyword(key_in,Type,TypeNames,key_out,ok) \
 { ok = false; \
     for (unsigned int i=0; i<(sizeof(TypeNames)/sizeof(char*)); ++i) \
     {  \
