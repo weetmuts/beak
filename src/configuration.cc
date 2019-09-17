@@ -406,6 +406,7 @@ bool ConfigurationImplementation::save()
     fs_->createFile(beak_conf_, &buf);
 
     UI::output("Configuration saved!\n\n");
+    UI::attention();
     load();
     return true;
 }

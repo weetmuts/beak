@@ -57,6 +57,7 @@ enum KeepOrChange {
 
 struct UI
 {
+    static void attention();
     // Print output data
     static void output(const char *fmt, ...);
     static void output(std::string msg);

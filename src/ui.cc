@@ -43,6 +43,11 @@ UIImplementation::UIImplementation()
 {
 }
 
+void UI::attention()
+{
+    usleep(2*1000*1000);
+}
+
 void UI::output(const char *fmt, ...)
 {
     va_list args;
