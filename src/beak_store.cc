@@ -31,14 +31,24 @@ RC BeakImplementation::store(Settings *settings, Monitor *monitor)
     assert(settings->from.type == ArgOrigin || settings->from.type == ArgRule);
     assert(settings->to.type == ArgStorage);
 
+    FileSystem *storage_fs = local_fs_;
+    Storage *storage = settings->to.storage;
+    if (storage->type == RCloneStorage ||
+        storage->type == RSyncStorage) {
+        storage_fs = storage_tool_->asCachedReadOnlyFS(storage, monitor);
+    }
+
+    storage_fs->recurse(Path::lookupRoot(),
+                        [](Path *path, FileStat *stat) { return RecurseContinue; });
+
     unique_ptr<ProgressStatistics> progress = monitor->newProgressStatistics(buildJobName("store", settings));
+    progress->startDisplayOfProgress();
 
     unique_ptr<Backup> backup  = newBackup(origin_tool_->fs());
 
     // This command scans the origin file system and builds
     // an in memory representation of the backup file system,
     // with tar files,index files and directories.
-    progress->startDisplayOfProgress();
     rc = backup->scanFileSystem(&settings->from, settings, progress.get());
 
     // Now store the beak file system into the selected storage.

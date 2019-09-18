@@ -204,9 +204,9 @@ struct TarFile
     // src_fs: Fetch the tarfile contents from this filesystem
     // dst_fs: Store into this filesystem
     // off: Start storing from this offset in the tar file.
-    bool createFile(Path *file, FileStat *stat, uint partnr,
-                    FileSystem *src_fs, FileSystem *dst_fs, size_t off,
-                    std::function<void(size_t)> update_progress);
+    bool createFilee(Path *file, FileStat *stat, uint partnr,
+                     FileSystem *src_fs, FileSystem *dst_fs, size_t off,
+                     std::function<void(size_t)> update_progress);
 
     TarEntry *singleContent() {
         return contents_.begin()->second;

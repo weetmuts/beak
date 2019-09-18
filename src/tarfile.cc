@@ -395,7 +395,7 @@ size_t TarFile::readVirtualTar(char *buf, size_t bufsize, off_t offset, FileSyst
     return copied;
 }
 
-bool TarFile::createFile(Path *file, FileStat *stat, uint partnr,
+bool TarFile::createFilee(Path *file, FileStat *stat, uint partnr,
                          FileSystem *src_fs, FileSystem *dst_fs, size_t off,
                          function<void(size_t)> update_progress)
 {

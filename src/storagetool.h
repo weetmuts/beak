@@ -51,6 +51,9 @@ struct StorageTool
     virtual FileSystem *asCachedReadOnlyFS(Storage *storage,
                                            Monitor *monitor) = 0;
 
+    virtual FileSystem *asStatOnlyFS(Storage *storage,
+                                     Monitor *monitor) = 0;
+
     virtual RC removeBackupFiles(Storage *storage,
                                  std::vector<Path*>& files,
                                  ProgressStatistics *progress) = 0;

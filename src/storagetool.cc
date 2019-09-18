@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2018 Fredrik Öhrström
+ Copyright (C) 2018-2019 Fredrik Öhrström
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -58,6 +58,9 @@ struct StorageToolImplementation : public StorageTool
 
     FileSystem *asCachedReadOnlyFS(Storage *storage,
                                    Monitor *monitor);
+
+    FileSystem *asStatOnlyFS(Storage *storage,
+                             Monitor *monitor);
 
     System *sys_;
     FileSystem *local_fs_;
@@ -153,7 +156,7 @@ void store_local_backup_file(Backup *backup,
         }
         // The size gets incrementally update while the tar file is written!
         auto func = [&progress](size_t n){ progress->stats.size_files_stored += n; };
-        tarr->createFile(file_name, stat, partnr, origin_fs, storage_fs, 0, func);
+        tarr->createFilee(file_name, stat, partnr, origin_fs, storage_fs, 0, func);
 
         storage_fs->utime(file_name, stat);
         progress->stats.num_files_stored++;
@@ -162,8 +165,7 @@ void store_local_backup_file(Backup *backup,
     }
 }
 
-void copy_local_backup_file(Backup *backup,
-                            Path *relpath,
+void copy_local_backup_file(Path *relpath,
                             Path *source_location,
                             FileSystem *source_fs,
                             FileStat *stat,
@@ -242,7 +244,7 @@ RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backupp,
         vector<string> other_files;
         RC rc = RC::OK;
         if (storage->type == RCloneStorage)
-       {
+        {
             rc = rcloneListBeakFiles(storage, &files, &bad_files, &other_files, &contents, sys_, progress);
         }
         else
@@ -392,8 +394,7 @@ RC StorageToolImplementation::copyBackupIntoStorage(Backup  *backupp,
         backup_fs->recurse(backup_dir, [=]
                            (Path *path, FileStat *stat) {
                                Path *pp = path->subpath(backup_dir->depth());
-                               copy_local_backup_file(backupp,
-                                                      pp,
+                               copy_local_backup_file(pp,
                                                       backup_dir,
                                                       backup_fs,
                                                       stat,
@@ -669,4 +670,9 @@ FileSystem *StorageToolImplementation::asCachedReadOnlyFS(Storage *storage, Moni
     CacheFS *fs = new CacheFS(local_fs_, cache_dir, storage, sys_, monitor);
     fs->refreshCache();
     return fs;
+}
+
+FileSystem *StorageToolImplementation::asStatOnlyFS(Storage *storage, Monitor *monitor)
+{
+    return NULL;
 }

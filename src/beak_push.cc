@@ -59,8 +59,14 @@ RC BeakImplementation::push(Settings *settings, Monitor *monitor)
 RC BeakImplementation::storeRuleLocallyThenRemotely(Rule *rule, Settings *settings, Monitor *monitor)
 {
     RC rc = RC::OK;
-    // Ah, first store locally.
+
     info(PUSH, "Storing origin into %s\n", rule->local.storage_location->c_str());
+    bool ok = local_fs_->mkDirpWriteable(rule->local.storage_location);
+    if (!ok)
+    {
+        warning(PUSH, "Could not write to local storage directory %s\n", rule->local.storage_location->c_str());
+        return RC::ERR;
+    }
 
     unique_ptr<ProgressStatistics> progress = monitor->newProgressStatistics(buildJobName("store", settings));
 
