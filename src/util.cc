@@ -570,6 +570,11 @@ string tolowercase(string const& s)
     return wto_string(ss);
 }
 
+bool greaterThan(struct timespec *a, struct timespec *b)
+{
+    return a->tv_sec > b->tv_sec || (a->tv_sec == b->tv_sec && a->tv_nsec > b->tv_nsec);
+}
+
 bool isInTheFuture(const struct timespec *tm)
 {
     // What happens with summer and winter time changes?

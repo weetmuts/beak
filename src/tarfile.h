@@ -182,6 +182,7 @@ struct TarFile
     std::pair<TarEntry*, size_t> findTarEntry(size_t offset);
     void calculateHash();
     void calculateHash(std::vector<std::pair<TarFile*,TarEntry*>> &tars, std::string &contents);
+    void calculateHashFromString(std::string &contents);
     std::vector<char> &hash();
 
     size_t currentTarOffset()
@@ -227,7 +228,6 @@ private:
     UpdateDisk disk_update;
 
     void calculateSHA256Hash();
-    void calculateSHA256Hash(std::vector<std::pair<TarFile*,TarEntry*>> &tars, std::string &content);
 
     std::vector<char> sha256_hash_;
     // Number of parts.

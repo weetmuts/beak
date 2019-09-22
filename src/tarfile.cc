@@ -123,7 +123,31 @@ void TarFile::calculateHash()
 
 void TarFile::calculateHash(vector<pair<TarFile*,TarEntry*>> &tars, string &content)
 {
-    calculateSHA256Hash(tars, content);
+    SHA256_CTX sha256ctx;
+    SHA256_Init(&sha256ctx);
+
+    // SHA256 all other tar and gz file hashes! This is the hash of this state!
+    for (auto & p : tars)
+    {
+        TarFile *tf = p.first;
+        if (tf == this) continue;
+        SHA256_Update(&sha256ctx, &tf->hash()[0], tf->hash().size());
+    }
+    // SHA256 the detailed file listing too!
+    SHA256_Update(&sha256ctx, &content[0], content.length());
+    sha256_hash_.resize(SHA256_DIGEST_LENGTH);
+    SHA256_Final((unsigned char*)&sha256_hash_[0], &sha256ctx);
+}
+
+void TarFile::calculateHashFromString(string &content)
+{
+    SHA256_CTX sha256ctx;
+    SHA256_Init(&sha256ctx);
+
+    SHA256_Update(&sha256ctx, &content[0], content.length());
+
+    sha256_hash_.resize(SHA256_DIGEST_LENGTH);
+    SHA256_Final((unsigned char*)&sha256_hash_[0], &sha256ctx);
 }
 
 vector<char> &TarFile::hash() {
@@ -140,27 +164,6 @@ void TarFile::calculateSHA256Hash()
         TarEntry *te = a.second;
         SHA256_Update(&sha256ctx, &te->metaHash()[0], te->metaHash().size());
     }
-    sha256_hash_.resize(SHA256_DIGEST_LENGTH);
-    SHA256_Final((unsigned char*)&sha256_hash_[0], &sha256ctx);
-}
-
-void TarFile::calculateSHA256Hash(vector<pair<TarFile*,TarEntry*>> &tars, string &content)
-{
-    SHA256_CTX sha256ctx;
-    SHA256_Init(&sha256ctx);
-
-    // SHA256 all other tar and gz file hashes! This is the hash of this state!
-    for (auto & p : tars)
-    {
-        TarFile *tf = p.first;
-        if (tf == this) continue;
-
-        SHA256_Update(&sha256ctx, &tf->hash()[0], tf->hash().size());
-    }
-
-    // SHA256 the detailed file listing too!
-    SHA256_Update(&sha256ctx, &content[0], content.length());
-
     sha256_hash_.resize(SHA256_DIGEST_LENGTH);
     SHA256_Final((unsigned char*)&sha256_hash_[0], &sha256ctx);
 }

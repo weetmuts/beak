@@ -33,6 +33,8 @@
 
 void strprintf(std::string &s, const char* fmt, ...);
 
+bool greaterThan(struct timespec *a, struct timespec *b);
+
 std::string humanReadable(size_t s);
 std::string humanReadableTwoDecimals(size_t s);
 std::string humanReadableTimeTwoDecimals(uint64_t micros);
