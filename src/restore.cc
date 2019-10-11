@@ -360,6 +360,11 @@ void Restore::loadCache(PointInTime *point, Path *path)
     // Walk up in the directory structure until a gz file is found.
     for (;;)
     {
+        if (path == NULL) {
+            // No gz file found anywhere! This filesystem should not have been mounted!
+            debug(RESTORE, "no index file found anywhere!\n");
+            return;
+        }
         Path *gz = loadDirContents(point, path);
         if (gz != NULL)
         {
@@ -376,14 +381,16 @@ void Restore::loadCache(PointInTime *point, Path *path)
             }
             // Can we terminate this search early?
         }
-        if (path == NULL) {
-            // No gz file found anywhere! This filesystem should not have been mounted!
-            debug(RESTORE, "no index file found anywhere!\n");
-            return;
-        }
         // Move up in the directory tree.
         path = path->parent();
-        debug(RESTORE, "moving up to %s\n", path->c_str());
+        if (path != NULL)
+        {
+            debug(RESTORE, "moving up to %s\n", path->c_str());
+        }
+        else
+        {
+            debug(RESTORE, "cannot move up!\n");
+        }
     }
     assert(0);
 }

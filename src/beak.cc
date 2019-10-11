@@ -224,11 +224,6 @@ unique_ptr<Restore> BeakImplementation::accessBackup_(Argument *storage,
     return restore;
 }
 
-RC BeakImplementation::configure(Settings *settings)
-{
-    return configuration_->configure();
-}
-
 RC BeakImplementation::umountDaemon(Settings *settings)
 {
     return sys_->umountDaemon(settings->from.dir);

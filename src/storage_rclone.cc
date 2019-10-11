@@ -202,13 +202,21 @@ RC rcloneFetchFiles(Storage *storage,
                     FileSystem *local_fs,
                     ProgressStatistics *progress)
 {
-    Path *target_dir = storage->storage_location->prepend(local_dir);
+    assert(storage->type == RCloneStorage);
+    // An rclone storage can be: s3_work_crypt:
+    // Or a combo: s3_backups_crypt:/Work
+    // Split it into: s3_backups_crypt:
+    Path *rclone_storage_config = storage->storage_location->subpath(0,1);
+    // And the: Work.
+    // Now create the proper target dir: /home/me/.cache/beak/s3_backups_crypt:
+    Path *target_dir = rclone_storage_config->prepend(local_dir);
 
     string files_to_fetch;
     for (auto& p : *files) {
         // Drop the leading storage location (eg s3_work_crypt:).
         // Rclone is only interested in the actual file name, without
         // a leading slash.
+        // This path will have the full s3_backups_crypt:/Work prefix.
         Path *pp = p->subpath(1);
         files_to_fetch.append(pp->c_str());
         files_to_fetch.append("\n");
@@ -222,7 +230,7 @@ RC rcloneFetchFiles(Storage *storage,
     args.push_back("copy");
     args.push_back("--include-from");
     args.push_back(tmp->c_str());
-    args.push_back(storage->storage_location->c_str());
+    args.push_back(rclone_storage_config->c_str());
     args.push_back(target_dir->c_str());
     vector<char> output;
     rc = sys->invoke("rclone", args, &output, CaptureBoth,
