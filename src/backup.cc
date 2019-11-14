@@ -598,8 +598,8 @@ size_t Backup::groupFilesIntoTars()
         for (auto & t : te->largeTars())
         {
             TarFile *tf = t.second;
-            tf->fixSize(tar_split_size, tarheaderstyle_);
             tf->calculateHash();
+            tf->fixSize(tar_split_size, tarheaderstyle_);
             if (tf->currentTarOffset() > 0)
             {
                 debug(BACKUP,"%s%s size became GURKA parts %zu\n", te->path()->c_str(), "NAMEHERE");
@@ -610,8 +610,8 @@ size_t Backup::groupFilesIntoTars()
         for (auto & t : te->mediumTars())
         {
             TarFile *tf = t.second;
-            tf->fixSize(tar_split_size, tarheaderstyle_);
             tf->calculateHash();
+            tf->fixSize(tar_split_size, tarheaderstyle_);
             if (tf->currentTarOffset() > 0)
             {
                 debug(BACKUP,"%s%s size became\n", te->path()->c_str(), "NAMEHERE");
@@ -621,8 +621,8 @@ size_t Backup::groupFilesIntoTars()
         }
         for (auto & t : te->smallTars()) {
             TarFile *tf = t.second;
-            tf->fixSize(tar_split_size, tarheaderstyle_);
             tf->calculateHash();
+            tf->fixSize(tar_split_size, tarheaderstyle_);
             if (tf->currentTarOffset() > 0) {
                 debug(BACKUP,"%s%s size ecame GURKA\n", te->path()->c_str(), "NAMEHERE");
                 te->appendBeakFile(tf);
@@ -630,8 +630,8 @@ size_t Backup::groupFilesIntoTars()
             }
         }
 
-        te->tazFile()->fixSize(tar_split_size, tarheaderstyle_);
         te->tazFile()->calculateHash();
+        te->tazFile()->fixSize(tar_split_size, tarheaderstyle_);
 
         set<uid_t> uids;
         set<gid_t> gids;
@@ -939,11 +939,11 @@ struct BackupFuseAPI : FuseAPI
                 stbuf->st_gid = getegid();
                 stbuf->st_mode = S_IFREG | 0500;
                 stbuf->st_nlink = 1;
-                stbuf->st_size = tar->size(partnr);
+                stbuf->st_size = tar->diskSize(partnr);
 #ifdef PLATFORM_POSIX
                 stbuf->st_blksize = 512;
                 if (tar->totalSize() > 0) {
-                    stbuf->st_blocks = 1+(tar->size(partnr)/512);
+                    stbuf->st_blocks = 1+(tar->diskSize(partnr)/512);
                 } else {
                     stbuf->st_blocks = 0;
                 }
@@ -1231,7 +1231,7 @@ struct BeakFS : FileSystem
                     FileStat stat;
                     stat.st_atim = *tf->mtim();
                     stat.st_mtim = *tf->mtim();
-                    stat.st_size = tf->size(i);
+                    stat.st_size = tf->diskSize(i);
                     stat.st_mode = 0400;
                     stat.setAsRegularFile();
                     if (stat.st_size > 0) {

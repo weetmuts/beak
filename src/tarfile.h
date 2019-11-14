@@ -162,6 +162,8 @@ struct TarFile
         return size_;
     }
     size_t size(uint partnr);
+    size_t diskSize(uint partnr);
+
     size_t partHeaderSize()
     {
         return part_header_size_;
@@ -219,7 +221,10 @@ private:
     TarContents tar_contents_ = SMALL_FILES_TAR;
     uint32_t hash_;
     bool hash_initialized = false;
+    // Size of tar file contents.
     size_t size_;
+    // Size of on disk tar/gz file is larger since it is rounded up to suitable boundary.
+    size_t ondisk_size_;
     std::map<size_t, TarEntry*> contents_;
     std::vector<size_t> offsets;
     size_t current_tar_offset_ = 0;
@@ -227,15 +232,23 @@ private:
     struct timespec mtim_;
     UpdateDisk disk_update;
 
+    size_t onDiskSize(size_t from);
+    void fixOnDiskSizes();
     void calculateSHA256Hash();
 
     std::vector<char> sha256_hash_;
+    bool sha256_calculated_ {};
+
     // Number of parts.
     uint num_parts_ {};
     // The size of each part, except the last one, which could be smaller.
     size_t part_size_ {};
+    // On disk file size.
+    size_t ondisk_part_size_ {};
     // The last part can be smaller.
     size_t last_part_size_ {};
+    // On disk file size.
+    size_t ondisk_last_part_size_ {};
     // A tar parts file by itself can have a tar continutation header.
     size_t part_header_size_ {};
     // How many extra 512 byte blocks are need if the file name exceeds 100 chars?

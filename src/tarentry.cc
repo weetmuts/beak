@@ -77,7 +77,7 @@ TarEntry::TarEntry(size_t size, TarHeaderStyle ths)
     // Round size to nearest 512 byte boundary
     children_size_ = blocked_size_ = (size%T_BLOCKSIZE==0)?size:(size+T_BLOCKSIZE-(size%T_BLOCKSIZE));
 
-    debug(TARENTRY, "index file entry added size %ju blocked size %ju!\n", fs_.st_size, blocked_size_);
+    debug(TARENTRY, "index file entry added size %ju blocked size %ju\n", fs_.st_size, blocked_size_);
 }
 
 TarEntry::TarEntry(Path *ap, Path *p, FileStat *st, TarHeaderStyle ths, bool should_content_split) : fs_(*st)
@@ -234,6 +234,7 @@ size_t TarEntry::copy(char *buf, size_t size, size_t from, FileSystem *fs)
             copied += l;
         }
     }
+
     // Round up to next 512 byte boundary.
     size_t remainder = (copied%T_BLOCKSIZE == 0) ? 0 : T_BLOCKSIZE-copied%T_BLOCKSIZE;
     if (remainder > size) {
