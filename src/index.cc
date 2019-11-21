@@ -122,6 +122,7 @@ RC Index::loadIndex(vector<char> &v,
                                   &ie->is_sym_link, &ie->is_hard_link,
                                   &ie->num_parts, &ie->part_offset,
                                   &ie->part_size, &ie->last_part_size,
+                                  &ie->ondisk_part_size, &ie->ondisk_last_part_size,
                                   &eof, &err);
         if (err) {
             failure(INDEX, "Could not parse index file in >%s<\n>%s<\n", dtp, ii);

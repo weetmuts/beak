@@ -36,9 +36,9 @@
 
 struct TarEntry;
 
-enum TarContents
+enum class TarContents
 {
-    REG_FILE,
+    INDEX_FILE,
     DIR_TAR,
     SMALL_FILES_TAR,
     MEDIUM_FILES_TAR,
@@ -47,7 +47,14 @@ enum TarContents
     CONTENT_SPLIT_LARGE_FILE_TAR
 };
 
-#define REG_FILE_CHAR 'z'
+enum class TarFilePaddingStyle : short {
+    None, // Tar files are not padded at all.
+    Relative, // Padded relative the size, small size -> small padding, large size -> large padding.
+    Absolute, // Always pad to the target size -ta/--targetsize. Which by default is 10M.
+    Random // Pseudorandom padding based on the timestamp.
+};
+
+#define INDEX_FILE_CHAR 'z'
 #define DIR_TAR_CHAR 'y'
 #define SMALL_FILES_TAR_CHAR 's'
 #define MEDIUM_FILES_TAR_CHAR 'm'
@@ -64,7 +71,9 @@ struct TarFileName
     time_t sec {};
     long nsec {};
     size_t size {};
+    size_t ondisk_size {};
     size_t last_size {};
+    size_t ondisk_last_size {};
     size_t backup_size {};
     std::string header_hash {};
     uint part_nr {};
@@ -75,7 +84,9 @@ struct TarFileName
         version(tfn.version),
         sec(tfn.sec), nsec(tfn.nsec),
         size(tfn.size),
+        ondisk_size(tfn.ondisk_size),
         last_size(tfn.last_size),
+        ondisk_last_size(tfn.last_size),
         backup_size(tfn.backup_size),
         header_hash(tfn.header_hash),
         part_nr(tfn.part_nr),
@@ -93,7 +104,7 @@ struct TarFileName
     }
 
     bool isIndexFile() {
-        return type == REG_FILE;
+        return type == TarContents::INDEX_FILE;
     }
 
     static bool isIndexFile(Path *);
@@ -105,39 +116,39 @@ struct TarFileName
 
     static char chartype(TarContents type) {
         switch (type) {
-        case REG_FILE: return REG_FILE_CHAR;
-        case DIR_TAR: return DIR_TAR_CHAR;
-        case SMALL_FILES_TAR: return SMALL_FILES_TAR_CHAR;
-        case MEDIUM_FILES_TAR: return MEDIUM_FILES_TAR_CHAR;
-        case SINGLE_LARGE_FILE_TAR: return SINGLE_LARGE_FILE_TAR_CHAR;
-        case SPLIT_LARGE_FILE_TAR: return SPLIT_LARGE_FILE_TAR_CHAR;
-        case CONTENT_SPLIT_LARGE_FILE_TAR: return CONTENT_SPLIT_LARGE_FILE_TAR_CHAR;
+        case TarContents::INDEX_FILE: return INDEX_FILE_CHAR;
+        case TarContents::DIR_TAR: return DIR_TAR_CHAR;
+        case TarContents::SMALL_FILES_TAR: return SMALL_FILES_TAR_CHAR;
+        case TarContents::MEDIUM_FILES_TAR: return MEDIUM_FILES_TAR_CHAR;
+        case TarContents::SINGLE_LARGE_FILE_TAR: return SINGLE_LARGE_FILE_TAR_CHAR;
+        case TarContents::SPLIT_LARGE_FILE_TAR: return SPLIT_LARGE_FILE_TAR_CHAR;
+        case TarContents::CONTENT_SPLIT_LARGE_FILE_TAR: return CONTENT_SPLIT_LARGE_FILE_TAR_CHAR;
         }
         return 0;
     }
 
     static bool typeFromChar(char c, TarContents *tc) {
         switch (c) {
-        case REG_FILE_CHAR: *tc = REG_FILE; return true;
-        case DIR_TAR_CHAR: *tc = DIR_TAR; return true;
-        case SMALL_FILES_TAR_CHAR: *tc = SMALL_FILES_TAR; return true;
-        case MEDIUM_FILES_TAR_CHAR: *tc = MEDIUM_FILES_TAR; return true;
-        case SINGLE_LARGE_FILE_TAR_CHAR: *tc = SINGLE_LARGE_FILE_TAR; return true;
-        case SPLIT_LARGE_FILE_TAR_CHAR: *tc = SPLIT_LARGE_FILE_TAR; return true;
-        case CONTENT_SPLIT_LARGE_FILE_TAR_CHAR: *tc = CONTENT_SPLIT_LARGE_FILE_TAR; return true;
+        case INDEX_FILE_CHAR: *tc = TarContents::INDEX_FILE; return true;
+        case DIR_TAR_CHAR: *tc = TarContents::DIR_TAR; return true;
+        case SMALL_FILES_TAR_CHAR: *tc = TarContents::SMALL_FILES_TAR; return true;
+        case MEDIUM_FILES_TAR_CHAR: *tc = TarContents::MEDIUM_FILES_TAR; return true;
+        case SINGLE_LARGE_FILE_TAR_CHAR: *tc = TarContents::SINGLE_LARGE_FILE_TAR; return true;
+        case SPLIT_LARGE_FILE_TAR_CHAR: *tc = TarContents::SPLIT_LARGE_FILE_TAR; return true;
+        case CONTENT_SPLIT_LARGE_FILE_TAR_CHAR: *tc = TarContents::CONTENT_SPLIT_LARGE_FILE_TAR; return true;
         }
         return false;
     }
 
     static const char *suffixtype(TarContents type) {
         switch (type) {
-        case REG_FILE: return "gz";
-        case DIR_TAR:
-        case SMALL_FILES_TAR:
-        case MEDIUM_FILES_TAR:
-        case SINGLE_LARGE_FILE_TAR:
-        case SPLIT_LARGE_FILE_TAR: return "tar";
-        case CONTENT_SPLIT_LARGE_FILE_TAR: return "bin";
+        case TarContents::INDEX_FILE: return "gz";
+        case TarContents::DIR_TAR:
+        case TarContents::SMALL_FILES_TAR:
+        case TarContents::MEDIUM_FILES_TAR:
+        case TarContents::SINGLE_LARGE_FILE_TAR:
+        case TarContents::SPLIT_LARGE_FILE_TAR: return "tar";
+        case TarContents::CONTENT_SPLIT_LARGE_FILE_TAR: return "bin";
         }
         assert(0);
         return "";
@@ -146,7 +157,6 @@ struct TarFileName
 private:
 
     bool parseFileNameVersion_(std::string &name, size_t p1);
-
     void writeTarFileNameIntoBufferVersion_(char *buf, size_t buf_len, Path *dir);
 };
 
@@ -157,15 +167,10 @@ struct TarFile
     ~TarFile();
 
     TarContents type() { return tar_contents_; }
-
-    size_t totalSize() {
-        return size_;
-    }
-    size_t size(uint partnr);
-    size_t partHeaderSize()
-    {
-        return part_header_size_;
-    }
+    size_t contentSize() { return content_size_; }
+    size_t partContentSize(uint partnr);
+    size_t diskSize(uint partnr);
+    size_t partHeaderSize() { return part_header_size_; }
     // Given an offset into a multivol part, find the offset into
     // the original tarfile that includes a header.
     size_t calculateOriginTarOffset(uint partnr, size_t offset);
@@ -174,7 +179,8 @@ struct TarFile
     {
         return num_parts_;
     }
-    void fixSize(size_t split_size, TarHeaderStyle ths);
+    size_t onDiskSize_(size_t from, TarContents type, TarFilePaddingStyle padding, size_t target_size);
+    void fixSize(size_t split_size, TarHeaderStyle ths, TarFilePaddingStyle padding, size_t target_size);
     void addEntryLast(TarEntry *entry);
     void addEntryFirst(TarEntry *entry);
 
@@ -216,10 +222,13 @@ struct TarFile
 private:
 
     // A virtual tar can contain small files, medium files or a single large file.
-    TarContents tar_contents_ = SMALL_FILES_TAR;
+    TarContents tar_contents_ = TarContents::SMALL_FILES_TAR;
     uint32_t hash_;
     bool hash_initialized = false;
-    size_t size_;
+    // The size of all the tar entries, content and tar headers.
+    // The tar file can be exactly this file if TarFilePaddingStyle is None.
+    // But the default is to round the disk file size to nice boundaries.
+    size_t content_size_;
     std::map<size_t, TarEntry*> contents_;
     std::vector<size_t> offsets;
     size_t current_tar_offset_ = 0;
@@ -234,12 +243,20 @@ private:
     uint num_parts_ {};
     // The size of each part, except the last one, which could be smaller.
     size_t part_size_ {};
+    // The part size on disk can be larger, which includes padding.
+    size_t ondisk_part_size_ {};
+
     // The last part can be smaller.
     size_t last_part_size_ {};
+    // The last part size on disk can be larger, which includes padding.
+    size_t ondisk_last_part_size_ {};
+
     // A tar parts file by itself can have a tar continutation header.
     size_t part_header_size_ {};
     // How many extra 512 byte blocks are need if the file name exceeds 100 chars?
-    size_t num_long_path_blocks_;
+    size_t num_long_path_blocks_ {};
+    // Set to true when the hash is valid.
+    bool sha256_calculated_ {};
 };
 
 #endif

@@ -225,13 +225,13 @@ while IFS='' read tar_file; do
     then
         # V1 file or single part V2 file.
         if [ "$verbose" = "true" ]; then
-            CMD="tar ${cmd}f \"$file\" \"$ex\""
+            CMD="tar ${cmd}f \"$file\" --warning=no-alone-zero-block \"$ex\""
             pushDir
             if [ "$debug" == "true" ]; then echo "$CMD"; fi
             eval $CMD > $dir/tmplist
             popDir
             if [ "$?" == "0" ]; then
-                echo Beak: tar ${cmd}f \"$file\" \"$ex\"
+                echo Beak: tar ${cmd}f \"$file\" --warning=no-alone-zero-block \"$ex\"
             fi
             if [ "$extract" == "true" ]; then
                 # GNU Tar simply prints the filename when extracting verbosely.
@@ -245,13 +245,13 @@ while IFS='' read tar_file; do
 
         else
 
-            CMD="tar ${cmd}f \"$file\" \"$ex\""
+            CMD="tar ${cmd}f \"$file\" --warning=no-alone-zero-block \"$ex\""
             pushDir
             if [ "$debug" == "true" ]; then echo "$CMD"; fi
             eval $CMD
             popDir
             if [ "$?" != "0" ]; then
-                echo Failed: tar ${cmd}f \"$file\"
+                echo Failed: "$CMD"
             fi
         fi
     else
@@ -305,7 +305,7 @@ EOF
             # Gnu tar prints unnecessary warnings when extracting multivol files
             # with long path names. Also there is always an error when the last
             # multivol part has been extract. Hide this with pipe to null.
-            tar ${cmd}Mf "${root}/${tar_file}" -F ${newvolumescript} > /dev/null 2>&1
+            tar ${cmd}Mf "${root}/${tar_file}" --warning=no-alone-zero-block -F ${newvolumescript} > /dev/null 2>&1
             popDir
         else
             echo Broken multipart listing in index file, prefix not found.

@@ -37,6 +37,7 @@
 enum Command : short;
 enum PointInTimeFormat : short;
 enum TarHeaderStyle : short;
+enum class TarFilePaddingStyle : short;
 enum class WhichArgument { FirstArg, SecondArg  };
 
 struct Settings;
@@ -159,6 +160,7 @@ LIST_OF_COMMANDS
     X(OptionType::LOCAL_SECONDARY,,relaxtimechecks,bool,false,"Accept future dated files.") \
     X(OptionType::LOCAL_SECONDARY,,tarheader,TarHeaderStyle,true,"Style of tar headers used. E.g. --tarheader=simple Alternatives are: none,simple,full Default is simple.")    \
     X(OptionType::LOCAL_PRIMARY,,now,std::string,true,"When pruning use this date time as now.") \
+    X(OptionType::LOCAL_SECONDARY,,padding,TarFilePaddingStyle,true,"Style of padding of tarfiles. E.g. --padding=absolute Alternatives are: none,relative,absolute Default is relative.")    \
     X(OptionType::LOCAL_SECONDARY,ta,targetsize,size_t,true,"Tar target size. E.g. --targetsize=20M and the default is 10M.") \
     X(OptionType::LOCAL_SECONDARY,tr,triggersize,size_t,true,"Trigger tar generation in dir at size. E.g. -tr 40M and the default is 20M.")    \
     X(OptionType::GLOBAL_SECONDARY,,trace,bool,true,"Log the most detailed trace information.") \
@@ -179,7 +181,7 @@ LIST_OF_OPTIONS
 };
 
 #define LIST_OF_OPTIONS_PER_COMMAND \
-    X(bmount_cmd, (12, contentsplit_option, depth_option, splitsize_option, targetsize_option, triggersize_option, triggerglob_option, exclude_option, include_option, progress_option, relaxtimechecks_option, tarheader_option, yesorigin_option) ) \
+    X(bmount_cmd, (12, contentsplit_option, depth_option, foreground_option, fusedebug_option, splitsize_option, tarheader_option, targetsize_option, triggersize_option, triggerglob_option, exclude_option, include_option, progress_option, relaxtimechecks_option, tarheader_option, yesorigin_option) ) \
     X(config_cmd, (0) ) \
     X(diff_cmd, (1, depth_option) ) \
     X(fsck_cmd, (1, deepcheck_option) ) \

@@ -207,6 +207,8 @@ bool OriginToolImplementation::extractFileFromBackup(RestoreEntry *entry,
                           char name[4096];
                           tfn.size = entry->part_size;
                           tfn.last_size = entry->last_part_size;
+                          tfn.ondisk_size = entry->ondisk_part_size;
+                          tfn.ondisk_last_size = entry->ondisk_last_part_size;
                           tfn.part_nr = partnr;
                           tfn.num_parts = entry->num_parts;
                           tfn.writeTarFileNameIntoBuffer(name, sizeof(name), tar_inside_dir);

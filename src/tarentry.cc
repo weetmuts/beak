@@ -134,21 +134,23 @@ void TarEntry::calculateTarpath(Path *storage_dir) {
 }
 
 void TarEntry::createSmallTar(int i) {
-    small_tars_[i] = new TarFile(SMALL_FILES_TAR);
+    small_tars_[i] = new TarFile(TarContents::SMALL_FILES_TAR);
     tars_.push_back(small_tars_[i]);
 }
 void TarEntry::createMediumTar(int i) {
-    medium_tars_[i] = new TarFile(MEDIUM_FILES_TAR);
+    medium_tars_[i] = new TarFile(TarContents::MEDIUM_FILES_TAR);
     tars_.push_back(medium_tars_[i]);
 }
 void TarEntry::createLargeTar(uint32_t hash) {
-    large_tars_[hash] = new TarFile(SINGLE_LARGE_FILE_TAR);
+    large_tars_[hash] = new TarFile(TarContents::SINGLE_LARGE_FILE_TAR);
     tars_.push_back(large_tars_[hash]);
 }
 
 size_t TarEntry::copy(char *buf, size_t size, size_t from, FileSystem *fs)
 {
     size_t copied = 0;
+    size_t file_size = fs_.st_size;
+
     debug(TARENTRY, "copying from %s\n", name_->c_str());
 
     if (size > 0 && from < header_size_)
@@ -204,7 +206,8 @@ size_t TarEntry::copy(char *buf, size_t size, size_t from, FileSystem *fs)
         from += len;
     }
 
-    if (size > 0 && copied < blocked_size_ && from >= header_size_ && from < blocked_size_) {
+    if (size > 0 && copied < blocked_size_ && from >= header_size_ && from < blocked_size_)
+    {
         debug(TARENTRY, "copying max %zu from %zu from content %s\n"
 	      "with blocked_size=%zu header_size=%zu hard?=%d\n", size, from, tarpath_->c_str(), blocked_size_, header_size_,
 	    is_hard_linked_);
@@ -220,15 +223,18 @@ size_t TarEntry::copy(char *buf, size_t size, size_t from, FileSystem *fs)
             size -= len;
             buf += len;
             copied += len;
-        } else {
-            debug(TARENTRY, "reading from file size=%ju copied=%ju blocked_size=%ju from=%ju header_size=%ju\n",
-                  size, copied, blocked_size_, from, header_size_);
-            debug(TARENTRY, "        contents out from %s %zu size=%zu\n", path_->c_str(), from-header_size_, size);
+        }
+        else
+        {
+            debug(TARENTRY, "reading from file size=%ju copied=%ju blocked_size=%ju from=%ju header_size=%ju path=%s\n",
+                  size, copied, blocked_size_, from, header_size_, path_->c_str());
+            debug(TARENTRY, "        contents out %zu < %zu size=%zu\n", from-header_size_, file_size);
+            //assert(from-header_size_ < file_size);
             ssize_t l = fs->pread(abspath_, buf, size, from-header_size_);
             if (l==-1) {
                 failure(TARENTRY, "Could not open file \"%s\"\n", abspath_->c_str());
             }
-            assert(l>0);
+            //assert(l>0);
             size -= l;
             buf += l;
             copied += l;
@@ -236,7 +242,8 @@ size_t TarEntry::copy(char *buf, size_t size, size_t from, FileSystem *fs)
     }
     // Round up to next 512 byte boundary.
     size_t remainder = (copied%T_BLOCKSIZE == 0) ? 0 : T_BLOCKSIZE-copied%T_BLOCKSIZE;
-    if (remainder > size) {
+    if (remainder > size)
+    {
         remainder = size;
     }
     memset(buf, 0, remainder);
@@ -347,12 +354,12 @@ void TarEntry::registerTarFile(TarFile *tf, size_t o) {
 }
 
 void TarEntry::registerTazFile() {
-    taz_file_ = new TarFile(DIR_TAR);
+    taz_file_ = new TarFile(TarContents::DIR_TAR);
     tars_.push_back(taz_file_);
 }
 
 void TarEntry::registerGzFile() {
-    gz_file_ = new TarFile(REG_FILE);
+    gz_file_ = new TarFile(TarContents::INDEX_FILE);
     tars_.push_back(gz_file_);
 }
 
@@ -437,7 +444,7 @@ string cookColumns()
     s += "link "; i++;
     s += "tarprefix "; i++;
     s += "offset "; i++;
-    s += "multipart(num,partoffset,size,last_size) "; i++; // eg 2,512,65536,238
+    s += "multipart(num,partoffset,size,last_size,disksize,last_disksize) "; i++; // eg 2,512,70000,238,70000,1000
     s += "path_size_mtime_hash "; i++;
 
     return "with "+to_string(i)+" columns: "+s;
@@ -502,7 +509,8 @@ void cookEntry(string *listing, TarEntry *entry) {
         char nps[256];
         TarFile *tf = entry->tarFile();
         uint np = tf->numParts();
-        snprintf(nps, sizeof(nps), "%u,%zu,%zu,%zu", np, tf->partHeaderSize(), tf->size(0), tf->size(np-1));
+        snprintf(nps, sizeof(nps), "%u,%zu,%zu,%zu,%zu,%zu", np, tf->partHeaderSize(),
+                 tf->partContentSize(0), tf->partContentSize(np-1), tf->diskSize(0), tf->diskSize(np-1));
         listing->append(nps);
     }
     listing->append(separator_string);
@@ -516,6 +524,7 @@ bool eatEntry(int beak_version, vector<char> &v, vector<char>::iterator &i, Path
               FileStat *fs, size_t *offset, string *tar, Path **path,
               string *link, bool *is_sym_link, bool *is_hard_link,
               uint *num_parts, size_t *part_offset, size_t *part_size, size_t *last_part_size,
+              size_t *disk_size, size_t *last_disk_size,
               bool *eof, bool *err)
 {
     string permission = eatTo(v, i, separator, 32, eof, err);
@@ -623,12 +632,18 @@ bool eatEntry(int beak_version, vector<char> &v, vector<char>::iterator &i, Path
         if (*err || *eof) return false;
         string part_size_s = eatTo(multip, j, ',', 64, eof, err);
         if (*err || *eof) return false;
-        string last_part_size_s = eatTo(multip, j, -1, 64, eof, err);
+        string last_part_size_s = eatTo(multip, j, ',', 64, eof, err);
+        if (*err || *eof) return false;
+        string disk_size_s = eatTo(multip, j, ',', 64, eof, err);
+        if (*err || *eof) return false;
+        string last_disk_size_s = eatTo(multip, j, -1, 64, eof, err);
         if (*err) return false;
         *num_parts = atol(num_parts_s.c_str());
         *part_offset = atol(offset_s.c_str());
         *part_size = atol(part_size_s.c_str());
         *last_part_size = atol(last_part_size_s.c_str());
+        *disk_size = atol(disk_size_s.c_str());
+        *last_disk_size = atol(last_disk_size_s.c_str());
     }
     string meta_hash = eatTo(v, i, separator, 65, eof, err);
     meta_hash.pop_back(); // Last column in line has the newline

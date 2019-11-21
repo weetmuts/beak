@@ -1043,7 +1043,7 @@ bool has_index_files_or_is_empty_(FileSystem *fs, Path *path)
     {
         TarFileName tfn;
         bool ok = tfn.parseFileName(f->str());
-        if (ok && tfn.type == REG_FILE)
+        if (ok && tfn.type == TarContents::INDEX_FILE)
         {
             return true;
         }

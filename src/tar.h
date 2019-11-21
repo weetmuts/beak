@@ -27,8 +27,8 @@ enum TarHeaderStyle : short {
     None, // Tar headers are not inserted into the archive file. Tar cannot be used to extract data.
     Simple, // Simple headers, uid/guid set to 1000/1000 name is beak/beak, atime=ctime set to mtime.
     Full // Full headers, sometimes useful if you expect to use tar to extract the data.
-    // Full extraction is always available using beak itself since the x01_.....gz files always
-    // store all meta data. But not atime and ctime.
+    // Almost full extraction is always available using beak itself since the index files beak_z_.....gz
+    // store all meta data (except atime and ctime).
 };
 
 #define T_BLOCKSIZE		512

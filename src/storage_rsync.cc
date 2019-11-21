@@ -99,8 +99,8 @@ RC rsyncListBeakFiles(Storage *storage,
             if (rc.isErr()) {
                 siz = -1;
             }
-            if ( (tfn.type != REG_FILE && tfn.size == siz) ||
-                 (tfn.type == REG_FILE && tfn.size == 0) )
+            if ( (tfn.type != TarContents::INDEX_FILE && tfn.size == siz) ||
+                 (tfn.type == TarContents::INDEX_FILE && tfn.size == 0) )
             {
                 files->push_back(tfn);
                 Path *p = tfn.asPathWithDir(storage->storage_location);

@@ -336,6 +336,7 @@ bool eatEntry(int beak_version, std::vector<char> &v, std::vector<char>::iterato
               FileStat *fs, size_t *offset, std::string *tar, Path **path,
               std::string *link, bool *is_sym_link, bool *is_hard_link,
               uint *num_parts, size_t *part_offset, size_t *part_size, size_t *last_part_size,
+              size_t *disk_size, size_t *last_disk_size,
               bool *eof, bool *err);
 
 

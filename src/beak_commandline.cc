@@ -401,6 +401,18 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
                 settings->now = value;
                 settings->now_supplied = true;
                 break;
+            case padding_option:
+            {
+                if (value == "none") settings->padding = TarFilePaddingStyle::None;
+                else if (value == "relative") settings->padding = TarFilePaddingStyle::Relative;
+                else if (value == "absolute") settings->padding = TarFilePaddingStyle::Absolute;
+                else {
+                    error(COMMANDLINE, "No such tarfile padding style \"%s\".\n", value.c_str());
+                }
+                settings->padding_supplied = true;
+            }
+            break;
+
             case pointintimeformat_option:
                 if (value == "absolute") settings->pointintimeformat = absolute_point;
                 else if (value == "relative") settings->pointintimeformat = relative_point;

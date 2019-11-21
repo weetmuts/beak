@@ -65,8 +65,8 @@ RC rcloneListBeakFiles(Storage *storage,
             // transfer interruption....
             tfn.last_size = tfn.size;
             size_t siz = (size_t)atol(size.c_str());
-            if ( (tfn.type != REG_FILE && tfn.size == siz) ||
-                 (tfn.type == REG_FILE && tfn.size == siz) )
+            if ( (tfn.type != TarContents::INDEX_FILE && tfn.size == siz) ||
+                 (tfn.type == TarContents::INDEX_FILE && tfn.size == siz) )
             {
                 files->push_back(tfn);
                 Path *p = Path::lookup(dir)->prepend(storage->storage_location);

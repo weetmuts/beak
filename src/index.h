@@ -37,6 +37,8 @@ struct IndexEntry {
     size_t part_offset;
     size_t part_size;
     size_t last_part_size;
+    size_t ondisk_part_size;
+    size_t ondisk_last_part_size;
 };
 
 struct IndexTar {

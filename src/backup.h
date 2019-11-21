@@ -60,9 +60,9 @@ struct Backup
     std::string mount_dir;
     Path *mount_dir_path;
 
-    size_t tar_target_size = 10ull*1024*1024;
-    size_t tar_trigger_size = 20ull*1024*1024;
-    size_t tar_split_size = 50ull*1024*1024;
+    size_t tar_target_size = 10ull*1000*1000;
+    size_t tar_trigger_size = 20ull*1000*1000;
+    size_t tar_split_size = 10ull*1000*1000;
 
     // The default setting is to trigger tars in each subdirectory below the root.
     // Even if the subdir does not qualify with enough data to create a min tar file.
@@ -103,6 +103,7 @@ struct Backup
 
     void setConfig(std::string c) { config_ = c; }
     void setTarHeaderStyle(TarHeaderStyle ths) { tarheaderstyle_= ths; }
+    void setTarFilePaddingStyle(TarFilePaddingStyle pad) { tarfilepaddingstyle_= pad; }
     Backup(ptr<FileSystem> origin_fs);
 
     virtual ~Backup() = default;
@@ -114,6 +115,7 @@ private:
                           size_t *sc, size_t *mc);
     std::string config_;
     TarHeaderStyle tarheaderstyle_;
+    TarFilePaddingStyle tarfilepaddingstyle_;
 
     FileSystem* origin_fs_;
 

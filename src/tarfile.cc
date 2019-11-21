@@ -38,7 +38,11 @@ ComponentId HASHING = registerLogComponent("hashing");
 
 TarFile::TarFile(TarContents tc)
 {
-    size_ = 0;
+    content_size_ = 0;
+    part_size_ = 0;
+    ondisk_part_size_ = 0;
+    last_part_size_ = 0;
+    ondisk_last_part_size_ = 0;
     tar_contents_ = tc;
     memset(&mtim_, 0, sizeof(mtim_));
     disk_update = NoUpdate;
@@ -91,7 +95,7 @@ void TarFile::addEntryFirst(TarEntry *entry)
 
 pair<TarEntry*, size_t> TarFile::findTarEntry(size_t offset)
 {
-    if (offset > size_)
+    if (offset > content_size_)
     {
         return pair<TarEntry*, size_t>(NULL, 0);
     }
@@ -104,23 +108,27 @@ pair<TarEntry*, size_t> TarFile::findTarEntry(size_t offset)
     if (i == offsets.end())
     {
         o = *offsets.rbegin();
+        debug(TARFILE, "Is past last entry o=%zu\n", o);
     }
     else
     {
         i--;
         o = *i;
+        debug(TARFILE, "Found entry o=%zu\n", o);
     }
     TarEntry *te = contents_[o];
 
     debug(TARFILE, "Found it %s\n", te->path()->c_str());
-    return pair<TarEntry*, size_t>(te, o);
+    return { te, o }; // pair<TarEntry*, size_t>(te, o);
 }
 
+// Invoked for standard tar files.
 void TarFile::calculateHash()
 {
     calculateSHA256Hash();
 }
 
+// Invoked for the index gz file.
 void TarFile::calculateHash(vector<pair<TarFile*,TarEntry*>> &tars, string &content)
 {
     SHA256_CTX sha256ctx;
@@ -137,6 +145,7 @@ void TarFile::calculateHash(vector<pair<TarFile*,TarEntry*>> &tars, string &cont
     SHA256_Update(&sha256ctx, &content[0], content.length());
     sha256_hash_.resize(SHA256_DIGEST_LENGTH);
     SHA256_Final((unsigned char*)&sha256_hash_[0], &sha256ctx);
+    sha256_calculated_ = true;
 }
 
 void TarFile::calculateHashFromString(string &content)
@@ -166,6 +175,7 @@ void TarFile::calculateSHA256Hash()
     }
     sha256_hash_.resize(SHA256_DIGEST_LENGTH);
     SHA256_Final((unsigned char*)&sha256_hash_[0], &sha256ctx);
+    sha256_calculated_ = true;
 }
 
 void TarFile::updateMtim(struct timespec *mtim) {
@@ -187,8 +197,10 @@ TarFileName::TarFileName(TarFile *tf, uint partnr)
     version = 2;
     sec = tf->mtim()->tv_sec;
     nsec = tf->mtim()->tv_nsec;
-    size = tf->size(0);
-    last_size = tf->size(tf->numParts()-1);
+    size = tf->partContentSize(0);
+    ondisk_size = tf->diskSize(0);
+    last_size = tf->partContentSize(tf->numParts()-1);
+    ondisk_last_size = tf->diskSize(tf->numParts()-1);
     assert(tf->numParts() <= 1 || last_size != 0);
     header_hash = toHex(tf->hash());
     part_nr = partnr;
@@ -234,7 +246,8 @@ bool TarFileName::parseFileNameVersion_(string &name, size_t p1)
     size_t p4 = name.find('_', p3+1); if (p4 == string::npos) return false;
     size_t p5 = name.find('-', p4+1); if (p5 == string::npos) return false;
     size_t p6 = name.find('_', p5+1); if (p6 == string::npos) return false;
-    size_t p7 = name.find('.', p6+1); if (p7 == string::npos) return false;
+    size_t p7 = name.find('_', p6+1); if (p7 == string::npos) return false;
+    size_t p8 = name.find('.', p7+1); if (p8 == string::npos) return false;
 
     string secss;
     k = digitsOnly(&name[p1], p2-p1, &secss);
@@ -265,7 +278,12 @@ bool TarFileName::parseFileNameVersion_(string &name, size_t p1)
     if (!k) return false;
     size = atol(sizes.c_str());
 
-    string suffix = name.substr(p7+1);
+    string ondisk_sizes;
+    k = digitsOnly(&name[p7+1], p8-p7-1, &ondisk_sizes);
+    if (!k) return false;
+    ondisk_size = atol(ondisk_sizes.c_str());
+
+    string suffix = name.substr(p8+1);
     if (suffixtype(type) != suffix) {
         return false;
     }
@@ -286,6 +304,16 @@ void TarFileName::writeTarFileNameIntoBufferVersion_(char *buf, size_t buf_len, 
     } else {
         snprintf(sizes, 32, "%zu", size);
     }
+    char ondisk_sizes[32];
+    memset(ondisk_sizes, 0, sizeof(ondisk_sizes));
+    if (num_parts > 1 && part_nr == num_parts-1)
+    {
+        snprintf(ondisk_sizes, 32, "%zu", ondisk_last_size);
+    }
+    else
+    {
+        snprintf(ondisk_sizes, 32, "%zu", ondisk_size);
+    }
     char secs_and_micros[32];
     memset(secs_and_micros, 0, sizeof(secs_and_micros));
     long usec = nsec/1000;
@@ -294,18 +322,22 @@ void TarFileName::writeTarFileNameIntoBufferVersion_(char *buf, size_t buf_len, 
     string partnr = toHex(part_nr+1, num_parts);
     const char *suffix = suffixtype(type);
 
-    if (dir == NULL) {
-        snprintf(buf, buf_len, "beak_%c_%s_%s_%s-%x_%s.%s",
+    if (dir == NULL)
+    {
+        snprintf(buf, buf_len, "beak_%c_%s_%s_%s-%x_%s_%s.%s",
                  TarFileName::chartype(type),
                  secs_and_micros,
                  header_hash.c_str(),
                  partnr.c_str(),
                  num_parts,
                  sizes,
+                 ondisk_sizes,
                  suffix);
-    } else {
+    }
+    else
+    {
         const char *slashornot = dir->str().length() > 0 ? "/" : "";
-        snprintf(buf, buf_len, "%s%sbeak_%c_%s_%s_%s-%x_%s.%s",
+        snprintf(buf, buf_len, "%s%sbeak_%c_%s_%s_%s-%x_%s_%s.%s",
                  dir->c_str(),
                  slashornot,
                  TarFileName::chartype(type),
@@ -314,6 +346,7 @@ void TarFileName::writeTarFileNameIntoBufferVersion_(char *buf, size_t buf_len, 
                  partnr.c_str(),
                  num_parts,
                  sizes,
+                 ondisk_sizes,
                  suffix);
     }
 }
@@ -334,14 +367,16 @@ Path *TarFileName::asPathWithDir(Path *dir)
 size_t TarFile::readVirtualTar(char *buf, size_t bufsize, off_t offset, FileSystem *fs, uint partnr)
 {
     size_t copied = 0;
+    size_t partsize = partContentSize(partnr);
+    size_t disksize = diskSize(partnr);
 
     if (offset < 0) return 0;
     size_t from = (size_t)offset;
-    if (from >= size(partnr)) return 0;
+    if (from >= disksize) return 0;
 
     while (bufsize>0)
     {
-        //fprintf(stderr, "partnr=%u buf=%p from=%zu bufsize=%zu headersize=%zu\n", partnr, buf, from, bufsize, header_size_);
+        //fprintf(stdout, "partnr=%u from=%zu bufsize=%zu partsize=%zu disksize=%zu copied=%zu\n", partnr, from, bufsize, partsize, disksize, copied);
         if (partnr > 0 && from < part_header_size_)
         {
             debug(TARFILE, "Copying max %zu from %zu, now inside header (header size=%ju)\n",
@@ -377,15 +412,50 @@ size_t TarFile::readVirtualTar(char *buf, size_t bufsize, off_t offset, FileSyst
             copied += len;
             from += len;
         }
-        else
+        else if (from < partsize)
         {
             size_t origin_from = calculateOriginTarOffset(partnr, from);
             pair<TarEntry*,size_t> r = findTarEntry(origin_from);
             TarEntry *te = r.first;
             size_t tar_offset = r.second;
             assert(te != NULL);
+            debug(TARFILE, "XX copy size=%ju from=%zu \n", bufsize, origin_from-tar_offset);
             size_t len = te->copy(buf, bufsize, origin_from - tar_offset, fs);
-            debug(TARFILE, "copy size=%ju result=%ju\n", bufsize, len);
+            assert(len <= bufsize);
+            debug(TARFILE, "XX copied result=%ju\n", len);
+            bufsize -= len;
+            buf += len;
+            copied += len;
+            from += len;
+            // No more tar entries...
+            if (len==0) {
+                if (from < disksize)
+                {
+                    size_t remainder = disksize-from;
+                    if (remainder > bufsize)
+                    {
+                        remainder = bufsize;
+                    }
+                    memset(buf, 0, remainder);
+                    bufsize -= remainder;
+                    buf += remainder;
+                    copied += remainder;
+                    from += remainder;
+                }
+
+                debug(TARFILE, "BREAKING?\n");
+                break;
+            }
+        }
+        else if (from < disksize)
+        {
+            size_t len = disksize-from;
+            if (len > bufsize) {
+                len = bufsize;
+            }
+            debug(TARFILE, "padding out from %zu size=%zu\n", from, len);
+            assert(from+len <= disksize);
+            memset(buf, 0, len);
             bufsize -= len;
             buf += len;
             copied += len;
@@ -393,8 +463,12 @@ size_t TarFile::readVirtualTar(char *buf, size_t bufsize, off_t offset, FileSyst
             // No more tar entries...
             if (len==0) break;
         }
+        else
+        {
+            break;
+        }
     }
-
+    debug(TARFILE, "Endid %zu\n", copied);
     return copied;
 }
 
@@ -474,18 +548,78 @@ void splitParts_(size_t total_tar_size,
     }
 }
 
-void TarFile::fixSize(size_t split_size, TarHeaderStyle ths)
+size_t TarFile::onDiskSize_(size_t from, TarContents type, TarFilePaddingStyle padding, size_t target_size)
 {
-    size_ = current_tar_offset_;
-    if (size_ <= split_size || tar_contents_ != SINGLE_LARGE_FILE_TAR) {
+    if (from == 0) return 0;
+
+    if (padding == TarFilePaddingStyle::None) return from;
+    // Absolute padding is not used for the index files.
+    if (type != TarContents::INDEX_FILE && padding == TarFilePaddingStyle::Absolute) return target_size;
+
+    //assert(sha256_calculated_); // This is needed for the pseudo-random padding.
+
+    // Relative padding.
+    size_t modv = 0;
+    size_t to = from;
+    if (from > 1000*1000)
+    {
+        modv = 1000*1000;
+    }
+    else if (from > 100*1000)
+    {
+        modv = 100*1000;
+    }
+    else if (from > 10*1000)
+    {
+        modv = 10*1000;
+    }
+    else
+    {
+        modv = 1000;
+    }
+    size_t mod = from % modv;
+    // Round up to nearest 1K 10K 100K or 1M boundary.
+    if (mod != 0)
+    {
+        to = from + (modv-mod);
+        mod = to % modv;
+        assert(mod == 0);
+    }
+
+    if (padding == TarFilePaddingStyle::Random)
+    {
+        // Now add a pseudo-random amount of the modv again, based on the sha256 sum.
+        size_t hash = 0;
+        assert(sha256_hash_.size() == SHA256_DIGEST_LENGTH);
+        for (int i=0; i<SHA256_DIGEST_LENGTH; ++i)
+        {
+            hash ^= sha256_hash_[i+0] << 24;
+            hash ^= sha256_hash_[i+1] << 16;
+            hash ^= sha256_hash_[i+2] << 8;
+            hash ^= sha256_hash_[i+3] << 0;
+        }
+        size_t add = hash % modv;
+        printf("from=%zu to=%zu modv=%zu hash=%zu add=%zu\n", from, to, modv, hash, add);
+        assert(add > 0);
+        to = from + add;
+    }
+    return to;
+}
+
+void TarFile::fixSize(size_t split_size, TarHeaderStyle ths, TarFilePaddingStyle pad, size_t target_size)
+{
+    content_size_ = current_tar_offset_;
+    if (content_size_ <= split_size || tar_contents_ != TarContents::SINGLE_LARGE_FILE_TAR)
+    {
         // No splitting needed.
         num_parts_ = 1;
-        part_size_ = size_;
+        part_size_ = content_size_;
         part_header_size_ = 0;
+        ondisk_part_size_ = onDiskSize_(part_size_, tar_contents_, pad, target_size);
         return;
     }
 
-    splitParts_(size_,
+    splitParts_(content_size_,
                 split_size,
                 ths,
                 &num_parts_,
@@ -494,21 +628,38 @@ void TarFile::fixSize(size_t split_size, TarHeaderStyle ths)
                 &part_header_size_);
 
     if (num_parts_ > 1) {
-        tar_contents_ = SPLIT_LARGE_FILE_TAR;
+        tar_contents_ = TarContents::SPLIT_LARGE_FILE_TAR;
     }
+
+    ondisk_part_size_ = onDiskSize_(part_size_, tar_contents_, pad, target_size);
+    ondisk_last_part_size_ = onDiskSize_(last_part_size_, tar_contents_, pad, target_size);
 }
 
-size_t TarFile::size(uint partnr)
+size_t TarFile::partContentSize(uint partnr)
 {
     assert(partnr < num_parts_);
     if (num_parts_ == 1) {
-        return size_;
+        assert(content_size_ == part_size_);
+        return part_size_;
     }
     if (partnr < num_parts_-1) {
         return part_size_;
     }
     // This is the last part, it can be shorter than part_size_.
     return last_part_size_;
+}
+
+size_t TarFile::diskSize(uint partnr)
+{
+    assert(partnr < num_parts_);
+    if (num_parts_ == 1) {
+        return ondisk_part_size_;
+    }
+    if (partnr < num_parts_-1) {
+        return ondisk_part_size_;
+    }
+    // This is the last part, it can be shorter than part_size_.
+    return ondisk_last_part_size_;
 }
 
 size_t TarFile::calculateOriginTarOffset(uint partnr, size_t offset)

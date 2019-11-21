@@ -37,6 +37,8 @@
 
 using namespace std;
 
+#define DEFAULT_TARGET_SIZE 10*1000*1000
+
 static ComponentId COMMANDLINE = registerLogComponent("commandline");
 static ComponentId BACKUP = registerLogComponent("backup");
 static ComponentId HARDLINKS = registerLogComponent("hardlinks");
@@ -598,7 +600,7 @@ size_t Backup::groupFilesIntoTars()
         for (auto & t : te->largeTars())
         {
             TarFile *tf = t.second;
-            tf->fixSize(tar_split_size, tarheaderstyle_);
+            tf->fixSize(tar_split_size, tarheaderstyle_, tarfilepaddingstyle_, tar_target_size);
             tf->calculateHash();
             if (tf->currentTarOffset() > 0)
             {
@@ -610,7 +612,7 @@ size_t Backup::groupFilesIntoTars()
         for (auto & t : te->mediumTars())
         {
             TarFile *tf = t.second;
-            tf->fixSize(tar_split_size, tarheaderstyle_);
+            tf->fixSize(tar_split_size, tarheaderstyle_, tarfilepaddingstyle_, tar_target_size);
             tf->calculateHash();
             if (tf->currentTarOffset() > 0)
             {
@@ -621,7 +623,7 @@ size_t Backup::groupFilesIntoTars()
         }
         for (auto & t : te->smallTars()) {
             TarFile *tf = t.second;
-            tf->fixSize(tar_split_size, tarheaderstyle_);
+            tf->fixSize(tar_split_size, tarheaderstyle_, tarfilepaddingstyle_, tar_target_size);
             tf->calculateHash();
             if (tf->currentTarOffset() > 0) {
                 debug(BACKUP,"%s%s size ecame GURKA\n", te->path()->c_str(), "NAMEHERE");
@@ -630,7 +632,7 @@ size_t Backup::groupFilesIntoTars()
             }
         }
 
-        te->tazFile()->fixSize(tar_split_size, tarheaderstyle_);
+        te->tazFile()->fixSize(tar_split_size, tarheaderstyle_, tarfilepaddingstyle_, tar_target_size);
         te->tazFile()->calculateHash();
 
         set<uid_t> uids;
@@ -647,7 +649,7 @@ size_t Backup::groupFilesIntoTars()
             bool b = ste->path()->isBelowOrEqual(te->path());
             if (b) {
                 for (auto & tf : ste->tars()) {
-                    if (tf->totalSize() > 0 ) {
+                    if (tf->contentSize() > 0 ) {
                         tars.push_back({tf,ste});
                         // Make sure the gzfile timestamp is the latest
                         // of all subtars as well.
@@ -661,7 +663,7 @@ size_t Backup::groupFilesIntoTars()
 
         size_t backup_size = 0;
         for (auto & p : tars) {
-            backup_size += p.first->totalSize();
+            backup_size += p.first->contentSize();
         }
 
         string gzfile_contents;
@@ -732,7 +734,7 @@ size_t Backup::groupFilesIntoTars()
         uint num_content_splits = 0;
         for (auto & t : tars) {
             TarFile *tf = t.first;
-            if (tf->type() == CONTENT_SPLIT_LARGE_FILE_TAR) {
+            if (tf->type() == TarContents::CONTENT_SPLIT_LARGE_FILE_TAR) {
                 num_content_splits++;
             }
         }
@@ -743,7 +745,7 @@ size_t Backup::groupFilesIntoTars()
 
         for (auto & t : tars) {
             TarFile *tf = t.first;
-            if (tf->type() == CONTENT_SPLIT_LARGE_FILE_TAR)
+            if (tf->type() == TarContents::CONTENT_SPLIT_LARGE_FILE_TAR)
             {
                 TarEntry *te = t.first->singleContent();
                 gzfile_contents.append(te->tarpath()->str());
@@ -774,12 +776,12 @@ size_t Backup::groupFilesIntoTars()
         dirs->setContent(compressed_gzfile_contents);
         te->gzFile()->addEntryLast(dirs);
         dynamics.push_back(unique_ptr<TarEntry>(dirs));
-        te->gzFile()->fixSize(tar_split_size, tarheaderstyle_);
+        te->gzFile()->fixSize(tar_split_size, tarheaderstyle_, tarfilepaddingstyle_, tar_target_size);
 
-        if (te->tazFile()->totalSize() > 0 ) {
+        if (te->tazFile()->contentSize() > 0 ) {
 
             debug(BACKUP,"%s%s size became %zu\n", te->path()->c_str(),
-                  "NAMEHERE", te->tazFile()->totalSize());
+                  "NAMEHERE", te->tazFile()->contentSize());
 
             te->appendBeakFile(te->tazFile());
             te->enableTazFile();
@@ -860,38 +862,38 @@ TarFile *Backup::findTarFromPath(Path *path, uint *partnr)
     debug(BACKUP, "Type is %d suffix is %s \n", tfn.type, "SUFFIXHERE");
 
     switch (tfn.type) {
-    case REG_FILE:
+    case TarContents::INDEX_FILE:
         if (!te->hasGzFile()) {
             debug(BACKUP, "No such gz file >%s<\n", toHex(hash).c_str());
             return NULL;
         }
         return te->gzFile();
-    case SINGLE_LARGE_FILE_TAR:
-    case SPLIT_LARGE_FILE_TAR:
+    case TarContents::SINGLE_LARGE_FILE_TAR:
+    case TarContents::SPLIT_LARGE_FILE_TAR:
         if (te->largeHashTars().count(hash) == 0) {
             debug(BACKUP, "No such large tar >%s<\n", toHex(hash).c_str());
             return NULL;
         }
         return te->largeHashTar(hash);
-    case MEDIUM_FILES_TAR:
+    case TarContents::MEDIUM_FILES_TAR:
         if (te->mediumHashTars().count(hash) == 0) {
             debug(BACKUP, "No such medium tar >%s<\n", toHex(hash).c_str());
             return NULL;
         }
         return te->mediumHashTar(hash);
-    case SMALL_FILES_TAR:
+    case TarContents::SMALL_FILES_TAR:
         if (te->smallHashTars().count(hash) == 0) {
             debug(BACKUP, "No such small tar >%s<\n", toHex(hash).c_str());
             return NULL;
         }
         return te->smallHashTar(hash);
-    case DIR_TAR:
+    case TarContents::DIR_TAR:
         if (!te->hasTazFile()) {
             debug(BACKUP, "No such dir tar >%s<\n", toHex(hash).c_str());
             return NULL;
         }
         return te->tazFile();
-    case CONTENT_SPLIT_LARGE_FILE_TAR:
+    case TarContents::CONTENT_SPLIT_LARGE_FILE_TAR:
         if (te->contentHashTars().count(hash) == 0) {
             debug(BACKUP, "No such content hash tar >%s<\n", toHex(hash).c_str());
             return NULL;
@@ -939,11 +941,11 @@ struct BackupFuseAPI : FuseAPI
                 stbuf->st_gid = getegid();
                 stbuf->st_mode = S_IFREG | 0500;
                 stbuf->st_nlink = 1;
-                stbuf->st_size = tar->size(partnr);
+                stbuf->st_size = tar->diskSize(partnr);
 #ifdef PLATFORM_POSIX
                 stbuf->st_blksize = 512;
-                if (tar->totalSize() > 0) {
-                    stbuf->st_blocks = 1+(tar->size(partnr)/512);
+                if (stbuf->st_size > 0) {
+                    stbuf->st_blocks = 1+(stbuf->st_size/512);
                 } else {
                     stbuf->st_blocks = 0;
                 }
@@ -1086,16 +1088,29 @@ RC Backup::scanFileSystem(Argument *origin, Settings *settings, ProgressStatisti
     forced_tar_collection_dir_depth = settings->depth;
     config += "-d "+to_string(settings->depth)+" ";
 
-    if (settings->tarheader_supplied) {
+    if (settings->tarheader_supplied)
+    {
         setTarHeaderStyle(settings->tarheader);
         config += "--tarheader="+to_string(settings->tarheader)+" ";
-    } else {
+    }
+    else
+    {
         setTarHeaderStyle(TarHeaderStyle::Simple);
+    }
+
+    if (settings->padding_supplied)
+    {
+        setTarFilePaddingStyle(settings->padding);
+        config += "--padding=GURKA"; //+to_string(settings->padding)+" ";
+    }
+    else
+    {
+        setTarFilePaddingStyle(TarFilePaddingStyle::Relative);
     }
 
     if (!settings->targetsize_supplied) {
         // Default settings
-        tar_target_size = 10*1024*1024;
+        tar_target_size = DEFAULT_TARGET_SIZE;
     } else {
         tar_target_size = settings->targetsize;
     }
@@ -1109,13 +1124,13 @@ RC Backup::scanFileSystem(Argument *origin, Settings *settings, ProgressStatisti
     config += "-tr "+to_string(tar_trigger_size)+" ";
 
     if (!settings->splitsize_supplied) {
-        tar_split_size = tar_target_size *5;
+        tar_split_size = tar_target_size;
     } else {
         tar_split_size = settings->splitsize;
     }
-    if (tar_split_size < tar_target_size*2) {
+    /*if (tar_split_size < tar_target_size*2) {
         error(COMMANDLINE, "The split size must be at least twice the target size.\n");
-    }
+        }*/
     config += "-ts "+to_string(tar_split_size)+" ";
 
     for (auto &e : settings->triggerglob) {
@@ -1231,7 +1246,7 @@ struct BeakFS : FileSystem
                     FileStat stat;
                     stat.st_atim = *tf->mtim();
                     stat.st_mtim = *tf->mtim();
-                    stat.st_size = tf->size(i);
+                    stat.st_size = tf->diskSize(i);
                     stat.st_mode = 0400;
                     stat.setAsRegularFile();
                     if (stat.st_size > 0) {

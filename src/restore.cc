@@ -729,6 +729,8 @@ struct RestoreFuseAPI : FuseAPI
                           char name[4096];
                           tfn.size = e->part_size;
                           tfn.last_size = e->last_part_size;
+                          tfn.ondisk_size = e->ondisk_part_size;
+                          tfn.ondisk_last_size = e->ondisk_last_part_size;
                           tfn.part_nr = partnr;
                           tfn.num_parts = e->num_parts;
                           Path *dir = e->path->parent()->prepend(restore_->rootDir());
@@ -774,7 +776,7 @@ RC Restore::lookForPointsInTime(PointInTimeFormat f, Path *path)
         TarFileName tfn;
         ok = tfn.parseFileName(f->str());
 
-        if (ok && tfn.type == REG_FILE)
+        if (ok && tfn.type == TarContents::INDEX_FILE)
         {
             PointInTime p(tfn.sec, tfn.nsec);;
             char datetime[20];
@@ -937,6 +939,8 @@ void RestoreEntry::loadFromIndex(IndexEntry *ie)
     part_offset = ie->part_offset;
     part_size = ie->part_size;
     last_part_size = ie->last_part_size;
+    ondisk_part_size = ie->ondisk_part_size;
+    ondisk_last_part_size = ie->ondisk_last_part_size;
 }
 
 bool RestoreEntry::findPartContainingOffset(size_t file_offset, uint *partnr, size_t *offset_inside_part)

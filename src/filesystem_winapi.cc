@@ -229,7 +229,35 @@ RC FileSystemImplementationWinapi::ctimeTouch(Path *file)
 
 RC FileSystemImplementationWinapi::stat(Path *p, FileStat *fs)
 {
-    return RC::ERR;
+    /*
+    void find_link(void)
+    {
+        WIN32_FIND_DATA entry;
+        HANDLE cwd = INVALID_HANDLE_VALUE;
+
+        cwd = FindFirstFile(p->c_str(), &entry);
+        if (INVALID_HANDLE_VALUE == cwd)
+        {
+            return;
+        }
+
+        if( entry.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)
+        {
+            printf("Link: %s\n", entry.cFileName);
+        }
+        FindClose(cwd);
+    }*/
+    //struct stat sb;
+    struct _stat sb;
+    int rc = ::_stat(p->c_str(), &sb);
+    if (rc) return RC::ERR;
+    struct stat sbs;
+    memset(&sbs, 0, sizeof(sbs));
+    sbs.st_size = sb.st_size;
+    sbs.st_gid = sb.st_gid;
+    sbs.st_atime = sb.st_atime;
+    fs->loadFrom(&sbs);
+    return RC::OK;
 }
 
 RC FileSystemImplementationWinapi::chmod(Path *p, FileStat *fs)

@@ -995,13 +995,20 @@ setup splitparts "Split large file into multiple small parts"
 if [ $do_test ]; then
     dd if=/dev/urandom of=$root'/largefile' count=71 bs=1023 > /dev/null 2>&1
     performStore "-ta 25K -ts 66K --tarheader=full"
+    echo TJO
     standardStoreUntarTest
+    echo TJO1
     cleanCheck
+    echo TJO2
     standardStoreRestoreTest
+    echo TJO3
     cleanCheck
+    echo TJO4
     beakfs="$mount"
     startMountTest standardTest "-ta 25K -ts 66K --tarheader=full"
+    echo TJO5
     compareStoreAndMount
+    echo TJO6
     stopMount
     echo OK
 fi
