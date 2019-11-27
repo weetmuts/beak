@@ -930,3 +930,52 @@ long upToNearestMicros(long nsec)
     // micro second.
     //return ns+1000;
 }
+
+size_t upToBlockSize(size_t s)
+{
+    size_t m = s % 512;
+    if (m == 0) return s;
+    s = s + (512-m);
+    assert((s % 512) == 0);
+    return s;
+}
+
+size_t downToBlockSize(size_t s)
+{
+    size_t m = s % 512;
+    if (m == 0) return s;
+    s = s -m;
+    assert((s % 512) == 0);
+    return s;
+}
+
+size_t roundToThousandMultiple(size_t from)
+{
+    size_t modv = 0;
+    size_t to = from;
+    if (from > 1000*1000)
+    {
+        modv = 1000*1000;
+    }
+    else if (from > 100*1000)
+    {
+        modv = 100*1000;
+    }
+    else if (from > 10*1000)
+    {
+        modv = 10*1000;
+    }
+    else
+    {
+        modv = 1000;
+    }
+    size_t mod = from % modv;
+    // Round up to nearest 1K 10K 100K or 1M boundary.
+    if (mod != 0)
+    {
+        to = from + (modv-mod);
+        mod = to % modv;
+        assert(mod == 0);
+    }
+    return to;
+}

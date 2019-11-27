@@ -60,9 +60,9 @@ struct Backup
     std::string mount_dir;
     Path *mount_dir_path;
 
-    size_t tar_target_size = 10ull*1000*1000;
-    size_t tar_trigger_size = 20ull*1000*1000;
-    size_t tar_split_size = 10ull*1000*1000;
+    size_t tar_target_size {};
+    size_t tar_trigger_size {};
+    size_t tar_split_size {};
 
     // The default setting is to trigger tars in each subdirectory below the root.
     // Even if the subdir does not qualify with enough data to create a min tar file.

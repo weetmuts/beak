@@ -37,7 +37,7 @@
 
 using namespace std;
 
-#define DEFAULT_TARGET_SIZE 10*1024*1024
+#define DEFAULT_TARGET_SIZE 10*1000*1000
 
 static ComponentId COMMANDLINE = registerLogComponent("commandline");
 static ComponentId BACKUP = registerLogComponent("backup");
@@ -1108,29 +1108,44 @@ RC Backup::scanFileSystem(Argument *origin, Settings *settings, ProgressStatisti
         setTarFilePaddingStyle(TarFilePaddingStyle::Relative);
     }
 
-    if (!settings->targetsize_supplied) {
-        // Default settings
+    if (!settings->targetsize_supplied)
+    {
         tar_target_size = DEFAULT_TARGET_SIZE;
-    } else {
+    }
+    else
+    {
         tar_target_size = settings->targetsize;
     }
     config += "-ta "+to_string(tar_target_size)+" ";
 
-    if (!settings->triggersize_supplied) {
-        tar_trigger_size = tar_target_size * 2;
-    } else {
+    if (!settings->triggersize_supplied)
+    {
+        tar_trigger_size = tar_target_size * 3;
+    }
+    else
+    {
         tar_trigger_size = settings->triggersize;
     }
     config += "-tr "+to_string(tar_trigger_size)+" ";
 
-    if (!settings->splitsize_supplied) {
-        tar_split_size = tar_target_size;
-    } else {
+    if (!settings->splitsize_supplied)
+    {
+        // If tar target size is 10,000,000 then split becomes
+        // 19999744 which is the smallest block aligned size below 20,000,000.
+        tar_split_size = roundToThousandMultiple(tar_target_size * 2);
+        tar_split_size = downToBlockSize(tar_split_size);
+    }
+    else
+    {
+        if (settings->splitsize % 512 != 0)
+        {
+            error(COMMANDLINE, "The split size must be a multiple of 512 bytes.\n");
+        }
         tar_split_size = settings->splitsize;
     }
-    /*if (tar_split_size < tar_target_size*2) {
-        error(COMMANDLINE, "The split size must be at least twice the target size.\n");
-        }*/
+    if (tar_split_size < tar_target_size) {
+        error(COMMANDLINE, "The split size must be at least the target size.\n");
+    }
     config += "-ts "+to_string(tar_split_size)+" ";
 
     for (auto &e : settings->triggerglob) {

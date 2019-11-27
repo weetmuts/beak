@@ -35,6 +35,12 @@ void strprintf(std::string &s, const char* fmt, ...);
 
 bool greaterThan(struct timespec *a, struct timespec *b);
 
+// If s is not a multiple of 512 byte blocks, then round s up.
+size_t upToBlockSize(size_t s);
+// If s is not a multiple of 512 byte blocks, then round s down.
+size_t downToBlockSize(size_t s);
+// Size dependent rounding.
+size_t roundToThousandMultiple(size_t s);
 std::string humanReadable(size_t s);
 std::string humanReadableTwoDecimals(size_t s);
 std::string humanReadableTimeTwoDecimals(uint64_t micros);
