@@ -37,7 +37,7 @@
 
 using namespace std;
 
-#define DEFAULT_TARGET_SIZE 10*1000*1000
+#define DEFAULT_TARGET_SIZE 10*1024*1024
 
 static ComponentId COMMANDLINE = registerLogComponent("commandline");
 static ComponentId BACKUP = registerLogComponent("backup");

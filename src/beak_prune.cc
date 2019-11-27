@@ -75,7 +75,7 @@ RC BeakImplementation::prune(Settings *settings, Monitor *monitor)
 
     int num_kept_points_in_time = 0;
 
-    for (auto& i : restore->historyOldToNew())
+    for (PointInTime& i : restore->historyOldToNew())
     {
         if (keeps[i.point()]) {
             // We should keep this point in time, lets remember all the tars required.

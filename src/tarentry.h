@@ -89,6 +89,7 @@ struct TarEntry
     {
         return &fs_;
     }
+
     TarEntry *parent()
     {
         return parent_;

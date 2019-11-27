@@ -257,22 +257,24 @@ while IFS='' read tar_file; do
     else
 
         # Multi part V2 file!
-        prefix=$(echo "$tar_file" | sed "s/\(.*_\)[0-9a-f]\+-.*/\1/")
+        prefix=$(echo "$tar_file" | sed 's/\(.*_\)[0-9a-f]\+-.*/\1/')
         suffix=".tar"
-        first=$(echo "$tar_file" | sed "s/.*_\([0-9a-f]\+\)-.*/\1/")
+        first=$(echo "$tar_file" | sed 's/.*_\([0-9a-f]\+\)-.*/\1/')
         first=$((0x$first))
-        numx=$(echo "$tar_file" | sed "s/.*-\([0-9a-f]\+\)_.*/\1/")
+        numx=$(echo "$tar_file" | sed 's/.*-\([0-9a-f]\+\)_.*/\1/')
         num=$((0x$numx))
-        size=$(echo "$tar_file" | sed "s/.*_\([0-9]\+\)\.tar/\1/")
+        disksize=$(echo "$tar_file" | sed 's/.*_\([0-9]\+\)\.tar/\1/')
+        size=$(echo "$tar_file" | sed 's/.*_\([0-9]\+\)_[0-9]\+\.tar/\1/')
         partnrwidth=$(echo -n $numx | wc --c)
 
         if [ "$(echo "$last_file" | grep -o "$prefix")" = "$prefix" ]
         then
-            last=$(echo "$last_file" | sed "s/.*_\([0-9a-f]\+\)-.*/\1/")
+            last=$(echo "$last_file" | sed 's/.*_\([0-9a-f]\+\)-.*/\1/')
             last=$((0x$last))
-            nummx=$(echo "$last_file" | sed "s/.*-\([0-9a-f]\+\)_.*/\1/")
+            nummx=$(echo "$last_file" | sed 's/.*-\([0-9a-f]\+\)_.*/\1/')
             numm=$((0x$nummx))
-            lastsize=$(echo "$last_file" | sed "s/.*_\([0-9]\+\)\.tar/\1/")
+            disklastsize=$(echo "$last_file" | sed "s/.*_\([0-9]\+\)\.tar/\1/")
+            lastsize=$(echo "$last_file" | sed 's/.*_\([0-9]\+\)_[0-9]\+\.tar/\1/')
 
             newvolumescript=$(mktemp /tmp/beak_tarvolchangeXXXXXXXX.sh)
             cat > ${newvolumescript} <<EOF
@@ -285,19 +287,22 @@ then
     exit 1
 fi
 
-format="$(printf "%%s%%0%dx-%s_%%s%%s" ${partnrwidth} ${numx})"
+format="$(printf "%%s%%0%dx-%s_%%s_%%s%%s" ${partnrwidth} ${numx})"
 
 if [ "\$part" = "$num" ]
 then
     partsize="$lastsize"
+    disksize="$disklastsize"
 else
     partsize="$size"
+    disksize="$disksize"
 fi
 
-foo=\$(printf "\${format}" "${root}/${prefix}" "\${part}" "\${partsize}" "${suffix}")
+foo=\$(printf "\${format}" "${root}/${prefix}" "\${part}" "\${partsize}" "\${disksize}" "${suffix}")
 
-echo "\${foo}" >&\$TAR_FD
-
+# Cut the file to partsize (no padding), otherwise tar will be unhappy.
+dd if="\${foo}" of="${dir}/beak_part" bs=512 count=\$((partsize / 512)) > /dev/null 2>&1
+echo ${dir}/beak_part >&\$TAR_FD
 EOF
 
             chmod a+x ${newvolumescript}
@@ -305,7 +310,10 @@ EOF
             # Gnu tar prints unnecessary warnings when extracting multivol files
             # with long path names. Also there is always an error when the last
             # multivol part has been extract. Hide this with pipe to null.
-            tar ${cmd}Mf "${root}/${tar_file}" --warning=no-alone-zero-block -F ${newvolumescript} > /dev/null 2>&1
+
+            # Cut the file to partsize (no padding), otherwise tar will be unhappy.
+            dd if="${root}/${tar_file}" of="${dir}/beak_part" bs=512 count=$((size / 512)) > /dev/null 2>&1
+            tar ${cmd}Mf "${dir}/beak_part" -F ${newvolumescript} > /dev/null 2>&1
             popDir
         else
             echo Broken multipart listing in index file, prefix not found.

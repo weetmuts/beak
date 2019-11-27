@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 #
-#    Copyright (C) 2016-2018 Fredrik Öhrström
+#    Copyright (C) 2016-2019 Fredrik Öhrström
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -995,20 +995,13 @@ setup splitparts "Split large file into multiple small parts"
 if [ $do_test ]; then
     dd if=/dev/urandom of=$root'/largefile' count=71 bs=1023 > /dev/null 2>&1
     performStore "-ta 25K -ts 66K --tarheader=full"
-    echo TJO
     standardStoreUntarTest
-    echo TJO1
     cleanCheck
-    echo TJO2
     standardStoreRestoreTest
-    echo TJO3
     cleanCheck
-    echo TJO4
     beakfs="$mount"
     startMountTest standardTest "-ta 25K -ts 66K --tarheader=full"
-    echo TJO5
     compareStoreAndMount
-    echo TJO6
     stopMount
     echo OK
 fi
@@ -1038,9 +1031,9 @@ if [ $do_test ]; then
     standardStoreUntarTest
     cleanCheck
     standardStoreRestoreTest
-    cleanCheck
     beakfs="$mount"
     startMountTest standardTest "-ta 100K -ts 213K"
+    cleanCheck
     compareStoreAndMount
     stopMount
     echo OK
@@ -1185,12 +1178,12 @@ if [ $do_test ]; then
     mkdir -p $root/Beta
     echo HEJSAN > $root/Beta/delta
     echo HEJSAN > $root/BetaDelta
-    performStore "-i Beta/**"
+    performStore "-i 'Beta/**'"
     storeUntarFilterTest
     cleanCheck
     storeUnStoreFilterTest
     cleanCheck
-    startMountTest mountFilterTest "-i Beta/**"
+    startMountTest mountFilterTest "-i 'Beta/**'"
 fi
 
 setup partial_extraction "Extract a subdirectory in the backup!"

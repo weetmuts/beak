@@ -372,14 +372,19 @@ size_t TarFile::readVirtualTar(char *buf, size_t bufsize, off_t offset, FileSyst
 
     if (offset < 0) return 0;
     size_t from = (size_t)offset;
-    if (from >= disksize) return 0;
+    if (from >= disksize) {
+        return 0;
+    }
 
     while (bufsize>0)
     {
-        //fprintf(stdout, "partnr=%u from=%zu bufsize=%zu partsize=%zu disksize=%zu copied=%zu\n", partnr, from, bufsize, partsize, disksize, copied);
+        if (from >= disksize) {
+            break;
+        }
+
         if (partnr > 0 && from < part_header_size_)
         {
-            debug(TARFILE, "Copying max %zu from %zu, now inside header (header size=%ju)\n",
+            debug(TARFILE, "Copying max %zu from %zu, now inside multivol header (header size=%ju)\n",
                   bufsize, from,
                   part_header_size_);
 
@@ -391,10 +396,14 @@ size_t TarFile::readVirtualTar(char *buf, size_t bufsize, off_t offset, FileSyst
             assert(te != NULL);
 
             size_t file_offset = calculateOriginTarOffset(partnr, part_header_size_);
+            debug(TARFILE, "Multivol file_offset %zu partnr=%u partheadersize=%zu\n", file_offset,
+                    partnr, part_header_size_);
             assert(file_offset > te->headerSize());
             file_offset -= te->headerSize();
             th.setMultivolType(te->tarpath(), file_offset);
             th.setSize(te->stat()->st_size-file_offset);
+            debug(TARFILE, "Multivol size %zu offset %zu\n", te->stat()->st_size-file_offset, file_offset);
+
             th.calculateChecksum();
 
             memcpy(tmp, th.buf(), T_BLOCKSIZE);
@@ -419,33 +428,20 @@ size_t TarFile::readVirtualTar(char *buf, size_t bufsize, off_t offset, FileSyst
             TarEntry *te = r.first;
             size_t tar_offset = r.second;
             assert(te != NULL);
-            debug(TARFILE, "XX copy size=%ju from=%zu \n", bufsize, origin_from-tar_offset);
-            size_t len = te->copy(buf, bufsize, origin_from - tar_offset, fs);
+            size_t n = bufsize;
+            if (from + n > partsize)
+            {
+                // Do not read outside of the desired partsize.
+                n = partsize-from;
+            }
+            debug(TARFILE, "copy size=%ju from=%zu \n", n, origin_from-tar_offset);
+            size_t len = te->copy(buf, n, origin_from - tar_offset, fs);
             assert(len <= bufsize);
-            debug(TARFILE, "XX copied result=%ju\n", len);
+            debug(TARFILE, "copied len=%ju\n", len);
             bufsize -= len;
             buf += len;
             copied += len;
             from += len;
-            // No more tar entries...
-            if (len==0) {
-                if (from < disksize)
-                {
-                    size_t remainder = disksize-from;
-                    if (remainder > bufsize)
-                    {
-                        remainder = bufsize;
-                    }
-                    memset(buf, 0, remainder);
-                    bufsize -= remainder;
-                    buf += remainder;
-                    copied += remainder;
-                    from += remainder;
-                }
-
-                debug(TARFILE, "BREAKING?\n");
-                break;
-            }
         }
         else if (from < disksize)
         {

@@ -177,6 +177,7 @@ RC Index::loadIndex(vector<char> &v,
             //}
             tofile.parseFileName(to);
             fromfile.last_size = tofile.size;
+            fromfile.ondisk_last_size = tofile.ondisk_size;
             for (uint i=0; i<fromfile.num_parts; ++i) {
                 char buf[1024];
                 fromfile.part_nr = i;
