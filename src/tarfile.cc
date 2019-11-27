@@ -548,33 +548,22 @@ size_t TarFile::onDiskSize_(size_t from, TarContents type, TarFilePaddingStyle p
 {
     if (from == 0) return 0;
 
-    if (padding == TarFilePaddingStyle::None) return from;
-    // Absolute padding is not used for the index files.
-    if (type != TarContents::INDEX_FILE && padding == TarFilePaddingStyle::Absolute) return target_size;
+    if (padding == TarFilePaddingStyle::None)
+    {
+        return from;
+    }
 
-    //assert(sha256_calculated_); // This is needed for the pseudo-random padding.
+    if (padding == TarFilePaddingStyle::Absolute)
+    {
+        if (type != TarContents::INDEX_FILE && from <= target_size)
+        {
+            return target_size;
+        }
+    }
 
-    // Relative padding.
+    // Relative padding and index files and files larger than target size.
     size_t to = roundToThousandMultiple(from);
 
-    /*
-    if (padding == TarFilePaddingStyle::Random)
-    {
-        // Now add a pseudo-random amount of the modv again, based on the sha256 sum.
-        size_t hash = 0;
-        assert(sha256_hash_.size() == SHA256_DIGEST_LENGTH);
-        for (int i=0; i<SHA256_DIGEST_LENGTH; ++i)
-        {
-            hash ^= sha256_hash_[i+0] << 24;
-            hash ^= sha256_hash_[i+1] << 16;
-            hash ^= sha256_hash_[i+2] << 8;
-            hash ^= sha256_hash_[i+3] << 0;
-        }
-        size_t add = hash % modv;
-        printf("from=%zu to=%zu modv=%zu hash=%zu add=%zu\n", from, to, modv, hash, add);
-        assert(add > 0);
-        to = from + add;
-        }*/
     return to;
 }
 

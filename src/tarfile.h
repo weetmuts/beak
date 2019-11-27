@@ -47,11 +47,11 @@ enum class TarContents
     CONTENT_SPLIT_LARGE_FILE_TAR
 };
 
-enum class TarFilePaddingStyle : short {
-    None, // Tar files are not padded at all.
+enum class TarFilePaddingStyle : short
+{
+    None,     // Tar files are not padded at all.
     Relative, // Padded relative the size, small size -> small padding, large size -> large padding.
-    Absolute, // Always pad to the target size -ta/--targetsize. Which by default is 10M.
-    Random // Pseudorandom padding based on the timestamp.
+    Absolute  // Always pad to the target size -ta/--targetsize. Which by default is 10M.
 };
 
 #define INDEX_FILE_CHAR 'z'
