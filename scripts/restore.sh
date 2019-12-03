@@ -183,7 +183,7 @@ then
     exit 1
 fi
 # Extract the list of tar files from the index file.
-gunzip -c "$generation" 2>/dev/null | tr -d '\0' | grep -A1000000 -m1 \#tars | grep -B1000000 -m1 \#parts | grep -v beak_z_ | grep -v \#tars | grep -v \#parts | sed 's/^\///'  > "$dir/aa"
+gunzip -c "$generation" 2>/dev/null | tr -d '\0' | grep -A1000000 -m1 \#tars | grep -B1000000 -m1 \#parts | grep -v \#tars | grep -v \#parts | sed 's/^\///'  > "$dir/aa"
 
 cat "$dir/aa" | tr -c -d '/\n' | tr / a > "$dir/bb"
 # Sort them on the number of slashes, ie handle the
@@ -220,18 +220,43 @@ while IFS='' read tar_file; do
         exit
     fi
 
-    # Test if single tar file.
-    if [ "$(echo "$file" | grep -o -)" = "" ] || [ "$last_file" = "" ]
+    # Test if gz index file containing a tar.
+    if [[ $file == *.gz ]] && [[ $file != *.tar.gz ]]
     then
-        # V1 file or single part V2 file.
+        # Extract the directory and hard links and rdiff patches.
+        pushDir
+        POS=$(zcat < "$file" | grep -ab "#end" | cut -f 1 -d ':')
+        zcat < "$file" | dd skip=$((POS + 72)) ibs=1 2> /dev/null > /tmp/beak_restore.tar
+        # zcat < "$file" 2>/dev/null | xxd -p  | tr -d '\n' | sed 's/.*23656e6420.\{128\}0a00//' | xxd -r -p > /tmp/beak_restoree.tar
+
+        if [ -s /tmp/beak_restore.tar ]
+        then
+            tar ${cmd}f /tmp/beak_restore.tar
+            if [ "$?" != "0" ]
+            then
+                echo GURKA "$file"
+                exit 1
+            fi
+        fi
+        if [ "$?" != "0" ]
+        then
+            exit 1
+        fi
+        popDir
+        if [ "$?" != "0" ]; then
+            echo Failed: "$CMD"
+        fi
+    elif [ "$last_file" = "" ]
+    then
+        # Single part file.
         if [ "$verbose" = "true" ]; then
-            CMD="tar ${cmd}f \"$file\" --warning=no-alone-zero-block \"$ex\""
+            CMD="tar ${cmd}f \"$file\" --warning=no-alone-zero-block"
             pushDir
             if [ "$debug" == "true" ]; then echo "$CMD"; fi
             eval $CMD > $dir/tmplist
             popDir
             if [ "$?" == "0" ]; then
-                echo Beak: tar ${cmd}f \"$file\" --warning=no-alone-zero-block \"$ex\"
+                echo Beak: tar ${cmd}f \"$file\" --warning=no-alone-zero-block
             fi
             if [ "$extract" == "true" ]; then
                 # GNU Tar simply prints the filename when extracting verbosely.
@@ -245,7 +270,7 @@ while IFS='' read tar_file; do
 
         else
 
-            CMD="tar ${cmd}f \"$file\" --warning=no-alone-zero-block \"$ex\""
+            CMD="tar ${cmd}f \"$file\" --warning=no-alone-zero-block"
             pushDir
             if [ "$debug" == "true" ]; then echo "$CMD"; fi
             eval $CMD
@@ -256,7 +281,7 @@ while IFS='' read tar_file; do
         fi
     else
 
-        # Multi part V2 file!
+        # Multi part file!
         prefix=$(echo "$tar_file" | sed 's/\(.*_\)[0-9a-f]\+-.*/\1/')
         suffix=".tar"
         first=$(echo "$tar_file" | sed 's/.*_\([0-9a-f]\+\)-.*/\1/')
@@ -321,3 +346,11 @@ EOF
      fi
 
 done <"$dir/cc"
+
+# Extract the final tar from the index file.
+POS=$(zcat < "$generation" | grep -ab "#end" | cut -f 1 -d ':')
+zcat < "$generation" | dd skip=$((POS + 72)) ibs=1 2> /dev/null > /tmp/beak_restore.tar
+if [ -s /tmp/beak_restore.tar ]
+then
+    tar ${cmd}f /tmp/beak_restore.tar
+fi

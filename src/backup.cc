@@ -668,7 +668,7 @@ size_t Backup::groupFilesIntoTars()
 
         string gzfile_contents;
 
-        gzfile_contents.append("#beak 0.81\n");
+        gzfile_contents.append("#beak 0.9\n");
         gzfile_contents.append("#config ");
         gzfile_contents.append(config_);
         gzfile_contents.append("\n");
@@ -769,6 +769,14 @@ size_t Backup::groupFilesIntoTars()
         gzfile_contents.append("\n");
         gzfile_contents.append(separator_string);
 
+        size_t taz_size = te->tazFile()->contentSize();
+        if (taz_size > 0)
+        {
+            char buf[taz_size];
+            te->tazFile()->readVirtualTar(buf, taz_size, 0, origin_fs_, 0);
+            gzfile_contents.append(string(buf, taz_size));
+        }
+
         vector<char> compressed_gzfile_contents;
         gzipit(&gzfile_contents, &compressed_gzfile_contents);
 
@@ -778,15 +786,16 @@ size_t Backup::groupFilesIntoTars()
         dynamics.push_back(unique_ptr<TarEntry>(dirs));
         te->gzFile()->fixSize(tar_split_size, tarheaderstyle_, tarfilepaddingstyle_, tar_target_size);
 
-        if (te->tazFile()->contentSize() > 0 ) {
-
+        /*
+        if (te->tazFile()->contentSize() > 0 )
+        {
             debug(BACKUP,"%s%s size became %zu\n", te->path()->c_str(),
                   "NAMEHERE", te->tazFile()->contentSize());
 
-            te->appendBeakFile(te->tazFile());
-            te->enableTazFile();
-            has_dir = 1;
-        }
+            //te->appendBeakFile(te->tazFile());
+            //te->enableTazFile();
+            //has_dir = 1;
+            }*/
         te->appendBeakFile(te->gzFile());
         te->enableGzFile();
 

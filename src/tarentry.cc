@@ -355,7 +355,6 @@ void TarEntry::registerTarFile(TarFile *tf, size_t o) {
 
 void TarEntry::registerTazFile() {
     taz_file_ = new TarFile(TarContents::DIR_TAR);
-    tars_.push_back(taz_file_);
 }
 
 void TarEntry::registerGzFile() {
@@ -491,17 +490,20 @@ void cookEntry(string *listing, TarEntry *entry) {
         listing->append(entry->link()->str());
     }
     listing->append(separator_string);
-    char filename[256];
-    TarFileName tfn(entry->tarFile(), 0);
-    tfn.writeTarFileNameIntoBuffer(filename, sizeof(filename), NULL);
-    listing->append(filename);
+    if (entry->tarFile()->type() != TarContents::DIR_TAR)
+    {
+        char filename[256];
+        TarFileName tfn(entry->tarFile(), 0);
+        tfn.writeTarFileNameIntoBuffer(filename, sizeof(filename), NULL);
+        listing->append(filename);
+    }
     listing->append(separator_string);
     listing->append(to_string(entry->tarOffset()+entry->headerSize()));
     listing->append(separator_string);
 
     if (entry->tarFile()->numParts() == 1)
     {
-        listing->append("1");
+       listing->append("1");
     }
     else
     {
@@ -603,12 +605,14 @@ bool eatEntry(int beak_version, vector<char> &v, vector<char>::iterator &i, Path
         *is_sym_link = false;
         *is_hard_link = true;
     }
-    if (dir_to_prepend) {
-        *tar = dir_to_prepend->str() + "/" + eatTo(v, i, separator, 1024, eof, err);
-    } else {
-        *tar = eatTo(v, i, separator, 1024, eof, err);
-    }
+    string tarp = eatTo(v, i, separator, 1024, eof, err);
     if (*err || *eof) return false;
+    if (dir_to_prepend && tarp.length() > 0)
+    {
+        *tar = dir_to_prepend->str() + "/" + tarp;
+    } else {
+        *tar = tarp;
+    }
 
     string off = eatTo(v, i, separator, 32, eof, err);
     if (*err || *eof) return false;

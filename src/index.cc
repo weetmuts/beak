@@ -53,15 +53,11 @@ RC Index::loadIndex(vector<char> &v,
         return RC::ERR;
     }
     string vers = type.substr(6);
-    if (vers == "0.7") {
-        beak_version = 70;
-    } else if (vers == "0.8") {
-        beak_version = 80;
-    } else if (vers == "0.81") {
-        beak_version = 81;
+    if (vers == "0.9") {
+        beak_version = 90;
     } else {
         failure(INDEX,
-                "Version was \"%s\" which is not the supported 0.7 or 0.8\n",
+                "Version was \"%s\" which is not the supported 0.9\n",
                 type.c_str());
         return RC::ERR;
     }
@@ -124,6 +120,7 @@ RC Index::loadIndex(vector<char> &v,
                                   &ie->part_size, &ie->last_part_size,
                                   &ie->ondisk_part_size, &ie->ondisk_last_part_size,
                                   &eof, &err);
+        debug(INDEX, "eatEntry \"%s\" \"%s\"\n", ie->tar.c_str(), ie->path->c_str());
         if (err) {
             failure(INDEX, "Could not parse index file in >%s<\n>%s<\n", dtp, ii);
             break;
@@ -134,7 +131,7 @@ RC Index::loadIndex(vector<char> &v,
     }
 
     if (num_files != 0) {
-        failure(INDEX, "Error in gz file format! numfiles=%d\n", num_files);
+        failure(INDEX, "Error in gz file format! Num files count expected to be zero but it was=%d\n", num_files);
         return RC::ERR;
     }
 
@@ -245,7 +242,7 @@ RC Index::loadIndex(vector<char> &v,
         return RC::ERR;
     }
 
-    if (beak_version >= 81) {
+    if (beak_version >= 90) {
         char hex[65];
         hex[64] = 0;
         n = sscanf(sha256s.c_str(), "#end %64s", hex);
