@@ -47,8 +47,6 @@ RC rcloneListBeakFiles(Storage *storage,
     bool eof = false, err = false;
 
     for (;;) {
-        // Example line:
-        // 12288 z01_001506595429.268937346_0_7eb62d8e0097d5eaa99f332536236e6ba9dbfeccf0df715ec96363f8ddd495b6_0.gz
         eatWhitespace(out, i, &eof);
         if (eof) break;
         string size = eatTo(out, i, ' ', 64, &eof, &err);
@@ -63,10 +61,9 @@ RC rcloneListBeakFiles(Storage *storage,
             // Check that the remote size equals the content. If there is a mismatch,
             // then for sure the file must be overwritte/updated. Perhaps there was an earlier
             // transfer interruption....
-            tfn.last_size = tfn.size;
+            tfn.ondisk_last_size = tfn.ondisk_size;
             size_t siz = (size_t)atol(size.c_str());
-            if ( (tfn.type != TarContents::INDEX_FILE && tfn.size == siz) ||
-                 (tfn.type == TarContents::INDEX_FILE && tfn.size == siz) )
+            if (tfn.ondisk_last_size == siz)
             {
                 files->push_back(tfn);
                 Path *p = Path::lookup(dir)->prepend(storage->storage_location);
