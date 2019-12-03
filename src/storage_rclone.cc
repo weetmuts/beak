@@ -61,6 +61,7 @@ RC rcloneListBeakFiles(Storage *storage,
             // Check that the remote size equals the content. If there is a mismatch,
             // then for sure the file must be overwritte/updated. Perhaps there was an earlier
             // transfer interruption....
+            tfn.last_size = tfn.size;
             tfn.ondisk_last_size = tfn.ondisk_size;
             size_t siz = (size_t)atol(size.c_str());
             if (tfn.ondisk_last_size == siz)
