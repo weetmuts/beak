@@ -531,7 +531,6 @@ size_t Backup::groupFilesIntoTars()
         // This is the taz file that store sub directories for this tar collection dir.
         te->registerTazFile();
         te->registerGzFile();
-        size_t has_dir = 0;
 
         // Order of creation: l m r z
         TarFile *curr = NULL;
@@ -607,6 +606,7 @@ size_t Backup::groupFilesIntoTars()
                 debug(BACKUP,"%s%s size became GURKA parts %zu\n", te->path()->c_str(), "NAMEHERE");
                 te->appendBeakFile(tf);
                 te->largeHashTars()[tf->hash()] = tf;
+                num += tf->numParts();
             }
         }
         for (auto & t : te->mediumTars())
@@ -619,6 +619,7 @@ size_t Backup::groupFilesIntoTars()
                 debug(BACKUP,"%s%s size became\n", te->path()->c_str(), "NAMEHERE");
                 te->appendBeakFile(tf);
                 te->mediumHashTars()[tf->hash()] = tf;
+                num += tf->numParts();
             }
         }
         for (auto & t : te->smallTars()) {
@@ -629,6 +630,7 @@ size_t Backup::groupFilesIntoTars()
                 debug(BACKUP,"%s%s size ecame GURKA\n", te->path()->c_str(), "NAMEHERE");
                 te->appendBeakFile(tf);
                 te->smallHashTars()[tf->hash()] = tf;
+                num += tf->numParts();
             }
         }
 
@@ -798,8 +800,7 @@ size_t Backup::groupFilesIntoTars()
             }*/
         te->appendBeakFile(te->gzFile());
         te->enableGzFile();
-
-        num += has_dir+te->smallTars().size()+te->mediumTars().size()+te->largeTars().size();
+        num++; // Count the index file.
     }
     return num;
 }

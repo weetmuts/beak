@@ -150,8 +150,7 @@ void parse_rclone_verbose_output(ProgressStatistics *st,
         }
         else
         {
-            debug(RCLONE, "Error! No file size found for %s\n", path->c_str());
-            assert(0);
+            warning(RCLONE, "Error! No file size found for %s\n", path->c_str());
         }
     }
 }
