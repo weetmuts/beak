@@ -197,11 +197,8 @@ TarFileName::TarFileName(TarFile *tf, uint partnr)
     version = 2;
     sec = tf->mtim()->tv_sec;
     nsec = tf->mtim()->tv_nsec;
-    size = tf->partContentSize(0);
-    ondisk_size = tf->diskSize(0);
-    last_size = tf->partContentSize(tf->numParts()-1);
-    ondisk_last_size = tf->diskSize(tf->numParts()-1);
-    assert(tf->numParts() <= 1 || last_size != 0);
+    size = tf->partContentSize(partnr);
+    ondisk_size = tf->diskSize(partnr);
     header_hash = toHex(tf->hash());
     part_nr = partnr;
     num_parts = tf->numParts();
@@ -299,21 +296,12 @@ void TarFileName::writeTarFileNameIntoBufferVersion_(char *buf, size_t buf_len, 
 {
     char sizes[32];
     memset(sizes, 0, sizeof(sizes));
-    if (num_parts > 1 && part_nr == num_parts-1) {
-        snprintf(sizes, 32, "%zu", last_size);
-    } else {
-        snprintf(sizes, 32, "%zu", size);
-    }
+    snprintf(sizes, 32, "%zu", size);
+
     char ondisk_sizes[32];
     memset(ondisk_sizes, 0, sizeof(ondisk_sizes));
-    if (num_parts > 1 && part_nr == num_parts-1)
-    {
-        snprintf(ondisk_sizes, 32, "%zu", ondisk_last_size);
-    }
-    else
-    {
-        snprintf(ondisk_sizes, 32, "%zu", ondisk_size);
-    }
+    snprintf(ondisk_sizes, 32, "%zu", ondisk_size);
+
     char secs_and_micros[32];
     memset(secs_and_micros, 0, sizeof(secs_and_micros));
     long usec = nsec/1000;

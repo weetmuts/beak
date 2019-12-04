@@ -58,13 +58,8 @@ RC rcloneListBeakFiles(Storage *storage,
         bool ok = tfn.parseFileName(file_name, &dir);
         // Only files that have proper beakfs names are included.
         if (ok) {
-            // Check that the remote size equals the content. If there is a mismatch,
-            // then for sure the file must be overwritte/updated. Perhaps there was an earlier
-            // transfer interruption....
-            tfn.last_size = tfn.size;
-            tfn.ondisk_last_size = tfn.ondisk_size;
             size_t siz = (size_t)atol(size.c_str());
-            if (tfn.ondisk_last_size == siz)
+            if (tfn.ondisk_size == siz)
             {
                 files->push_back(tfn);
                 Path *p = Path::lookup(dir)->prepend(storage->storage_location);
@@ -138,20 +133,25 @@ void parse_rclone_verbose_output(ProgressStatistics *st,
     string file = storage->storage_location->str()+"/"+string(buf+from, to-from);
     TarFileName tfn;
     string dir;
-    if (tfn.parseFileName(file, &dir)) {
+    if (tfn.parseFileName(file, &dir))
+    {
         size_t size = 0;
         Path *dirp = Path::lookup(dir);
         string file_path = tfn.asStringWithDir(dirp);
         Path *path = Path::lookup(file_path);
         debug(RCLONE, "copied: %ju \"%s\"\n", st->stats.file_sizes.count(path), path->c_str());
 
-        if (st->stats.file_sizes.count(path)) {
+        if (st->stats.file_sizes.count(path))
+        {
             size = st->stats.file_sizes[path];
             st->stats.size_files_stored += size;
             st->stats.num_files_stored++;
             st->updateProgress();
-        } else {
+        }
+        else
+        {
             debug(RCLONE, "Error! No file size found for %s\n", path->c_str());
+            assert(0);
         }
     }
 }
@@ -188,7 +188,7 @@ RC rcloneSendFiles(Storage *storage,
                                                         len);
                         });
 
-    // local_fs->deleteFile(tmp);
+    local_fs->deleteFile(tmp);
 
     return rc;
 }

@@ -106,6 +106,7 @@ RC BeakImplementation::storeRuleLocallyThenRemotely(Rule *rule, Settings *settin
     for (auto & p : rule->storages)
     {
         unique_ptr<ProgressStatistics> progress = monitor->newProgressStatistics(buildJobName("copy", settings));
+        progress->startDisplayOfProgress();
         info(PUSH, "Copying local backup into %s\n", p.second.storage_location->c_str());
         storage_tool_->copyBackupIntoStorage(backup.get(),
                                              rule->local.storage_location, // copy from here
@@ -113,10 +114,12 @@ RC BeakImplementation::storeRuleLocallyThenRemotely(Rule *rule, Settings *settin
                                              &p.second, // copy to here
                                              settings,
                                              progress.get());
+
         if (progress->stats.num_files_stored == 0 && progress->stats.num_dirs_updated == 0) {
             info(PUSH, "No copying needed, remote backup is up to date.\n");
         }
     }
+
     return rc;
 }
 

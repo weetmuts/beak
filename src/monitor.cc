@@ -388,7 +388,6 @@ void ProgressStatisticsImplementation::finishProgress()
 {
     if (stats.num_files == 0 || stats.num_files_to_store == 0) return;
     updateProgress();
-    monitor_->regular_->stop();
     redrawLine();
 
     switch (pdt_) {
@@ -399,6 +398,7 @@ void ProgressStatisticsImplementation::finishProgress()
     case ProgressDisplayType::Normal:
         UI::output(" done.\n");
     }
+    monitor_->stopDisplay(0);
 }
 
 unique_ptr<ProgressStatistics> newwProgressStatistics(ProgressDisplayType t, MonitorImplementation *monitor, std::string job)

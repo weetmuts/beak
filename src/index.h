@@ -39,6 +39,18 @@ struct IndexEntry {
     size_t last_part_size;
     size_t ondisk_part_size;
     size_t ondisk_last_part_size;
+
+    size_t contentSize(size_t partnr)
+    {
+        if (partnr == num_parts-1) return last_part_size;
+        return part_size;
+    }
+
+    size_t diskSize(size_t partnr)
+    {
+        if (partnr == num_parts-1) return ondisk_last_part_size;
+        return ondisk_part_size;
+    }
 };
 
 struct IndexTar {

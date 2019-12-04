@@ -727,11 +727,9 @@ struct RestoreFuseAPI : FuseAPI
                       [&](uint partnr, off_t offset_inside_part, char *buffer, size_t length_to_read)
                       {
                           char name[4096];
-                          tfn.size = e->part_size;
-                          tfn.last_size = e->last_part_size;
-                          tfn.ondisk_size = e->ondisk_part_size;
-                          tfn.ondisk_last_size = e->ondisk_last_part_size;
                           tfn.part_nr = partnr;
+                          tfn.size = e->contentSize(partnr);
+                          tfn.ondisk_size = e->diskSize(partnr);
                           tfn.num_parts = e->num_parts;
                           Path *dir = e->path->parent()->prepend(restore_->rootDir());
                           tfn.writeTarFileNameIntoBuffer(name, sizeof(name), dir);

@@ -173,11 +173,16 @@ RC Index::loadIndex(vector<char> &v,
             //    failure(INDEX, "Could not parse from tar file name.\n");
             //}
             tofile.parseFileName(to);
-            fromfile.last_size = tofile.size;
-            fromfile.ondisk_last_size = tofile.ondisk_size;
+            size_t last_size = tofile.size;
+            size_t ondisk_last_size = tofile.ondisk_size;
             for (uint i=0; i<fromfile.num_parts; ++i) {
                 char buf[1024];
                 fromfile.part_nr = i;
+                if (i == fromfile.num_parts-1)
+                {
+                    fromfile.size = last_size;
+                    fromfile.ondisk_size = ondisk_last_size;
+                }
                 fromfile.writeTarFileNameIntoBuffer(buf, sizeof(buf), dir);
                 Path *pp = Path::lookup(buf);
                 it->path = pp;

@@ -97,7 +97,7 @@ void add_backup_work(ProgressStatistics *progress,
         // rclone/rsync later reports that a file has been successfully sent.
         assert(progress->stats.file_sizes.count(file_to_extract) == 0);
         progress->stats.file_sizes[file_to_extract] = stat->st_size;
-
+        debug(STORAGETOOL, "Added backup work %s %zu\n", file_to_extract->c_str(), stat->st_size);
         // Compare our local file with the stats of the one stored remotely.
         stat->checkStat(to_fs, file_to_extract);
 
