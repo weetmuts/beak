@@ -632,6 +632,8 @@ CXXFLAGS_debug
 CLANG
 ac_ct_CXX
 CXXFLAGS
+RSYNC_LIBS
+RSYNC_CFLAGS
 ZLIB_LIBS
 ZLIB_CFLAGS
 OPENSSL_LIBS
@@ -4125,6 +4127,12 @@ else
     { $as_echo "$as_me:${as_lineno-$LINENO}: result: using ${with_zlib}" >&5
 $as_echo "using ${with_zlib}" >&6; }
 fi
+
+
+
+
+RSYNC_CFLAGS=""
+RSYNC_LIBS="-lrsync"
 
 
 
