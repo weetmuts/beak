@@ -200,11 +200,25 @@ fi
 AC_SUBST(ZLIB_CFLAGS)
 AC_SUBST(ZLIB_LIBS)
 
-RSYNC_CFLAGS=""
-RSYNC_LIBS="-lrsync"
+AC_MSG_CHECKING([for librsync])
+AC_ARG_WITH(librsync, [AS_HELP_STRING([--with-librsync],
+      [specify prefix directory for the librsync package
+      (expecting the libraries under PATH and the headers under PATH/src)])])
 
-AC_SUBST(RSYNC_CFLAGS)
-AC_SUBST(RSYNC_LIBS)
+if test "x${with_librsync}" = "x"; then
+    LIBRSYNC_CFLAGS=""
+    LIBRSYNC_LIBS="-lrsync"
+    AC_MSG_RESULT([found])
+else
+    with_librsync=$(realpath ${with_librsync})
+    LIBRSYNC_CFLAGS="-I${with_librsync}/src"
+    LIBRSYNC_LIBS="${with_librsync}/librsync.dll.a"
+    AC_MSG_RESULT([using ${with_librsync}])
+fi
+
+
+AC_SUBST(LIBRSYNC_CFLAGS)
+AC_SUBST(LIBRSYNC_LIBS)
 
 AC_MSG_CHECKING(for sizeof time_t)
 AC_CHECK_SIZEOF([time_t])

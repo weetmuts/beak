@@ -100,13 +100,13 @@ $(OUTPUT_ROOT)/$(TYPE)/%.o: $(SRC_ROOT)/src/%.cc
 $(OUTPUT_ROOT)/$(TYPE)/beak: $(BEAK_OBJS)
 	@echo Linking $(TYPE) $(CONF_MNEMONIC) $@
 	$(VERBOSE)$(CXX) -o $@ $(LDFLAGS_$(TYPE)) $(LDFLAGS) $(BEAK_OBJS) \
-                      $(OPENSSL_LIBS) $(ZLIB_LIBS) $(FUSE_LIBS) $(RSYNC_LIBS) $(LDFLAGSEND_$(TYPE)) -lpthread
+                      $(OPENSSL_LIBS) $(ZLIB_LIBS) $(FUSE_LIBS) $(LIBRSYNC_LIBS) $(LDFLAGSEND_$(TYPE)) -lpthread
 	$(VERBOSE)$(STRIP_COMMAND) $@
 
 $(OUTPUT_ROOT)/$(TYPE)/testinternals: $(TESTINTERNALS_OBJS)
 	@echo Linking $(TYPE) $(CONF_MNEMONIC) $@
 	$(VERBOSE)$(CXX) -o $@ $(LDFLAGS_$(TYPE)) $(LDFLAGS) $(TESTINTERNALS_OBJS) \
-                      $(OPENSSL_LIBS) $(ZLIB_LIBS) $(FUSE_LIBS) $(RSYNC_LIBS) $(LDFLAGSEND_$(TYPE)) -lpthread
+                      $(OPENSSL_LIBS) $(ZLIB_LIBS) $(FUSE_LIBS) $(LIBRSYNC_LIBS) $(LDFLAGSEND_$(TYPE)) -lpthread
 	$(VERBOSE)$(STRIP_COMMAND) $@
 
 $(OUTPUT_ROOT)/$(TYPE)/libgcc_s_seh-1.dll: /usr/lib/gcc/x86_64-w64-mingw32/5.3-win32/libgcc_s_seh-1.dll

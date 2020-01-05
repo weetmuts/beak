@@ -632,8 +632,8 @@ CXXFLAGS_debug
 CLANG
 ac_ct_CXX
 CXXFLAGS
-RSYNC_LIBS
-RSYNC_CFLAGS
+LIBRSYNC_LIBS
+LIBRSYNC_CFLAGS
 ZLIB_LIBS
 ZLIB_CFLAGS
 OPENSSL_LIBS
@@ -721,6 +721,7 @@ enable_fuse
 with_fuse
 with_openssl
 with_zlib
+with_librsync
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1373,6 +1374,9 @@ Optional Packages:
   --with-zlib             specify prefix directory for the zlib package
                           (expecting the libraries under PATH and the headers
                           under PATH)
+  --with-librsync         specify prefix directory for the librsync package
+                          (expecting the libraries under PATH and the headers
+                          under PATH/src)
 
 Some influential environment variables:
   CC          C compiler command
@@ -4131,8 +4135,28 @@ fi
 
 
 
-RSYNC_CFLAGS=""
-RSYNC_LIBS="-lrsync"
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for librsync" >&5
+$as_echo_n "checking for librsync... " >&6; }
+
+# Check whether --with-librsync was given.
+if test "${with_librsync+set}" = set; then :
+  withval=$with_librsync;
+fi
+
+
+if test "x${with_librsync}" = "x"; then
+    LIBRSYNC_CFLAGS=""
+    LIBRSYNC_LIBS="-lrsync"
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: found" >&5
+$as_echo "found" >&6; }
+else
+    with_librsync=$(realpath ${with_librsync})
+    LIBRSYNC_CFLAGS="-I${with_librsync}/src"
+    LIBRSYNC_LIBS="${with_librsync}/librsync.dll.a"
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: using ${with_librsync}" >&5
+$as_echo "using ${with_librsync}" >&6; }
+fi
+
 
 
 

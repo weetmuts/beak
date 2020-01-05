@@ -83,3 +83,25 @@ if [ ! -d winfsp ]; then
     echo
     git clone https://github.com/billziss-gh/winfsp
 fi
+
+if [ ! -d librsync-winapi ]; then
+    echo
+    echo Fetching RSync
+    echo
+    git clone https://github.com/librsync/librsync.git librsync-winapi
+    if [ ! -d librsync-arm ]; then
+        git clone librsync-winapi librsync-arm
+    fi
+fi
+
+cd librsync-winapi
+if [ ! -f librsync.dll ]; then
+    echo
+    echo Building librsync w64
+    echo
+
+    MINGW_ARCH=64 cmake -DBUILD_RDIFF=OFF -DCMAKE_INSTALL_PREFIX=/opt/myoutput -DCMAKE_PREFIX_PATH=/usr -DMINGW_PREFIX="/usr" -DCMAKE_INSTALL_LIBDIR=/opt/mingw-w64-x86_64/lib -DENABLE_COMPRESSION=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_DISABLE_FIND_PACKAGE_POPT=TRUE -DCMAKE_DISABLE_FIND_PACKAGE_libb2=TRUE -DCMAKE_DISABLE_FIND_PACKAGE_ZLIB=TRUE -DCMAKE_DISABLE_FIND_PACKAGE_BZip2=TRUE -DCMAKE_DISABLE_FIND_PACKAGE_Doxygen=TRUE -DCMAKE_TOOLCHAIN_FILE=../librsync.toolchain.cmake
+
+    make
+fi
+cd ..
