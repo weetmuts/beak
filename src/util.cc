@@ -462,7 +462,7 @@ void trimWhitespace(string *s)
     s->erase(s->find_last_not_of(ws) + 1);
 }
 
-string toHexAndText(const char *b, size_t len)
+string toHexAndText(const char *b, size_t len, int line_length)
 {
     string s;
     char buf[5];
@@ -479,16 +479,16 @@ string toHexAndText(const char *b, size_t len)
             snprintf(buf, 5, "\\x%02X", ((unsigned int) b[j]) & 255);
             s.append(buf);
         }
-        if (j > 0 && j % 32 == 0)
+        if (j > 0 && j % line_length == 0)
             s.append("\n");
     }
 
     return s;
 }
 
-string toHexAndText(vector<char> &b)
+string toHexAndText(vector<char> &b, int line_length)
 {
-    return toHexAndText(&b[0], b.size());
+    return toHexAndText(&b[0], b.size(), line_length);
 }
 
 string toHex(const char *b, size_t len)

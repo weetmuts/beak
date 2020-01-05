@@ -323,7 +323,7 @@ function stopTwoFS {
 }
 
 function untar {
-    (cd "$check"; $THIS_DIR/scripts/restore.sh x "$1")
+    ($THIS_DIR/scripts/restore.sh x "$1" "$check")
 }
 
 function pack {
@@ -331,7 +331,7 @@ function pack {
 }
 
 function untarpacked {
-    (cd "$check"; $THIS_DIR/scripts/restore.sh xa "$1" "$2")
+    ($THIS_DIR/scripts/restore.sh xa "$1" "$2" "$check")
 }
 
 function checkdiff {
@@ -349,7 +349,7 @@ function checklsld {
     diff $org $dest
     if [ $? -ne 0 ]; then
         echo "$if_test_fail_msg"
-        echo Failed file attributes diff for $1! Check in $dir for more information.
+        echo Failed checklsld for $1! Check in $dir for more information.
         exit
     fi
 }
@@ -360,20 +360,20 @@ function checklsld_no_nanos {
     diff $org $dest
     if [ $? -ne 0 ]; then
         echo "$if_test_fail_msg"
-        echo Failed file attributes diff for $1! Check in $dir for more information.
+        echo Failed checklslsd_no_nanos for $1! Check in $dir for more information.
         exit
     fi
 }
 
 function standardStoreUntarTest {
-    if_test_fail_msg="Store untar test failed: "
+    if_test_fail_msg="Store/restore.sh test failed: "
     untar "$store"
     checkdiff
     checklsld_no_nanos
 }
 
 function standardStoreRestoreTest {
-    if_test_fail_msg="Store unstor test failed: "
+    if_test_fail_msg="Store/restore test failed: "
     performReStore
     checkdiff
     checklsld
@@ -1273,7 +1273,7 @@ fi
 function devTest {
     $THIS_DIR/scripts/integrity-test.sh -dd "$dir" -f "! -path '*shm*'" /dev "$beakfs"
     if [ $? -ne 0 ]; then
-        echo Failed file attributes diff for $1! Check in $dir for more information.
+        echo Failed integrity test for $1! Check in $dir for more information.
         exit
     fi
 }
@@ -1452,7 +1452,7 @@ function percentageTest {
     # The percentage in the file name will become a printf command.
     $THIS_DIR/scripts/integrity-test.sh -dd "$dir" "$root" "$mount"
     if [ $? -ne 0 ]; then
-        echo Failed file attributes diff for $1! Check in $dir for more information.
+        echo Failed percentage integrity test $1! Check in $dir for more information.
         exit
     fi
     if [[ $(find "$dir/test_root.txt" -type f -size +200c 2>/dev/null) ]] ||

@@ -21,12 +21,6 @@ while (<STDIN>) {
         $fi = "$fi -> $li";
     }
     if ($fi ne "./") {
-        print("$fi $bi $ow $si $da $ti\n");
+        print("/$fi $bi $ow $si $da $ti\n");
     }
 }
-
-
-
-
-
-

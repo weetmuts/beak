@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2016 Fredrik Öhrström
+ Copyright (C) 2016-2019 Fredrik Öhrström
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -26,6 +26,7 @@
 #include <iterator>
 #include <stdlib.h>
 
+#include "lock.h"
 #include "log.h"
 #include "tar.h"
 #include "tarentry.h"
@@ -35,6 +36,9 @@ using namespace std;
 
 ComponentId TARFILE = registerLogComponent("tarfile");
 ComponentId HASHING = registerLogComponent("hashing");
+
+pthread_mutex_t tarfile_counter_ {};
+int tarfile_max_ {};
 
 TarFile::TarFile(TarContents tc)
 {

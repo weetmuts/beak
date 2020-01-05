@@ -1,4 +1,6 @@
 #!/bin/bash
+IFS=$'\n\t'
+set -eu
 #
 #    Copyright (C) 2016 Fredrik Öhrström
 #
@@ -22,10 +24,6 @@ function finish {
     if [ "$debug" == "" ]
     then
         rm -rf $dir
-        if [ -r "$newvolumescript" ]
-        then
-            rm "$newvolumescript"
-        fi
     else
         echo Not removing $dir
     fi
@@ -43,12 +41,12 @@ realpath() {
 
 function Help() {
     echo
-    echo Usage: beak-restore {-d} {-c} [x\|t]{a}{v} [DirWithTars] {PathToExtract}
+    echo Usage: beak-restore {-d} {-c} [x\|t]{a}{v} [DirWithTars] [TargetDir]
     echo
     echo Example:
-    echo beak-restore x /Mirror/Storage
-    echo beak-restore xv /Mirror/Storage/Articles
-    echo beak-restore xa /Mirror/Storage/Articles mag1.pdf
+    echo beak-restore x /Mirror/Storage .
+    echo beak-restore xv /Mirror/Storage/Articles /home/storage
+    echo beak-restore xa /Mirror/Storage/Articles /home/storage
     echo beak-restore tav /Mirror/Storage/Work
     echo
     echo Add -d to debug.
@@ -57,8 +55,8 @@ function Help() {
 
 function pushDir() {
     if [ "$extract" = "true" ]; then
-        mkdir -p "$tar_dir"
-        pushd "$tar_dir" > /dev/null
+        mkdir -p "$target_dir"
+        pushd "$target_dir" > /dev/null
         if [ "$debug" == "true" ]; then echo pushd $(pwd); fi
     fi
 }
@@ -77,6 +75,10 @@ verbose=''
 extract=''
 ext=''
 gen=''
+
+if [ -z ${1+x} ] || [ -z ${2+x} ]; then
+    Help
+fi
 
 while [[ $1 =~ -.* ]]
 do
@@ -115,6 +117,28 @@ case $1 in
         ;;
 esac
 
+if [ -z ${2+x} ]
+then
+    root=""
+else
+    root="$2"
+fi
+
+if [ -z ${3+x} ]
+then
+    target=""
+else
+    target="$3"
+fi
+
+root="$(realpath "$root")"
+target="$(realpath "$target")"
+
+if [ "$cmd" != "t" ] && [ "$target" = "" ]
+then
+    Help
+fi
+
 case $1 in
     *a*)
         cmd=${cmd}a
@@ -129,11 +153,10 @@ case $1 in
         ;;
 esac
 
-if [ "$cmd" = "" ] || [ "$2" = "" ]; then
+if [ "$cmd" = "" ] || [ "$root" = "" ]
+then
     Help
 fi
-
-root="$(realpath "$2")"
 
 numgzs=$(ls "$root"/beak_z_*.gz | sort -r | wc | tr -s ' ' | cut -f 2 -d ' ')
 
@@ -183,17 +206,55 @@ then
     exit 1
 fi
 # Extract the list of tar files from the index file.
-gunzip -c "$generation" 2>/dev/null | tr -d '\0' | grep -A1000000 -m1 \#tars | grep -B1000000 -m1 \#parts | grep -v \#tars | grep -v \#parts | sed 's/^\///'  > "$dir/aa"
+gunzip -c "$generation" 2>/dev/null \
+    | grep -a -A1000000 -m1 \#tars \
+    | grep -a -B1000000 -m1 \#parts \
+    | grep -a -v \#tars \
+    | grep -a -v \#parts  > "$dir/aa"
 
-cat "$dir/aa" | tr -c -d '/\n' | tr / a > "$dir/bb"
+# Extract the paths to the tarfiles
+cat "$dir/aa" | sed 's/.*\x00//'  > "$dir/tarfiles"
+
+# Extract the backup location for each tarfile
+cat "$dir/aa" | sed 's/\x00\([^\x00]*\)\x00.*/\1/' > "$dir/backup_locations"
+
+# Extract the potential basis_tarfile for each tarfile
+cat "$dir/aa" | sed 's/\x00\[^\x00]*\x00\([^\x00]*\).*/\1/' > "$dir/basis_tarfiles"
+
+# Extract the potential delta_tarfile for each tarfile
+cat "$dir/aa" | sed 's/\x00\[^\x00]*\x00\[^\x00]*\x00\([^\x00]*\).*/\1/' > "$dir/delta_tarfiles"
+
+# Generate slashes
+cat "$dir/backup_locations" | tr -c -d '/\n' | tr / a > "$dir/slashes"
+
 # Sort them on the number of slashes, ie handle the
 # deepest directories first, finish with the root
 # (replaced / with a to make sort work)
-paste "$dir/bb" "$dir/aa" | LC_COLLATE=en_US.UTF8 sort | cut -f 2- > "$dir/cc"
+paste "$dir/slashes" "$dir/backup_locations" "$dir/tarfiles" "$dir/basis_tarfiles" "$dir/delta_tarfiles" | LC_COLLATE=en_US.UTF8 sort > "$dir/sorted_tars"
+
+if [ "$debug" == "true" ]
+then
+    echo "$dir/aa"
+    echo "$dir/slashes"
+    echo "$dir/backup_locations"
+    echo "$dir/tarfiles"
+    echo "$dir/basis_tarfiles"
+    echo "$dir/delta_tarfiles"
+    echo "$dir/sorted_tars"
+fi
 
 # Iterate over the tar files and extract them
-# in the corresponding directory. Read store a line at a time from $dir/cc into $tar_file
-while IFS='' read tar_file; do
+# in the corresponding directory. Read store a line at a time from $dir/ee into $tar_file
+while read -r depth backup_location tar_file basis delta
+do
+    if [ "$debug" == "true" ]
+    then
+        echo depth=$depth
+        echo backup_location=$backup_location
+        echo tarfile=$tar_file
+        echo basis=$basis
+        echo delta=$delta
+    fi
 
     last_file=""
     # Test for split tar i02_123123123.tar ... i02_123123122.tar
@@ -202,17 +263,19 @@ while IFS='' read tar_file; do
         tmp="$tar_file"
         tar_file="$(echo "$tar_file" | sed 's/\(.*\)\ \.\.\.\ .*/\1/')"
         last_file="$(echo "$tmp" | sed 's/.*\ \.\.\.\ \(.*\)/\1/')"
+        if [ "$debug" == "true" ]
+        then
+            echo "Split file"
+            echo tar_file=$tar_file
+            echo last_file=$last_file
+        fi
     fi
 
     # Extract directory in which the tar file resides.
-    tar_dir="$(dirname "$tar_file")"
+    target_dir="$target/$backup_location"
 
     # Rename the top directory . into the empty string.
-    tar_dir_prefix="${tar_dir#.}"
-    if [ "$tar_dir_prefix" != "" ]; then
-        # Make sure prefix ends with a slash.
-        tar_dir_prefix="$tar_dir_prefix"/
-    fi
+    target_dir_prefix="${backup_location#.}"
 
     file=$(echo "$root/$tar_file"*)
     if [ ! -f "$file" ]; then
@@ -226,61 +289,57 @@ while IFS='' read tar_file; do
         # Extract the directory and hard links and rdiff patches.
         pushDir
         POS=$(zcat < "$file" | grep -ab "#end" | cut -f 1 -d ':')
-        zcat < "$file" | dd skip=$((POS + 72)) ibs=1 2> /dev/null > /tmp/beak_restore.tar
+        zcat < "$file" | dd skip=$((POS + 72)) ibs=1 2> /dev/null > ${dir}/beak_restore.tar
         # zcat < "$file" 2>/dev/null | xxd -p  | tr -d '\n' | sed 's/.*23656e6420.\{128\}0a00//' | xxd -r -p > /tmp/beak_restoree.tar
 
-        if [ -s /tmp/beak_restore.tar ]
+        if [ -s ${dir}/beak_restore.tar ]
         then
-            tar ${cmd}f /tmp/beak_restore.tar
-            if [ "$?" != "0" ]
-            then
-                echo GURKA "$file"
-                exit 1
-            fi
-        fi
-        if [ "$?" != "0" ]
-        then
-            exit 1
-        fi
-        popDir
-        if [ "$?" != "0" ]; then
-            echo Failed: "$CMD"
-        fi
-    elif [ "$last_file" = "" ]
-    then
-        # Single part file.
-        if [ "$verbose" = "true" ]; then
-            CMD="tar ${cmd}f \"$file\" --warning=no-alone-zero-block"
-            pushDir
-            if [ "$debug" == "true" ]; then echo "$CMD"; fi
+            CMD="tar ${cmd}f ${dir}/beak_restore.tar"
+            if [ "$verbose" == "true" ]; then echo CMD="$CMD"; fi
             eval $CMD > $dir/tmplist
-            popDir
-            if [ "$?" == "0" ]; then
-                echo Beak: tar ${cmd}f \"$file\" --warning=no-alone-zero-block
+            if [ "$?" != "0" ]; then
+                echo Failed: "$CMD"
             fi
             if [ "$extract" == "true" ]; then
                 # GNU Tar simply prints the filename when extracting verbosely.
                 # Simply prefix the tar dir.
-                awk -v prefix="$tar_dir_prefix" '{print prefix $0}' $dir/tmplist
+                awk -v prefix="$target_dir_prefix" '{print prefix $0}' $dir/tmplist
             else
                 # GNU Tar prints permissions, date etc when viewing verbosely.
-                awk '{p=match($0," [0-9][0-9]:[0-9][0-9] "); print substr($0,0,p+6)"'" $tar_dir_prefix"'"substr($0,p+7)}' $dir/tmplist
+                awk '{p=match($0," [0-9][0-9]:[0-9][0-9] "); print substr($0,0,p+6)"'" $target_dir_prefix"'"substr($0,p+7)}' $dir/tmplist
             fi
             rm $dir/tmplist
-
-        else
-
-            CMD="tar ${cmd}f \"$file\" --warning=no-alone-zero-block"
-            pushDir
-            if [ "$debug" == "true" ]; then echo "$CMD"; fi
-            eval $CMD
             popDir
-            if [ "$?" != "0" ]; then
-                echo Failed: "$CMD"
-            fi
         fi
+    elif [ "$last_file" = "" ]
+    then
+        if [ "$debug" == "true" ]
+        then
+            echo "Single file"
+        fi
+        # Single part file.
+        CMD="tar ${cmd}f \"$file\" --warning=no-alone-zero-block"
+        pushDir
+        if [ "$verbose" = "true" ]; then echo CMD="$CMD"; fi
+        eval $CMD > $dir/tmplist
+        if [ "$?" != "0" ]; then
+            echo Failed: "$CMD"
+        fi
+        if [ "$extract" == "true" ]; then
+            # GNU Tar simply prints the filename when extracting verbosely.
+            # Simply prefix the tar dir.
+            awk -v prefix="$target_dir_prefix" '{print prefix $0}' $dir/tmplist
+        else
+            # GNU Tar prints permissions, date etc when viewing verbosely.
+            awk '{p=match($0," [0-9][0-9]:[0-9][0-9] "); print substr($0,0,p+6)"'" $target_dir_prefix"'"substr($0,p+7)}' $dir/tmplist
+        fi
+        rm $dir/tmplist
+        popDir
     else
-
+        if [ "$debug" == "true" ]
+        then
+            echo "Multi part file"
+        fi
         # Multi part file!
         prefix=$(echo "$tar_file" | sed 's/\(.*_\)[0-9a-f]\+-.*/\1/')
         suffix=".tar"
@@ -301,7 +360,7 @@ while IFS='' read tar_file; do
             disklastsize=$(echo "$last_file" | sed "s/.*_\([0-9]\+\)\.tar/\1/")
             lastsize=$(echo "$last_file" | sed 's/.*_\([0-9]\+\)_[0-9]\+\.tar/\1/')
 
-            newvolumescript=$(mktemp /tmp/beak_tarvolchangeXXXXXXXX.sh)
+            newvolumescript="${dir}/beak_tarvolchange.sh"
             cat > ${newvolumescript} <<EOF
 #!/bin/bash
 
@@ -345,12 +404,31 @@ EOF
         fi
      fi
 
-done <"$dir/cc"
+done <"$dir/sorted_tars"
 
-# Extract the final tar from the index file.
+# Extract the final tar contents from the index file.
+target_dir="$target/$backup_location"
+target_dir_prefix="/"
+
 POS=$(zcat < "$generation" | grep -ab "#end" | cut -f 1 -d ':')
-zcat < "$generation" | dd skip=$((POS + 72)) ibs=1 2> /dev/null > /tmp/beak_restore.tar
-if [ -s /tmp/beak_restore.tar ]
+zcat < "$generation" | dd skip=$((POS + 72)) ibs=1 2> /dev/null > ${dir}/beak_restore.tar
+if [ -s ${dir}/beak_restore.tar ]
 then
-    tar ${cmd}f /tmp/beak_restore.tar
+    CMD="tar ${cmd}f ${dir}/beak_restore.tar"
+    if [ "$verbose" == "true" ]; then echo CMD="$CMD"; fi
+    pushDir
+    eval $CMD > $dir/tmplist
+    if [ "$?" != "0" ]; then
+        echo Failed: "$CMD"
+    fi
+    if [ "$extract" == "true" ]; then
+        # GNU Tar simply prints the filename when extracting verbosely.
+        # Simply prefix the tar dir.
+        awk -v prefix="$target_dir_prefix" '{print prefix $0}' $dir/tmplist
+    else
+        # GNU Tar prints permissions, date etc when viewing verbosely.
+        awk '{p=match($0," [0-9][0-9]:[0-9][0-9] "); print substr($0,0,p+6)"'" $target_dir_prefix"'"substr($0,p+7)}' $dir/tmplist
+    fi
+    rm $dir/tmplist
+    popDir
 fi

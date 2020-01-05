@@ -324,6 +324,9 @@ It is rare, but it might happen that you have gamesrc and GameSrc and they end u
 chunked directories, that would conflict on the remote storage. Beak will detect this
 and refuse to perform the backup, giving you a chance to rename the directories.
 
+Beak will not accept files or directories containing control characters, ie chars with values 1-31,
+and refuse to perform the backup, giving you a chance to rename the file/dir.
+
 ## Naming the chunky files
 
 As you now have seen, the chunk files have long names. Why is that?

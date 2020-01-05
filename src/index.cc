@@ -140,7 +140,7 @@ RC Index::loadIndex(vector<char> &v,
     vector<char> tar_data(tar_header.begin(), tar_header.end());
     j = tar_data.begin();
 
-    string tars = eatTo(data, j, '\n', 64, &eof, &err);
+    string tars = eatTo(data, j, '\n', 128, &eof, &err);
 
     int num_tars = 0;
     int n = sscanf(tars.c_str(), "#tars %d", &num_tars);
@@ -150,23 +150,38 @@ RC Index::loadIndex(vector<char> &v,
     }
     debug(INDEX,"found num tars %d\n", num_tars);
 
-    string name;
+    string backup_location, basis_file, delta_file, tar_file;
     eof = false;
     while (i != v.end() && !eof && num_tars > 0) {
-        name = eatTo(v, i, separator, 4096, &eof, &err); // Max path names 4096 bytes
+        backup_location = eatTo(v, i, separator, 4096, &eof, &err); // Max path names 4096 bytes
         if (err) {
-            failure(INDEX, "Could not parse tarredfs-tars file!\n");
+            failure(INDEX, "File format error gz file. [%d]\n", __LINE__);
+            break;
+        }
+        basis_file = eatTo(v, i, separator, 4096, &eof, &err); // Max path names 4096 bytes
+        if (err) {
+            failure(INDEX, "File format error gz file. [%d]\n", __LINE__);
+            break;
+        }
+        delta_file = eatTo(v, i, separator, 4096, &eof, &err); // Max path names 4096 bytes
+        if (err) {
+            failure(INDEX, "File format error gz file. [%d]\n", __LINE__);
+            break;
+        }
+        tar_file = eatTo(v, i, separator, 4096, &eof, &err); // Max path names 4096 bytes
+        if (err) {
+            failure(INDEX, "File format error gz file. [%d]\n", __LINE__);
             break;
         }
         // Remove the newline at the end.
-        name.pop_back();
-        if (name.length()==0) continue;
-        auto dots = name.find(" ... ");
+        tar_file.pop_back();
+        if (tar_file.length()==0) continue;
+        auto dots = tar_file.find(" ... ");
         if (dots != string::npos)
         {
             TarFileName fromfile, tofile;
-            string from = name.substr(0,dots);
-            string to = name.substr(dots+5);
+            string from = tar_file.substr(0,dots);
+            string to = tar_file.substr(dots+5);
             Path *dir = Path::lookup(from)->parent();
             fromfile.parseFileName(from);
             //) {
@@ -192,7 +207,7 @@ RC Index::loadIndex(vector<char> &v,
         }
         else
         {
-            Path *p = Path::lookup(name);
+            Path *p = Path::lookup(tar_file);
             if (p->parent()) {
                 debug(INDEX, "found tar %d %s in dir %s\n", num_tars,  p->name()->c_str(), p->parent()->c_str());
             } else {

@@ -55,6 +55,14 @@ Backup::Backup(ptr<FileSystem> origin_fs)
 
 RecurseOption Backup::addTarEntry(Path *abspath, FileStat *st)
 {
+    if (abspath->hasForbiddenChars())
+    {
+        string safe = toHexAndText(abspath->c_str(), abspath->str().length(), 4096);
+
+        usageError(BACKUP, "Cowardly refusing to backup file system with path containing control characters:\n"
+                   "%s\n", safe.c_str());
+        assert(0);
+    }
     Path *path = abspath->subpath(root_dir_path->depth());
     path = path->prepend(Path::lookupRoot());
 
@@ -708,9 +716,10 @@ size_t Backup::groupFilesIntoTars()
 
         gzfile_contents.append("#tars ");
         gzfile_contents.append(to_string(tars.size()));
-        gzfile_contents.append("\n");
+        gzfile_contents.append(" with 4 columns: backup_location basis_tarfile delta_tarfile tarfile\n");
         gzfile_contents.append(separator_string);
-        for (auto & p : tars)
+
+        for (pair<TarFile*,TarEntry*> &p : tars)
         {
             char filename[1024];
             TarFileName tfn(p.first, 0);
@@ -718,6 +727,21 @@ size_t Backup::groupFilesIntoTars()
             if (path) {
                 path = path->subpath(te->path()->depth());
             }
+            gzfile_contents.append("/");
+            if (path->str().length() > 0)
+            {
+                gzfile_contents.append(path->str());
+                gzfile_contents.append("/");
+            }
+            debug(BACKUP, "Added backup_location %s\n", path->c_str());
+            gzfile_contents.append(separator_string);
+
+            debug(BACKUP, "Added basis tarfile %s\n", "");
+            gzfile_contents.append(separator_string);
+
+            debug(BACKUP, "Added delta tarfile %s\n", "");
+            gzfile_contents.append(separator_string);
+
             tfn.writeTarFileNameIntoBuffer(filename, sizeof(filename), path);
             debug(BACKUP, "Added tar filename %s\n", filename);
             gzfile_contents.append(filename);
@@ -1183,6 +1207,7 @@ RC Backup::scanFileSystem(Argument *origin, Settings *settings, ProgressStatisti
     if (found_future_dated_file_ && settings->relaxtimechecks == false) {
         usageError(BACKUP, "Cowardly refusing to backup file system with files from the future.\n"
                    "Add --relaxtimechecks if you really want to backup anyway.\n");
+        assert(0);
     }
     uint64_t stop = clockGetTimeMicroSeconds();
     uint64_t scan_time = stop - start;

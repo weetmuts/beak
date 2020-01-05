@@ -86,6 +86,7 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
         if (!rp)
         {
             usageError(COMMANDLINE, "Expected directory. Got \"%s\" instead.\n", arg.c_str());
+            assert(0);
         }
         argument.dir = rp;
         argument.type = ArgDir;
@@ -102,6 +103,7 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
         if (!rp)
         {
             usageError(COMMANDLINE, "Expected file. Got \"%s\" instead.\n", arg.c_str());
+            assert(0);
         }
         argument.file = rp;
         argument.type = ArgFile;
@@ -137,6 +139,7 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
         if (expected_type == ArgStorage)
         {
             usageError(COMMANDLINE, "Expected storage, but \"%s\" is not a storage location.\n", arg.c_str());
+            assert(0);
         }
 
         // Not a storage, thus ArgORS will pass through here, to try origin and rule.
@@ -165,6 +168,7 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
         {
             // We expected a rule, but there was none....
             usageError(COMMANDLINE, "Expected a rule. Got \"%s\" instead.\n", arg.c_str());
+            assert(0);
         }
     }
 
@@ -189,6 +193,7 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
         if (expected_type == ArgOrigin)
         {
             usageError(COMMANDLINE, "Expected an origin. Got \"%s\" instead.\n", arg.c_str());
+            assert(0);
         }
     }
 
@@ -198,8 +203,10 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
         CommandEntry *cmde = parseCommand(arg.c_str());
         Command cmd = nosuch_cmd;
         if (cmde != NULL) cmd = cmde->cmd;
-        if (cmd == nosuch_cmd) {
+        if (cmd == nosuch_cmd)
+        {
             usageError(COMMANDLINE, "Expected command. Got \"%s\" instead.\n", arg.c_str());
+            assert(0);
         }
         argument.type = ArgCommand;
         argument.command = cmd;
@@ -207,6 +214,7 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
     }
 
     usageError(COMMANDLINE, "Not what I expected, got \"%s\".\n", arg.c_str());
+    assert(0);
 
     return argument;
 }
@@ -301,6 +309,7 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
             return cmd;
         }
         usageError(COMMANDLINE, "No such command \"%s\"\n", args[0].c_str());
+        assert(0);
     }
     settings->depth = 2; // Default value
 
@@ -330,6 +339,7 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
                     && !hasCommandOption(cmd, op)) {
                     usageError(COMMANDLINE, "You cannot use option: --%s with the command: %s.\n",
                                ope->name, cmde->name);
+                    assert(0);
                 }
                 if (!ope->requires_value && contains_value) {
                     error(COMMANDLINE,"Option \"%s\" should not have a value specified.\n", ope->name);

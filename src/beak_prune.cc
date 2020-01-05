@@ -46,8 +46,10 @@ RC BeakImplementation::prune(Settings *settings, Monitor *monitor)
     if (settings->now_supplied) {
         time_t nowt;
         RC rc = parseDateTime(settings->now, &nowt);
-        if (rc.isErr()) {
+        if (rc.isErr())
+        {
             usageError(PRUNE, "Cannot parse date time \"%s\"\n", settings->now.c_str());
+            assert(0);
         }
         now_nanos = ((uint64_t)nowt)*1000000000ull;
     }
@@ -63,6 +65,7 @@ RC BeakImplementation::prune(Settings *settings, Monitor *monitor)
         if (i.point() > now_nanos) {
             verbose(PRUNE, "Found point in time \"%s\" which is in the future.\n", i.datetime.c_str());
             usageError(PRUNE, "Cowardly refusing to prune a storage with point in times from the future!\n");
+            assert(0);
         }
         prune->addPointInTime(i.point());
         num_existing_points_in_time++;
@@ -158,6 +161,7 @@ RC BeakImplementation::prune(Settings *settings, Monitor *monitor)
     if (num_lost > 0)
     {
         usageError(PRUNE, "Warning! Lost %d backup files! First run fsck.\n", num_lost);
+        assert(0);
     }
 
     if (settings->dryrun == false)

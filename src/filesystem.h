@@ -209,6 +209,7 @@ struct Path
         return (t == p);
     }
     Path *realpath();
+    bool hasForbiddenChars();
 
     private:
 

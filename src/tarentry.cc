@@ -441,7 +441,7 @@ string cookColumns()
     s += "mtime "; i++;
     s += "path "; i++;
     s += "link "; i++;
-    s += "tarprefix "; i++;
+    s += "tarfile_nr "; i++;
     s += "offset "; i++;
     s += "multipart(num,partoffset,size,last_size,disksize,last_disksize) "; i++; // eg 2,512,70000,238,70000,1000
     s += "path_size_mtime_hash "; i++;
@@ -492,6 +492,7 @@ void cookEntry(string *listing, TarEntry *entry) {
     listing->append(separator_string);
     if (entry->tarFile()->type() != TarContents::DIR_TAR)
     {
+        //listing->append(to_string(entry->tarFile()->tarfileNr()));
         char filename[256];
         TarFileName tfn(entry->tarFile(), 0);
         tfn.writeTarFileNameIntoBuffer(filename, sizeof(filename), NULL);

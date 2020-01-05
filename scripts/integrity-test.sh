@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-#    Copyright (C) 2016 Fredrik Öhrström
+#    Copyright (C) 2017-2020 Fredrik Öhrström
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -105,11 +105,12 @@ then
     sort $dir/test_root.txt > $dir/test_root_sorted.txt
     sort $dir/test_tar.txt > $dir/test_tar_sorted.txt
 
-    rc=$(diff $dir/test_root_sorted.txt $dir/test_tar_sorted.txt)
+    diff $dir/test_root_sorted.txt $dir/test_tar_sorted.txt > $dir/difff
+    rc=$(cat $dir/difff)
     if [ "$rc" = "" ]; then
         echo OK
     else
-        echo XXX${rc}XXX
+        cat $dir/difff
         debug='true'
         exit 1
     fi

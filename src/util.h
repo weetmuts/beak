@@ -77,8 +77,8 @@ std::string eatToSkipWhitespace(std::vector<char> &v, std::vector<char>::iterato
 void trimWhitespace(std::string *s);
 // Translate binary buffer with printable strings to ascii
 // with non-printabled escaped as such: \xC0 \xFF \xEE
-std::string toHexAndText(const char *b, size_t len);
-std::string toHexAndText(std::vector<char> &b);
+std::string toHexAndText(const char *b, size_t len, int line_length);
+std::string toHexAndText(std::vector<char> &b, int line_length);
 std::string toHex(const char *b, size_t len);
 std::string toHex(std::vector<char> &b);
 void hex2bin(std::string s, std::vector<char> *target);

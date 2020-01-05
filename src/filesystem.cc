@@ -579,6 +579,15 @@ Path* Path::commonPrefix(Path *a, Path *b)
     return a->subpath(0, i);
 }
 
+bool Path::hasForbiddenChars()
+{
+    for (char c : str())
+    {
+        if (c < 32) return true;
+    }
+    return false;
+}
+
 Path::Initializer::Initializer()
 {
     Atom *root = Atom::lookup("");
