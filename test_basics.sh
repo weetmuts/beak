@@ -331,7 +331,7 @@ function pack {
 }
 
 function untarpacked {
-    ($THIS_DIR/scripts/restore.sh xa "$1" "$2" "$check")
+    $THIS_DIR/scripts/restore.sh x "$1" "$check"
 }
 
 function checkdiff {
