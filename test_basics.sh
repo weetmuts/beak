@@ -1197,10 +1197,7 @@ if [ $do_test ]; then
     performStore
     if_test_fail_msg="Store untar test failed: "
     GAMMA=$(basename $store/Gamma*)
-    echo FOOBURAK1 $GAMMA
-    echo FOOBURAK2 $store
     untar "$store/$GAMMA"
-    echo OKOKOKOKKO
     checkdiff /Gamma
     checklsld_no_nanos /Gamma
     cleanCheck

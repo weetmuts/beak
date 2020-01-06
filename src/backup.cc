@@ -770,6 +770,9 @@ size_t Backup::groupFilesIntoTars()
             if (path) {
                 path = path->subpath(te->path()->depth());
             }
+            if (safepath) {
+                safepath = safepath->subpath(te->safepath()->depth());
+            }
             gzfile_contents.append("/");
             if (path->str().length() > 0)
             {
