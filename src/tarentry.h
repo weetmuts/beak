@@ -49,6 +49,14 @@ struct TarEntry
     {
         return abspath_;
     }
+    Path *safepath()
+    {
+        return safepath_;
+    }
+    void setSafePath(Path *p)
+    {
+        safepath_ = p;
+    }
     Path *tarpath()
     {
         return tarpath_;
@@ -164,7 +172,7 @@ struct TarEntry
         return tar_offset_;
     }
 
-    std::vector<TarEntry*>& dirs()
+    std::vector<Path*>& dirs()
     {
         return dirs_;
     }
@@ -251,7 +259,7 @@ struct TarEntry
     {
         is_added_to_directory_ = true;
     }
-    void addDir(TarEntry *dir);
+    void addDir(Path *dir);
     void addEntry(TarEntry *te);
     std::vector<TarEntry*>& entries()
     {
@@ -277,6 +285,8 @@ struct TarEntry
     Atom *name_;
     // The path below root_dir, starts with a /.
     Path *path_;
+    // The safe path used for the collection dirs. alfa/gamma/beta becomes alfa_gamma_beta_HASH
+    Path *safepath_ {};
     // The path inside the tar, does not start with a /.
     // And can be much shorter than path, because the tar can be located
     // deep in the tree below root_dir.
@@ -301,7 +311,7 @@ struct TarEntry
     TarEntry *storage_dir_;
 
     bool is_tar_storage_dir_;
-    std::vector<TarEntry*> dirs_; // Directories to be listed inside this TarEntry
+    std::vector<Path*> dirs_; // Directories to be listed inside this TarEntry
     std::vector<TarFile*> files_; // Files to be listed inside this TarEntry (ie the virtual tar files..)
     TarFile *taz_file_;
     bool taz_file_in_use_ = false;
@@ -333,7 +343,7 @@ struct TarEntry
 void cookEntry(std::string *listing, TarEntry *entry);
 std::string cookColumns();
 
-bool eatEntry(int beak_version, std::vector<char> &v, std::vector<char>::iterator &i, Path *dir_to_prepend,
+bool eatEntry(int beak_version, std::vector<char> &v, std::vector<char>::iterator &i, Path *dir_to_prepend, Path *safedir_to_prepend,
               FileStat *fs, size_t *offset, std::string *tar, Path **path,
               std::string *link, bool *is_sym_link, bool *is_hard_link,
               uint *num_parts, size_t *part_offset, size_t *part_size, size_t *last_part_size,

@@ -581,9 +581,11 @@ Path* Path::commonPrefix(Path *a, Path *b)
 
 bool Path::hasForbiddenChars()
 {
-    for (char c : str())
+    for (unsigned char c : str())
     {
-        if (c < 32) return true;
+        if (c < 32) {
+            return true;
+        }
     }
     return false;
 }

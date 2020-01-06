@@ -105,6 +105,10 @@ std::string randomUpperCaseCharacterString(int len);
     } \
 } \
 
+
+// Convert a deep path like alfa/beta/gamma to a single directory alfa%2Fbeta%2Fgamma_HASH
+Path *makeSafePath(Path *p, bool original, bool hash_only);
+
 void printContents(std::map<Path*,FileStat> &contents);
 
 // Extract the leading digits from buf and store into s.

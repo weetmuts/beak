@@ -44,7 +44,7 @@ RC BeakImplementation::fsck(Settings *settings, Monitor *monitor)
     {
         Path *p = Path::lookup(i.filename);
         required_beak_files.insert(p);
-        for (auto& t : *(i.tars()))
+        for (auto& t : *(i.tarfiles()))
         {
             required_beak_files.insert(t);
         }
@@ -90,7 +90,7 @@ RC BeakImplementation::fsck(Settings *settings, Monitor *monitor)
             bool missing = 0 == set_of_existing_beak_files.count(p);
             if (!missing)
             {
-                for (auto& t : *(i.tars()))
+                for (auto& t : *(i.tarfiles()))
                 {
                     if (set_of_existing_beak_files.count(t) == 0) {
                         missing = true;

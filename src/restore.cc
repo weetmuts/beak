@@ -231,6 +231,9 @@ Restore::~Restore() {
 // The gz file to load, and the dir to populate with its contents.
 bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
 {
+    debug(RESTORE, "loadGz gzfile=%s backup_location=%s\n", gz?gz->c_str():"NULL", dir_to_prepend?dir_to_prepend->c_str():"NULL");
+    Path *safedir_to_prepend = gz->parent()->subpath(rootDir()->depth());;
+
     RC rc = RC::OK;
     if (point->hasLoadedGzFile(gz))
     {
@@ -257,7 +260,7 @@ bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
     vector<RestoreEntry*> es;
     bool parsed_tars_already = point->hasGzFiles();
 
-    rc = Index::loadIndex(contents, i, &index_entry, &index_tar, dir_to_prepend, &point->size,
+    rc = Index::loadIndex(contents, i, &index_entry, &index_tar, dir_to_prepend, safedir_to_prepend, &point->size,
              [point,&es,dir_to_prepend](IndexEntry *ie) {
                          if (!point->hasPath(ie->path)) {
                              debug(RESTORE, "adding entry for >%s<\n", ie->path->c_str());
@@ -269,7 +272,8 @@ bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
                          RestoreEntry *e = point->getPath(ie->path);
                          assert(e->path = ie->path);
                          e->loadFromIndex(ie);
-                         if (ie->is_hard_link) {
+                         if (ie->is_hard_link)
+                         {
                              // A Hard link as stored in the beakfs >must< point to a file
                              // in the same directory or to a file in subdirectory.
                              if (dir_to_prepend) {
@@ -284,12 +288,11 @@ bool Restore::loadGz(PointInTime *point, Path *gz, Path *dir_to_prepend)
                           {
                               if (!parsed_tars_already)
                               {
-                                  Path *p = it->path;
-                                  if (TarFileName::isIndexFile(p))
+                                  if (TarFileName::isIndexFile(it->tarfile_location))
                                   {
-                                      point->addGzFile(p->parent(), p);
+                                      point->addGzFile(it->backup_location, it->tarfile_location);
                                   }
-                                  point->addTar(p);
+                                  point->addTar(it->tarfile_location);
                               }
                           });
 
@@ -688,7 +691,8 @@ struct RestoreFuseAPI : FuseAPI
         e = restore_->findEntry(point, path);
         if (!e) goto err;
 
-        tar = e->tar->prepend(restore_->rootDir());
+        tar = e->tarr->prepend(restore_->rootDir());
+        //fprintf(stderr, "GURKABANAN %s\n", e->tarr->c_str());
         if (!tfn.parseFileName(tar->str())) {
             debug(RESTORE, "bad tar file name '%s'\n", tar->c_str());
             goto err;
@@ -866,7 +870,8 @@ RC Restore::loadBeakFileSystem(Argument *storage)
 {
     setRootDir(storage->storage->storage_location);
 
-    for (auto &point : historyOldToNew()) {
+    for (auto &point : historyOldToNew())
+    {
         string name = point.filename;
         debug(RESTORE,"found backup for %s filename %s\n", point.ago.c_str(), name.c_str());
 
@@ -932,7 +937,7 @@ void RestoreEntry::loadFromIndex(IndexEntry *ie)
     path = ie->path;
     is_sym_link = ie->is_sym_link;
     symlink = ie->link;
-    tar = Path::lookup(ie->tar);
+    tarr = Path::lookup(ie->tarr);
     num_parts = ie->num_parts;
     part_offset = ie->part_offset;
     part_size = ie->part_size;

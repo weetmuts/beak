@@ -83,7 +83,7 @@ RC BeakImplementation::prune(Settings *settings, Monitor *monitor)
         if (keeps[i.point()]) {
             // We should keep this point in time, lets remember all the tars required.
             num_kept_points_in_time++;
-            for (auto& t : *(i.tars())) {
+            for (auto& t : *(i.tarfiles())) {
                 required_beak_files.insert(t);
             }
             Path *p = Path::lookup(i.filename);

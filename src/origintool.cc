@@ -348,7 +348,7 @@ RecurseOption OriginToolImplementation::handleRegularFiles(Path *path, FileStat 
                                                            FileSystem *backup_fs)
 {
     auto entry = restore->findEntry(point, path);
-    auto tar_file = entry->tar->prepend(settings->from.storage->storage_location);
+    auto tar_file = entry->tarr->prepend(settings->from.storage->storage_location);
     auto tar_file_offset = entry->offset_;
     auto file_to_extract = path->prepend(settings->to.origin);
 

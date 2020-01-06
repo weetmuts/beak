@@ -32,6 +32,7 @@ RC Index::loadIndex(vector<char> &v,
                     vector<char>::iterator &i,
                     IndexEntry *ie, IndexTar *it,
                     Path *dir_to_prepend,
+                    Path *safedir_to_prepend,
                     size_t *size,
                     function<void(IndexEntry*)> on_entry,
                     function<void(IndexTar*)> on_tar)
@@ -93,6 +94,9 @@ RC Index::loadIndex(vector<char> &v,
         else if (startsWith(line, "#gids ")) {
             // Ignore the uid info.
         }
+        else if (startsWith(line, "#delta ")) {
+            // Ignore the delta info.
+        }
         else if (startsWith(line, "#files ")) {
             int n = sscanf(line.c_str(), "#files %d", &num_files);
             if (n != 1) {
@@ -113,14 +117,14 @@ RC Index::loadIndex(vector<char> &v,
     while (i != v.end() && !eof && num_files > 0)
     {
         ii = i;
-        bool got_entry = eatEntry(beak_version, v, i, dir_to_prepend, &ie->fs, &ie->offset,
-                                  &ie->tar, &ie->path, &ie->link,
+        bool got_entry = eatEntry(beak_version, v, i, dir_to_prepend, safedir_to_prepend, &ie->fs, &ie->offset,
+                                  &ie->tarr, &ie->path, &ie->link,
                                   &ie->is_sym_link, &ie->is_hard_link,
                                   &ie->num_parts, &ie->part_offset,
                                   &ie->part_size, &ie->last_part_size,
                                   &ie->ondisk_part_size, &ie->ondisk_last_part_size,
                                   &eof, &err);
-        debug(INDEX, "eatEntry \"%s\" \"%s\"\n", ie->tar.c_str(), ie->path->c_str());
+        debug(INDEX, "eatEntry \"%s\" \"%s\"\n", ie->tarr.c_str(), ie->path->c_str());
         if (err) {
             failure(INDEX, "Could not parse index file in >%s<\n>%s<\n", dtp, ii);
             break;
@@ -158,6 +162,12 @@ RC Index::loadIndex(vector<char> &v,
             failure(INDEX, "File format error gz file. [%d]\n", __LINE__);
             break;
         }
+        if (backup_location.length() > 0 && backup_location[0] == '/')
+        {
+            // Drop the initial slash.
+            backup_location.erase(0,1);
+        }
+        Path *bl = Path::lookup(backup_location);
         basis_file = eatTo(v, i, separator, 4096, &eof, &err); // Max path names 4096 bytes
         if (err) {
             failure(INDEX, "File format error gz file. [%d]\n", __LINE__);
@@ -184,13 +194,12 @@ RC Index::loadIndex(vector<char> &v,
             string to = tar_file.substr(dots+5);
             Path *dir = Path::lookup(from)->parent();
             fromfile.parseFileName(from);
-            //) {
-            //    failure(INDEX, "Could not parse from tar file name.\n");
-            //}
             tofile.parseFileName(to);
+            // TODO handle failures here.
             size_t last_size = tofile.size;
             size_t ondisk_last_size = tofile.ondisk_size;
-            for (uint i=0; i<fromfile.num_parts; ++i) {
+            for (uint i=0; i<fromfile.num_parts; ++i)
+            {
                 char buf[1024];
                 fromfile.part_nr = i;
                 if (i == fromfile.num_parts-1)
@@ -200,7 +209,9 @@ RC Index::loadIndex(vector<char> &v,
                 }
                 fromfile.writeTarFileNameIntoBuffer(buf, sizeof(buf), dir);
                 Path *pp = Path::lookup(buf);
-                it->path = pp;
+                it->tarfile_location = pp;
+                it->backup_location = bl;
+                debug(INDEX, "loaded tar %d %s for dir %s\n", num_tars,  pp->c_str(), bl->c_str());
                 on_tar(it);
             }
             num_tars--;
@@ -208,13 +219,9 @@ RC Index::loadIndex(vector<char> &v,
         else
         {
             Path *p = Path::lookup(tar_file);
-            if (p->parent()) {
-                debug(INDEX, "found tar %d %s in dir %s\n", num_tars,  p->name()->c_str(), p->parent()->c_str());
-            } else {
-                debug(INDEX, "found tar %d %s\n", num_tars, p->name()->c_str());
-            }
-
-            it->path = p;
+            it->tarfile_location = p;
+            it->backup_location = bl;
+            debug(INDEX, "loaded tar %d %s for dir %s\n", num_tars,  p->c_str(), bl->c_str());
             on_tar(it);
             num_tars--;
         }

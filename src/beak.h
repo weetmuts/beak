@@ -37,6 +37,7 @@
 enum Command : short;
 enum PointInTimeFormat : short;
 enum TarHeaderStyle : short;
+
 enum class TarFilePaddingStyle : short;
 enum class WhichArgument { FirstArg, SecondArg  };
 
@@ -49,6 +50,7 @@ struct OriginTool;
 
 enum class CommandType { PRIMARY, SECONDARY };
 enum class OptionType { GLOBAL_PRIMARY, LOCAL_PRIMARY, GLOBAL_SECONDARY, LOCAL_SECONDARY };
+
 
 Path *findBeakConf(int argc, char **argv, Path *default_conf);
 void findAndSetLogging(int argc, char **argv);

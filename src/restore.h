@@ -46,7 +46,7 @@ struct RestoreEntry
 {
     FileStat fs;
     Path *path {};
-    Path *tar {};
+    Path *tarr {};
     bool is_sym_link {};
     // A symbolic link can be anything! Must not point to a real file.
     std::string symlink;
@@ -118,9 +118,13 @@ struct PointInTime {
     bool hasLoadedGzFile(Path *gz) { return loaded_gz_files_.count(gz) == 1; }
     void addLoadedGzFile(Path *gz) { loaded_gz_files_.insert(gz); }
     bool hasGzFiles() { return gz_files_.size() != 0; }
-    void addGzFile(Path *parent, Path *p) { gz_files_[parent] = p; }
-    Path *getGzFile(Path *p) { if (gz_files_.count(p) == 1) { return gz_files_[p]; } else { return NULL; } }
-    std::vector<Path*> *tars() { return &tars_; }
+    void addGzFile(Path *parent, Path *gzfile)
+    {
+        //fprintf(stderr, "GURKA Add gz file %s to dir %s\n", gzfile->c_str(), parent->c_str());
+        gz_files_[parent] = gzfile;
+    }
+    Path *getGzFile(Path *dir) { if (gz_files_.count(dir) == 1) { return gz_files_[dir]; } else { return NULL; } }
+    std::vector<Path*> *tarfiles() { return &tars_; }
 
     const struct timespec *ts() { return &ts_; }
     uint64_t point() { return point_; }

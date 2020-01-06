@@ -713,8 +713,9 @@ if [ $do_test ]; then
     performStore
     rm $root/Alfa/gurka.c
     performStore
-   rm -f $store/Alfa/beak_s_*.tar
-    echo SVEJSAN > $store/Alfa/xyzzy
+    ALFA=$(echo $store/Alfa*)
+    rm -f $ALFA/beak_s_*.tar
+    echo SVEJSAN > $ALFA/xyzzy
     performFsck
     CHECK=$(cat $log | grep -o -E 'Broken|OK' | tr -d '\n' | tr -s ' ')
     if [ ! "$CHECK" = "BrokenBrokenOK" ]; then
@@ -1195,12 +1196,16 @@ if [ $do_test ]; then
     echo HEJSAN > $root/Gamma/Tau
     performStore
     if_test_fail_msg="Store untar test failed: "
-    untar "$store/Gamma"
+    GAMMA=$(basename $store/Gamma*)
+    echo FOOBURAK1 $GAMMA
+    echo FOOBURAK2 $store
+    untar "$store/$GAMMA"
+    echo OKOKOKOKKO
     checkdiff /Gamma
     checklsld_no_nanos /Gamma
     cleanCheck
     if_test_fail_msg="Store unstor test failed: "
-    subdir="/Gamma"
+    subdir="/$GAMMA"
     performReStore
     checkdiff /Gamma
     checklsld /Gamma

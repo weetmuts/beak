@@ -28,7 +28,7 @@
 struct IndexEntry {
     FileStat fs;
     size_t offset;
-    std::string tar;
+    std::string tarr;
     Path *path;
     std::string link;
     bool is_sym_link;
@@ -54,7 +54,8 @@ struct IndexEntry {
 };
 
 struct IndexTar {
-    Path *path;
+    Path *backup_location;
+    Path *tarfile_location;
     TarFileName from, to;
 };
 
@@ -63,6 +64,7 @@ struct Index {
                          std::vector<char>::iterator &i,
                          IndexEntry *tmpentry, IndexTar *tmptar,
                          Path *dir_to_prepend,
+                         Path *safedir_to_prepend,
                          size_t *size,
                          std::function<void(IndexEntry*)> on_entry,
                          std::function<void(IndexTar*)> on_tar);

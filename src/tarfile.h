@@ -54,6 +54,13 @@ enum class TarFilePaddingStyle : short
     Absolute  // Always pad to the target size -ta/--targetsize. Which by default is 10M.
 };
 
+enum class TarFilePathStyle : short
+{
+    Original,   // Reuse original path
+    PrefixHash, // Rewrite original path into safe prefix and append hash of original path.
+    HashOnly    // Use only the hash of the original path.
+};
+
 #define INDEX_FILE_CHAR 'z'
 #define DIR_TAR_CHAR 'y'
 #define SMALL_FILES_TAR_CHAR 's'
@@ -216,6 +223,11 @@ struct TarFile
     }
 
 private:
+
+    // A collection dir to be expanded into alfa/beta/gamma
+    // has its tarfiles stored into alfa_beta_gamma_CRC32
+    // or if its depth exceeds 250 chars then alfa_beta_gamma_HASH
+    Path *conc_path_ {};
 
     // A virtual tar can contain small files, medium files or a single large file.
     TarContents tar_contents_ = TarContents::SMALL_FILES_TAR;

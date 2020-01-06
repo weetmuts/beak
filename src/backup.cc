@@ -195,54 +195,94 @@ void Backup::findTarCollectionDirs() {
     }
 }
 
-void Backup::recurseAddDir(Path *path, TarEntry *direntry) {
-    if (direntry->isAddedToDir() || path->isRoot()) {
-        // Stop if the direntry is already added to a parent.
-        // Stop at the root.
+
+void Backup::recurseCalculateSafePath(TarEntry *tcd)
+{
+    // Already calculated.
+    if (tcd->safepath() != NULL) return;
+
+    if (tcd->path()->isRoot())
+    {
+        tcd->setSafePath(tcd->path());
         return;
     }
-    TarEntry *parent = directories[path->parent()];
-    assert(parent!=NULL);
-    if (!direntry->isAddedToDir()) {
-        parent->addDir(direntry);
-        direntry->setAsAddedToDir();
-        debug(BACKUP, "ADDED recursive dir %s to %s\n",
-              path->name()->c_str(), path->parent()->c_str());
-        recurseAddDir(path->parent(), parent);
+
+    TarEntry *parent_tcd = findParentTCD(tcd);
+    if (parent_tcd->safepath() == NULL)
+    {
+        recurseCalculateSafePath(parent_tcd);
+        assert(parent_tcd->safepath() != NULL);
     }
+
+    // Remove the parent tcd:s REAL path from the tcd:s REAL path.
+    Path *p = tcd->path()->subpath(parent_tcd->path()->depth());
+    // Translate this into a safe path.
+    Path *safe_path = makeSafePath(p, false, false);
+    // Now prepend the parents safe path, to this tcd:s safe path.
+    safe_path = safe_path->prepend(parent_tcd->safepath());
+    /*
+    fprintf(stderr, "PATH %s\n", tcd->path()->c_str());
+    fprintf(stderr, "PARE %s\n", parent_tcd->path()->c_str());
+    fprintf(stderr, "SAFE %s\n", safe_path->c_str());*/
+
+    tcd->setSafePath(safe_path);
 }
 
-void Backup::addDirsToDirectories() {
+TarEntry *Backup::findParentTCD(TarEntry *te)
+{
+    assert(!te->path()->isRoot());
+
+    Path *i = te->path()->parent();
+    assert(i != NULL);
+
+    for (;;)
+    {
+        assert(directories.count(i) > 0);
+        te = directories[i];
+
+        // Root is always a TCD.
+        if (i->isRoot()) return te;
+
+        // Found a TCD.
+        if (te->isStorageDir()) return te;
+
+        // Move closer to the root.
+        i = i->parent();
+    }
+    assert(0);
+}
+
+void Backup::addDirsToDirectories()
+{
     // Find all directories that are tar collection dirs
-    // and make sure they can be listed in all the parent
-    // directories down to the root. Even if those intermediate
-    // directories might not be tar collection dirs.
-    for(auto & e : files) {
-        Path *path = e.first;
-        TarEntry *te = &e.second;
-        if (!te->isDirectory() || path->isRoot() || !te->isStorageDir()) {
+    // and make sure they can be listed in a parent tar collection dir (tcd).
+    // The root is always a tar collection dir.
+    for(auto & e : files)
+    {
+        Path *tcd_path = e.first;
+        TarEntry *tcd_entry = &e.second;
+        if (!tcd_entry->isDirectory() || tcd_path->isRoot() ||
+            !tcd_entry->isStorageDir() || tcd_entry->isAddedToDir())
+        {
             // Ignore files
             // Ignore the root
             // Ignore directories that are not tar collection dirs.
+            // Ignore directories that have already been added.
             continue;
         }
-        TarEntry *parent = directories[path->parent()];
-        assert(parent!=NULL);
-        // Add the tar collection dir to its parent.
-        if (!te->isAddedToDir()) {
-            parent->addDir(te);
-            te->setAsAddedToDir();
-            debug(BACKUP,"ADDED dir >%s< to >%s\n",
-                  path->name()->c_str(), path->parent()->c_str());
 
-            // Now make sure the parent is linked to its parent all the way to the root.
-            // Despite these parents might not be tar collection dirs.
-            recurseAddDir(path->parent(), parent);
-        }
+        TarEntry *parent_tcd = findParentTCD(tcd_entry);
+
+        recurseCalculateSafePath(tcd_entry);
+
+        parent_tcd->addDir(tcd_entry->safepath());
+        directories[tcd_entry->safepath()] = tcd_entry;
+        tcd_entry->setAsAddedToDir();
     }
 }
 
-void Backup::addEntriesToTarCollectionDirs() {
+void Backup::addEntriesToTarCollectionDirs()
+{
     for(auto & e : files) {
         Path *path = e.first;
         TarEntry *dir = NULL;
@@ -558,7 +598,7 @@ size_t Backup::groupFilesIntoTars()
         {
             // The entries must be files inside the tar collection directory,
             // or subdirectories inside the tar collection subdirectory!
-            assert(entry->path()->depth() > te->path()->depth());
+            //assert(entry->path()->depth() > te->path()->depth());
 
             if (entry->isDirectory())
             {
@@ -697,6 +737,8 @@ size_t Backup::groupFilesIntoTars()
             gzfile_contents.append(to_string(x));
         }
         gzfile_contents.append("\n");
+        gzfile_contents.append("#delta");
+        gzfile_contents.append("\n");
         gzfile_contents.append("#files ");
         gzfile_contents.append(to_string(te->entries().size()));
         gzfile_contents.append(" ");
@@ -724,6 +766,7 @@ size_t Backup::groupFilesIntoTars()
             char filename[1024];
             TarFileName tfn(p.first, 0);
             Path *path = p.second != NULL ? p.second->path() : NULL;
+            Path *safepath = p.second != NULL ? p.second->safepath() : NULL;
             if (path) {
                 path = path->subpath(te->path()->depth());
             }
@@ -742,16 +785,17 @@ size_t Backup::groupFilesIntoTars()
             debug(BACKUP, "Added delta tarfile %s\n", "");
             gzfile_contents.append(separator_string);
 
-            tfn.writeTarFileNameIntoBuffer(filename, sizeof(filename), path);
-            debug(BACKUP, "Added tar filename %s\n", filename);
-            gzfile_contents.append(filename);
+            tfn.writeTarFileNameIntoBuffer(filename, sizeof(filename), safepath);
+            int drop_slash = (filename[0]=='/'?1:0);
+            debug(BACKUP, "Added tar filename %s\n", filename+drop_slash);
+            gzfile_contents.append(filename+drop_slash);
             if (p.first->numParts() > 1)
             {
                 TarFileName tfnn(p.first, p.first->numParts()-1);
-                tfnn.writeTarFileNameIntoBuffer(filename, sizeof(filename), path);
-                debug(BACKUP, "Appended last multipart tar filename %s\n", filename);
+                tfnn.writeTarFileNameIntoBuffer(filename, sizeof(filename), safepath);
+                debug(BACKUP, "Appended last multipart tar filename %s\n", filename+drop_slash);
                 gzfile_contents.append(" ... ");
-                gzfile_contents.append(filename);
+                gzfile_contents.append(filename+drop_slash);
             }
             gzfile_contents.append("\n");
             gzfile_contents.append(separator_string);
@@ -1027,7 +1071,7 @@ struct BackupFuseAPI : FuseAPI
         filler(buf, "..", NULL, 0);
         for (auto & e : te->dirs()) {
             char filename[256];
-            snprintf(filename, 256, "%s", e->path()->name()->c_str());
+            snprintf(filename, 256, "%s", e->name()->c_str());
             filler(buf, filename, NULL, 0);
         }
 
@@ -1287,24 +1331,34 @@ struct BeakFS : FileSystem
     {
         for (auto& e : forw_->tar_storage_directories)
         {
-            for (auto& tf : e.second->tars()) {
+            if (e.second->safepath() == NULL)
+            {
+                forw_->recurseCalculateSafePath(e.second);
+            }
+            for (auto& tf : e.second->tars())
+            {
                 char filename[256];
-                for (uint i=0; i < tf->numParts(); ++i) {
+                /*fprintf(stderr, "ORG  %s\n", e.second->path()->c_str());
+                  fprintf(stderr, "SAFE %s\n", e.second->safepath()->c_str());*/
+                for (uint i=0; i < tf->numParts(); ++i)
+                {
                     TarFileName tfn(tf, i);
                     tfn.writeTarFileNameIntoBuffer(filename, sizeof(filename), NULL);
-                    Path *fn = e.second->path()->appendName(Atom::lookup(filename));
+                    Path *fn = e.second->safepath()->appendName(Atom::lookup(filename));
                     FileStat stat;
                     stat.st_atim = *tf->mtim();
                     stat.st_mtim = *tf->mtim();
                     stat.st_size = tf->diskSize(i);
                     stat.st_mode = 0400;
                     stat.setAsRegularFile();
-                    if (stat.st_size > 0) {
+                    if (stat.st_size > 0)
+                    {
                         cb(fn, &stat);
                     }
                 }
             }
-            Path *dir = e.second->path(); //->prepend(settings->dst);
+
+            Path *dir = e.second->safepath(); //->prepend(settings->dst);
             FileStat stat;
             stat.st_mode = 0600;
             stat.setAsDirectory();

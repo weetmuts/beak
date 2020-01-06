@@ -979,3 +979,89 @@ size_t roundToThousandMultiple(size_t from)
     }
     return to;
 }
+
+string makeSafeDirectory(string &s)
+{
+    string r;
+    char buf[4];
+
+    for (unsigned char c : s)
+    {
+        if (c == '/')
+        {
+            r.append("_", 1);
+        }
+        else if (c == ' ')
+        {
+            r.append("~", 1);
+        }
+        // Avoid NTFS forbidden chars: * . " / \ [ ] : ; | ,
+        // So that a beak archive can be stored on Windows, even though
+        // It might have problems with being extracted exactly the same.
+        else if (c < 32 ||
+                 c == 127 ||
+                 c == '<' ||
+                 c == '>' ||
+                 c == ':' ||
+                 c == '"' ||
+                 c == '\\' ||
+                 c == '|' ||
+                 c == '?' ||
+                 c == '*')
+        {
+            memset(buf, 0, 4);
+            snprintf(buf, 4, "%%%02X", ((unsigned int) c) & 255);
+            r.append(buf);
+        }
+        else
+        {
+            // Hopefully nice and clean UTF8 gets stored here....
+            // But that really depends on what is stored in the file system.
+            r.append((char*)&c, 1);
+        }
+    }
+
+    return r;
+}
+
+Path *makeSafePath(Path *p, bool original, bool hash_only)
+{
+    if (original)
+    {
+        assert(!hash_only);
+        return p;
+    }
+
+    string org = p->str();
+    string safe = makeSafeDirectory(org);
+
+    // This number comes from storing rclone crypt archives on linux.
+    if (safe.length() <= 143)
+    {
+        return Path::lookup(safe);
+    }
+
+    // Ouch, the safe dir cannot be stored.
+    // Replace it with a hash prefixed with as much
+    // as will fit from the safe path.
+    string olen = to_string(org.length());
+
+    SHA256_CTX sha256ctx;
+    vector<char> sha256_hash;
+
+    SHA256_Init(&sha256ctx);
+    SHA256_Update(&sha256ctx, org.c_str(), org.length());
+    sha256_hash.resize(SHA256_DIGEST_LENGTH);
+    SHA256_Final((unsigned char*)&sha256_hash[0], &sha256ctx);
+    string hash = toHex(sha256_hash)+"L"+olen;
+
+    if (hash_only)
+    {
+        return Path::lookup(hash);
+    }
+
+    int len = 143-hash.length()-2;
+    string left = safe.substr(0, len); // Pick starting chars
+    string path = left+"_"+hash;
+    return Path::lookup(path);
+}

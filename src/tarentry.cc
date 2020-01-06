@@ -59,6 +59,7 @@ TarEntry::TarEntry(size_t size, TarHeaderStyle ths)
 {
     abspath_ = Path::lookupRoot();
     path_ = Path::lookupRoot();
+    safepath_ = NULL;
     tar_header_style_ = ths;
     memset(&fs_, 0, sizeof(fs_));
     fs_.st_size = size;
@@ -377,7 +378,8 @@ void TarEntry::addChildrenSize(size_t s)
     children_size_ += s;
 }
 
-void TarEntry::addDir(TarEntry *dir) {
+void TarEntry::addDir(Path *dir)
+{
     dirs_.push_back(dir);
 }
 
@@ -523,8 +525,9 @@ void cookEntry(string *listing, TarEntry *entry) {
     listing->append(separator_string);
 }
 
-bool eatEntry(int beak_version, vector<char> &v, vector<char>::iterator &i, Path *dir_to_prepend,
-              FileStat *fs, size_t *offset, string *tar, Path **path,
+bool eatEntry(int beak_version, vector<char> &v, vector<char>::iterator &i,
+              Path *dir_to_prepend, Path *safedir_to_prepend,
+              FileStat *fs, size_t *offset, string *tarr, Path **path,
               string *link, bool *is_sym_link, bool *is_hard_link,
               uint *num_parts, size_t *part_offset, size_t *part_size, size_t *last_part_size,
               size_t *disk_size, size_t *last_disk_size,
@@ -608,11 +611,11 @@ bool eatEntry(int beak_version, vector<char> &v, vector<char>::iterator &i, Path
     }
     string tarp = eatTo(v, i, separator, 1024, eof, err);
     if (*err || *eof) return false;
-    if (dir_to_prepend && tarp.length() > 0)
+    if (safedir_to_prepend && tarp.length() > 0)
     {
-        *tar = dir_to_prepend->str() + "/" + tarp;
+        *tarr = safedir_to_prepend->str() + "/" + tarp;
     } else {
-        *tar = tarp;
+        *tarr = tarp;
     }
 
     string off = eatTo(v, i, separator, 32, eof, err);

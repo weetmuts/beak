@@ -86,7 +86,8 @@ struct Backup
     RecurseOption addTarEntry(Path *abspath, FileStat *st);
     void findHardLinks();
     void findTarCollectionDirs();
-    void recurseAddDir(Path *path, TarEntry *direntry);
+    void recurseCalculateSafePath(TarEntry *tcd);
+    TarEntry *findParentTCD(TarEntry *te);
     void addDirsToDirectories();
     void addEntriesToTarCollectionDirs();
     void pruneDirectories();
