@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 #
-#    Copyright (C) 2016-2019 Fredrik Öhrström
+#    Copyright (C) 2016-2020 Fredrik Öhrström
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -22,15 +22,21 @@
 # You can run a single test: test.sh test6
 # You can run a single test using gdb: test.sh test6 gdb
 
-BEAK=$1
+DIR=$1
+BEAK=$2
 
-if [ "$BEAK" = "" ]; then
-    echo First argument must be the binary to test!
+if [ "$DIR" = "" ]; then
+    echo First argument must be the source directory of beak.
     exit 1
 fi
 
-test=$2
-gdb=$3
+if [ "$BEAK" = "" ]; then
+    echo Second argument must be the binary to test!
+    exit 1
+fi
+
+test=$3
+gdb=$4
 
 tmpdir=$(mktemp -d /tmp/beak_testXXXXXXXX)
 
@@ -66,12 +72,11 @@ beakfs=""
 # if_test_fail_msg: Message tuned to the failure of the test.
 if_test_fail_msg=""
 
-THIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 THIS_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 
 if [ "$1" == "list" ]; then
     grep '^setup ' $THIS_SCRIPT | grep -v grep | cut -f 2- -d ' '
-    exit
+    exit 0
 fi
 
 function setup {
@@ -323,15 +328,15 @@ function stopTwoFS {
 }
 
 function untar {
-    ($THIS_DIR/scripts/restore.sh x "$1" "$check")
+    ($DIR/scripts/restore.sh x "$1" "$check")
 }
 
 function pack {
-    (cd "$dir"; $THIS_DIR/scripts/pack.sh gzip "$mount" "$packed") >> "$log" 2>&1
+    (cd "$dir"; $DIR/scripts/pack.sh gzip "$mount" "$packed") >> "$log" 2>&1
 }
 
 function untarpacked {
-    $THIS_DIR/scripts/restore.sh x "$1" "$check"
+    $DIR/scripts/restore.sh x "$1" "$check"
 }
 
 function checkdiff {
@@ -339,7 +344,7 @@ function checkdiff {
     if [ $? -ne 0 ]; then
         echo "$if_test_fail_msg"
         echo Failed diff for $1! Check in $dir for more information.
-        exit
+        exit 1
     fi
 }
 
@@ -350,7 +355,7 @@ function checklsld {
     if [ $? -ne 0 ]; then
         echo "$if_test_fail_msg"
         echo Failed checklsld for $1! Check in $dir for more information.
-        exit
+        exit 1
     fi
 }
 
@@ -361,7 +366,7 @@ function checklsld_no_nanos {
     if [ $? -ne 0 ]; then
         echo "$if_test_fail_msg"
         echo Failed checklslsd_no_nanos for $1! Check in $dir for more information.
-        exit
+        exit 1
     fi
 }
 
@@ -383,7 +388,7 @@ function compareStoreAndMount {
     diff -rq $store $mount
     if [ $? -ne 0 ]; then
         echo Store and Mount generated different beak filesystems! Check in $dir for more information.
-        exit
+        exit 1
     fi
 }
 
@@ -504,13 +509,13 @@ if [ $do_test ]; then
     mkdir -p $root/BhlcuNTyTvLedMdLYqDeSySKkGCajOLG/JelKMOzorxaHRRYilhHCH/zGtUkDjJrpaYruHVsh
     echo Hejsan > $root/BhlcuNTyTvLedMdLYqDeSySKkGCajOLG/JelKMOzorxaHRRYilhHCH/zGtUkDjJrpaYruHVsh/zTeEgnbHEROQBZhnLzfkSOWkAu
     echo Hejsan > $root/BhlcuNTyTvLedMdLYqDeSySKkGCajOLG/JelKMOzorxaHRRYilhHCH/AijIwubbgq
-    performStore
+    performStore --tarheader=full
     standardStoreUntarTest
     cleanCheck
     standardStoreRestoreTest
     cleanCheck
     beakfs="$mount"
-    startMountTest standardTest
+    startMountTest standardTest --tarheader=full
     compareStoreAndMount
     stopMount
     echo OK
@@ -571,7 +576,7 @@ if [ $do_test ]; then
     CHECK=$(cat $diff)
     if [ ! "$CHECK" = "" ]; then
         echo Failed beak diff! Expected no change. Check in $dir for more information.
-        exit
+        exit 1
     fi
     echo SVEJSAN > $root/Alfa/Gamma/gurka.cc
     performDiff "-d 1"
@@ -580,7 +585,7 @@ if [ $do_test ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff! Expected one added. Check in $dir for more information.
-        exit
+        exit 1
     fi
     echo SVEJSAN > $root/Alfa/Gamma/banan.txt
     performDiff "-d 1"
@@ -589,7 +594,7 @@ if [ $do_test ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff! Expected one added and one changed. Check in $dir for more information.
-        exit
+        exit 1
     fi
     rm $root/Alfa/Beta/gurka.cc
     performDiff "-d 1"
@@ -598,7 +603,7 @@ if [ $do_test ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff! Expected one added, one removed and one changed. Check in $dir for more information.
-        exit
+        exit 1
     fi
     chmod a-w $root/Alfa/Gamma/toppen.h
     performDiff "-d 1"
@@ -607,7 +612,7 @@ if [ $do_test ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff! Expected one added, one removed, one changed and one permission. Check in $dir for more information.
-        exit
+        exit 1
     fi
     echo OK
 fi
@@ -623,7 +628,7 @@ if [ $do_test ]; then
     CHECK=$(cat $diff)
     if [ ! "$CHECK" = "" ]; then
         echo Failed beak diff! Expected no change. Check in $dir for more information.
-        exit
+        exit 1
     fi
     echo SVEJSAN > $root/Alfa/Gamma/banana.pdf
     performDiff "-d 1"
@@ -632,7 +637,7 @@ if [ $do_test ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff! Expected both ends of hardlink to change. Check in $dir for more information.
-        exit
+        exit 1
     fi
     performReStore
     (cd "$root"; cp -a $check/* .)
@@ -641,7 +646,7 @@ if [ $do_test ]; then
     if [ ! "$CHECK" = "" ]; then
         cat $diff
         echo Failed beak diff! Expected no change after restore. Check in $dir for more information.
-        exit
+        exit 1
     fi
     rm $root/Alfa/Gamma/banana.pdf
     echo SVEJSAN > $root/Alfa/Gamma/banana.pdf
@@ -651,7 +656,7 @@ if [ $do_test ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff! Expected only one file to change. Check in $dir for more information.
-        exit
+        exit 1
     fi
     performStore
     performDiffInsideBackup "-d 1"
@@ -660,7 +665,7 @@ if [ $do_test ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff inside backup! Expected only one file to change. Check in $dir for more information.
-        exit
+        exit 1
     fi
     echo OK
 fi
@@ -680,7 +685,7 @@ if [ $do_test ]; then
     CHECK=$(cat $diff)
     if [ ! "$CHECK" = "" ]; then
         echo Failed beak diff! Expected no change. Check in $dir for more information.
-        exit
+        exit 1
     fi
     echo SVEJSAN > $root/Alfa/Gamma/.git/content/sxkxkxkx
     performDiff "-d 1"
@@ -689,7 +694,7 @@ if [ $do_test ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff! Expected one added. Check in $dir for more information.
-        exit
+        exit 1
     fi
     rm -rf $root/Alfa/Gamma
     performDiff "-d 1"
@@ -698,7 +703,7 @@ if [ $do_test ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
         echo Failed beak diff! Expected Alfa/Gamma removed. Check in $dir for more information.
-        exit
+        exit 1
     fi
     echo OK
 fi
@@ -724,7 +729,7 @@ if [ $do_test ]; then
         echo ----------------
         echo "CHECK=\"$CHECK\""
         echo Failed beak fsck! Expected two broken and one ok. Check in $dir for more information.
-        exit
+        exit 1
     fi
     echo OK
 fi
@@ -746,14 +751,14 @@ if [ $do_test ]; then
         echo ------------------
         echo CHECK=\"${CHECK}\"
         echo Failed beak prune! Expected no pruning. Check in $dir for more information.
-        exit
+        exit 1
     fi
     performFsckExpectOK
     COUNTBEFORE=$(ls $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
     if [ ! "$COUNTBEFORE" = "2" ]
     then
         echo Oups! Expected there to be two points in time!
-        exit
+        exit 1
     fi
     performPrune "--yesprune -k 'all:1w'"
     CHECK=$(cat $log | tr -d '\n' | tr -s ' ' | grep -o "Backup is now pruned.")
@@ -763,7 +768,7 @@ if [ $do_test ]; then
         echo ------------------
         echo CHECK=\"${CHECK}\"
         echo Failed beak prune! Expected a single prune. Check in $dir for more information.
-        exit
+        exit 1
     fi
     performFsckExpectOK
     COUNTAFTER=$(ls $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
@@ -771,7 +776,7 @@ if [ $do_test ]; then
     then
         echo One point in time should have been pruned leaving 1!
         echo But there are $COUNTAFTER points in time now.
-        exit
+        exit 1
     fi
     echo OK
 fi
@@ -794,14 +799,14 @@ if [ $do_test ]; then
         echo ------------------
         echo CHECK=\"${CHECK}\"
         echo Failed beak prune! Expected no pruning. Check in $dir for more information.
-        exit
+        exit 1
     fi
     performFsckExpectOK
     COUNTBEFORE=$(ls $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
     if [ ! "$COUNTBEFORE" = "2" ]
     then
         echo Oups! Expected there to be two points in time in dir: $store
-        exit
+        exit 1
     fi
     performPrune "--yesprune -k 'all:1w'"
     CHECK=$(cat $log | tr -d '\n' | tr -s ' ' | grep -o "Backup is now pruned.")
@@ -811,7 +816,7 @@ if [ $do_test ]; then
         echo ------------------
         echo CHECK=\"${CHECK}\"
         echo Failed beak prune! Expected a single prune. Check in $dir for more information.
-        exit
+        exit 1
     fi
     performFsckExpectOK
     COUNTAFTER=$(ls $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
@@ -819,7 +824,7 @@ if [ $do_test ]; then
     then
         echo One point in time should have been pruned leaving 1!
         echo But there are $COUNTAFTER points in time now.
-        exit
+        exit 1
     fi
     echo OK
 fi
@@ -904,7 +909,7 @@ if [ $do_test ]; then
     if [ ! "$COUNTAFTER" = "22" ]
     then
         echo Oups! Expected there to be 15 points in time after prune, but found $COUNTAFTER
-        exit
+        exit 1
     fi
     performPrune "--yesprune -v --now='2019-03-20 11:01' -k 'weekly:2m'"
     CHECK0=$(cat $log | grep -o "Backup is now pruned.")
@@ -925,7 +930,7 @@ if [ $do_test ]; then
     if [ ! "$COUNTAFTER" = "4" ]
     then
         echo Oups! Expected there to be 4 points in time after prune, but found $COUNTAFTER
-        exit
+        exit 1
     fi
 
     performPrune "--yesprune -v --now='2019-03-20 11:02' -k 'daily:1w'"
@@ -947,7 +952,7 @@ if [ $do_test ]; then
     if [ ! "$COUNTAFTER" = "2" ]
     then
         echo Oups! Expected there to be 2 points in time after prune, but found $COUNTAFTER
-        exit
+        exit 1
     fi
 
     performPrune "--yesprune -v --now='2019-03-20 11:03' -k 'all:1d'"
@@ -969,7 +974,7 @@ if [ $do_test ]; then
     if [ ! "$COUNTAFTER" = "1" ]
     then
         echo Oups! Expected there to be 1 points in time after prune, but found $COUNTAFTER
-        exit
+        exit 1
     fi
 
     echo OK
@@ -1013,13 +1018,13 @@ if [ $do_test ]; then
     filename="${dir}/0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345.txt"
     mkdir -p "$dir"
     dd if=/dev/urandom of=$filename count=71 bs=1023 > /dev/null 2>&1
-    performStore "-ta 25K -ts 66K"
+    performStore "-ta 25K -ts 66K --tarheader=full"
     standardStoreUntarTest
     cleanCheck
     standardStoreRestoreTest
     cleanCheck
     beakfs="$mount"
-    startMountTest standardTest "-ta 25K -ts 66K"
+    startMountTest standardTest "-ta 25K -ts 66K --tarheader=full"
     compareStoreAndMount
     stopMount
     echo OK
@@ -1028,12 +1033,12 @@ fi
 setup splitmoreparts "Split larger file into multiple small parts"
 if [ $do_test ]; then
     dd if=/dev/urandom of=$root'/largefile' count=3271 bs=1023 > /dev/null 2>&1
-    performStore "-ta 100K -ts 213K"
+    performStore "-ta 100K -ts 213K --tarheader=full"
     standardStoreUntarTest
     cleanCheck
     standardStoreRestoreTest
     beakfs="$mount"
-    startMountTest standardTest "-ta 100K -ts 213K"
+    startMountTest standardTest "-ta 100K -ts 213K --tarheader=full"
     cleanCheck
     compareStoreAndMount
     stopMount
@@ -1043,13 +1048,13 @@ fi
 setup splitmanymoreparts "Split larger file into many many small parts"
 if [ $do_test ]; then
     dd if=/dev/urandom of=$root'/largefile' count=8192 bs=2048 > /dev/null 2>&1
-    performStore "-ta 15K -ts 37K"
+    performStore "-ta 15K -ts 37K --tarheader=full"
     standardStoreUntarTest
     cleanCheck
     standardStoreRestoreTest
     cleanCheck
     beakfs="$mount"
-    startMountTest standardTest "-ta 15K -ts 37K"
+    startMountTest standardTest "-ta 15K -ts 37K --tarheader=full"
     compareStoreAndMount
     stopMount
     echo OK
@@ -1058,7 +1063,7 @@ fi
 setup splitbasedoncontent "Split large file based on content"
 if [ $do_test ]; then
     dd if=/dev/urandom of=$root'/largefile.vdi' count=8192 bs=2048 > /dev/null 2>&1
-    performStore "-ta 40K -ts 100K --contentsplit '*.vdi'"
+    performStore "-ta 40K -ts 100K --contentsplit '*.vdi' --tarheader=full"
     standardStoreUntarTest
     echo OK
 fi
@@ -1067,13 +1072,13 @@ setup symlink "Symbolic link"
 if [ $do_test ]; then
     echo HEJSAN > $root/test
     ln -s $root/test $root/link
-    performStore
+    performStore  --tarheader=full
     standardStoreUntarTest
     cleanCheck
     standardStoreRestoreTest
     cleanCheck
     beakfs="$mount"
-    startMountTest standardTest
+    startMountTest standardTest --tarheader=full
     compareStoreAndMount
     stopMount
     echo OK
@@ -1084,13 +1089,13 @@ if [ $do_test ]; then
     tmp=$root/01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789
     echo HEJSAN > $tmp
     ln -s $tmp $root/link
-    performStore
+    performStore  --tarheader=full
     standardStoreUntarTest
     cleanCheck
     standardStoreRestoreTest
     cleanCheck
     beakfs="$mount"
-    startMountTest standardTest
+    startMountTest standardTest  --tarheader=full
     compareStoreAndMount
     stopMount
     echo OK
@@ -1106,13 +1111,13 @@ if [ $do_test ]; then
     ln $root/alfa/beta/test2 $root/linkdeep
     mkdir -p $root/gamma/epsilon
     ln $root/alfa/beta/test2 $root/gamma/epsilon/test3
-    performStore
+    performStore  --tarheader=full
     standardStoreUntarTest
     cleanCheck
     standardStoreRestoreTest
     cleanCheck
     beakfs="$mount"
-    startMountTest standardTest
+    startMountTest standardTest  --tarheader=full
     compareStoreAndMount
     stopMount
     echo OK
@@ -1124,13 +1129,13 @@ if [ $do_test ]; then
     echo HEJSAN > $root/Work/beak/3rdparty/openssl-1.0.2-winapi/.git/objects/pack/pack-21499a1067865c380bfb261287724242a1fe2e9c.idx
     mkdir -p $root/Work/beak/3rdparty/openssl-1.0.2-arm/.git/objects/pack
     ln $root/Work/beak/3rdparty/openssl-1.0.2-winapi/.git/objects/pack/pack-21499a1067865c380bfb261287724242a1fe2e9c.idx $root/Work/beak/3rdparty/openssl-1.0.2-arm/.git/objects/pack/pack-21499a1067865c380bfb261287724242a1fe2e9c.idx
-    performStore
+    performStore  --tarheader=full
     standardStoreUntarTest
     cleanCheck
     standardStoreRestoreTest
     cleanCheck
     beakfs="$mount"
-    startMountTest standardTest
+    startMountTest standardTest  --tarheader=full
     compareStoreAndMount
     stopMount
     echo OK
@@ -1140,19 +1145,19 @@ setup fifo "FIFO"
 if [ $do_test ]; then
     mkfifo $root/fifo1
     mkfifo $root/fifo2
-    performStore
+    performStore  --tarheader=full
     fifoStoreUntarTest
     cleanCheck
     fifoStoreUnStoreTest
     cleanCheck
-    startMountTest fifoTest
+    startMountTest fifoTest  --tarheader=full
 fi
 
 function filterCheck {
     F=$(cd $check; find . -printf "%p ")
     if [ "$F" != ". ./Beta ./Beta/delta " ]; then
         echo Failed filter test $1! Check in $dir for more information.
-        exit
+        exit 1
     fi
 }
 
@@ -1179,12 +1184,12 @@ if [ $do_test ]; then
     mkdir -p $root/Beta
     echo HEJSAN > $root/Beta/delta
     echo HEJSAN > $root/BetaDelta
-    performStore "-i 'Beta/**'"
+    performStore "-i 'Beta/**'  --tarheader=full"
     storeUntarFilterTest
     cleanCheck
     storeUnStoreFilterTest
     cleanCheck
-    startMountTest mountFilterTest "-i 'Beta/**'"
+    startMountTest mountFilterTest "-i 'Beta/**'  --tarheader=full"
 fi
 
 setup partial_extraction "Extract a subdirectory in the backup!"
@@ -1194,7 +1199,7 @@ if [ $do_test ]; then
     mkdir -p $root/Gamma
     echo HEJSAN > $root/Gamma/Delta
     echo HEJSAN > $root/Gamma/Tau
-    performStore
+    performStore  --tarheader=full
     if_test_fail_msg="Store untar test failed: "
     GAMMA=$(basename $store/Gamma*)
     untar "$store/$GAMMA"
@@ -1273,10 +1278,10 @@ if [ $do_test ]; then
 fi
 
 function devTest {
-    $THIS_DIR/scripts/integrity-test.sh -dd "$dir" -f "! -path '*shm*'" /dev "$beakfs"
+    $DIR/scripts/integrity-test.sh -dd "$dir" -f "! -path '*shm*'" /dev "$beakfs"
     if [ $? -ne 0 ]; then
         echo Failed integrity test for $1! Check in $dir for more information.
-        exit
+        exit 1
     fi
 }
 
@@ -1311,13 +1316,13 @@ if [ $do_test ]; then
     echo HEJSAN > $root/libtar/.gitignore
     touch -d "2 hours ago" $root/libtar/.git/config $root/libtar/.git/hooks $root/libtar/.gitignore $root/libtar/.git
 
-    performStore
+    performStore --tarheader=full
     standardStoreUntarTest
     cleanCheck
     standardStoreRestoreTest
     cleanCheck
     beakfs="$mount"
-    startMountTest standardTest
+    startMountTest standardTest --tarheader=full
     compareStoreAndMount
     stopMount
     echo OK
@@ -1340,7 +1345,7 @@ function mtimeTestPart2 {
         echo "****$rc****"
         echo Comparison should be empty since the nanoseconds do not show in ls -ld.
         echo Check in $dir for more information.
-        exit
+        exit 1
     fi
 
     cat $org  | egrep -o beak_z_[[:digit:]]+\.[[:digit:]]+ | sed 's/1234/1235/' > ${org}.2
@@ -1352,7 +1357,7 @@ function mtimeTestPart2 {
         echo Comparison should be empty since we adjusted the 1234 nanos to 12345
         echo and cut away the hashes that are expected to change.
         echo Check in $dir for more information.
-        exit
+        exit 1
     fi
     stopMount
 }
@@ -1383,7 +1388,7 @@ function timestampHashTest2 {
     if [ "$rc1" = "$rc2" ]; then
         echo "$rc1"
         echo Change in timestamp should change the virtual tar file name!
-        exit
+        exit 1
     fi
     rcc1=$(echo "$rc1" | sed 's/.*_1024_\(.*\)_0.tar/\1/')
     rcc2=$(echo "$rc2" | sed 's/.*_1024_\(.*\)_0.tar/\1/')
@@ -1391,7 +1396,7 @@ function timestampHashTest2 {
         echo The hashes should be different!
         echo **$rcc1** **$rcc2**
         echo Check in $dir for more information.
-        exit
+        exit 1
     fi
     stopMount
 }
@@ -1411,13 +1416,13 @@ if [ $do_test ]; then
     echo HEJSAN > "$root/alfa beta/gamma/delta"
     echo HEJSAN > "$root/alfa beta/gamma/del ta"
     echo HEJSAN > "$root/alfa beta/gam ma/del ta"
-    performStore
+    performStore --tarheader=full
     standardStoreUntarTest
     cleanCheck
     standardStoreRestoreTest
     cleanCheck
     beakfs="$mount"
-    startMountTest standardTest
+    startMountTest standardTest --tarheader=full
     compareStoreAndMount
     stopMount
     echo OK
@@ -1428,7 +1433,7 @@ function checkExtractFile {
     diff "$root/alfa beta/gamma/del ta" "$check/alfa beta/gamma/del ta"
     if [ "$?" != "0" ]; then
         echo Could not extract single file! Check in $dir for more information.
-        exit
+        exit 1
     fi
 }
 
@@ -1452,15 +1457,15 @@ function percentageTest {
     checklsld_no_nanos
     # This error can pop up because of accidental use of printf in perl code.
     # The percentage in the file name will become a printf command.
-    $THIS_DIR/scripts/integrity-test.sh -dd "$dir" "$root" "$mount"
+    $DIR/scripts/integrity-test.sh -dd "$dir" "$root" "$mount"
     if [ $? -ne 0 ]; then
         echo Failed percentage integrity test $1! Check in $dir for more information.
-        exit
+        exit 1
     fi
     if [[ $(find "$dir/test_root.txt" -type f -size +200c 2>/dev/null) ]] ||
        [[ $(find "$dir/test_mount.txt" -type f -size +200c 2>/dev/null) ]] ; then
         echo Percentage in filename was not handled properly! Check in $dir for more information.
-        exit
+        exit 1
     fi
 }
 
@@ -1490,7 +1495,7 @@ if [ $do_test ]; then
         dd if=/dev/zero of="$root/$i" bs=1024 count=10240 > /dev/null 2>&1
     done
     beakfs="$mount"
-    startMountTest standardTest
+    startMountTest standardTest --tarheader=full
     stopMount
     echo OK
 fi
@@ -1499,7 +1504,7 @@ function expectCaseConflict {
     if [ "$?" == "0" ]; then
         echo Expected beak to fail startup!
         stopMount
-        exit
+        exit 1
     fi
 }
 
@@ -1520,7 +1525,7 @@ if [ $do_test ]; then
     echo HEJSAN > $root/Alfa/a
     echo HEJSAN > $root/alfa/b
     beakfs="$mount"
-    startMountTest standardTest "-d 1 -ta 1G"
+    startMountTest standardTest "-d 1 -ta 1G --tarheader=full"
     stopMount
     echo OK
 fi
@@ -1529,7 +1534,7 @@ function expectLocaleFailure {
     if [ "$?" == "0" ]; then
         echo Expected beak to fail startup!
         stopMount nook
-        exit
+        exit 1
     fi
 }
 
@@ -1544,7 +1549,7 @@ fi
 function txTriggerTest {
     if [ ! -f $mount/Alfa/snapshot_2016-12-30/beak_z_*.gz ]; then
         echo Expected the snapshot dir to be tarred! Check in $dir for more information.
-        exit
+        exit 1
     fi
     untar "$mount"
     checkdiff
@@ -1558,7 +1563,7 @@ if [ $do_test ]; then
     mkdir -p $root/Alfa/snapshot_2016-12-30
     echo HEJSAN > $root/Alfa/a
     cp -a $root/Alfa/a $root/Alfa/snapshot_2016-12-30
-    startMountTest txTriggerTest "-tx 'snapshot*'"
+    startMountTest txTriggerTest "-tx 'snapshot*' --tarheader=full"
     echo OK
 fi
 
@@ -1606,17 +1611,17 @@ fi
 
 setup bulktest1 "Mount of generated bulk extract all default settings"
 if [ $do_test ]; then
-    ./scripts/generate_filesystem.sh $root 5 10
+    $DIR/scripts/generate_filesystem.sh $root 5 10
     beakfs="$mount"
-    startMountTest standardTest
+    startMountTest standardTest --tarheader=full
     stopMount
     echo OK
 fi
 
 setup bulktest2 "Mount of generated bulk, pack using xz, decompress and untar."
 if [ $do_test ]; then
-    ./scripts/generate_filesystem.sh $root 5 10
-    startMountTest standardPackedTest
+    $DIR/scripts/generate_filesystem.sh $root 5 10
+    startMountTest standardPackedTest --tarheader=full
     echo OK
 fi
 
@@ -1627,15 +1632,15 @@ function expectOneBigR01Tar {
     num=$(find $mount -name "beak_s_*.tar" | wc --lines)
     if [ "$num" != "1" ]; then
         echo Expected a single big beak_s_...tar! Check in $dir for more information.
-        exit
+        exit 1
     fi
     stopMount
 }
 
 setup bulktest3 "Mount of generated bulk -d 1 -ta 1G"
 if [ $do_test ]; then
-    ./scripts/generate_filesystem.sh $root 5 10
-    startMountTest expectOneBigR01Tar "-d 1 -ta 1G"
+    $DIR/scripts/generate_filesystem.sh $root 5 10
+    startMountTest expectOneBigR01Tar "-d 1 -ta 1G --tarheader=full"
     echo OK
 fi
 
@@ -1646,31 +1651,31 @@ function expect8R01Tar {
     num=$(find $mount -name "beak_s_*.tar" | wc --lines)
     if [ "$num" != "8" ]; then
         echo Expected 8 beak_s_...tar! Check in $dir for more information.
-        exit
+        exit 1
     fi
     stopMount
 }
 
 setup bulktest4 "Mount of generated bulk -d 1 -ta 1M -tr 1G"
 if [ $do_test ]; then
-    ./scripts/generate_filesystem.sh $root 5 10
-    startMountTest expect8R01Tar "-d 1 -ta 1M -tr 1G"
+    $DIR/scripts/generate_filesystem.sh $root 5 10
+    startMountTest expect8R01Tar "-d 1 -ta 1M -tr 1G --tarheader=full"
     echo OK
 fi
 
 function compareTwo {
-    rc=$($THIS_DIR/scripts/compare.sh --nodirs "$root" "$mountreverse")
+    rc=$($DIR/scripts/compare.sh --nodirs "$root" "$mountreverse")
     if [ "$rc" != "" ]; then
         echo xx"$rc"xx
         echo Unexpected diff after forward and then reverse!
-        exit
+        exit 1
     fi
     stopTwoFS
 }
 
 setup reverse1 "Forward mount of libtar, Reverse mount back!"
 if [ $do_test ]; then
-    ./scripts/generate_filesystem.sh $root 5 10
+    $DIR/scripts/generate_filesystem.sh $root 5 10
     startTwoFS compareTwo "" "@0"
     echo OK
 fi
@@ -1680,7 +1685,7 @@ function pointInTimeTestPart1 {
     chmod -R u+w "$packed"/*
     stopMount nook
     dd if=/dev/zero of="$root/s200" bs=1024 count=60 > /dev/null 2>&1
-    startMountTest pointInTimeTestPart2
+    startMountTest pointInTimeTestPart2 --tarheader=full
 }
 
 function pointInTimeTestPart2 {
@@ -1694,7 +1699,7 @@ function pointInTimeTestPart3 {
     if [ ! -f "$check/s200" ]; then
         echo Error s200 should be there since we mount the latest pointInTime.
         echo Check in $dir for more information.
-        exit
+        exit 1
     fi
     stopMountArchive
     startMountTestArchive pointInTimeTestPart4 "@1"
@@ -1704,14 +1709,14 @@ function pointInTimeTestPart4 {
     if [ -f "$check/s200" ]; then
         echo Error s200 should NOT be there since we mount the previous pointInTime.
         echo Check in $dir for more information.
-        exit
+        exit 1
     fi
     stopMountArchive
 }
 
 setup points_in_time "Test that pointInTimes work"
 if [ $do_test ]; then
-    ./scripts/generate_filesystem.sh $root 3
+    $DIR/scripts/generate_filesystem.sh $root 3
     startMountTest pointInTimeTestPart1
     echo OK
 fi

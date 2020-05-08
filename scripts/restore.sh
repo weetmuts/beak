@@ -294,7 +294,7 @@ do
 
         if [ -s ${dir}/beak_restore.tar ]
         then
-            CMD="tar ${cmd}f ${dir}/beak_restore.tar"
+            CMD="tar ${cmd}f ${dir}/beak_restore.tar --preserve-permissions"
             if [ "$verbose" == "true" ]; then echo CMD="$CMD"; fi
             eval $CMD > $dir/tmplist
             if [ "$?" != "0" ]; then
@@ -318,7 +318,7 @@ do
             echo "Single file"
         fi
         # Single part file.
-        CMD="tar ${cmd}f \"$file\" --warning=no-alone-zero-block"
+        CMD="tar ${cmd}f \"$file\" --warning=no-alone-zero-block --preserve-permissions"
         pushDir
         if [ "$verbose" = "true" ]; then echo CMD="$CMD"; fi
         eval $CMD > $dir/tmplist
@@ -414,7 +414,7 @@ POS=$(zcat < "$generation" | grep -ab "#end" | cut -f 1 -d ':')
 zcat < "$generation" | dd skip=$((POS + 72)) ibs=1 2> /dev/null > ${dir}/beak_restore.tar
 if [ -s ${dir}/beak_restore.tar ]
 then
-    CMD="tar ${cmd}f ${dir}/beak_restore.tar"
+    CMD="tar ${cmd}f ${dir}/beak_restore.tar --preserve-permissions"
     if [ "$verbose" == "true" ]; then echo CMD="$CMD"; fi
     pushDir
     eval $CMD > $dir/tmplist

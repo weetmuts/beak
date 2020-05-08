@@ -125,9 +125,44 @@ RC BeakImplementation::storeRuleLocallyThenRemotely(Rule *rule, Settings *settin
 
 RC BeakImplementation::storeRuleRemotely(Rule *rule, Settings *settings, Monitor *monitor)
 {
+    RC rc = RC::OK;
+
+    unique_ptr<ProgressStatistics> progress = monitor->newProgressStatistics(buildJobName("store", settings));
+
+    unique_ptr<Backup> backup  = newBackup(origin_tool_->fs());
+
+    // This command scans the origin file system and builds
+    // an in memory representation of the backup file system,
+    // with tar files,index files and directories.
+    progress->startDisplayOfProgress();
+    rc = backup->scanFileSystem(&settings->from, settings, progress.get());
+
     for (auto & p : rule->storages)
     {
         info(PUSH, "Pushing to: %s\n", p.second.storage_location->c_str());
+
+        settings->to.storage = &p.second;
+        // Now store the beak file system into the selected storage.
+        storage_tool_->storeBackupIntoStorage(backup.get(),
+                                          settings->to.storage,
+                                          settings,
+                                          progress.get());
+
+        if (progress->stats.num_files_stored == 0 && progress->stats.num_dirs_updated == 0) {
+            info(PUSH, "No stores needed, everything was up to date.\n");
+        }
+
+        uint64_t start = clockGetTimeMicroSeconds();
+        int unpleasant_modifications = backup->checkIfFilesHaveChanged();
+        uint64_t stop = clockGetTimeMicroSeconds();
+        uint64_t scan_time = stop - start;
+        if (scan_time > 2000000)
+        {
+            info(PUSH, "Time to rescan %jdms.\n", scan_time / 1000);
+        }
+        if (unpleasant_modifications > 0) {
+            warning(PUSH, "Warning! Origin directory modified while doing backup!\n");
+        }
     }
     return RC::OK;
 }
