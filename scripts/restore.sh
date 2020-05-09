@@ -397,7 +397,8 @@ EOF
 
             # Cut the file to partsize (no padding), otherwise tar will be unhappy.
             dd if="${root}/${tar_file}" of="${dir}/beak_part" bs=512 count=$((size / 512)) > /dev/null 2>&1
-            tar ${cmd}Mf "${dir}/beak_part" -F ${newvolumescript} > /dev/null 2>&1
+            # Invoke the tar command and or with true, to hide the silly failed return value from tar.
+            (tar ${cmd}Mf "${dir}/beak_part" -F ${newvolumescript} > /dev/null 2>&1) || true
             popDir
         else
             echo Broken multipart listing in index file, prefix not found.

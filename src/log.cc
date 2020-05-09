@@ -135,18 +135,26 @@ void setLogLevel(LogLevel l) {
     }
 }
 
-void addRemoveComponent_(const char *co, set<int> *components)
+void addRemoveComponent_(string co, set<int> *components)
 {
     // You can do --log=all,-systemio,-lock to reduce the amount of logging.
-    if (!strncmp(co, "all", 3)) {
+    assert(co.length() > 0);
+    if (co == "all")
+    {
         logAll(components);
-    } else {
-        if (co[0] == '-') {
-            int c = findComponent(co+1);
-            if (c == -1) error(0,"No such log component: \"%s\"\n", co+1);
+    }
+    else
+    {
+        if (co[0] == '-')
+        {
+            co = co.substr(1);
+            int c = findComponent(co.c_str());
+            if (c == -1) error(0,"No such log component: \"%s\"\n", co.c_str());
             components->erase(c);
-        } else {
-            int c = findComponent(co);
+        }
+        else
+        {
+            int c = findComponent(co.c_str());
             if (c == -1) error(0,"No such log component: \"%s\"\n", co);
             components->insert(c);
         }
@@ -161,11 +169,11 @@ void setLogOrTraceComponents_(const char *cs, set<int> *components)
     while (p < clist.length()) {
         pp = clist.find(',', p);
         if (pp == string::npos) {
-            const char *co = clist.substr(p).c_str();
+            string co = clist.substr(p);
             addRemoveComponent_(co, components);
             break;
         } else {
-            const char *co = clist.substr(p, pp-p).c_str();
+            string co = clist.substr(p, pp-p);
             addRemoveComponent_(co, components);
         }
         p = pp+1;

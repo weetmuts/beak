@@ -50,9 +50,13 @@ TarEntry::~TarEntry()
 {
     for (auto & tf : tars_)
     {
+        if (tf == taz_file_) taz_file_ = NULL;
+        if (tf == gz_file_) gz_file_ = NULL;
         if (tf != NULL) delete tf;
     }
     tars_.clear();
+    if (taz_file_) { delete taz_file_; }
+    if (gz_file_) { delete gz_file_; }
 }
 
 TarEntry::TarEntry(size_t size, TarHeaderStyle ths)

@@ -313,9 +313,9 @@ struct TarEntry
     bool is_tar_storage_dir_;
     std::vector<Path*> dirs_; // Directories to be listed inside this TarEntry
     std::vector<TarFile*> files_; // Files to be listed inside this TarEntry (ie the virtual tar files..)
-    TarFile *taz_file_;
+    TarFile *taz_file_ {};
     bool taz_file_in_use_ = false;
-    TarFile *gz_file_;
+    TarFile *gz_file_ {};
     bool gz_file_in_use_ = false;
     std::vector<TarFile*> tars_; // All tars including the taz.
     std::map<size_t, TarFile*> small_tars_;  // Small file tars in side this TarEntry
