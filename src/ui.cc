@@ -71,7 +71,7 @@ void UI::outputln(string msg)
 
 void UI::clearLine()
 {
-    if (logLevel() <= INFO) {
+    if (logLevel() == INFO) {
         output("\x1B[2K\r");
     }
 }
@@ -93,7 +93,7 @@ void UI::moveTopLeft()
 
 void UI::redrawLineOutput(const char *fmt, ...)
 {
-    if (logLevel() <= INFO) {
+    if (logLevel() == INFO) {
         // Move to top left corner: \x1B[1;1H
         //fprintf(stdout, "\x1B[s\x1B[1000D");
         fprintf(stdout, "\x1B[2K\r");
