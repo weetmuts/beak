@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2016-2018 Fredrik Öhrström
+    Copyright (C) 2016-2020 Fredrik Öhrström
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -555,7 +555,9 @@ void Backup::fixTarPaths() {
 
 size_t Backup::groupFilesIntoTars()
 {
-    size_t num = 0;
+    size_t num_virtual_tars = 0;
+    size_t count = 0;
+    size_t total = tar_storage_directories.size();
 
     for (auto & e : files)
     {
@@ -563,9 +565,17 @@ size_t Backup::groupFilesIntoTars()
         te->calculateHash();
     }
 
+
     for (auto & e : tar_storage_directories)
     {
         TarEntry *te = e.second;
+
+        if (count % 100 == 0)
+        {
+            UI::clearLine();
+            info(BACKUP, "Indexing %zu/%zu dirs.", count, total);
+        }
+        count++;
 
         debug(BACKUP, "TAR COLLECTION DIR >%s< >%s<\n", e.first->c_str(), te->path()->c_str());
 
@@ -654,7 +664,7 @@ size_t Backup::groupFilesIntoTars()
                 debug(BACKUP,"%s%s size became GURKA parts %zu\n", te->path()->c_str(), "NAMEHERE");
                 te->appendBeakFile(tf);
                 te->largeHashTars()[tf->hash()] = tf;
-                num += tf->numParts();
+                num_virtual_tars += tf->numParts();
             }
         }
         for (auto & t : te->mediumTars())
@@ -667,7 +677,7 @@ size_t Backup::groupFilesIntoTars()
                 debug(BACKUP,"%s%s size became\n", te->path()->c_str(), "NAMEHERE");
                 te->appendBeakFile(tf);
                 te->mediumHashTars()[tf->hash()] = tf;
-                num += tf->numParts();
+                num_virtual_tars += tf->numParts();
             }
         }
         for (auto & t : te->smallTars()) {
@@ -678,7 +688,7 @@ size_t Backup::groupFilesIntoTars()
                 debug(BACKUP,"%s%s size ecame GURKA\n", te->path()->c_str(), "NAMEHERE");
                 te->appendBeakFile(tf);
                 te->smallHashTars()[tf->hash()] = tf;
-                num += tf->numParts();
+                num_virtual_tars += tf->numParts();
             }
         }
 
@@ -871,9 +881,12 @@ size_t Backup::groupFilesIntoTars()
             }*/
         te->appendBeakFile(te->gzFile());
         te->enableGzFile();
-        num++; // Count the index file.
+        num_virtual_tars++; // Count the index file.
     }
-    return num;
+    UI::clearLine();
+    info(BACKUP, "Indexed %d dirs.\n", total);
+
+    return num_virtual_tars;
 }
 
 void Backup::sortTarCollectionEntries() {
@@ -1246,10 +1259,26 @@ RC Backup::scanFileSystem(Argument *origin, Settings *settings, ProgressStatisti
           tar_split_size);
 
     setConfig(config);
-    info(BACKUP, "Scanning %s\n", root_dir.c_str());
+    info(BACKUP, "Scanning %s ...", root_dir.c_str());
     uint64_t start = clockGetTimeMicroSeconds();
 
-    origin_fs_->recurse(root_dir_path, [this](Path *p, FileStat *st) { return this->addTarEntry(p, st); });
+    size_t sizes = 0;
+    int num = 0;
+    origin_fs_->recurse(root_dir_path, [this, &sizes, &num](Path *p, FileStat *st) {
+            sizes += st->st_size;
+            num++;
+            if (num % 1000 == 0)
+            {
+                UI::clearLine();
+                string s = humanReadable(sizes);
+                info(BACKUP, "Scanning %s %d files à %s.", root_dir.c_str(), num, s.c_str());
+            }
+            return this->addTarEntry(p, st);
+        });
+
+    UI::clearLine();
+    string s = humanReadable(sizes);
+    info(BACKUP, "Scanned %s %d files à %s.\n", root_dir.c_str(), num, s.c_str());
 
     if (found_future_dated_file_ && settings->relaxtimechecks == false) {
         usageError(BACKUP, "Cowardly refusing to backup file system with files from the future.\n"
@@ -1261,18 +1290,32 @@ RC Backup::scanFileSystem(Argument *origin, Settings *settings, ProgressStatisti
     start = stop;
 
     // Find hard links and mark them
+    UI::clearLine();
+    info(BACKUP, "Finding hardlinks...");
     findHardLinks();
     // Find suitable directories points where virtual tars will be created.
+    UI::clearLine();
+    info(BACKUP, "Finding suitable indexing points...");
     findTarCollectionDirs();
     // Remove all other directories that will be hidden inside tars.
+    UI::clearLine();
+    info(BACKUP, "Prune directories...");
     pruneDirectories();
     // Add remaining dirs as dir entries to their parent directories.
+    UI::clearLine();
+    info(BACKUP, "Create directory structure...");
     addDirsToDirectories();
     // Add content (files and directories) to the tar collection dirs.
+    UI::clearLine();
+    info(BACKUP, "Add entries to indexing points...");
     addEntriesToTarCollectionDirs();
     // Remove prefixes from hard links, and potentially move them up.
+    UI::clearLine();
+    info(BACKUP, "Fix hard links...");
     fixHardLinks();
     // Remove prefixes from paths and store the result in tarpath.
+    UI::clearLine();
+    info(BACKUP, "Fix tar paths...");
     fixTarPaths();
     // Group the entries into tar files.
     size_t num_tars = groupFilesIntoTars();
