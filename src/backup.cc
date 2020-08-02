@@ -573,7 +573,7 @@ size_t Backup::groupFilesIntoTars()
         if (count % 100 == 0)
         {
             UI::clearLine();
-            info(BACKUP, "Indexing %zu/%zu dirs.", count, total);
+            info(BACKUP, "Organizing files into %zu/%zu dirs.", count, total);
         }
         count++;
 
@@ -884,7 +884,6 @@ size_t Backup::groupFilesIntoTars()
         num_virtual_tars++; // Count the index file.
     }
     UI::clearLine();
-    info(BACKUP, "Indexed %d dirs.\n", total);
 
     return num_virtual_tars;
 }
@@ -1259,11 +1258,11 @@ RC Backup::scanFileSystem(Argument *origin, Settings *settings, ProgressStatisti
           tar_split_size);
 
     setConfig(config);
-    info(BACKUP, "Scanning %s ...", root_dir.c_str());
+    info(BACKUP, "Indexing %s ...", root_dir.c_str());
     uint64_t start = clockGetTimeMicroSeconds();
 
     size_t sizes = 0;
-    int num = 0;
+    int num = -1; // Do not count the root directory, which is not added.
     origin_fs_->recurse(root_dir_path, [this, &sizes, &num](Path *p, FileStat *st) {
             sizes += st->st_size;
             num++;
@@ -1271,14 +1270,14 @@ RC Backup::scanFileSystem(Argument *origin, Settings *settings, ProgressStatisti
             {
                 UI::clearLine();
                 string s = humanReadable(sizes);
-                info(BACKUP, "Scanning %s %d files à %s.", root_dir.c_str(), num, s.c_str());
+                info(BACKUP, "Indexing %s %d files à %s.", root_dir.c_str(), num, s.c_str());
             }
             return this->addTarEntry(p, st);
         });
 
     UI::clearLine();
     string s = humanReadable(sizes);
-    info(BACKUP, "Scanned %s %d files à %s.\n", root_dir.c_str(), num, s.c_str());
+    info(BACKUP, "Indexed %s %d files à %s.\n", root_dir.c_str(), num, s.c_str());
 
     if (found_future_dated_file_ && settings->relaxtimechecks == false) {
         usageError(BACKUP, "Cowardly refusing to backup file system with files from the future.\n"
@@ -1326,9 +1325,10 @@ RC Backup::scanFileSystem(Argument *origin, Settings *settings, ProgressStatisti
     uint64_t group_time = stop - start;
     string scant = humanReadableTimeTwoDecimals(scan_time);
     string groupt = humanReadableTimeTwoDecimals(group_time);
-    info(BACKUP, "Mounted %zu virtual tars with %zu entries (scan %jdms group %jdms)\n",
-            num_tars, files.size(),
-            scan_time / 1000, group_time / 1000);
+    info(BACKUP, "Organized files into %zu dirs with %zu virtual tars (scan %jdms group %jdms)\n",
+         tar_storage_directories.size(),
+         num_tars,
+         scan_time / 1000, group_time / 1000);
 
     return RC::OK;
 }
@@ -1336,15 +1336,25 @@ RC Backup::scanFileSystem(Argument *origin, Settings *settings, ProgressStatisti
 int Backup::checkIfFilesHaveChanged()
 {
     int count = 0;
+    int num = 0;
+    size_t total = files.size();
 
     for(auto & e : files)
     {
+        if (num % 1000 == 0)
+        {
+            UI::clearLine();
+            info(BACKUP, "Rescanning index files %d/%d.", num, total);
+        }
+        num++;
+
         TarEntry *te = &e.second;
         FileStat st;
         RC rc = origin_fs_->stat(te->abspath(), &st);
         if (rc.isErr())
         {
             count++;
+            UI::clearLine();
             warning(BACKUP, "File lost %s\n", te->abspath()->c_str());
         }
         else
@@ -1352,10 +1362,12 @@ int Backup::checkIfFilesHaveChanged()
             if (!te->stat()->equal(&st))
             {
                 count++;
+                UI::clearLine();
                 warning(BACKUP, "File changed %s\n", te->abspath()->c_str());
             }
         }
     }
+    UI::clearLine();
 
     return count;
 }

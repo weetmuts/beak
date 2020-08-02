@@ -67,7 +67,7 @@ RC BeakImplementation::store(Settings *settings, Monitor *monitor)
     uint64_t scan_time = stop - start;
     if (scan_time > 2000000)
     {
-        info(STORE, "Time to rescan %jdms.\n", scan_time / 1000);
+        info(STORE, "Rescanned indexed files. (%jdms)\n", scan_time / 1000);
     }
     if (unpleasant_modifications > 0) {
         warning(STORE, "Warning! Origin directory modified while doing backup!\n");

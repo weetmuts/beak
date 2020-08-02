@@ -95,7 +95,7 @@ RC BeakImplementation::storeRuleLocallyThenRemotely(Rule *rule, Settings *settin
     uint64_t scan_time = stop - start;
     if (scan_time > 2000000)
     {
-        info(PUSH, "Time to rescan %jdms.\n", scan_time / 1000);
+        info(PUSH, "Rescanned indexed files. (%jdms)\n", scan_time / 1000);
     }
     if (unpleasant_modifications > 0) {
         warning(PUSH, "Warning! Origin directory modified while doing local backup!\n");
@@ -158,7 +158,7 @@ RC BeakImplementation::storeRuleRemotely(Rule *rule, Settings *settings, Monitor
         uint64_t scan_time = stop - start;
         if (scan_time > 2000000)
         {
-            info(PUSH, "Time to rescan %jdms.\n", scan_time / 1000);
+            info(PUSH, "Rescanned indexed files. (%jdms)\n", scan_time / 1000);
         }
         if (unpleasant_modifications > 0) {
             warning(PUSH, "Warning! Origin directory modified while doing backup!\n");
