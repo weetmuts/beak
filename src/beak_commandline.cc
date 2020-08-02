@@ -366,6 +366,9 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
             case deepcheck_option:
                 settings->deepcheck = true;
                 break;
+            case delta_option:
+                settings->delta = true;
+                break;
             case depth_option:
                 settings->depth = atoi(value.c_str());
                 settings->depth_supplied = true;

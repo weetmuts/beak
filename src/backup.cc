@@ -87,6 +87,7 @@ RecurseOption Backup::addTarEntry(Path *abspath, FileStat *st)
         if (err == 0) {
             // Oups found .beak subdir! This directory and children
             // must be ignored!
+            UI::clearLine();
             info(BACKUP,"Skipping subbeak %s\n", abspath->c_str());
             return RecurseSkipSubTree;
         }

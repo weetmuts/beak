@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2016-2017 Fredrik Öhrström
+ Copyright (C) 2016-2020 Fredrik Öhrström
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -129,10 +129,12 @@ enum ArgumentType
     X(prune,CommandType::PRIMARY,"Discard old backups according to the keep rule.",ArgStorage,ArgNone) \
     X(pull,CommandType::PRIMARY,"Merge the most recent backup for the given rule.",ArgRule,ArgNone) \
     X(push,CommandType::PRIMARY,"Backup a rule to a storage location.",ArgRule,ArgNone) \
+    X(pushd,CommandType::PRIMARY,"Backup a rule to a storage location using delta compression.",ArgRule,ArgNone) \
     X(restore,CommandType::PRIMARY,"Restore from a backup into your file system.",ArgStorage,ArgOrigin) \
     X(shell,CommandType::PRIMARY,"Mount your backup(s) and spawn a shell. Exit the shell to unmount.",ArgStorageOrRule,ArgNone) \
     X(status,CommandType::PRIMARY,"Show the backup status of your configured rules.",ArgRuleOrNone,ArgNone) \
     X(store,CommandType::PRIMARY,"Store your file system into a backup.",ArgOrigin,ArgStorage) \
+    X(stored,CommandType::PRIMARY,"Store your file system into a backup using delta compression.",ArgOrigin,ArgStorage) \
     X(umount,CommandType::PRIMARY,"Unmount a virtual file system.",ArgDir,ArgNone) \
     X(version,CommandType::PRIMARY,"Show version.",ArgNone,ArgNone) \
     X(nosuch,CommandType::SECONDARY,"No such command.",ArgNone,ArgNone) \
@@ -147,7 +149,8 @@ LIST_OF_COMMANDS
     X(OptionType::LOCAL_PRIMARY,c,cache,std::string,true,"Directory to store cached files when mounting a remote storage.") \
     X(OptionType::LOCAL_PRIMARY,,contentsplit,std::vector<std::string>,true,"Split matching files based on content. E.g. --contentsplit='*.vdi'") \
     X(OptionType::LOCAL_PRIMARY,,deepcheck,bool,false,"Do deep checking of backup integrity.") \
-    X(OptionType::LOCAL_PRIMARY,d,depth,int,true,"Force all dirs at this depth to contain tars. 1 is the root, 2 is the first subdir. The default is 2.")    \
+    X(OptionType::LOCAL_PRIMARY,,delta,bool,true,"Use delta compression.")    \
+    X(OptionType::LOCAL_PRIMARY,,depth,int,true,"Force all dirs at this depth to contain tars. 1 is the root, 2 is the first subdir. The default is 2.")    \
     X(OptionType::LOCAL_PRIMARY,,dryrun,bool,false,"Print what would be done, do not actually perform the prune/store.") \
     X(OptionType::LOCAL_SECONDARY,f,foreground,bool,false,"When mounting do not spawn a daemon.")   \
     X(OptionType::LOCAL_SECONDARY,fd,fusedebug,bool,false,"Enable fuse debug mode, this also triggers foreground.") \
@@ -187,7 +190,7 @@ LIST_OF_OPTIONS
     X(config_cmd, (0) ) \
     X(diff_cmd, (1, depth_option) ) \
     X(fsck_cmd, (1, deepcheck_option) ) \
-    X(store_cmd, (14, background_option, contentsplit_option, depth_option, splitsize_option, targetsize_option, triggersize_option, triggerglob_option, exclude_option, include_option, padding_option, progress_option, relaxtimechecks_option, tarheader_option, yesorigin_option) ) \
+    X(store_cmd, (14, background_option, contentsplit_option, delta_option, depth_option, splitsize_option, targetsize_option, triggersize_option, triggerglob_option, exclude_option, include_option, padding_option, progress_option, relaxtimechecks_option, tarheader_option, yesorigin_option) ) \
     X(mount_cmd, (3, progress_option,foreground_option, fusedebug_option ) )  \
     X(prune_cmd, (3, keep_option, now_option, yesprune_option) ) \
     X(pull_cmd, (2, background_option, progress_option) ) \

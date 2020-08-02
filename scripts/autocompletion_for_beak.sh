@@ -86,10 +86,12 @@ _beak()
         prune) _beakstorages ;;
         pull) _beakrules ;;
         push) _beakrules ;;
+        pushd) _beakrules ;;
         restore) _beakstorages ;;
         shell) _beakstorages ;;
         status) _beakorigins ;;
         store) _beakstorages ;;
+        stored) _beakstorages ;;
         umount) _beakusermounts ;;
     esac
 
@@ -99,10 +101,11 @@ _beak()
         mount) _filedir -d ;;
         restore) _beakorigins ;;
         store) _beakstorages ;;
+        stored) _beakstorages ;;
     esac
 
     if [ -z "$COMPREPLY" ]; then
-        COMPREPLY=($(compgen -W "bmount config diff fsck genautocomplete genmounttrigger help prune mount pull push restore shell status store umount" -- $cur))
+        COMPREPLY=($(compgen -W "bmount config diff fsck genautocomplete genmounttrigger help prune mount pull push pushd restore shell status store stored umount" -- $cur))
     fi
 }
 

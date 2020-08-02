@@ -212,7 +212,8 @@ ssize_t FileSystemImplementationPosix::pread(Path *p, char *buf, size_t size, of
             // Give up permanently.
             return -1;
         }
-        warning(FILESYSTEM,"You are not the owner of \"%s\" so backing up causes its access time to be updated.\n", p->c_str());
+        UI::clearLine();
+        info(FILESYSTEM,"You are not the owner of \"%s\" so backing up causes its access time to be updated.\n", p->c_str());
     }
     ssize_t n = ::pread(fd, buf, size, offset);
     close(fd);

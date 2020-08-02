@@ -153,6 +153,11 @@ int run(int argc, char *argv[])
         rc = beak->push(&settings, monitor.get());
         break;
 
+    case pushd_cmd:
+        settings.delta = true;
+        rc = beak->push(&settings, monitor.get());
+        break;
+
     case pull_cmd:
         rc = beak->pull(&settings, monitor.get());
         break;
@@ -178,6 +183,11 @@ int run(int argc, char *argv[])
         break;
 
     case store_cmd:
+        rc = beak->store(&settings, monitor.get());
+        break;
+
+    case stored_cmd:
+        settings.delta = true;
         rc = beak->store(&settings, monitor.get());
         break;
 

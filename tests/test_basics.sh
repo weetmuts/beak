@@ -572,14 +572,14 @@ if [ $do_test ]; then
     echo HEJSAN > $root/Alfa/Gamma/banan.txt
     echo HEJSAN > $root/Alfa/Gamma/toppen.h
     performStore
-    performDiff "-d 1"
+    performDiff "--depth 1"
     CHECK=$(cat $diff)
     if [ ! "$CHECK" = "" ]; then
         echo Failed beak diff! Expected no change. Check in $dir for more information.
         exit 1
     fi
     echo SVEJSAN > $root/Alfa/Gamma/gurka.cc
-    performDiff "-d 1"
+    performDiff "--depth 1"
     CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
     if [ ! "$CHECK" = "Alfa/Gamma/ 1 source added (cc)" ]; then
         cat $diff
@@ -588,7 +588,7 @@ if [ $do_test ]; then
         exit 1
     fi
     echo SVEJSAN > $root/Alfa/Gamma/banan.txt
-    performDiff "-d 1"
+    performDiff "--depth 1"
     CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
     if [ ! "$CHECK" = "Alfa/Gamma/ 1 source added (cc) 1 document changed (txt)" ]; then
         cat $diff
@@ -597,7 +597,7 @@ if [ $do_test ]; then
         exit 1
     fi
     rm $root/Alfa/Beta/gurka.cc
-    performDiff "-d 1"
+    performDiff "--depth 1"
     CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
     if [ ! "$CHECK" = "Alfa/Beta/ 1 source removed (cc)Alfa/Gamma/ 1 source added (cc) 1 document changed (txt)" ]; then
         cat $diff
@@ -606,7 +606,7 @@ if [ $do_test ]; then
         exit 1
     fi
     chmod a-w $root/Alfa/Gamma/toppen.h
-    performDiff "-d 1"
+    performDiff "--depth 1"
     CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
     if [ ! "$CHECK" = "Alfa/Beta/ 1 source removed (cc)Alfa/Gamma/ 1 source permission changed (h) 1 source added (cc) 1 document changed (txt)" ]; then
         cat $diff
@@ -624,14 +624,14 @@ if [ $do_test ]; then
     echo HEJSAN > $root/Alfa/Beta/gurka.pdf
     ln $root/Alfa/Beta/gurka.pdf $root/Alfa/Gamma/banana.pdf
     performStore
-    performDiff "-d 1"
+    performDiff "--depth 1"
     CHECK=$(cat $diff)
     if [ ! "$CHECK" = "" ]; then
         echo Failed beak diff! Expected no change. Check in $dir for more information.
         exit 1
     fi
     echo SVEJSAN > $root/Alfa/Gamma/banana.pdf
-    performDiff "-d 1"
+    performDiff "--depth 1"
     CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
     if [ ! "$CHECK" = "Alfa/Beta/ 1 document changed (pdf)Alfa/Gamma/ 1 document changed (pdf)" ]; then
         cat $diff
@@ -641,7 +641,7 @@ if [ $do_test ]; then
     fi
     performReStore
     (cd "$root"; cp -a $check/* .)
-    performDiff "-d 1"
+    performDiff "--depth 1"
     CHECK=$(cat $diff)
     if [ ! "$CHECK" = "" ]; then
         cat $diff
@@ -650,7 +650,7 @@ if [ $do_test ]; then
     fi
     rm $root/Alfa/Gamma/banana.pdf
     echo SVEJSAN > $root/Alfa/Gamma/banana.pdf
-    performDiff "-d 1"
+    performDiff "--depth 1"
     CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
     if [ ! "$CHECK" = "Alfa/Gamma/ 1 document changed (pdf)" ]; then
         cat $diff
@@ -659,7 +659,7 @@ if [ $do_test ]; then
         exit 1
     fi
     performStore
-    performDiffInsideBackup "-d 1"
+    performDiffInsideBackup "--depth 1"
     CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
     if [ ! "$CHECK" = "Alfa/Gamma/ 1 document changed (pdf)" ]; then
         cat $diff
@@ -688,7 +688,7 @@ if [ $do_test ]; then
         exit 1
     fi
     echo SVEJSAN > $root/Alfa/Gamma/.git/content/sxkxkxkx
-    performDiff "-d 1"
+    performDiff "--depth 1"
     CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
     if [ ! "$CHECK" = "Alfa/Gamma/.git/... 1 other file added (...)" ]; then
         cat $diff
@@ -697,7 +697,7 @@ if [ $do_test ]; then
         exit 1
     fi
     rm -rf $root/Alfa/Gamma
-    performDiff "-d 1"
+    performDiff "--depth 1"
     CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
     if [ ! "$CHECK" = "Alfa/Gamma/... dir removed 3 sources removed (c,h,bas) 1 other file removed (...)" ]; then
         cat $diff
@@ -1332,7 +1332,7 @@ function mtimeTestPart1 {
     (cd $mount; find . -exec ls -ld \{\} \; > $org)
     stopMount
     touch -d "2015-03-03 03:03:03.1235" $root/beta/zz
-    startMountTest mtimeTestPart2 "-d 1"
+    startMountTest mtimeTestPart2 "--depth 1"
 }
 
 function mtimeTestPart2 {
@@ -1371,7 +1371,7 @@ if [ $do_test ]; then
     echo HEJSAN > $root/beta/zz
     echo HEJSAN > $root/beta/ww
     touch -d "2015-03-03 03:03:03.1234" $root/alfa/* $root/beta/* $root/alfa $root/beta $root
-    startMountTest mtimeTestPart1 "-d 1"
+    startMountTest mtimeTestPart1 "--depth 1"
     echo OK
 fi
 
@@ -1514,7 +1514,7 @@ if [ $do_test ]; then
     mkdir -p $root/alfa
     echo HEJSAN > $root/Alfa/a
     echo HEJSAN > $root/alfa/b
-    startMountTestExpectFail expectCaseConflict "-d 1 -ta 0"
+    startMountTestExpectFail expectCaseConflict "--depth 1 -ta 0"
     echo OK
 fi
 
@@ -1525,7 +1525,7 @@ if [ $do_test ]; then
     echo HEJSAN > $root/Alfa/a
     echo HEJSAN > $root/alfa/b
     beakfs="$mount"
-    startMountTest standardTest "-d 1 -ta 1G --tarheader=full"
+    startMountTest standardTest "--depth 1 -ta 1G --tarheader=full"
     stopMount
     echo OK
 fi
@@ -1542,7 +1542,7 @@ setup locale_C "Test that LC_ALL=C fails"
 if [ $do_test ]; then
     mkdir -p $root/Alfa
     echo HEJSAN > $root/Alfa/a
-    startMountTestExpectFail expectLocaleFailure "-d 1 -ta 0" LC_ALL=en_US.UTF-8
+    startMountTestExpectFail expectLocaleFailure "--depth 1 -ta 0" LC_ALL=en_US.UTF-8
     echo OK
 fi
 
@@ -1637,10 +1637,10 @@ function expectOneBigR01Tar {
     stopMount
 }
 
-setup bulktest3 "Mount of generated bulk -d 1 -ta 1G"
+setup bulktest3 "Mount of generated bulk --depth 1 -ta 1G"
 if [ $do_test ]; then
     $DIR/scripts/generate_filesystem.sh $root 5 10
-    startMountTest expectOneBigR01Tar "-d 1 -ta 1G --tarheader=full"
+    startMountTest expectOneBigR01Tar "--depth 1 -ta 1G --tarheader=full"
     echo OK
 fi
 
@@ -1656,10 +1656,10 @@ function expect8R01Tar {
     stopMount
 }
 
-setup bulktest4 "Mount of generated bulk -d 1 -ta 1M -tr 1G"
+setup bulktest4 "Mount of generated bulk --depth 1 -ta 1M -tr 1G"
 if [ $do_test ]; then
     $DIR/scripts/generate_filesystem.sh $root 5 10
-    startMountTest expect8R01Tar "-d 1 -ta 1M -tr 1G --tarheader=full"
+    startMountTest expect8R01Tar "--depth 1 -ta 1M -tr 1G --tarheader=full"
     echo OK
 fi
 

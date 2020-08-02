@@ -3,6 +3,11 @@
 
 #include<librsync.h>
 
+int gurkkkkkk()
+{
+    return 42;
+}
+
 /*
 #include <stdlib.h>
 #include <stdarg.h>
@@ -17,6 +22,17 @@ static int show_stats = 0;
 
 char *rs_hash_name;
 char *rs_rollsum_name;
+
+rs_result rs_sig_file(FILE *old_file, FILE *sig_file,
+                      size_t block_len, size_t strong_len, rs_stats_t *);
+
+rs_result rs_loadsig_file(FILE *, rs_signature_t **, rs_stats_t *);
+
+rs_result rs_file_copy_cb(void *arg, rs_long_t pos, size_t *len, void **buf);
+
+rs_result rs_delta_file(rs_signature_t *, FILE *new_file, FILE *delta_file, rs_stats_t *);
+
+rs_result rs_patch_file(FILE *basis_file, FILE *delta_file, FILE *new_file, rs_stats_t *);
 
 static rs_result rdiff_sig(poptContext opcon)
 {

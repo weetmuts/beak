@@ -423,6 +423,7 @@ or otherwise executing a beak command.
 
 ```
 beak store <origin> <storage>    beak restore <storage> <origin>
+beak stored <origin> <storage>
 
 beak shell {<rule>|<storage>}
 
@@ -431,6 +432,7 @@ beak mount <storage> <dir>       beak bmount <origin> <dir>
 beak fsck <storage>
 
 beak push <rule>                 beak pull <rule>
+beak pushd <rule>
 
 beak diff {<storage>|<origin>|<rule>} {<storage>|<origin>|<rule>}
 
