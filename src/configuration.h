@@ -67,6 +67,7 @@ struct Keep
     // Return true if a storage pruned with this keep rule is a subset of
     // the same storage pruned with the k rule.
     bool subsetOf(const Keep &k);
+
     bool equals(Keep& k) { return all==k.all && daily==k.daily && weekly==k.weekly && monthly==k.monthly; }
 };
 

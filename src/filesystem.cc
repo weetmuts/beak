@@ -68,6 +68,10 @@ struct FileSystemFuseAPIImplementation : FileSystem
     {
         return 0;
     }
+    FILE *openAsFILE(Path *f, const char *mode)
+    {
+        return NULL;
+    }
 
     FileSystemFuseAPIImplementation(FuseAPI *api);
     private:

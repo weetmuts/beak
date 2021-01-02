@@ -119,6 +119,7 @@ struct FileSystemImplementationWinapi : FileSystem
     RC enableWatch();
     RC addWatch(Path *dir);
     int endWatch();
+    FILE *openAsFILE(Path *p, const char *mode);
 
     FileSystemImplementationWinapi() : FileSystem("FileSystemImplementationWinapi") {}
 
@@ -489,4 +490,9 @@ RC  FileSystemImplementationWinapi::addWatch(Path *dir)
 int  FileSystemImplementationWinapi::endWatch()
 {
     return 0;
+}
+
+FILE *FileSystemImplementationWinapi::openAsFILE(Path *p, const char *mode)
+{
+    return fopen(p->c_str(), mode);
 }

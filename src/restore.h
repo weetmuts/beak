@@ -147,7 +147,7 @@ private:
 
 struct Restore
 {
-    RC loadBeakFileSystem(Argument *storage);
+    RC loadBeakFileSystem(Storage *storage);
 
     pthread_mutex_t global;
     pthread_mutexattr_t global_attr;
@@ -172,6 +172,7 @@ struct Restore
     std::vector<PointInTime> &historyOldToNew() { return history_old_to_new_; }
     PointInTime *findPointInTime(std::string s);
     PointInTime *setPointInTime(std::string g);
+    PointInTime *setPointInTime(uint64_t g);
 
     Restore(FileSystem *backup_fs);
 

@@ -168,6 +168,11 @@ bool StatOnlyFileSystem::readLink(Path *file, string *target)
     return false;
 }
 
+FILE *StatOnlyFileSystem::openAsFILE(Path *file, const char *mode)
+{
+    return NULL;
+}
+
 RC ReadOnlyCacheFileSystemBaseImplementation::stat(Path *p, FileStat *fs)
 {
     if (entries_.count(p) == 0) {

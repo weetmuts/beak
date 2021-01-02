@@ -335,6 +335,8 @@ struct FileSystem
     virtual RC addWatch(Path *dir) = 0;
     // Return number of modifications made during watch. Hopefully zero.
     virtual int endWatch() = 0;
+    // Return a FILE for interaction with librsync.
+    virtual FILE *openAsFILE(Path *f, const char *mode) = 0;
 
     virtual ~FileSystem() = default;
 

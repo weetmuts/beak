@@ -83,7 +83,8 @@ RC BeakImplementation::storeRuleLocallyThenRemotely(Rule *rule, Settings *settin
     storage_tool_->storeBackupIntoStorage(backup.get(),
                                           &rule->local,
                                           settings,
-                                          progress.get());
+                                          progress.get(),
+                                          monitor);
 
     if (progress->stats.num_files_stored == 0 && progress->stats.num_dirs_updated == 0) {
         info(PUSH, "No stores needed, local backup is up to date.\n");
@@ -146,7 +147,8 @@ RC BeakImplementation::storeRuleRemotely(Rule *rule, Settings *settings, Monitor
         storage_tool_->storeBackupIntoStorage(backup.get(),
                                           settings->to.storage,
                                           settings,
-                                          progress.get());
+                                              progress.get(),
+            monitor);
 
         if (progress->stats.num_files_stored == 0 && progress->stats.num_dirs_updated == 0) {
             info(PUSH, "No stores needed, everything was up to date.\n");

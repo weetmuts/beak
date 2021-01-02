@@ -1,69 +1,112 @@
+/*
+ Copyright (C) 2020 Fredrik Öhrström
 
-#include<stdio.h>
+ This program is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#include"always.h"
+#include"log.h"
+#include"rdiff.h"
+#include"util.h"
 
 #include<librsync.h>
-
-int gurkkkkkk()
-{
-    return 42;
-}
-
-/*
-#include <stdlib.h>
-#include <stdarg.h>
-#include <string.h>
-#include <popt.h>
-#include "librsync.h"
 
 static size_t block_len = RS_DEFAULT_BLOCK_LEN;
 static size_t strong_len = 0;
 
-static int show_stats = 0;
-
-char *rs_hash_name;
-char *rs_rollsum_name;
-
-rs_result rs_sig_file(FILE *old_file, FILE *sig_file,
-                      size_t block_len, size_t strong_len, rs_stats_t *);
-
-rs_result rs_loadsig_file(FILE *, rs_signature_t **, rs_stats_t *);
-
-rs_result rs_file_copy_cb(void *arg, rs_long_t pos, size_t *len, void **buf);
-
-rs_result rs_delta_file(rs_signature_t *, FILE *new_file, FILE *delta_file, rs_stats_t *);
-
-rs_result rs_patch_file(FILE *basis_file, FILE *delta_file, FILE *new_file, rs_stats_t *);
-
-static rs_result rdiff_sig(poptContext opcon)
+bool generateSignature(Path *old, FileSystem *old_fs,
+                       Path *sig, FileSystem *sig_fs)
 {
-    FILE *basis_file, *sig_file;
     rs_stats_t stats;
-    rs_result result;
-    rs_long_t sig_magic;
 
-    basis_file = rs_file_open(poptGetArg(opcon), "rb", file_force);
-    sig_file = rs_file_open(poptGetArg(opcon), "wb", file_force);
+    FILE *oldf = old_fs->openAsFILE(old, "rb");
+    FILE *sigf = sig_fs->openAsFILE(sig, "rwb");
+    rs_result rc = rs_sig_file(oldf, sigf, block_len, strong_len, &stats);
 
-    rdiff_no_more_args(opcon);
+    fclose(sigf);
+    fclose(oldf);
 
-    sig_magic = RS_BLAKE2_SIG_MAGIC;
-    sig_magic += 0x10;
+    if (rc != RS_DONE) return false;
 
-    result =
-        rs_sig_file(basis_file, sig_file, block_len, strong_len, sig_magic,
-                    &stats);
+    rs_log_stats(&stats);
 
-    rs_file_close(sig_file);
-    rs_file_close(basis_file);
-    if (result != RS_DONE)
-        return result;
-
-    if (show_stats)
-        rs_log_stats(&stats);
-
-    return result;
+    return true;
 }
 
+bool generateDelta(Path *sig, FileSystem *sig_fs,
+                   Path *target, FileSystem *target_fs,
+                   Path *delta, FileSystem *delta_fs)
+{
+    rs_stats_t stats;
+    rs_signature_t *sumset;
+
+    FILE *sigf = sig_fs->openAsFILE(sig, "rb");
+    FILE *targetf = target_fs->openAsFILE(target, "rb");
+    FILE *deltaf = delta_fs->openAsFILE(delta, "rb");
+
+    rs_result rc = rs_loadsig_file(sigf, &sumset, &stats);
+    if (rc != RS_DONE) goto err;
+
+    rs_log_stats(&stats);
+
+    rc = rs_build_hash_table(sumset);
+    if (rc != RS_DONE) goto err;
+
+    rc = rs_delta_file(sumset, targetf, deltaf, &stats);
+    if (rc != RS_DONE) goto err;
+
+    rs_log_stats(&stats);
+
+    fclose(deltaf);
+    fclose(targetf);
+    fclose(sigf);
+
+    return true;
+
+err:
+
+    fclose(deltaf);
+    fclose(targetf);
+    fclose(sigf);
+
+    return false;
+}
+
+bool applyPatch(Path *old, FileSystem *old_fs,
+                Path *delta, FileSystem *delta_fs,
+                Path *target, FileSystem *target_fs)
+{
+    rs_stats_t stats;
+
+    FILE *oldf = old_fs->openAsFILE(old, "rb");
+    FILE *deltaf = delta_fs->openAsFILE(delta, "rb");
+    FILE *targetf = target_fs->openAsFILE(target, "rwb");
+
+    rs_result rc = rs_patch_file(oldf, deltaf, targetf, &stats);
+
+    fclose(oldf);
+    fclose(deltaf);
+    fclose(targetf);
+
+    if (rc != RS_DONE) return false;
+
+    rs_log_stats(&stats);
+
+    return true;
+}
+
+/*
 static rs_result rdiff_delta(poptContext opcon)
 {
     FILE *sig_file, *new_file, *delta_file;
@@ -106,37 +149,6 @@ static rs_result rdiff_delta(poptContext opcon)
     }
 
     rs_free_sumset(sumset);
-
-    return result;
-}
-
-static rs_result rdiff_patch(poptContext opcon)
-{
-    FILE *basis_file, *delta_file, *new_file;
-    char const *basis_name;
-    rs_stats_t stats;
-    rs_result result;
-
-    if (!(basis_name = poptGetArg(opcon))) {
-        rdiff_usage("Usage for patch: "
-                    "rdiff [OPTIONS] patch BASIS [DELTA [NEW]]");
-        exit(RS_SYNTAX_ERROR);
-    }
-
-    basis_file = rs_file_open(basis_name, "rb", file_force);
-    delta_file = rs_file_open(poptGetArg(opcon), "rb", file_force);
-    new_file = rs_file_open(poptGetArg(opcon), "wb", file_force);
-
-    rdiff_no_more_args(opcon);
-
-    result = rs_patch_file(basis_file, delta_file, new_file, &stats);
-
-    rs_file_close(new_file);
-    rs_file_close(delta_file);
-    rs_file_close(basis_file);
-
-    if (show_stats)
-        rs_log_stats(&stats);
 
     return result;
 }

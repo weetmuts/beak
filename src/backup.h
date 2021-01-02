@@ -97,7 +97,9 @@ struct Backup
     void sortTarCollectionEntries();
     TarEntry *findNearestStorageDirectory(Path *a, Path *b);
 
-    TarFile *findTarFromPath(Path *path, uint *partnr);
+    // Lookup the tarfile structure from the path name eg beak_s_........tar
+    TarFile *findTarFromPath(Path *path_to_tarfile, uint *partnr);
+
     FileSystem *asFileSystem();
     FileSystem *originFileSystem() { return origin_fs_; }
     FuseAPI *asFuseAPI();

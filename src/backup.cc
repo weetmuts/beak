@@ -929,13 +929,13 @@ TarEntry *Backup::findNearestStorageDirectory(Path *a, Path *b) {
     return te;
 }
 
-TarFile *Backup::findTarFromPath(Path *path, uint *partnr)
+TarFile *Backup::findTarFromPath(Path *path_to_tarfile, uint *partnr)
 {
     bool ok;
-    string n = path->name()->str();
-    string d = path->parent()->name()->str();
+    string n = path_to_tarfile->name()->str();
+    string d = path_to_tarfile->parent()->name()->str();
 
-    TarEntry *te = directories[path->parent()];
+    TarEntry *te = directories[path_to_tarfile->parent()];
     if (!te)
     {
         debug(BACKUP,"Not a directory >%s<\n",d.c_str());
@@ -1516,7 +1516,10 @@ struct BeakFS : FileSystem
     {
         return 0;
     }
-
+    FILE *openAsFILE(Path *f, const char *mode)
+    {
+        return NULL;
+    }
     BeakFS(Backup *forw) : FileSystem("BeakFS"), forw_(forw) { }
 };
 

@@ -215,7 +215,7 @@ unique_ptr<Restore> BeakImplementation::accessBackup_(Argument *storage,
         }
     }
 
-    rc = restore->loadBeakFileSystem(storage);
+    rc = restore->loadBeakFileSystem(storage->storage);
     if (rc.isErr()) {
         error(COMMANDLINE, "Could not load beak file system.\n");
         return NULL;

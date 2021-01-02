@@ -170,6 +170,7 @@ struct TarFile
     ~TarFile();
 
     TarContents type() { return tar_contents_; }
+    std::map<size_t, TarEntry*> &contents() { return contents_; }
     size_t contentSize() { return content_size_; }
     size_t partContentSize(uint partnr);
     size_t diskSize(uint partnr);

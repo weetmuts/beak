@@ -210,6 +210,10 @@ struct RestoreFileSystem : FileSystem
         return 0;
     }
 
+    FILE *openAsFILE(Path *f, const char *mode)
+    {
+        return NULL;
+    }
     RestoreFileSystem(Restore *rev) : FileSystem("RestoreFileSystem"), rev_(rev) { }
 };
 
@@ -866,9 +870,22 @@ PointInTime *Restore::setPointInTime(string g) {
     return single_point_in_time_;
 }
 
-RC Restore::loadBeakFileSystem(Argument *storage)
+PointInTime *Restore::setPointInTime(uint64_t point)
 {
-    setRootDir(storage->storage->storage_location);
+    for (auto &p : history_old_to_new_)
+    {
+        if (p.point() == point)
+        {
+            single_point_in_time_ = &p;
+            return single_point_in_time_;
+        }
+    }
+    return NULL;
+}
+
+RC Restore::loadBeakFileSystem(Storage *storage)
+{
+    setRootDir(storage->storage_location);
 
     for (auto &point : historyOldToNew())
     {

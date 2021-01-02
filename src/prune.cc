@@ -31,6 +31,7 @@ struct PruneImplementation : public Prune
 public:
     void addPointInTime(uint64_t p);
     void prune(std::map<uint64_t,bool> *result);
+    uint64_t mostRecentWeeklyBackup();
 
     PruneImplementation(uint64_t now, const Keep &keep) { now_ = now; keep_ = keep; }
 private:
@@ -165,6 +166,17 @@ void PruneImplementation::addPointInTime(uint64_t p)
 const char* weekday_names[] = { "mon", "tue", "wed", "thu", "fri", "sat", "sun" };
 const char* month_names[] = { "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec" };
 
+uint64_t PruneImplementation::mostRecentWeeklyBackup()
+{
+    uint64_t w = 0;
+    for (auto& e : weekly_max_) {
+        w = e.second;
+    }
+
+    if (w == 0) return latest_;
+    return w;
+}
+
 void PruneImplementation::prune(std::map<uint64_t,bool> *result)
 {
     points_[latest_] = true;
@@ -173,7 +185,7 @@ void PruneImplementation::prune(std::map<uint64_t,bool> *result)
     for (auto& e : weekly_max_) { points_[e.second] = true; }
     for (auto& e : monthly_max_) { points_[e.second] = true; }
 
-    // Print the pruning descisions...
+    // Print the pruning decisions...
     verbose(PRUNE, "Action     Date       Time      Daynr  Weeknr     Monthnr\n");
     for (auto& e : points_)
     {

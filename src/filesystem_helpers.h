@@ -69,6 +69,7 @@ StatOnlyFileSystem(System *sys, std::map<Path*,FileStat> &contents) : ReadOnlyFi
     RC stat(Path *p, FileStat *fs);
     RC loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
     bool readLink(Path *file, std::string *target);
+    FILE *openAsFILE(Path *f, const char *mode);
 
     protected:
 

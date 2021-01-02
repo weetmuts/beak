@@ -22,6 +22,7 @@
 #include "backup.h"
 #include "beak.h"
 #include "configuration.h"
+#include "delta.h"
 #include "restore.h"
 #include "tarfile.h"
 #include "monitor.h"
@@ -35,7 +36,8 @@ struct StorageTool
     virtual RC storeBackupIntoStorage(Backup *backup,
                                       Storage *storage,
                                       Settings *settings,
-                                      ProgressStatistics *progress) = 0;
+                                      ProgressStatistics *progress,
+                                      Monitor *monitor) = 0;
 
     virtual RC copyBackupIntoStorage(Backup *backup,
                                      Path *backup_dir,
@@ -43,10 +45,6 @@ struct StorageTool
                                      Storage *storage,
                                      Settings *settings,
                                      ProgressStatistics *progress) = 0;
-
-    virtual RC listPointsInTime(Storage *storage,
-                                std::vector<std::pair<Path*,struct timespec>> *v,
-                                ProgressStatistics *progress) = 0;
 
     virtual FileSystem *asCachedReadOnlyFS(Storage *storage,
                                            Monitor *monitor) = 0;

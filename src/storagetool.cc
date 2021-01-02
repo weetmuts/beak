@@ -21,6 +21,7 @@
 #include "filesystem_helpers.h"
 #include "log.h"
 #include "monitor.h"
+#include "prune.h"
 #include "system.h"
 #include "storage_rclone.h"
 #include "storage_rsync.h"
@@ -30,6 +31,7 @@
 
 static ComponentId STORAGETOOL = registerLogComponent("storagetool");
 static ComponentId CACHE = registerLogComponent("cache");
+static ComponentId DELTA = registerLogComponent("delta");
 
 using namespace std;
 
@@ -40,7 +42,8 @@ struct StorageToolImplementation : public StorageTool
     RC storeBackupIntoStorage(Backup *backup,
                               Storage *storage,
                               Settings *settings,
-                              ProgressStatistics *progress);
+                              ProgressStatistics *progress,
+                              Monitor *monitor);
 
     RC copyBackupIntoStorage(Backup *backup,
                              Path *backup_dir,
@@ -48,9 +51,6 @@ struct StorageToolImplementation : public StorageTool
                              Storage *storage,
                              Settings *settings,
                              ProgressStatistics *progress);
-
-    RC listPointsInTime(Storage *storage, vector<pair<Path*,struct timespec>> *v,
-                        ProgressStatistics *progress);
 
     RC removeBackupFiles(Storage *storage,
                          std::vector<Path*>& files,
@@ -220,7 +220,8 @@ void copy_local_backup_file(Path *relpath,
 RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backupp,
                                                      Storage *storage,
                                                      Settings *settings,
-                                                     ProgressStatistics *progress)
+                                                     ProgressStatistics *progress,
+                                                     Monitor *monitor)
 {
     // The backup archive files (.tar .gz) are found here.
     FileSystem *backup_fs = backupp->asFileSystem();
@@ -229,10 +230,12 @@ RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backupp,
     // Store the archive files here.
     FileSystem *storage_fs = NULL;
     // This is the list of files to be sent to the storage.
-    vector<Path*> files_to_backup;
+    vector<Path*> beak_files_to_backup;
 
     map<Path*,FileStat> contents;
+    // Read only file system to list the beak files in the storage.
     unique_ptr<FileSystem> fs;
+
     if (storage->type == FileSystemStorage)
     {
         storage_fs = local_fs_;
@@ -262,13 +265,102 @@ RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backupp,
         fs = newStatOnlyFileSystem(sys_, contents);
         storage_fs = fs.get();
     }
-    backup_fs->recurse(Path::lookupRoot(), [=,&files_to_backup]
+    backup_fs->recurse(Path::lookupRoot(), [=,&beak_files_to_backup]
                        (Path *path, FileStat *stat) {
-                           add_backup_work(progress, &files_to_backup, path, stat,
+                           add_backup_work(progress, &beak_files_to_backup, path, stat,
                                            settings->to.storage->storage_location,
                                            storage_fs);
                            return RecurseContinue;
                        });
+
+    if (settings->delta)
+    {
+        vector<pair<Path*,struct timespec>> points;
+
+        FileSystem *storage_fs = local_fs_;
+        if (storage->type == RCloneStorage ||
+            storage->type == RSyncStorage)
+        {
+            storage_fs = asCachedReadOnlyFS(storage, monitor);
+        }
+        unique_ptr<Restore> restore  = newRestore(storage_fs);
+
+        RC rc = restore->lookForPointsInTime(PointInTimeFormat::absolute_point,
+                                             storage->storage_location);
+
+        if (rc.isOk())
+        {
+            auto prune = newPrune(clockGetUnixTimeNanoSeconds(), storage->keep);
+            for (auto &i : restore->historyOldToNew())
+            {
+                prune->addPointInTime(i.point());
+            }
+            map<uint64_t,bool> keeps;
+            prune->prune(&keeps);
+
+            uint64_t weekly_backup = prune->mostRecentWeeklyBackup();
+            string s = timeToString(weekly_backup);
+
+            fprintf(stderr, "FOO %s\n", s.c_str());
+
+            auto point = restore->setPointInTime(weekly_backup);
+            assert(point != NULL);
+
+            rc = restore->loadBeakFileSystem(storage);
+            if (rc.isOk())
+            {
+                debug(DELTA, "mounted storage filesystem to find suitable old archive files.\n");
+
+                // We want to create delta files using librsync.
+                for (Path * f : beak_files_to_backup)
+                {
+                    uint partnr;
+                    TarFile *tarr = backupp->findTarFromPath(f, &partnr);
+                    assert(tarr);
+
+                    debug(DELTA, "looking for best diff source for %s\n", f->c_str());
+                    map<RestoreEntry*,size_t> alternatives;
+                    for (auto &p : tarr->contents())
+                    {
+                        Path *pp = p.second->path();
+                        Path *ppp = pp->subpath(1);
+                        if (ppp != NULL)
+                        {
+                            RestoreEntry *e = restore->findEntry(point, ppp);
+                            if (e && e->tarr)
+                            {
+                                debug(DELTA, "found possible old beak file %s\n", e->tarr->c_str());
+                                alternatives[e] += tarr->contentSize(); // TODO handle parts
+                            }
+                            else
+                            {
+                                debug(DELTA, "no suitable beak file found (new file?) for \"%s\"\n", ppp->c_str());
+                            }
+                        }
+                    }
+                    // Now find the best match:
+                    size_t max = 0;
+                    RestoreEntry *best = NULL;
+                    for (auto &p : alternatives)
+                    {
+                        if (p.second > max)
+                        {
+                            max = p.second;
+                            best = p.first;
+                        }
+                    }
+                    if (best != NULL)
+                    {
+                        debug(DELTA, "found best match %zu %s\n", max, best->tarr->c_str());
+
+
+                    }
+                }
+        //beak_files_to_backup
+        //storage_fs
+            }
+        }
+    }
 
     debug(STORAGETOOL, "work to be done: num_files=%ju num_dirs=%ju\n", progress->stats.num_files, progress->stats.num_dirs);
 
@@ -301,13 +393,13 @@ RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backupp,
         RC rc = RC::OK;
         if (storage->type == RCloneStorage) {
             rc = rcloneSendFiles(storage,
-                                 &files_to_backup,
+                                 &beak_files_to_backup,
                                  mount,
                                  local_fs_,
                                  sys_, progress);
         } else {
             rc = rsyncSendFiles(storage,
-                                &files_to_backup,
+                                &beak_files_to_backup,
                                 mount,
                                 local_fs_,
                                 sys_, progress);
@@ -345,7 +437,7 @@ RC StorageToolImplementation::copyBackupIntoStorage(Backup  *backupp,
     // Store the archive files here.
     FileSystem *storage_fs = NULL;
     // This is the list of files to be sent to the storage.
-    vector<Path*> files_to_backup;
+    vector<Path*> beak_files_to_backup;
 
     map<Path*,FileStat> contents;
     unique_ptr<FileSystem> fs;
@@ -378,10 +470,10 @@ RC StorageToolImplementation::copyBackupIntoStorage(Backup  *backupp,
         fs = newStatOnlyFileSystem(sys_, contents);
         storage_fs = fs.get();
     }
-    backup_fs->recurse(backup_dir, [=,&files_to_backup]
+    backup_fs->recurse(backup_dir, [=,&beak_files_to_backup]
                        (Path *path, FileStat *stat) {
                            Path *pp = path->subpath(backup_dir->depth());
-                           add_backup_work(progress, &files_to_backup, pp, stat,
+                           add_backup_work(progress, &beak_files_to_backup, pp, stat,
                                            storage->storage_location, storage_fs);
                            return RecurseContinue;
                        });
@@ -412,13 +504,13 @@ RC StorageToolImplementation::copyBackupIntoStorage(Backup  *backupp,
         RC rc = RC::OK;
         if (storage->type == RCloneStorage) {
             rc = rcloneSendFiles(storage,
-                                 &files_to_backup,
+                                 &beak_files_to_backup,
                                  backup_dir,
                                  local_fs_,
                                  sys_, progress);
         } else {
             rc = rsyncSendFiles(storage,
-                                &files_to_backup,
+                                &beak_files_to_backup,
                                 backup_dir,
                                 local_fs_,
                                 sys_, progress);
@@ -434,30 +526,6 @@ RC StorageToolImplementation::copyBackupIntoStorage(Backup  *backupp,
     }
 
     progress->finishProgress();
-
-    return RC::OK;
-}
-
-
-RC StorageToolImplementation::listPointsInTime(Storage *storage, vector<pair<Path*,struct timespec>> *v,
-                                               ProgressStatistics *progress)
-{
-    switch (storage->type) {
-    case FileSystemStorage:
-    {
-        break;
-    }
-    case RSyncStorage:
-    {
-        break;
-    }
-    case RCloneStorage:
-    {
-        break;
-    }
-    case NoSuchStorage:
-        assert(0);
-    }
 
     return RC::OK;
 }
@@ -527,6 +595,7 @@ struct CacheFS : ReadOnlyCacheFileSystemBaseImplementation
     RC loadDirectoryStructure(std::map<Path*,CacheEntry> *entries);
     RC fetchFile(Path *file);
     RC fetchFiles(vector<Path*> *files);
+    FILE *openAsFILE(Path *f, const char *mode) { return NULL; }
 
 protected:
 

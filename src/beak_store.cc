@@ -55,7 +55,8 @@ RC BeakImplementation::store(Settings *settings, Monitor *monitor)
     storage_tool_->storeBackupIntoStorage(backup.get(),
                                           settings->to.storage,
                                           settings,
-                                          progress.get());
+                                          progress.get(),
+                                          monitor);
 
     if (progress->stats.num_files_stored == 0 && progress->stats.num_dirs_updated == 0) {
         info(STORE, "No stores needed, everything was up to date.\n");

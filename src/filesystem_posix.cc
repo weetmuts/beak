@@ -140,6 +140,7 @@ struct FileSystemImplementationPosix : FileSystem
     RC enableWatch();
     RC addWatch(Path *dir);
     int endWatch();
+    FILE *openAsFILE(Path *f, const char *mode);
 
     FileSystemImplementationPosix(System *sys) : FileSystem("FileSystemImplementationPosix"), sys_(sys)
     {
@@ -780,4 +781,9 @@ int FileSystemImplementationPosix::endWatch()
     return count;
     */
     return 0;
+}
+
+FILE *FileSystemImplementationPosix::openAsFILE(Path *p, const char *mode)
+{
+    return fopen(p->c_str(), mode);
 }
