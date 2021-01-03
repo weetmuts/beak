@@ -632,6 +632,10 @@ CXXFLAGS_debug
 CLANG
 ac_ct_CXX
 CXXFLAGS
+LIBAVFORMAT_LIBS
+LIBAVFORMAT_CFLAGS
+LIBEXIV2_LIBS
+LIBEXIV2_CFLAGS
 LIBRSYNC_LIBS
 LIBRSYNC_CFLAGS
 ZLIB_LIBS
@@ -722,6 +726,8 @@ with_fuse
 with_openssl
 with_zlib
 with_librsync
+with_libexiv2
+with_libavformat
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1375,6 +1381,12 @@ Optional Packages:
                           (expecting the libraries under PATH and the headers
                           under PATH)
   --with-librsync         specify prefix directory for the librsync package
+                          (expecting the libraries under PATH and the headers
+                          under PATH/src)
+  --with-exiv2            specify prefix directory for the exiv2 package
+                          (expecting the libraries under PATH and the headers
+                          under PATH/src)
+  --with-libavformat      specify prefix directory for the libavformat package
                           (expecting the libraries under PATH and the headers
                           under PATH/src)
 
@@ -4157,6 +4169,44 @@ else
 $as_echo "using ${with_librsync}" >&6; }
 fi
 
+
+
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for exiv2" >&5
+$as_echo_n "checking for exiv2... " >&6; }
+
+# Check whether --with-libexiv2 was given.
+if test "${with_libexiv2+set}" = set; then :
+  withval=$with_libexiv2;
+fi
+
+
+if test "x${with_libexiv2}" = "x"; then
+    LIBEXIV2_CFLAGS=""
+    LIBEXIV2_LIBS="-lexiv2"
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: found" >&5
+$as_echo "found" >&6; }
+fi
+
+
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for libavformat" >&5
+$as_echo_n "checking for libavformat... " >&6; }
+
+# Check whether --with-libavformat was given.
+if test "${with_libavformat+set}" = set; then :
+  withval=$with_libavformat;
+fi
+
+
+if test "x${with_libavformat}" = "x"; then
+    LIBAVFORMAT_CFLAGS=""
+    LIBAVFORMAT_LIBS="-lavutil -lavformat -lavcodec"
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: found" >&5
+$as_echo "found" >&6; }
+fi
 
 
 

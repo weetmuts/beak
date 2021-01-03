@@ -220,6 +220,34 @@ fi
 AC_SUBST(LIBRSYNC_CFLAGS)
 AC_SUBST(LIBRSYNC_LIBS)
 
+AC_MSG_CHECKING([for exiv2])
+AC_ARG_WITH(libexiv2, [AS_HELP_STRING([--with-exiv2],
+      [specify prefix directory for the exiv2 package
+      (expecting the libraries under PATH and the headers under PATH/src)])])
+
+if test "x${with_libexiv2}" = "x"; then
+    LIBEXIV2_CFLAGS=""
+    LIBEXIV2_LIBS="-lexiv2"
+    AC_MSG_RESULT([found])
+fi
+
+AC_SUBST(LIBEXIV2_CFLAGS)
+AC_SUBST(LIBEXIV2_LIBS)
+
+AC_MSG_CHECKING([for libavformat])
+AC_ARG_WITH(libavformat, [AS_HELP_STRING([--with-libavformat],
+      [specify prefix directory for the libavformat package
+      (expecting the libraries under PATH and the headers under PATH/src)])])
+
+if test "x${with_libavformat}" = "x"; then
+    LIBAVFORMAT_CFLAGS=""
+    LIBAVFORMAT_LIBS="-lavutil -lavformat -lavcodec"
+    AC_MSG_RESULT([found])
+fi
+
+AC_SUBST(LIBAVFORMAT_CFLAGS)
+AC_SUBST(LIBAVFORMAT_LIBS)
+
 AC_MSG_CHECKING(for sizeof time_t)
 AC_CHECK_SIZEOF([time_t])
 AC_CHECK_SIZEOF([size_t])

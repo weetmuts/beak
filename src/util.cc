@@ -912,6 +912,28 @@ RC parseDateTime(string dt, time_t *out)
     return RC::OK;
 }
 
+RC parseDateTimeUTCNanos(string dt, time_t *tv_sec, long *tv_nsec)
+{
+    struct tm tp {};
+    int nanos {};
+
+    // 2018-12-02T14:38:53.000000Z
+    int n = sscanf(dt.c_str(), "%d-%d-%dT%d:%d:%d.%d",
+                   &tp.tm_year, &tp.tm_mon, &tp.tm_mday,
+                   &tp.tm_hour, &tp.tm_min, &tp.tm_sec,
+                   &nanos);
+    if (n<6) {
+        return RC::ERR;
+    }
+    tp.tm_year -= 1900;
+    tp.tm_mon -= 1;
+
+    // Need to adjust for current timezone since input is UTC.
+    *tv_sec = mktime(&tp) - timezone;
+    *tv_nsec = nanos;
+    return RC::OK;
+}
+
 bool startsWith(std::string s, std::string prefix)
 {
     if (prefix.length() == 0) return true;
@@ -1064,4 +1086,20 @@ Path *makeSafePath(Path *p, bool original, bool hash_only)
     string left = safe.substr(0, len); // Pick starting chars
     string path = left+"_"+hash;
     return Path::lookup(path);
+}
+
+bool isDate(const char *y, const char *m, const char *d)
+{
+    assert(y != NULL);
+    assert(m != NULL);
+    assert(d != NULL);
+
+    int year = atoi(y);
+    int month = atoi(m);
+    int day = atoi(d);
+
+    if (year < 1900 || year > 2222) return false;
+    if (month < 1 || month > 12) return false;
+    if (day < 1 || day > 31) return false;
+    return true;
 }

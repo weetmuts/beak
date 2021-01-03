@@ -37,8 +37,8 @@ int main(int argc, char *argv[])
     try {
         return run(argc, argv);
     }
-    catch (...) {
-        fprintf(stderr, "beak: Internal error due to C++ exception.\n");
+    catch (std::exception &e) {
+        fprintf(stderr, "beak: Internal error due to C++ exception >%s<.\n", e.what());
         // The catch/print is necessary for winapi hosts, since
         // a thrown exception is not necessarily printed! The program
         // just silently terminates. If only we could print the stack trace here...
@@ -176,6 +176,10 @@ int run(int argc, char *argv[])
 
     case shell_cmd:
         rc = beak->shell(&settings, monitor.get());
+        break;
+
+    case slurp_cmd:
+        rc = beak->slurp(&settings, monitor.get());
         break;
 
     case status_cmd:

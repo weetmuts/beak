@@ -50,7 +50,8 @@ size_t roundoffHumanReadable(size_t s);
 RC parseHumanReadable(std::string s, size_t *out);
 std::string keepDigits(std::string &s);
 bool parseTimeZoneOffset(std::string o, time_t *out);
-RC parseDateTime(std::string dt, time_t *out);
+RC parseDateTime(std::string dt, time_t *tv_sec);
+RC parseDateTimeUTCNanos(std::string dt, time_t *tv_sec, long *tv_nsec);
 bool parseLengthOfTime(std::string s, time_t *out);
 std::string getLengthOfTime(time_t t);
 time_t getTimeZoneOffset();
@@ -120,5 +121,8 @@ bool hexDigitsOnly(char *buf, size_t len, std::string *s);
 bool startsWith(std::string s, std::string prefix);
 
 long upToNearestMicros(long nsec);
+
+// Check that y is four digits, m is two digits, 1-12, and d is 1-31 or -30 or -28 or -29.
+bool isDate(const char *y, const char *m, const char *d);
 
 #endif

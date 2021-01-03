@@ -133,15 +133,21 @@ struct Atom
 
     const char *ext_c_str_() { return ext_; }
 
+    bool hasExtension(const char *suffix)
+    {
+        return 0 == strcasecmp(suffix, ext_);
+    }
+
     private:
 
     Atom(std::string n) : literal_(n)
     {
         size_t p0 = n.rfind('.');
-        if (p0 == std::string::npos) { ext_ = ""; } else { ext_ = n.c_str()+p0+1; }
+        if (p0 == std::string::npos) { ext_ = ""; } else { ext_ = literal_.c_str()+p0+1; }
     }
     std::string literal_;
     const char *ext_;
+
 };
 
 struct Path
@@ -154,6 +160,13 @@ struct Path
     static Path *store(std::string p);
     static Path *commonPrefix(Path *a, Path *b);
 
+    bool endsWith(const char *suffix)
+    {
+        size_t suffix_len = strlen(suffix);
+        size_t str_len = path_cache_.length();
+        if(suffix_len > str_len) return false;
+        return 0 == strncmp(c_str()+str_len-suffix_len, suffix, suffix_len);
+    }
     Path *parent() { return parent_; }
     Atom *name() { return atom_; }
     Path *appendName(Atom *n);
