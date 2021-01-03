@@ -6,7 +6,8 @@ os:
 sudo: required
 dist: xenial
 before_install:
-  - sudo apt-get install -qq pkg-config fuse libfuse-dev librsync-dev
+  - sudo apt-get install -qq pkg-config fuse libfuse-dev librsync-dev libexiv2-dev libavformat-dev
+
   - sudo modprobe fuse
   - sudo chmod 666 /dev/fuse
   - sudo chown root:$USER /etc/fuse.conf
