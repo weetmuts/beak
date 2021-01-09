@@ -36,6 +36,15 @@ then I simply mount the remote cloud to access it. To have a proper
 backup of the large data, it is of course imperative to have it stored
 in multiple independent cloud locations.
 
+I also like to import my images and videos (from iphone,android,digital SLR)
+into a normalized structure:
+```
+2018/08/09/img_20180809_211634_1533842194.0_3730379.jpg
+2018/08/09/vid_20180809_222624_1534942194.0_50900889.mp4
+```
+This normalized structure will also contain thumbnails and html files
+which makes it easy to browse the content without a specific program.
+
 ## Short short manual
 
 Local filesystem backups:
@@ -245,6 +254,35 @@ As usual, you usually want to do:
 ```
 
 and let the configured _rule_ select how to prune in the different _storage locations_.
+
+`>beak prune s3_work_crypt:`
+
+The default _keep_ configuration is:
+```
+All points in time for the last 2 days.
+One point in time per day for the last 2 weeks.
+One point in time per week for the last 2 months.
+One point in time per month for the last 2 years.
+```
+
+## Finding media and storing them normalized.
+
+When you import media using for example: `(mkdir TempDir; cd TempDir; gphoto2 --get-all-files)`
+You get a lot of media files with names that are dependent on the camera that took them.
+To normalize the images and videos before you backup them, do:
+```
+beak importmedia TempDir /home/you/Media
+```
+
+Then you can do:
+```
+firefox /home/you/Media/index.html
+```
+
+And you can backup your media like this:
+```
+beak store /home/you/Media s3_crypt:/Media
+```
 
 ## BeakFS, the chunky file system
 
