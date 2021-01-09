@@ -39,15 +39,16 @@ struct StorageToolImplementation : public StorageTool
 {
     StorageToolImplementation(ptr<System> sys, ptr<FileSystem> local_fs);
 
-    RC storeBackupIntoStorage(Backup *backup,
+    RC storeBackupIntoStorage(FileSystem *backup_fs,
+                              FileSystem *origin_fs,
+                              Backup *backup,
                               Storage *storage,
                               Settings *settings,
                               ProgressStatistics *progress,
                               Monitor *monitor);
 
-    RC copyBackupIntoStorage(Backup *backup,
+    RC copyBackupIntoStorage(FileSystem *backup_fs,
                              Path *backup_dir,
-                             FileSystem *backup_fs,
                              Storage *storage,
                              Settings *settings,
                              ProgressStatistics *progress);
@@ -217,16 +218,18 @@ void copy_local_backup_file(Path *relpath,
     }
 }
 
-RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backupp,
+RC StorageToolImplementation::storeBackupIntoStorage(FileSystem *backup_fs,
+                                                     FileSystem *origin_fs,
+                                                     Backup  *backupp,
                                                      Storage *storage,
                                                      Settings *settings,
                                                      ProgressStatistics *progress,
                                                      Monitor *monitor)
 {
     // The backup archive files (.tar .gz) are found here.
-    FileSystem *backup_fs = backupp->asFileSystem();
+    // FileSystem *backup_fs = backupp->asFileSystem();
     // The where the origin files can be found.
-    FileSystem *origin_fs = backupp->originFileSystem();
+    // FileSystem *origin_fs = backupp->originFileSystem();
     // Store the archive files here.
     FileSystem *storage_fs = NULL;
     // This is the list of files to be sent to the storage.
@@ -306,58 +309,61 @@ RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backupp,
             auto point = restore->setPointInTime(weekly_backup);
             assert(point != NULL);
 
-            rc = restore->loadBeakFileSystem(storage);
-            if (rc.isOk())
+            if (backupp != NULL)
             {
-                debug(DELTA, "mounted storage filesystem to find suitable old archive files.\n");
-
-                // We want to create delta files using librsync.
-                for (Path * f : beak_files_to_backup)
+                rc = restore->loadBeakFileSystem(storage);
+                if (rc.isOk())
                 {
-                    uint partnr;
-                    TarFile *tarr = backupp->findTarFromPath(f, &partnr);
-                    assert(tarr);
+                    debug(DELTA, "mounted storage filesystem to find suitable old archive files.\n");
 
-                    debug(DELTA, "looking for best diff source for %s\n", f->c_str());
-                    map<RestoreEntry*,size_t> alternatives;
-                    for (auto &p : tarr->contents())
+                    // We want to create delta files using librsync.
+                    for (Path * f : beak_files_to_backup)
                     {
-                        Path *pp = p.second->path();
-                        Path *ppp = pp->subpath(1);
-                        if (ppp != NULL)
+                        uint partnr;
+                        TarFile *tarr = backupp->findTarFromPath(f, &partnr);
+                        assert(tarr);
+
+                        debug(DELTA, "looking for best diff source for %s\n", f->c_str());
+                        map<RestoreEntry*,size_t> alternatives;
+                        for (auto &p : tarr->contents())
                         {
-                            RestoreEntry *e = restore->findEntry(point, ppp);
-                            if (e && e->tarr)
+                            Path *pp = p.second->path();
+                            Path *ppp = pp->subpath(1);
+                            if (ppp != NULL)
                             {
-                                debug(DELTA, "found possible old beak file %s\n", e->tarr->c_str());
-                                alternatives[e] += tarr->contentSize(); // TODO handle parts
-                            }
-                            else
-                            {
-                                debug(DELTA, "no suitable beak file found (new file?) for \"%s\"\n", ppp->c_str());
+                                RestoreEntry *e = restore->findEntry(point, ppp);
+                                if (e && e->tarr)
+                                {
+                                    debug(DELTA, "found possible old beak file %s\n", e->tarr->c_str());
+                                    alternatives[e] += tarr->contentSize(); // TODO handle parts
+                                }
+                                else
+                                {
+                                    debug(DELTA, "no suitable beak file found (new file?) for \"%s\"\n", ppp->c_str());
+                                }
                             }
                         }
-                    }
-                    // Now find the best match:
-                    size_t max = 0;
-                    RestoreEntry *best = NULL;
-                    for (auto &p : alternatives)
-                    {
-                        if (p.second > max)
+                        // Now find the best match:
+                        size_t max = 0;
+                        RestoreEntry *best = NULL;
+                        for (auto &p : alternatives)
                         {
-                            max = p.second;
-                            best = p.first;
+                            if (p.second > max)
+                            {
+                                max = p.second;
+                                best = p.first;
+                            }
+                        }
+                        if (best != NULL)
+                        {
+                            debug(DELTA, "found best match %zu %s\n", max, best->tarr->c_str());
+
+
                         }
                     }
-                    if (best != NULL)
-                    {
-                        debug(DELTA, "found best match %zu %s\n", max, best->tarr->c_str());
-
-
-                    }
+                    //beak_files_to_backup
+                    //storage_fs
                 }
-        //beak_files_to_backup
-        //storage_fs
             }
         }
     }
@@ -427,9 +433,8 @@ RC StorageToolImplementation::storeBackupIntoStorage(Backup  *backupp,
     return RC::OK;
 }
 
-RC StorageToolImplementation::copyBackupIntoStorage(Backup  *backupp,
+RC StorageToolImplementation::copyBackupIntoStorage(FileSystem *backup_fs,
                                                     Path *backup_dir,
-                                                    FileSystem *backup_fs,
                                                     Storage *storage,
                                                     Settings *settings,
                                                     ProgressStatistics *progress)

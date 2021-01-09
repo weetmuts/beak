@@ -33,15 +33,16 @@
 
 struct StorageTool
 {
-    virtual RC storeBackupIntoStorage(Backup *backup,
+    virtual RC storeBackupIntoStorage(FileSystem *backup_fs,
+                                      FileSystem *origin_fs,
+                                      Backup *backup,
                                       Storage *storage,
                                       Settings *settings,
                                       ProgressStatistics *progress,
                                       Monitor *monitor) = 0;
 
-    virtual RC copyBackupIntoStorage(Backup *backup,
+    virtual RC copyBackupIntoStorage(FileSystem *backup_fs,
                                      Path *backup_dir,
-                                     FileSystem *backup_fs,
                                      Storage *storage,
                                      Settings *settings,
                                      ProgressStatistics *progress) = 0;

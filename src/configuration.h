@@ -155,6 +155,7 @@ struct Rule {
 
 struct System;
 struct FileSystem;
+enum Command : short;
 
 struct Configuration
 {
@@ -165,7 +166,7 @@ struct Configuration
     virtual Rule *rule(std::string name) = 0;
     virtual std::vector<Rule*> sortedRules() = 0;
     virtual Rule *findRuleFromStorageLocation(Path *storage_location) = 0;
-    virtual Storage *findStorageFrom(Path *storage_location) = 0;
+    virtual Storage *findStorageFrom(Path *storage_location, Command cmd) = 0;
     virtual Storage *createStorageFrom(Path *storage_location) = 0;
 
     virtual ~Configuration() = default;

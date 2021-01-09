@@ -904,3 +904,25 @@ RC sortOn(SortOrder so, vector<pair<Path*,FileStat>> &files)
 {
     return RC::OK;
 }
+
+unique_ptr<MapFileSystem> newMapFileSystem(FileSystem *fs)
+{
+    return unique_ptr<MapFileSystem>(new MapFileSystem(fs));
+}
+
+string FileStat::str()
+{
+    std::string r;
+    strprintf(r,
+              "st_ino=%d st_mode=%o st_nlink=%d hard_link=%s st_uid=%d st_gid=%d st_rdev=%d st_size=%zd "
+              "st_atim.tv_sec=%d st_atim.tv_nsec=%d "
+              "st_mtim.tv_sec=%d st_mtim.tv_nsec=%d "
+              "st_ctim.tv_sec=%d st_ctim.tv_nsec=%d "
+              "disk_update=%d",
+              st_ino, st_mode, st_nlink, hard_link==NULL?"N/A":hard_link->c_str(), st_uid, st_gid, st_rdev, st_size,
+              st_atim.tv_sec, st_atim.tv_nsec,
+              st_mtim.tv_sec, st_mtim.tv_nsec,
+              st_ctim.tv_sec, st_ctim.tv_nsec,
+              disk_update);
+    return r;
+}

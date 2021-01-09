@@ -50,8 +50,10 @@ void strprintf(std::string &s, const char* fmt, ...)
     char buf[4096];
     va_list args;
     va_start(args, fmt);
-    vsnprintf(buf, 4095, fmt, args);
+    int n = vsnprintf(buf, 4095, fmt, args);
     va_end(args);
+    assert(n >= 0 && n <= 4095);
+    buf[n] = 0;
     s = buf;
 }
 

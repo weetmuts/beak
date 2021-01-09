@@ -63,7 +63,7 @@ struct Beak
     virtual RC store(Settings *settings, Monitor *monitor) = 0;
     virtual RC restore(Settings *settings, Monitor *monitor) = 0;
     virtual RC shell(Settings *settings, Monitor *monitor) = 0;
-    virtual RC slurp(Settings *settings, Monitor *monitor) = 0;
+    virtual RC importMedia(Settings *settings, Monitor *monitor) = 0;
     virtual RC prune(Settings *settings, Monitor *monitor) = 0;
 
     virtual RC diff(Settings *settings, Monitor *monitor) = 0;
@@ -133,7 +133,7 @@ enum ArgumentType
     X(pushd,CommandType::PRIMARY,"Backup a rule to a storage location using delta compression.",ArgRule,ArgNone) \
     X(restore,CommandType::PRIMARY,"Restore from a backup into your file system.",ArgStorage,ArgOrigin) \
     X(shell,CommandType::PRIMARY,"Mount your backup(s) and spawn a shell. Exit the shell to unmount.",ArgStorageOrRule,ArgNone) \
-    X(slurp,CommandType::PRIMARY,"Find all files of a certain type and add them to a backup.",ArgDir,ArgDir) \
+    X(importmedia,CommandType::PRIMARY,"Find media files in the source dir then rename and store them normalized into the target dir.",ArgOrigin,ArgStorage) \
     X(status,CommandType::PRIMARY,"Show the backup status of your configured rules.",ArgRuleOrNone,ArgNone) \
     X(store,CommandType::PRIMARY,"Store your file system into a backup.",ArgOrigin,ArgStorage) \
     X(stored,CommandType::PRIMARY,"Store your file system into a backup using delta compression.",ArgOrigin,ArgStorage) \

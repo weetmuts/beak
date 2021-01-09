@@ -103,7 +103,7 @@ public:
     Rule *rule(string name);
     vector<Rule*> sortedRules();
     Rule *findRuleFromStorageLocation(Path *storage_location);
-    Storage *findStorageFrom(Path *storage_location);
+    Storage *findStorageFrom(Path *storage_location, Command cmd);
     Storage *createStorageFrom(Path *storage_location);
 
     void editRule();
@@ -135,7 +135,7 @@ private:
                   Rule *current_rule, Storage **current_storage,
                   int line);
 
-    bool isFileSystemStorage(Path *storage_location);
+    bool isFileSystemStorage(Path *storage_location, Command cmd);
     bool isRCloneStorage(Path *storage_location, string *type = NULL);
     bool isRSyncStorage(Path *storage_location);
 
@@ -1051,7 +1051,7 @@ bool has_index_files_or_is_empty_(FileSystem *fs, Path *path)
     return false;
 }
 
-bool ConfigurationImplementation::isFileSystemStorage(Path *storage_location)
+bool ConfigurationImplementation::isFileSystemStorage(Path *storage_location, Command cmd)
 {
     Path *rp = storage_location->realpath();
     if (!rp)
@@ -1065,7 +1065,7 @@ bool ConfigurationImplementation::isFileSystemStorage(Path *storage_location)
     {
         return false;
     }
-    return has_index_files_or_is_empty_(fs_, storage_location);
+    return cmd == importmedia_cmd || has_index_files_or_is_empty_(fs_, storage_location);
 }
 
 bool ConfigurationImplementation::isRCloneStorage(Path *storage_location, string *type)
@@ -1129,7 +1129,7 @@ bool ConfigurationImplementation::isRSyncStorage(Path *storage_location)
 // Storage created on the fly depending on the command line arguments.
 Storage a_storage;
 
-Storage *ConfigurationImplementation::findStorageFrom(Path *storage_location)
+Storage *ConfigurationImplementation::findStorageFrom(Path *storage_location, Command cmd)
 {
     // This is a storage that is configured inside a rule.
     Rule *rule = findRuleFromStorageLocation(storage_location);
@@ -1159,7 +1159,7 @@ Storage *ConfigurationImplementation::findStorageFrom(Path *storage_location)
         if (rp) {
             storage_location = rp;
         }
-        if (isFileSystemStorage(storage_location))
+        if (isFileSystemStorage(storage_location, cmd))
         {
             a_storage.type = FileSystemStorage;
             a_storage.storage_location = storage_location;
@@ -1187,7 +1187,7 @@ Storage *ConfigurationImplementation::createStorageFrom(Path *storage_location)
         error(CONFIGURATION, "Could not create directory %s\n", storage_location->c_str());
     }
     info(CONFIGURATION, "Created storage directory %s\n", storage_location->c_str());
-    if (isFileSystemStorage(storage_location))
+    if (isFileSystemStorage(storage_location, store_cmd))
     {
         a_storage.type = FileSystemStorage;
         a_storage.storage_location = storage_location;

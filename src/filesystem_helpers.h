@@ -142,6 +142,55 @@ struct ReadOnlyCacheFileSystemBaseImplementation : ReadOnlyFileSystem
     RecurseOption recurse_helper_(Path *root, std::function<RecurseOption(Path *path, FileStat *stat)> cb);
 };
 
+struct MapEntry
+{
+    FileStat stat;
+    Path *path {};
+    Path *source {};
+    // If this is a directory, from is NULL and its contents is listed here instead.
+    std::map<Path*,MapEntry*> direntries;
+
+    MapEntry() { }
+    MapEntry(FileStat st, Path *p, Path *s) : stat(st), path(p), source(s) { assert(path); }
+};
+
+// Restructure an existing filesystem with new filenames/paths and timestamps but
+// read content from existing source files.
+struct MapFileSystem : ReadOnlyFileSystem
+{
+MapFileSystem(FileSystem *origin_fs) :
+    ReadOnlyFileSystem("MapFileSystem"), origin_fs_(origin_fs)
+    {
+        FileStat st;
+        st.setAsDirectory();
+        entries_[Path::lookupRoot()] = MapEntry(st, Path::lookupRoot(), NULL);
+    }
+
+    void mapFile(FileStat stat, Path *path, Path *source);
+    RecurseOption recurse_helper_(Path *p,
+                                  std::function<RecurseOption(Path *path, FileStat *stat)> cb);
+    void addDirToParent(Path *dir);
+
+    bool readdir(Path *p, std::vector<Path*> *vec);
+    ssize_t pread(Path *p, char *buf, size_t count, off_t offset);
+    RC recurse(Path *root, std::function<RecurseOption(Path *path, FileStat *stat)> cb);
+    RC recurse(Path *root, std::function<RecurseOption(const char *path, const struct stat *sb)> cb);
+    RC ctimeTouch(Path *p);
+
+    RC stat(Path *p, FileStat *fs);
+    RC loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
+    bool readLink(Path *file, std::string *target);
+    FILE *openAsFILE(Path *f, const char *mode);
+
+    protected:
+
+    FileSystem *origin_fs_;
+    std::map<Path*,MapEntry> entries_;
+};
+
+// A file system to render existing files under new names/paths and stats.
+// Add filemappings mapfs->addFile(from, to, filestat);
+std::unique_ptr<MapFileSystem> newMapFileSystem(FileSystem *fs);
 
 
 #endif

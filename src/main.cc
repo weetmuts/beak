@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2016-2018 Fredrik Öhrström
+ Copyright (C) 2016-2020 Fredrik Öhrström
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -178,8 +178,8 @@ int run(int argc, char *argv[])
         rc = beak->shell(&settings, monitor.get());
         break;
 
-    case slurp_cmd:
-        rc = beak->slurp(&settings, monitor.get());
+    case importmedia_cmd:
+        rc = beak->importMedia(&settings, monitor.get());
         break;
 
     case status_cmd:

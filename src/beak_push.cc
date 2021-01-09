@@ -80,7 +80,9 @@ RC BeakImplementation::storeRuleLocallyThenRemotely(Rule *rule, Settings *settin
 
     settings->to.storage = &rule->local;
     // Now store the beak file system into the selected storage.
-    storage_tool_->storeBackupIntoStorage(backup.get(),
+    storage_tool_->storeBackupIntoStorage(backup->asFileSystem(),
+                                          backup->originFileSystem(),
+                                          backup.get(),
                                           &rule->local,
                                           settings,
                                           progress.get(),
@@ -109,9 +111,8 @@ RC BeakImplementation::storeRuleLocallyThenRemotely(Rule *rule, Settings *settin
         unique_ptr<ProgressStatistics> progress = monitor->newProgressStatistics(buildJobName("copy", settings));
         progress->startDisplayOfProgress();
         info(PUSH, "Copying local backup into %s\n", p.second.storage_location->c_str());
-        storage_tool_->copyBackupIntoStorage(backup.get(),
+        storage_tool_->copyBackupIntoStorage(local_fs_, // copy from file system.
                                              rule->local.storage_location, // copy from here
-                                             local_fs_,
                                              &p.second, // copy to here
                                              settings,
                                              progress.get());
@@ -144,11 +145,13 @@ RC BeakImplementation::storeRuleRemotely(Rule *rule, Settings *settings, Monitor
 
         settings->to.storage = &p.second;
         // Now store the beak file system into the selected storage.
-        storage_tool_->storeBackupIntoStorage(backup.get(),
-                                          settings->to.storage,
-                                          settings,
+        storage_tool_->storeBackupIntoStorage(backup->asFileSystem(),
+                                              backup->originFileSystem(),
+                                              backup.get(),
+                                              settings->to.storage,
+                                              settings,
                                               progress.get(),
-            monitor);
+                                              monitor);
 
         if (progress->stats.num_files_stored == 0 && progress->stats.num_dirs_updated == 0) {
             info(PUSH, "No stores needed, everything was up to date.\n");

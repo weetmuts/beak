@@ -117,12 +117,16 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
         || expected_type == ArgStorageOrRule)
     {
         Path *storage_location = Path::lookup(arg);
-        Storage *storage = configuration_->findStorageFrom(storage_location);
-        if (!storage && cmd == store_cmd) {
+        Storage *storage = configuration_->findStorageFrom(storage_location, cmd);
+
+        if (!storage && (cmd == store_cmd || cmd == importmedia_cmd))
+        {
             // If we are storing, then try to create a missing directory.
             storage = configuration_->createStorageFrom(storage_location);
         }
-        if (storage) {
+
+        if (storage)
+        {
             argument.type = ArgStorage;
             argument.storage = storage;
 

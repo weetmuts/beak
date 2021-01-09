@@ -116,6 +116,8 @@ struct FileStat {
 
     std::string uidName();
     std::string gidName();
+
+    std::string str();
 };
 
 

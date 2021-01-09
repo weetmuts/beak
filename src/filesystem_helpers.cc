@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2018 Fredrik Öhrström
+ Copyright (C) 2018-2020 Fredrik Öhrström
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -25,6 +25,7 @@
 using namespace std;
 
 static ComponentId CACHE = registerLogComponent("cache");
+static ComponentId MAPFS = registerLogComponent("mapfs");
 
 RC ReadOnlyFileSystem::chmod(Path *p, FileStat *fs)
 {
@@ -169,6 +170,149 @@ bool StatOnlyFileSystem::readLink(Path *file, string *target)
 }
 
 FILE *StatOnlyFileSystem::openAsFILE(Path *file, const char *mode)
+{
+    return NULL;
+}
+
+void MapFileSystem::addDirToParent(Path *dir)
+{
+    // We have a directory
+    assert(dir);
+    // Check that the dir is already added to the cache entries.
+    assert(entries_.count(dir) == 1);
+    // Get the dir entry.
+    MapEntry *dir_entry = &entries_[dir];
+
+    // Check if there is a parent to add it to.
+    Path *parent = dir->parent();
+    if (parent == NULL) return; // Nope, give up here.
+
+    // Check if the parent is not in the entries.
+    if (entries_.count(parent) == 0)
+    {
+        // Add the parent!
+        FileStat dir_stat;
+        dir_stat.setAsDirectory();
+        entries_[parent] = MapEntry(dir_stat, parent, NULL);
+    }
+    // Get the parent entry.
+    MapEntry *parent_entry = &entries_[parent];
+
+    // Check if dir is already added to the parent.
+    if (parent_entry->direntries.count(dir) == 0)
+    {
+        // Nope, lets add dir to parent contents.
+        parent_entry->direntries[dir] = dir_entry;
+    }
+
+    // Proceed by having parent added to its parent.
+    addDirToParent(parent);
+}
+
+void MapFileSystem::mapFile(FileStat stat, Path *path, Path *source)
+{
+    assert(path);
+    assert(source);
+
+    // Add a map entry for this file.
+    entries_[path] = MapEntry(stat, path, source);
+    MapEntry *file_entry = &entries_[path];
+
+    // We should try to add the file to a directory.
+    Path *dir = path->parent();
+    if (dir != NULL)
+    {
+        if (entries_.count(dir) == 0)
+        {
+            FileStat dir_stat;
+            dir_stat.setAsDirectory();
+            entries_[dir] = MapEntry(dir_stat, dir, NULL);
+            // Add this dir to its parent directory.
+            addDirToParent(dir);
+        }
+        MapEntry *dir_entry = &entries_[dir];
+        dir_entry->direntries[path] = file_entry;
+    }
+    debug(MAPFS, "%s sourced from %s\n", path->c_str(), source->c_str());
+}
+
+bool MapFileSystem::readdir(Path *p, vector<Path*> *vec)
+{
+    return false;
+}
+
+ssize_t MapFileSystem::pread(Path *p, char *buf, size_t size, off_t offset)
+{
+    if (entries_.count(p) == 0) return -4711;
+
+    MapEntry *me = &entries_[p];
+    return origin_fs_->pread(me->source, buf, size, offset);
+}
+
+RecurseOption MapFileSystem::recurse_helper_(Path *p,
+                                             std::function<RecurseOption(Path *path, FileStat *stat)> cb)
+{
+    if (entries_.count(p) == 0) return RecurseContinue;
+    MapEntry *me = &entries_[p];
+    assert(me);
+    RecurseOption ro = cb(me->path, &me->stat);
+    if (ro == RecurseSkipSubTree || ro == RecurseStop) {
+        return ro;
+    }
+    for (auto& p : me->direntries)
+    {
+        if (p.second->stat.isDirectory())
+        {
+            ro = recurse_helper_(p.second->path, cb);
+            if (ro == RecurseStop)
+            {
+                return ro;
+            }
+        }
+        else
+        {
+            ro = cb(p.second->path, &p.second->stat);
+        }
+    }
+    return RecurseContinue;
+}
+
+RC MapFileSystem::recurse(Path *root, function<RecurseOption(Path *path, FileStat *stat)> cb)
+{
+    recurse_helper_(root, cb);
+    return RC::OK;
+}
+
+RC MapFileSystem::recurse(Path *root, std::function<RecurseOption(const char *path, const struct stat *sb)> cb)
+{
+    assert(0);
+    return RC::ERR;
+}
+
+RC MapFileSystem::ctimeTouch(Path *p)
+{
+    return RC::ERR;
+}
+
+RC MapFileSystem::stat(Path *p, FileStat *fs)
+{
+    if (entries_.count(p) == 0) return RC::ERR;
+
+    *fs = entries_[p].stat;
+    return RC::OK;
+}
+
+RC MapFileSystem::loadVector(Path *file, size_t blocksize, std::vector<char> *buf)
+{
+    return RC::OK;
+}
+
+bool MapFileSystem::readLink(Path *file, string *target)
+{
+    return false;
+}
+
+FILE *MapFileSystem::openAsFILE(Path *file, const char *mode)
 {
     return NULL;
 }

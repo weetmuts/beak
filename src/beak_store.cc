@@ -52,7 +52,9 @@ RC BeakImplementation::store(Settings *settings, Monitor *monitor)
     rc = backup->scanFileSystem(&settings->from, settings, progress.get());
 
     // Now store the beak file system into the selected storage.
-    storage_tool_->storeBackupIntoStorage(backup.get(),
+    storage_tool_->storeBackupIntoStorage(backup->asFileSystem(),
+                                          backup->originFileSystem(),
+                                          backup.get(),
                                           settings->to.storage,
                                           settings,
                                           progress.get(),
