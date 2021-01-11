@@ -531,7 +531,6 @@ RC StorageToolImplementation::copyBackupIntoStorage(FileSystem *backup_fs,
     }
 
     progress->finishProgress();
-
     return RC::OK;
 }
 

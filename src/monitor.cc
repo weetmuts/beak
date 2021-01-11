@@ -157,6 +157,7 @@ int MonitorImplementation::startDisplay(function<bool()> progress_cb)
 
 void MonitorImplementation::stopDisplay(int id)
 {
+    assert(redraws_.size() > 0);
     redraws_.pop_back();
 }
 
@@ -229,13 +230,13 @@ using namespace std;
 
 struct ProgressStatisticsImplementation : ProgressStatistics
 {
-    ProgressStatisticsImplementation(ProgressDisplayType t, MonitorImplementation *m, string job) : pdt_(t), monitor_(m), job_(job) {}
+    ProgressStatisticsImplementation(ProgressDisplayType t, MonitorImplementation *m, string job) : pdt_(t), monitor_(m), job_(job), mid_(-1) {}
     ~ProgressStatisticsImplementation() = default;
     void setProgress(string msg);
 
 private:
 
-    Stats copy;
+    Stats copy {};
 
     uint64_t start_time {};
 
@@ -245,6 +246,7 @@ private:
     ProgressDisplayType pdt_ {};
     MonitorImplementation *monitor_ {};
     string job_;
+    int mid_;
 
     bool redrawLine();
     void startDisplayOfProgress();
@@ -259,19 +261,21 @@ const char *spinner_[] = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧
 void ProgressStatisticsImplementation::startDisplayOfProgress()
 {
     start_time = clockGetTimeMicroSeconds();
-    monitor_->startDisplay([this](){ return redrawLine();});
+    mid_ = monitor_->startDisplay([this](){ return redrawLine();});
 }
 
 //Tar emot objekt: 100% (814178/814178), 669.29 MiB | 6.71 MiB/s, klart.
 //Analyserar delta: 100% (690618/690618), klart.
 void ProgressStatisticsImplementation::updateStatHint(size_t s)
 {
+    assert(start_time != 0);
     stats.stat_size_files_transferred = s;
     stats.latest_stat = clockGetTimeMicroSeconds();
 }
 
 void ProgressStatisticsImplementation::updateProgress()
 {
+    assert(start_time != 0);
     // Take a snapshot of the stats structure.
     // The snapshot is taken while the regular callback is blocked.
     monitor_->doWhileCallbackBlocked([this]() {
@@ -282,6 +286,7 @@ void ProgressStatisticsImplementation::updateProgress()
 
 void ProgressStatisticsImplementation::setProgress(string msg)
 {
+    assert(start_time != 0);
     string info;
     strprintf(info, "%s | %s", job_.c_str(), msg.c_str());
     monitor_->updateJob(getpid(), info);
@@ -290,6 +295,7 @@ void ProgressStatisticsImplementation::setProgress(string msg)
 // Draw the progress line based on the snapshotted contents in the copy struct.
 bool ProgressStatisticsImplementation::redrawLine()
 {
+    assert(start_time != 0);
     if (copy.num_files == 0 || copy.num_files_to_store == 0) return true;
     uint64_t now = clockGetTimeMicroSeconds();
     double secs = ((double)((now-start_time)/1000))/1000.0;
@@ -386,6 +392,7 @@ bool ProgressStatisticsImplementation::redrawLine()
 
 void ProgressStatisticsImplementation::finishProgress()
 {
+    assert(start_time != 0);
     if (stats.num_files == 0 || stats.num_files_to_store == 0) return;
     updateProgress();
     redrawLine();
@@ -398,7 +405,7 @@ void ProgressStatisticsImplementation::finishProgress()
     case ProgressDisplayType::Normal:
         UI::output(" done.\n");
     }
-    monitor_->stopDisplay(0);
+    monitor_->stopDisplay(mid_);
 }
 
 unique_ptr<ProgressStatistics> newwProgressStatistics(ProgressDisplayType t, MonitorImplementation *monitor, std::string job)

@@ -29,6 +29,7 @@ extern "C" {
 }
 
 #include <exiv2/exiv2.hpp>
+#include <exiv2/error.hpp>
 
 static ComponentId IMPORTMEDIA = registerLogComponent("importmedia");
 
@@ -45,29 +46,36 @@ string generate_name(string prefix, struct timespec &ts, struct tm &tm, size_t s
 struct ImportMediaData
 {
     BeakImplementation *beak_ {};
-    size_t *sizes_ {};
-    size_t *num_ {};
+    int num_ {};
+    int unknown_count_ {};
+    size_t unknown_size_ {};
+
+    map<string,int> img_suffix_count_;
+    map<string,int> vid_suffix_count_;
+    map<string,int> aud_suffix_count_;
+    map<string,int> unknown_suffix_count_;
+
+    map<string,size_t> img_suffix_size_;
+    map<string,size_t> vid_suffix_size_;
+    map<string,size_t> aud_suffix_size_;
+    map<string,size_t> unknown_suffix_size_;
+
     Settings *settings_ {};
     Monitor *monitor_ {};
     FileSystem *fs_ {};
 
-    set<Path*> unknown_files_;
-    size_t unknown_sizes_ {};
-    set<Path*> zero_length_files_;
-    set<string> unknown_suffixes_;
     set<Path*> inconsistent_dates_;
     set<Path*> failed_to_understand_;
 
     set<Path*> files_up_to_date_;
-    set<Path*> remove_files_;
     map<Path*,Path*> copy_files_;
 
     map<string,string> img_suffixes_;
     map<string,string> vid_suffixes_;
     map<string,string> aud_suffixes_;
 
-    ImportMediaData(BeakImplementation *beak, size_t *sizes, size_t *num, Settings *settings, Monitor *monitor, FileSystem *fs)
-        : beak_(beak), sizes_(sizes), num_(num), settings_(settings), monitor_(monitor), fs_(fs)
+    ImportMediaData(BeakImplementation *beak, Settings *settings, Monitor *monitor, FileSystem *fs)
+        : beak_(beak), settings_(settings), monitor_(monitor), fs_(fs)
     {
         vid_suffixes_["avi"] = "avi";
         vid_suffixes_["AVI"] = "avi";
@@ -102,6 +110,66 @@ struct ImportMediaData
         img_suffixes_["png"] = "png";
         img_suffixes_["PNG"] = "png";
 
+    }
+
+    string status(const char *tense)
+    {
+        string info;
+        for (auto &p : vid_suffix_count_)
+        {
+            string s = humanReadable(vid_suffix_size_[p.first]);
+            info += p.first+"("+to_string(p.second)+" á "+s+") ";
+        }
+        for (auto &p : img_suffix_count_)
+        {
+            string s = humanReadable(img_suffix_size_[p.first]);
+            info += p.first+"("+to_string(p.second)+" á "+s+") ";
+        }
+        for (auto &p : aud_suffix_count_)
+        {
+            string s = humanReadable(aud_suffix_size_[p.first]);
+            info += p.first+"("+to_string(p.second)+" á "+s+") ";
+        }
+        if (unknown_suffix_count_.size() > 0)
+        {
+            string s = humanReadable(unknown_size_);
+            info += "non-media("+to_string(unknown_count_)+" á "+s+") ";
+        }
+        if (info.length() > 0) info.pop_back();
+        string st;
+        strprintf(st, "Index%s %s", tense, info.c_str());
+        return st;
+    }
+
+    string statusUnknowns()
+    {
+        string info;
+        for (auto &p : unknown_suffix_count_)
+        {
+            if (p.first != "")
+            {
+                string s = humanReadable(img_suffix_size_[p.first]);
+                info += p.first+"("+to_string(p.second)+" á "+s+") ";
+            }
+        }
+        if (unknown_suffix_count_.count("") > 0)
+        {
+            string s = humanReadable(img_suffix_size_[""]);
+            info += "unknowns("+to_string(img_suffix_count_[""])+" á "+s+") ";
+        }
+
+        if (info.length() > 0) info.pop_back();
+        return info;
+    }
+
+    string brokenFiles()
+    {
+        string s;
+        for (Path *f : failed_to_understand_)
+        {
+            s += f->str()+"\n";
+        }
+        return s;
     }
 
     bool getDateFromPath(Path *p, struct timespec *ts, struct tm *tm)
@@ -143,6 +211,7 @@ struct ImportMediaData
     {
         AVFormatContext* av = avformat_alloc_context();
         av_register_all();
+        av_log_set_level(AV_LOG_FATAL);
         int rc = avformat_open_input(&av, p->c_str(), NULL, NULL);
 
         if (rc)
@@ -170,9 +239,9 @@ struct ImportMediaData
         //av_dict_set(&d, k, v, AV_DICT_DONT_STRDUP_KEY | AV_DICT_DONT_STRDUP_VAL);
         while ((t = av_dict_get(d, "", t, AV_DICT_IGNORE_SUFFIX)))
         {
+            verbose(IMPORTMEDIA, "%s = %s\n", t->key, t->value);
             if (!strcmp(t->key, "creation_time"))
             {
-                verbose(IMPORTMEDIA, "%s = %s\n", t->key, t->value);
                 string ct = t->value;
                 RC rc = parseDateTimeUTCNanos(ct, &ts->tv_sec, &ts->tv_nsec);
                 if (rc.isOk())
@@ -188,7 +257,10 @@ struct ImportMediaData
         avformat_close_input(&av);
         avformat_free_context(av);
 
-        if (!found_creation_time) failed_to_understand_.insert(p);
+        if (!found_creation_time)
+        {
+            verbose(IMPORTMEDIA, "no creation_time found!\n");
+        }
 
         return found_creation_time;
     }
@@ -198,6 +270,7 @@ struct ImportMediaData
         bool found_datetime = false;
         try
         {
+            Exiv2::LogMsg::setLevel(Exiv2::LogMsg::Level::mute);
             Exiv2::Image::AutoPtr image = Exiv2::ImageFactory::open(p->c_str());
             assert(image.get() != 0);
             image->readMetadata();
@@ -238,6 +311,7 @@ struct ImportMediaData
         catch (std::exception &e)
         {
             verbose(IMPORTMEDIA, "Failed to load %s\n", e.what());
+            failed_to_understand_.insert(p);
             return false;
         }
         return found_datetime;
@@ -250,25 +324,40 @@ struct ImportMediaData
 
         if (st->isDirectory()) return;
 
-        verbose(IMPORTMEDIA, "file %s\n", p->c_str());
-
-        if (size == 0)
+        if (num_ % 100 == 0)
         {
-            zero_length_files_.insert(p);
-            verbose(IMPORTMEDIA, "zero size, ignoring.\n");
-            return;
+            UI::clearLine();
+            string st = status("ing");
+            info(IMPORTMEDIA, "%s", st.c_str());
         }
+        num_++;
+
+        verbose(IMPORTMEDIA, "file %s\n", p->c_str());
 
         string ext = p->name()->ext_c_str_();
 
-        if (img_suffixes_.count(ext) == 0 &&
-            vid_suffixes_.count(ext) == 0 &&
-            aud_suffixes_.count(ext) == 0)
+        if (img_suffixes_.count(ext) != 0) {
+            ext = img_suffixes_[ext];
+            img_suffix_count_[ext]++;
+            img_suffix_size_[ext]+=size;
+
+        }
+        else if (vid_suffixes_.count(ext) != 0) {
+            ext = vid_suffixes_[ext];
+            vid_suffix_count_[ext]++;
+            vid_suffix_size_[ext]+=size;
+        }
+        else if (aud_suffixes_.count(ext) != 0) {
+            ext = aud_suffixes_[ext];
+            aud_suffix_count_[ext]++;
+            aud_suffix_size_[ext]+=size;
+        }
+        else
         {
-            unknown_files_.insert(p);
-            unknown_suffixes_.insert(ext);
-            unknown_sizes_ += size;
-            verbose(IMPORTMEDIA, "unknown extension.\n");
+            unknown_suffix_count_[ext]++;
+            unknown_suffix_size_[ext]+=size;
+            unknown_count_++;
+            unknown_size_ += size;
             return;
         }
 
@@ -276,7 +365,8 @@ struct ImportMediaData
         struct tm path_tm {};
         bool valid_date_from_path = getDateFromPath(p, &path_ts, &path_tm);
 
-        if (valid_date_from_path) {
+        if (valid_date_from_path)
+        {
             string tmp = generate_name(prefix, path_ts, path_tm, size, ext);
             verbose(IMPORTMEDIA, "path %s\n", tmp.c_str());
         }
@@ -285,7 +375,8 @@ struct ImportMediaData
         struct tm stat_tm {};
         bool valid_date_from_stat = getDateFromStat(st, &stat_ts, &stat_tm);
 
-        if (valid_date_from_stat) {
+        if (valid_date_from_stat)
+        {
             string tmp = generate_name(prefix, stat_ts, stat_tm, size, ext);
             verbose(IMPORTMEDIA, "mtime %s\n", tmp.c_str());
         }
@@ -378,62 +469,19 @@ struct ImportMediaData
         normalized.st_atim = ts;
         normalized.st_ctim = ts;
 
-        /*
-        string a = st->str();
-        string b = normalized.str();
-
-        fprintf(stderr, "A=%s\nB=%s\n", a.c_str(), b.c_str());
-        */
-        FileStat existing;
-
-        RC check = fs_->stat(target, &existing);
-        if (check.isErr())
-        {
-            map_fs->mapFile(normalized, target, p);
-            copy_files_[target] = p;
-            verbose(IMPORTMEDIA, "copying %s\n", name.c_str());
-        }
-        else
-        {
-            // The file exists, compare the desired timestamp ts, with the file tst timestamp.
-            if (ts.tv_sec != existing.st_mtim.tv_sec ||
-                ts.tv_nsec != existing.st_mtim.tv_nsec ||
-                size != existing.st_size)
-            {
-                struct tm tmt;
-                localtime_r(&existing.st_mtim.tv_sec, &tmt);
-
-                int ydiff = tm.tm_year-tmt.tm_year;
-                int modiff = tm.tm_mon-tmt.tm_mon;
-                int ddiff = tm.tm_mday-tmt.tm_mday;
-                int hdiff = tm.tm_hour-tmt.tm_hour;
-                int mdiff = tm.tm_min-tmt.tm_min;
-                int sdiff = tm.tm_sec-tmt.tm_sec;
-
-                verbose(IMPORTMEDIA, "File diff %d %d %d %d %d %d %zd, %s\n",
-                     ydiff, modiff, ddiff, hdiff, mdiff, sdiff, size-existing.st_size, target->c_str());
-
-                verbose(IMPORTMEDIA, "remove %s\n", name.c_str());
-                remove_files_.insert(target);
-                verbose(IMPORTMEDIA, "copying %s\n", name.c_str());
-                map_fs->mapFile(normalized, target, p);
-                copy_files_[target] = p;
-            }
-            else
-            {
-                verbose(IMPORTMEDIA, "nochange %s\n", name.c_str());
-                files_up_to_date_.insert(target);
-            }
-        }
+        map_fs->mapFile(normalized, target, p);
     }
 
     void printTodo()
     {
-        info(IMPORTMEDIA, "Skipping %zu already up to date files.\n", files_up_to_date_.size());
-        info(IMPORTMEDIA, "Removing %zu files.\n", remove_files_.size());
-        info(IMPORTMEDIA, "Copying %zu files.\n", copy_files_.size());
+        string s = statusUnknowns();
+        info(IMPORTMEDIA, "Ignored %zu files: %s\n", unknown_count_, s.c_str());
+        s = brokenFiles();
+        if (s != "")
+        {
+            info(IMPORTMEDIA, "Warning! Broken files that cannot be imported:\n%s\n", s.c_str());
+        }
     }
-
 };
 
 RC BeakImplementation::importMedia(Settings *settings, Monitor *monitor)
@@ -443,10 +491,7 @@ RC BeakImplementation::importMedia(Settings *settings, Monitor *monitor)
     assert(settings->from.type == ArgOrigin);
     assert(settings->to.type == ArgStorage);
 
-    size_t sizes = 0;
-    size_t num = 0;
-
-    ImportMediaData import_media(this, &sizes, &num, settings, monitor, local_fs_);
+    ImportMediaData import_media(this, settings, monitor, local_fs_);
 
     auto map_fs = newMapFileSystem(local_fs_);
     MapFileSystem *fs = map_fs.get();
@@ -457,12 +502,19 @@ RC BeakImplementation::importMedia(Settings *settings, Monitor *monitor)
     {
         usageError(IMPORTMEDIA, "Not a directory: %s\n", settings->from.origin->c_str());
     }
+
+    info(IMPORTMEDIA, "Importing media into %s\n",
+         settings->to.storage->storage_location->c_str());
+
     local_fs_->recurse(settings->from.origin, [&import_media,fs](Path *p, FileStat *st) {
             import_media.handleFile(p, st, fs);
             return RecurseOption::RecurseContinue;
         });
 
     UI::clearLine();
+    string st = import_media.status("ed");
+    info(IMPORTMEDIA, "%s\n", st.c_str());
+
     import_media.printTodo();
 
     unique_ptr<ProgressStatistics> progress = monitor->newProgressStatistics(buildJobName("import", settings));
@@ -473,6 +525,10 @@ RC BeakImplementation::importMedia(Settings *settings, Monitor *monitor)
                               settings->to.storage,
                               settings,
                               progress.get());
+
+    if (progress->stats.num_files_stored == 0 && progress->stats.num_dirs_updated == 0) {
+        info(IMPORTMEDIA, "No imports needed, everything was up to date.\n");
+    }
 
     return rc;
 }

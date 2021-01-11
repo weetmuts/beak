@@ -145,7 +145,22 @@ struct Atom
     Atom(std::string n) : literal_(n)
     {
         size_t p0 = n.rfind('.');
-        if (p0 == std::string::npos) { ext_ = ""; } else { ext_ = literal_.c_str()+p0+1; }
+        if (p0 == std::string::npos)
+        {
+            ext_ = "";
+        }
+        else
+        {
+            size_t s = literal_.length()-p0;
+            if (s < 10)
+            {
+                ext_ = literal_.c_str()+p0+1;
+            }
+            else
+            {
+                ext_ = "";
+            }
+        }
     }
     std::string literal_;
     const char *ext_;
