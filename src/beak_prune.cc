@@ -172,6 +172,7 @@ RC BeakImplementation::prune(Settings *settings, Monitor *monitor)
             proceed = UI::yesOrNo("Proceed?");
         }
 
+        progress->startDisplayOfProgress();
         if (proceed == UIYes)
         {
             storage_tool_->removeBackupFiles(settings->from.storage,
