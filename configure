@@ -636,6 +636,9 @@ LIBAVFORMAT_LIBS
 LIBAVFORMAT_CFLAGS
 LIBEXIV2_LIBS
 LIBEXIV2_CFLAGS
+MEDIA_LIBS
+MEDIA_CFLAGS
+ENABLE_MEDIA
 LIBRSYNC_LIBS
 LIBRSYNC_CFLAGS
 ZLIB_LIBS
@@ -727,6 +730,7 @@ with_openssl
 with_zlib
 with_librsync
 with_libexiv2
+enable_media
 with_libavformat
 '
       ac_precious_vars='build_alias
@@ -1367,6 +1371,7 @@ Optional Features:
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --disable-asan          disable address sanitizer for debug builds [enabled]
   --disable-fuse          disable libfuse (mount will not work) [enabled]
+  --disable-media         disable importmedia [enabled]
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -2324,6 +2329,7 @@ if test "${host_vendor}" = "w64"; then
    PATH_SEP=';'
    PLATFORM_CFLAGS=""
    FUSE_DEFAULT="no"
+   MEDIA_DEFAULT="no"
    ASAN_DEFALUT="no"
    CONF_MNEMONIC="winapi64"
    MNEMONIC="WINAPI64"
@@ -2332,6 +2338,7 @@ else
    PATH_SEP=':'
    PLATFORM_CFLAGS="-DUSE_SYSLOG"
    FUSE_DEFAULT="yes"
+   MEDIA_DEFAULT="yes"
    ASAN_DEFAULT="yes"
    if test "${host_cpu}" = "arm"; then
        CONF_MNEMONIC="arm32"
@@ -4188,6 +4195,27 @@ if test "x${with_libexiv2}" = "x"; then
     { $as_echo "$as_me:${as_lineno-$LINENO}: result: found" >&5
 $as_echo "found" >&6; }
 fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for media support" >&5
+$as_echo_n "checking for media support... " >&6; }
+
+# Check whether --enable-media was given.
+if test "${enable_media+set}" = set; then :
+  enableval=$enable_media; ENABLE_MEDIA=${enable_media}
+else
+  ENABLE_MEDIA=${MEDIA_DEFAULT}
+fi
+
+
+
+
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for libmagick++-dev" >&5
+$as_echo_n "checking for libmagick++-dev... " >&6; }
+
+MEDIA_CFLAGS=
+MEDIA_LIBS=$(Magick++-config --libs)
 
 
 

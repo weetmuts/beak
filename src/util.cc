@@ -932,6 +932,11 @@ RC parseDateTimeUTCNanos(string dt, time_t *tv_sec, long *tv_nsec)
 
     // Need to adjust for current timezone since input is UTC.
     *tv_sec = mktime(&tp) - timezone;
+    if (*tv_sec == -1)
+    {
+        // Oups, not a valid date!
+        return RC::ERR;
+    }
     *tv_nsec = nanos;
     return RC::OK;
 }

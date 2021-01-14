@@ -39,6 +39,7 @@ if test "${host_vendor}" = "w64"; then
    PATH_SEP=';'
    PLATFORM_CFLAGS=""
    FUSE_DEFAULT="no"
+   MEDIA_DEFAULT="no"
    ASAN_DEFALUT="no"
    CONF_MNEMONIC="winapi64"
    MNEMONIC="WINAPI64"
@@ -47,6 +48,7 @@ else
    PATH_SEP=':'
    PLATFORM_CFLAGS="-DUSE_SYSLOG"
    FUSE_DEFAULT="yes"
+   MEDIA_DEFAULT="yes"
    ASAN_DEFAULT="yes"
    if test "${host_cpu}" = "arm"; then
        CONF_MNEMONIC="arm32"
@@ -230,6 +232,22 @@ if test "x${with_libexiv2}" = "x"; then
     LIBEXIV2_LIBS="-lexiv2"
     AC_MSG_RESULT([found])
 fi
+
+AC_MSG_CHECKING([for media support])
+
+AC_ARG_ENABLE([media],
+  [AS_HELP_STRING([--disable-media],
+      [disable importmedia @<:@enabled@:>@])],
+      [ENABLE_MEDIA=${enable_media}], [ENABLE_MEDIA=${MEDIA_DEFAULT}])
+
+AC_SUBST(ENABLE_MEDIA)
+AC_SUBST(MEDIA_CFLAGS)
+AC_SUBST(MEDIA_LIBS)
+
+AC_MSG_CHECKING([for libmagick++-dev])
+
+MEDIA_CFLAGS=
+MEDIA_LIBS=$(Magick++-config --libs)
 
 AC_SUBST(LIBEXIV2_CFLAGS)
 AC_SUBST(LIBEXIV2_LIBS)

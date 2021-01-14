@@ -64,6 +64,7 @@ struct Beak
     virtual RC restore(Settings *settings, Monitor *monitor) = 0;
     virtual RC shell(Settings *settings, Monitor *monitor) = 0;
     virtual RC importMedia(Settings *settings, Monitor *monitor) = 0;
+    virtual RC indexMedia(Settings *settings, Monitor *monitor) = 0;
     virtual RC prune(Settings *settings, Monitor *monitor) = 0;
 
     virtual RC diff(Settings *settings, Monitor *monitor) = 0;
@@ -134,6 +135,7 @@ enum ArgumentType
     X(restore,CommandType::PRIMARY,"Restore from a backup into your file system.",ArgStorage,ArgOrigin) \
     X(shell,CommandType::PRIMARY,"Mount your backup(s) and spawn a shell. Exit the shell to unmount.",ArgStorageOrRule,ArgNone) \
     X(importmedia,CommandType::PRIMARY,"Find media files in the source dir then rename and store them normalized into the target dir.",ArgOrigin,ArgStorage) \
+    X(indexmedia,CommandType::PRIMARY,"Scan imported media and generate thumbnails and index.html.",ArgOrigin,ArgNone) \
     X(status,CommandType::PRIMARY,"Show the backup status of your configured rules.",ArgRuleOrNone,ArgNone) \
     X(store,CommandType::PRIMARY,"Store your file system into a backup.",ArgOrigin,ArgStorage) \
     X(stored,CommandType::PRIMARY,"Store your file system into a backup using delta compression.",ArgOrigin,ArgStorage) \

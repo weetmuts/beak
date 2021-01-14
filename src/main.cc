@@ -182,6 +182,10 @@ int run(int argc, char *argv[])
         rc = beak->importMedia(&settings, monitor.get());
         break;
 
+    case indexmedia_cmd:
+        rc = beak->indexMedia(&settings, monitor.get());
+        break;
+
     case status_cmd:
         rc = beak->status(&settings, monitor.get());
         break;

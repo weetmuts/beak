@@ -86,6 +86,7 @@ struct BeakImplementation : Beak {
 
     RC shell(Settings *settings, Monitor *monitor);
     RC importMedia(Settings *settings, Monitor *monitor);
+    RC indexMedia(Settings *settings, Monitor *monitor);
 
     RC status(Settings *settings, Monitor *monitor);
     RC monitor(Settings *settings, Monitor *monitor);
