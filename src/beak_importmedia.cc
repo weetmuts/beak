@@ -55,6 +55,9 @@ struct ImportMediaData
         if (m && m->type() != MediaType::Unknown)
         {
             map_fs->mapFile(m->normalizedStat(), m->normalizedFile(), p);
+            UI::clearLine();
+            string status = db_.status("ing");
+            info(IMPORTMEDIA, "%s", status.c_str());
         }
     }
 

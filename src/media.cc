@@ -781,7 +781,24 @@ Media *MediaDatabase::addFile(Path *p, FileStat *st)
     }
     Media *m = &media_files_[p];
     bool ok = m->readFile(p, st, fs_);
-    if (ok) return m;
+    if (ok) {
+        if (m->type() == MediaType::IMG)
+        {
+            img_suffix_count_[m->ext()]++;
+            img_suffix_size_[m->ext()]+=st->st_size;
+        }
+        if (m->type() == MediaType::VID)
+        {
+            vid_suffix_count_[m->ext()]++;
+            vid_suffix_size_[m->ext()]+=st->st_size;
+        }
+        if (m->type() == MediaType::AUD)
+        {
+            aud_suffix_count_[m->ext()]++;
+            aud_suffix_size_[m->ext()]+=st->st_size;
+        }
+        return m;
+    }
     return NULL;
 }
 

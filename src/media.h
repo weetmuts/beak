@@ -36,6 +36,7 @@ public:
     FileStat sourceStat() { return source_stat_; }
     int year() { return tm_.tm_year+1900; }
     Path* thmbFile() {  return thmb_file_; }
+    string ext() { return ext_; }
 
 protected:
     MediaType type_ {};
