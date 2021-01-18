@@ -50,8 +50,8 @@ struct IndexMedia
 
     int num_ {};
 
-    IndexMedia(BeakImplementation *beak, Settings *settings, Monitor *monitor, FileSystem *fs)
-        : beak_(beak), db_(fs), settings_(settings), monitor_(monitor), fs_(fs)
+    IndexMedia(BeakImplementation *beak, Settings *settings, Monitor *monitor, FileSystem *fs, System *sys)
+        : beak_(beak), db_(fs, sys), settings_(settings), monitor_(monitor), fs_(fs)
     {
     }
 
@@ -110,7 +110,7 @@ RC BeakImplementation::indexMedia(Settings *settings, Monitor *monitor)
 
     Path *root = settings->from.origin;
 
-    IndexMedia index_media(this, settings, monitor, local_fs_);
+    IndexMedia index_media(this, settings, monitor, local_fs_, sys_);
 
     FileStat origin_dir_stat;
     local_fs_->stat(root, &origin_dir_stat);
@@ -146,13 +146,18 @@ RC BeakImplementation::indexMedia(Settings *settings, Monitor *monitor)
                 index_media.db_.generateThumbnail(&p.second, root);
                 string &xmq = index_media.xmq_[year];
                 string tmp;
+                if (p.second.type() == MediaType::VID)
+                {
+                    tmp = "span(class=playbtn) = '▶️'";
+                }
                 strprintf(tmp,
                           "        a(href='%s')\n"
                           "        {\n"
-                          "            img(src='%s')\n"
+                          "            img(src='%s')%s\n"
                           "        }\n",
                           p.second.normalizedFile()->c_str()+1,
-                          p.second.thmbFile()->c_str());
+                          p.second.thmbFile()->c_str()+1,
+                          tmp.c_str());
                 xmq += tmp;
             }
         }
@@ -221,17 +226,30 @@ RC BeakImplementation::indexMedia(Settings *settings, Monitor *monitor)
         local_fs_->createFile(index_html, &output);
     }
 
-    string css =
-        "img {\n"
-        "vertial-align: top;\n"
-        "}\n"
-        "body {\n"
-        "background: black;\n"
-        "}\n"
-        "a, a:link, a:visited, a:hover, a:active {\n"
-        "color:white;\n"
-        "}\n";
-    vector<char> csss(css.begin(), css.end());
+    const char *css = R"CSS(
+img {
+    vertial-align: top;
+}
+body {
+    background: black;
+}
+a, a:link, a:visited, a:hover, a:active {
+    color:white;
+    position:relative;
+}
+.playbtn {
+   position: absolute;
+   width: 96px;
+   height: 96px;
+   left: 50%;
+   top: 50%;
+   margin-left: -48px;
+   margin-top: -48px;
+   font-size: 32px;
+}
+)CSS";
+
+    vector<char> csss(css, css+strlen(css));
 
     Path *style = root->append("style.css");
     local_fs_->createFile(style, &csss);

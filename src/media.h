@@ -36,7 +36,6 @@ public:
     FileStat sourceStat() { return source_stat_; }
     int year() { return tm_.tm_year+1900; }
     Path* thmbFile() {  return thmb_file_; }
-    void setThmbFile(Path *tf) { thmb_file_ = tf; }
 
 protected:
     MediaType type_ {};
@@ -67,10 +66,11 @@ public:
     string duplicateFiles();
     RC generateThumbnail(Media *m, Path *root);
 
-    MediaDatabase(FileSystem *fs) : fs_(fs) {}
+MediaDatabase(FileSystem *fs, System *sys) : fs_(fs), sys_(sys) {}
 
 protected:
     FileSystem *fs_ {};
+    System *sys_ {};
     map<Path*,Media> media_files_;
 
     int num_media_files_ {};

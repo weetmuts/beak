@@ -44,8 +44,8 @@ struct ImportMediaData
     Monitor *monitor_ {};
     FileSystem *fs_ {};
 
-    ImportMediaData(BeakImplementation *beak, Settings *settings, Monitor *monitor, FileSystem *fs)
-        : beak_(beak), db_(fs), settings_(settings), monitor_(monitor), fs_(fs)
+    ImportMediaData(BeakImplementation *beak, Settings *settings, Monitor *monitor, FileSystem *fs, System *sys)
+        : beak_(beak), db_(fs, sys), settings_(settings), monitor_(monitor), fs_(fs)
     {
     }
 
@@ -94,7 +94,7 @@ RC BeakImplementation::importMedia(Settings *settings, Monitor *monitor)
     assert(settings->from.type == ArgOrigin);
     assert(settings->to.type == ArgStorage);
 
-    ImportMediaData import_media(this, settings, monitor, local_fs_);
+    ImportMediaData import_media(this, settings, monitor, local_fs_, sys_);
 
     auto map_fs = newMapFileSystem(local_fs_);
     MapFileSystem *fs = map_fs.get();

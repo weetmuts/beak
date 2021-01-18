@@ -494,7 +494,17 @@ Path *Media::normalizedFile()
               hex.c_str(),
               ext_.c_str());
 
+    string thmb;
+    strprintf(thmb, "/thumbnails/%04d/%02d/%02d/thmb_%s_%04d%02d%02d_%02d%02d%02d_%dx%d_%zu_%lu.%lu_%s_%s.jpg",
+              tm_.tm_year+1900, tm_.tm_mon+1, tm_.tm_mday, toString(type_),
+              tm_.tm_year+1900, tm_.tm_mon+1, tm_.tm_mday, tm_.tm_hour, tm_.tm_min, tm_.tm_sec,
+              width_, height_, size_,
+              ts_.tv_sec, ts_.tv_nsec,
+              metas_.c_str(),
+              hex.c_str());
+
     normalized_file_ = Path::lookup(name);
+    thmb_file_ = Path::lookup(thmb);
     return normalized_file_;
 }
 
@@ -783,10 +793,9 @@ RC MediaDatabase::generateThumbnail(Media *m, Path *root)
         return RC::OK;
     }
     Path *img = m->normalizedFile();
+    Path *thmb = m->thmbFile();
     Path *source = img->prepend(root);
-    Path *prefix = img->parent();
-    Path *target = Path::lookup(root->str()+"/thumbnails"+prefix->str()+"/"+string("thmb_")+img->name()->str());
-    m->setThmbFile(target);
+    Path *target = thmb->prepend(root);
 
     FileStat original, thumb;
     RC org = fs_->stat(source, &original);
@@ -804,21 +813,59 @@ RC MediaDatabase::generateThumbnail(Media *m, Path *root)
             return RC::OK;
         }
     }
-    Magick::Image image;
-    try {
-        // Read a file into image object
-        image.read(source->c_str());
-        // Crop the image to specified size (width, height, xOffset, yOffset)
-        image.resize( Magick::Geometry(256, 128, 0, 0) );
-        fs_->mkDirpWriteable(target->parent());
-        image.write(target->c_str());
-        fs_->utime(target, &original);
-        verbose(MEDIA, "wrote thumbnail %s\n", target->c_str());
-    }
-    catch( Magick::Exception &error_ )
+    if (m->type() == MediaType::IMG)
     {
-        warning(MEDIA, "Caught exception: %s\n", error_.what());
-        return RC::ERR;
+        Magick::Image image;
+        try {
+            // Read a file into image object
+            image.read(source->c_str());
+            // Crop the image to specified size (width, height, xOffset, yOffset)
+            image.resize( Magick::Geometry(256, 128, 0, 0) );
+            fs_->mkDirpWriteable(target->parent());
+            image.write(target->c_str());
+            fs_->utime(target, &original);
+            verbose(MEDIA, "wrote thumbnail %s\n", target->c_str());
+        }
+        catch( Magick::Exception &error_ )
+        {
+            warning(MEDIA, "Caught exception: %s\n", error_.what());
+            return RC::ERR;
+        }
     }
+    if (m->type() == MediaType::VID)
+    {
+        fs_->mkDirpWriteable(target->parent());
+        vector<char> output;
+        vector<string> args;
+        args.push_back("-loglevel");
+        args.push_back("fatal");
+        args.push_back("-y");
+        args.push_back("-i");
+        args.push_back(source->str());
+        args.push_back("-ss");
+        args.push_back("00:00:00.000");
+        args.push_back("-vframes");
+        args.push_back("1");
+        args.push_back("-filter:v");
+        args.push_back("scale=128:-1");
+        args.push_back(target->str());
+        RC rc = sys_->invoke("ffmpeg",
+                             args,
+                             &output,
+                             CaptureBoth);
+        if (rc.isOk())
+        {
+            fprintf(stderr, "VID OK\n");
+            fs_->utime(target, &original);
+        }
+        else
+        {
+            info(MEDIA, "Could not thumbnail %s\n%.*s\n", source->c_str(), (int)output.size(), &output[0]);
+        }
+
+        //ffmpeg -i sdf/2015/08/03/vid_20150803_123154_1920x1080_36492225_1438597914.0_f_abc1bc7322b819140de29524998ff8aea8d4cfb50ed22cb8f5e4437839af9a30.mov -ss 00:00:00.000 -vframes 1 -filter:v scale="128:-1" thumb.jpg
+    }
+
+
     return RC::OK;
 }
