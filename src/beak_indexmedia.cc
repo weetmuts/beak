@@ -22,6 +22,7 @@
 #include "backup.h"
 #include "filesystem_helpers.h"
 #include "log.h"
+#include "media.h"
 #include "storagetool.h"
 #include "system.h"
 
@@ -38,60 +39,20 @@ static ComponentId INDEXMEDIA = registerLogComponent("importmedia");
 struct IndexMedia
 {
     BeakImplementation *beak_ {};
-
+    MediaDatabase db_;
+    map<Path*,Media> medias_;
+    vector<Path*> sorted_medias_;
+    set<int> years_;
+    map<int,string> xmq_;
     Settings *settings_ {};
     Monitor *monitor_ {};
     FileSystem *fs_ {};
 
     int num_ {};
-    vector<Path*> index_files_;
-
-    map<string,string> img_suffixes_;
-    map<string,string> vid_suffixes_;
-    map<string,string> aud_suffixes_;
-
-    string xmq_;
 
     IndexMedia(BeakImplementation *beak, Settings *settings, Monitor *monitor, FileSystem *fs)
-        : beak_(beak), settings_(settings), monitor_(monitor), fs_(fs)
+        : beak_(beak), db_(fs), settings_(settings), monitor_(monitor), fs_(fs)
     {
-        vid_suffixes_["avi"] = "avi";
-        vid_suffixes_["AVI"] = "avi";
-
-        vid_suffixes_["flv"] = "flv";
-        vid_suffixes_["FLV"] = "flv";
-
-        vid_suffixes_["m4v"] = "m4v";
-        vid_suffixes_["M4V"] = "m4v";
-
-        vid_suffixes_["mov"] = "mov";
-        vid_suffixes_["MOV"] = "mov";
-
-        vid_suffixes_["mkv"] = "mkv";
-        vid_suffixes_["MKV"] = "mkv";
-
-        vid_suffixes_["mp4"] = "mp4";
-        vid_suffixes_["MP4"] = "mp4";
-
-        vid_suffixes_["webm"] = "webm";
-        vid_suffixes_["WEBM"] = "webm";
-
-        vid_suffixes_["wmv"] = "wmv";
-        vid_suffixes_["WMV"] = "wmv";
-
-        img_suffixes_["jpg"] = "jpg";
-        img_suffixes_["jpeg"] = "jpg";
-
-        img_suffixes_["JPG"] = "jpg";
-        img_suffixes_["JPEG"] = "jpg";
-
-        img_suffixes_["ogg"] = "ogg";
-        img_suffixes_["OGG"] = "ogg";
-
-        img_suffixes_["png"] = "png";
-        img_suffixes_["PNG"] = "png";
-
-        Magick::InitializeMagick(NULL);
     }
 
     string status(const char *tense)
@@ -107,82 +68,37 @@ struct IndexMedia
         if (st->isDirectory()) return;
 
         assert(p != NULL);
-        index_files_.push_back(p);
 
-        if (num_ % 100 == 0)
+        if (!strncmp("thmb_", p->name()->c_str(), 5))
         {
-            UI::clearLine();
-            string st = status("ing");
-            info(INDEXMEDIA, "%s\n", st.c_str());
+            // This is a thumbnail! Skip it!
+            return;
         }
-        num_++;
 
+        Media m;
+        bool ok = m.parseFileName(p);
+        if (!ok) return;
+
+        medias_[m.normalizedFile()] = m;
+
+        UI::clearLine();
+        info(INDEXMEDIA, "Indexing %zu media files.", medias_.size());
     }
 
     void sortFiles()
     {
-        sort(index_files_.begin(), index_files_.end(),
-             [](Path *a, Path *b)->bool { assert(a); assert(b); return strcmp(a->c_str(), b->c_str()) < 0; });
+        for (auto &p : medias_)
+        {
+            sorted_medias_.push_back(p.first);
+            years_.insert(p.second.year());
+        }
+        sort(sorted_medias_.begin(), sorted_medias_.end(),
+          [](Path *a, Path *b)->bool { assert(a); assert(b); return strcmp(a->c_str(), b->c_str()) < 0; });
     }
 
     void printTodo()
     {
         info(INDEXMEDIA, "Will thumbnail and index %d files.\n", num_);
-    }
-
-    RC generateThumbnail(Path *root, Path *img)
-    {
-        string ext = img->name()->ext_c_str_();
-        if (img_suffixes_.count(ext) == 0) return RC::OK;
-
-        // Is this a thumbnail?
-        if (!strncmp("thmb_", img->name()->c_str(), 5))
-        {
-            // This is a thumbnail! Skip it!
-            return RC::OK;
-        }
-
-        Path *prefix = img->parent();
-        prefix = prefix->subpath(root->depth());
-        Path *target = Path::lookup(root->str()+"/thumbnails/"+prefix->str()+"/"+string("thmb_")+img->name()->str());
-
-        FileStat original, thumb;
-        RC org = fs_->stat(img, &original);
-        RC thm = fs_->stat(target, &thumb);
-
-        string imglink;
-        strprintf(imglink, "a(href=%s){ img(src=%s) }\n", img->subpath(root->depth())->c_str(), target->subpath(root->depth())->c_str());
-        xmq_ += imglink;
-
-        if (org.isErr()) return RC::ERR; // Oups the original no longer exist!
-        if (thm.isOk())
-        {
-            // The thumbnail already exist, check its timestamp.
-            if (original.sameMTime(&thumb))
-            {
-                // The thumbnail has the same mtime as the original.
-                // We assume the thumbnails does not need to be written again.
-                verbose(INDEXMEDIA, "thumbnail up to date %s\n", target->c_str());
-                return RC::OK;
-            }
-        }
-        Magick::Image image;
-        try {
-            // Read a file into image object
-            image.read(img->c_str());
-            // Crop the image to specified size (width, height, xOffset, yOffset)
-            image.resize( Magick::Geometry(256, 128, 0, 0) );
-            fs_->mkDirpWriteable(target->parent());
-            image.write(target->c_str());
-            fs_->utime(target, &original);
-            verbose(INDEXMEDIA, "wrote thumbnail %s\n", target->c_str());
-        }
-        catch( Magick::Exception &error_ )
-        {
-            cout << "Caught exception: " << error_.what() << endl;
-            return RC::ERR;
-        }
-        return RC::OK;
     }
 };
 
@@ -192,53 +108,133 @@ RC BeakImplementation::indexMedia(Settings *settings, Monitor *monitor)
 
     assert(settings->from.type == ArgOrigin);
 
-    Path *src = settings->from.origin;
+    Path *root = settings->from.origin;
 
     IndexMedia index_media(this, settings, monitor, local_fs_);
 
     FileStat origin_dir_stat;
-    local_fs_->stat(src, &origin_dir_stat);
+    local_fs_->stat(root, &origin_dir_stat);
     if (!origin_dir_stat.isDirectory())
     {
-        usageError(INDEXMEDIA, "Not a directory: %s\n", src->c_str());
+        usageError(INDEXMEDIA, "Not a directory: %s\n", root->c_str());
     }
 
-    info(INDEXMEDIA, "Indexing media inside %s\n", src->c_str());
+    info(INDEXMEDIA, "Indexing media inside %s\n", root->c_str());
 
-    local_fs_->recurse(src, [&index_media](Path *p, FileStat *st) {
+    local_fs_->recurse(root, [&index_media](Path *p, FileStat *st) {
             index_media.indexFile(p, st);
             return RecurseOption::RecurseContinue;
         });
 
     UI::clearLine();
-    string st = index_media.status("ed");
-    info(INDEXMEDIA, "%s\n", st.c_str());
-
-    index_media.printTodo();
+    info(INDEXMEDIA, "Indexed %zu media files.\n", index_media.medias_.size());
 
     unique_ptr<ProgressStatistics> progress = monitor->newProgressStatistics(buildJobName("import", settings));
     progress->startDisplayOfProgress();
 
     index_media.sortFiles();
 
-    info(INDEXMEDIA, "Generating thumbnails and indexing media... %d\n", index_media.index_files_.size());
+    info(INDEXMEDIA, "Generating thumbnails and indexing media...\n");
 
-    for (auto p : index_media.index_files_)
+    for (int year : index_media.years_)
     {
-        index_media.generateThumbnail(src, p);
-    }
-    /*
-    local_fs_->recurse(src, [&index_media,settings,src](Path *p, FileStat *st) {
-            if (st->isRegularFile())
+        info(INDEXMEDIA, "%d\n", year);
+        for (auto &p : index_media.medias_)
+        {
+            if (p.second.year() == year)
             {
-                index_media.generateThumbnail(src, p);
+                index_media.db_.generateThumbnail(&p.second, root);
+                string &xmq = index_media.xmq_[year];
+                string tmp;
+                strprintf(tmp,
+                          "        a(href='%s')\n"
+                          "        {\n"
+                          "            img(src='%s')\n"
+                          "        }\n",
+                          p.second.normalizedFile()->c_str()+1,
+                          p.second.thmbFile()->c_str());
+                xmq += tmp;
             }
-            return RecurseOption::RecurseContinue;
-            });*/
-    info(INDEXMEDIA, "done\n");
+        }
+    }
 
-    index_media.xmq_ = "html { body(bgcolor=black) {" + index_media.xmq_ + "} }";
+    string top_xmq =
+        "html {\n"
+        "    head { link(rel=stylesheet href=style.css) }\n"
+        "    body {\n";
 
-    fprintf(stderr, "%s", index_media.xmq_.c_str());
+    for (int year : index_media.years_)
+    {
+        string tmp;
+        strprintf(tmp,
+                  "    a(href=index_%d.html) = %d\n"
+                  "    br\n", year, year);
+        top_xmq += tmp;
+
+        tmp =
+            "html {\n"
+            "    head { link(rel=stylesheet href=style.css) }\n"
+            "    body {\n"+
+            index_media.xmq_[year]+
+            "    }\n"+
+            "}\n";
+
+        string filename;
+        strprintf(filename, "index_%d.xmq", year);
+        Path *index_xmq = root->append(filename);
+        strprintf(filename, "index_%d.html", year);
+        Path *index_html = root->append(filename);
+        vector<char> content(tmp.begin(), tmp.end());
+        local_fs_->createFile(index_xmq, &content);
+
+        vector<char> output;
+        vector<string> args;
+        args.push_back("--nopp");
+        args.push_back(index_xmq->str());
+        RC rc = sys_->invoke("xmq",
+                       args,
+                       &output);
+        if (rc.isOk())
+        {
+            local_fs_->createFile(index_html, &output);
+        }
+    }
+
+    top_xmq +=
+        "    }\n"
+        "}\n";
+    vector<char> topp(top_xmq.begin(), top_xmq.end());
+    Path *index_xmq = root->append("index.xmq");
+    local_fs_->createFile(index_xmq, &topp);
+
+    Path *index_html = root->append("index.html");
+
+    vector<char> output;
+    vector<string> args;
+    args.push_back("--nopp");
+    args.push_back(index_xmq->str());
+    rc = sys_->invoke("xmq",
+                         args,
+                         &output);
+    if (rc.isOk())
+    {
+        local_fs_->createFile(index_html, &output);
+    }
+
+    string css =
+        "img {\n"
+        "vertial-align: top;\n"
+        "}\n"
+        "body {\n"
+        "background: black;\n"
+        "}\n"
+        "a, a:link, a:visited, a:hover, a:active {\n"
+        "color:white;\n"
+        "}\n";
+    vector<char> csss(css.begin(), css.end());
+
+    Path *style = root->append("style.css");
+    local_fs_->createFile(style, &csss);
+
     return rc;
 }

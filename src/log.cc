@@ -264,10 +264,10 @@ void logDebug(ComponentId ci, const char* fmt, ...) {
         va_list args;
         va_start(args, fmt);
         if (use_syslog) {
-	    syslog(LOG_INFO, "%s: ", all_components_[ci]);
+	    syslog(LOG_INFO, "(%s) ", all_components_[ci]);
             vsyslog(LOG_DEBUG, fmt, args);
         } else {
-	    fprintf(stdout, "%s: ", all_components_[ci]);
+	    fprintf(stdout, "(%s) ", all_components_[ci]);
             vfprintf(stdout, fmt, args);
         }
         va_end(args);
@@ -281,10 +281,10 @@ void logTrace(ComponentId ci, const char* fmt, ...) {
         va_list args;
         va_start(args, fmt);
         if (use_syslog) {
-	    syslog(LOG_INFO, "%s: ", all_components_[ci]);
+	    syslog(LOG_INFO, "(%s) ", all_components_[ci]);
             vsyslog(LOG_DEBUG, fmt, args);
         } else {
-	    fprintf(stdout, "%s: ", all_components_[ci]);
+	    fprintf(stdout, "(%s) ", all_components_[ci]);
             vfprintf(stdout, fmt, args);
         }
         va_end(args);

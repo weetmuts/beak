@@ -45,9 +45,6 @@ private:
     int val {};
 };
 
-// The RC return code type is used instead of an integer typedef.
-// This is necessary to prevent all those annoying automatic
-// to integer conversions that introduce bugs in the code.
 typedef ReturnCode RC;
 
 #define XSTR(s) STR(s)

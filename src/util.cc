@@ -509,6 +509,7 @@ string toHex(const char *b, size_t len)
 
 string toHex(vector<char> &b)
 {
+    if (b.size() == 0) return "";
     return toHex(&b[0], b.size());
 }
 
@@ -523,18 +524,22 @@ int char2int(char input)
     return -1;
 }
 
-void hex2bin(string s, vector<char> *target)
+bool hex2bin(string s, vector<char> *target)
 {
     char *src = &s[0];
-    if (!src) return;
+    if (!src) return false;
     while(*src && src[1]) {
         if (*src == ' ') {
             src++;
         } else {
-            target->push_back(char2int(*src)*16 + char2int(src[1]));
+            int a = char2int(*src);
+            int b = char2int(src[1]);
+            if (a < 0 || b < 0) return false;
+            target->push_back(a*16 + b);
             src += 2;
         }
     }
+    return true;
 }
 
 #ifdef PLATFORM_WINAPI
@@ -911,6 +916,21 @@ RC parseDateTime(string dt, time_t *out)
     tp.tm_mon -= 1;
 
     *out = mktime(&tp);
+    return RC::OK;
+}
+
+RC parseYYYYMMDDhhmmss(string dt, struct tm *tp)
+{
+    // 2019-03-20 15:32:12
+    int n = sscanf(dt.c_str(), "%04d%02d%02d%02d%02d%02d",
+                   &tp->tm_year, &tp->tm_mon, &tp->tm_mday,
+                   &tp->tm_hour, &tp->tm_min, &tp->tm_sec);
+    if (n<3) {
+        return RC::ERR;
+    }
+    tp->tm_year -= 1900;
+    tp->tm_mon -= 1;
+
     return RC::OK;
 }
 
