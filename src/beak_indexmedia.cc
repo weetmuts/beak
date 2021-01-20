@@ -136,27 +136,41 @@ RC BeakImplementation::indexMedia(Settings *settings, Monitor *monitor)
 
     info(INDEXMEDIA, "Generating thumbnails and indexing media...\n");
 
+    string prev_date;
     for (int year : index_media.years_)
     {
         info(INDEXMEDIA, "%d\n", year);
-        for (auto &p : index_media.medias_)
+        for (Path *p : index_media.sorted_medias_)
         {
-            if (p.second.year() == year)
+            Media *m = &index_media.medias_[p];
+            if (m->year() == year)
             {
-                index_media.db_.generateThumbnail(&p.second, root);
                 string &xmq = index_media.xmq_[year];
+                if (prev_date != m->yymmdd())
+                {
+                    prev_date = m->yymmdd();
+                    string tmp;
+                    strprintf(tmp, "h1='%s'\n", m->yymmdd().c_str());
+                    xmq += tmp;
+                }
+                if (m->width() == 0 && m->height() == 0) continue;
+                index_media.db_.generateThumbnail(m, root);
                 string tmp;
-                if (p.second.type() == MediaType::VID)
+                if (m->type() == MediaType::VID)
                 {
                     tmp = "span(class=playbtn) = '▶️'";
                 }
+    const char *templ = R"CSS(
+a(href='%s')
+{
+img(src='%s') %s
+}
+)CSS";
+
                 strprintf(tmp,
-                          "        a(href='%s')\n"
-                          "        {\n"
-                          "            img(src='%s')%s\n"
-                          "        }\n",
-                          p.second.normalizedFile()->c_str()+1,
-                          p.second.thmbFile()->c_str()+1,
+                          templ,
+                          m->normalizedFile()->c_str()+1,
+                          m->thmbFile()->c_str()+1,
                           tmp.c_str());
                 xmq += tmp;
             }
@@ -236,6 +250,9 @@ body {
 a, a:link, a:visited, a:hover, a:active {
     color:white;
     position:relative;
+}
+h1 {
+color:white;
 }
 .playbtn {
    position: absolute;

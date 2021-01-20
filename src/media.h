@@ -30,6 +30,8 @@ public:
     bool parseFileName(Path *p);
 
     MediaType type() { return type_; }
+    int width() { return width_; }
+    int height() { return height_; }
     Path* normalizedFile();
     FileStat normalizedStat() { return normalized_stat_; }
     Path* sourceFile() { return source_file_; }
@@ -37,6 +39,7 @@ public:
     int year() { return tm_.tm_year+1900; }
     Path* thmbFile() {  return thmb_file_; }
     string ext() { return ext_; }
+    string yymmdd() { return yymmdd_; }
 
 protected:
     MediaType type_ {};
@@ -54,6 +57,7 @@ protected:
     Path *source_file_ {};
     FileStat source_stat_ {};
     Path *thmb_file_ {};
+    string yymmdd_;
 };
 
 class MediaDatabase

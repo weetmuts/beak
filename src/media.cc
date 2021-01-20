@@ -503,6 +503,9 @@ Path *Media::normalizedFile()
               metas_.c_str(),
               hex.c_str());
 
+    strprintf(yymmdd_, "%04d%02d%02d",
+    tm_.tm_year+1900, tm_.tm_mon+1, tm_.tm_mday);
+
     normalized_file_ = Path::lookup(name);
     thmb_file_ = Path::lookup(thmb);
     return normalized_file_;
