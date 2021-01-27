@@ -59,6 +59,7 @@ struct MediaHelper
     bool getFFMPEGMetaData(Path *p,
                            struct timespec *ts, struct tm *tm,
                            int *width, int *height,
+                           Orientation *o,
                            vector<char> *hash, string *metas);
     bool getDateFromStat(FileStat *st, struct timespec *ts, struct tm *tm);
     bool getDateFromPath(Path *p, struct timespec *ts, struct tm *tm);
@@ -291,10 +292,13 @@ bool MediaHelper::getExiv2MetaData(Path *p,
         image->readMetadata();
         *width = image->pixelWidth();
         *height = image->pixelHeight();
+        *o = Orientation::None;
+
         bool meta_data_found = false;
 
         Exiv2::ExifData &exifData = image->exifData();
-        bool ed_found = false;
+        bool ed_found = false; // exit date found
+        bool eo_found = false; // exif orientation found
         Exiv2::IptcData &iptcData = image->iptcData();
         bool id_found = false;
         Exiv2::XmpData &xmpData = image->xmpData();
@@ -302,6 +306,7 @@ bool MediaHelper::getExiv2MetaData(Path *p,
 
         SHA256_CTX sha256ctx;
         SHA256_Init(&sha256ctx);
+
 
         auto end = exifData.end();
         for (auto i = exifData.begin(); i != end; ++i)
@@ -312,6 +317,17 @@ bool MediaHelper::getExiv2MetaData(Path *p,
                 meta_data_found = true;
                 ed_found = true;
                 *metas += "e";
+            }
+            if (eo_found == false && *o != Orientation::None)
+            {
+                eo_found = true;
+                switch (*o)
+                {
+                case Orientation::None: break;
+                case Orientation::Deg90: *metas += "90"; break;
+                case Orientation::Deg180: *metas += "90"; break;
+                case Orientation::Deg270: *metas += "270"; break;
+                }
             }
         }
 
@@ -399,6 +415,7 @@ bool MediaHelper::getDateFromStat(FileStat *st, struct timespec *ts, struct tm *
 bool MediaHelper::getFFMPEGMetaData(Path *p,
                                     struct timespec *ts, struct tm *tm,
                                     int *width, int *height,
+                                    Orientation *o,
                                     vector<char> *hash, string *metas)
 {
     AVFormatContext* av = avformat_alloc_context();
@@ -471,6 +488,27 @@ bool MediaHelper::getFFMPEGMetaData(Path *p,
     }
     if (video_stream_index != -1)
     {
+        AVDictionaryEntry *rotate_tag = av_dict_get(av->streams[video_stream_index]->metadata, "rotate", NULL, 0);
+        if (rotate_tag)
+        {
+            string ct = rotate_tag->value;
+            printf("GURKA ROTATE %s\n", ct.c_str());
+            if (ct == "90")
+            {
+                *o = Orientation::Deg90;
+                *metas += "90";
+            }
+            if (ct == "180")
+            {
+                *o = Orientation::Deg180;
+                *metas += "180";
+            }
+            if (ct == "270")
+            {
+                *o = Orientation::Deg180;
+                *metas += "270";
+            }
+        }
         // Get a pointer to the codec context for the video stream
         pCodecCtx = av->streams[video_stream_index]->codecpar;
         assert(pCodecCtx != NULL);
@@ -674,7 +712,7 @@ bool Media::readFile(Path *p, FileStat *st, FileSystem *fs)
 
     if (media_helper_.vid_suffixes_.count(ext) > 0)
     {
-        valid_date_from_ffmpeg = media_helper_.getFFMPEGMetaData(p, &ffmpeg_ts, &ffmpeg_tm, &width_, &height_, &hash_, &metas_);
+        valid_date_from_ffmpeg = media_helper_.getFFMPEGMetaData(p, &ffmpeg_ts, &ffmpeg_tm, &width_, &height_, &orientation_, &hash_, &metas_);
     }
 
     struct timespec path_ts {};
@@ -919,6 +957,8 @@ RC MediaDatabase::generateThumbnail(Media *m, Path *root)
     if (m->type() == MediaType::VID)
     {
         fs_->mkDirpWriteable(target->parent());
+        string scale;
+        strprintf(scale, "scale=%d:%d", m->thmbWidth(), m->thmbHeight());
         vector<char> output;
         vector<string> args;
         args.push_back("-loglevel");
@@ -931,7 +971,7 @@ RC MediaDatabase::generateThumbnail(Media *m, Path *root)
         args.push_back("-vframes");
         args.push_back("1");
         args.push_back("-filter:v");
-        args.push_back("scale=128:-1");
+        args.push_back(scale.c_str());
         args.push_back(target->str());
         RC rc = sys_->invoke("ffmpeg",
                              args,
