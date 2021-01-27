@@ -44,7 +44,8 @@ struct MediaHelper
 
     MediaHelper();
     bool exifEntry(Exiv2::ExifData::const_iterator i,
-                   struct timespec *ts, struct tm *tm, SHA256_CTX *sha256ctx);
+                   struct timespec *ts, struct tm *tm,
+                   Orientation *o, SHA256_CTX *sha256ctx);
     bool iptcEntry(Exiv2::IptcData::const_iterator i,
                    struct timespec *ts, struct tm *tm, SHA256_CTX *sha256ctx);
     bool xmpEntry(Exiv2::XmpData::const_iterator i,
@@ -52,6 +53,7 @@ struct MediaHelper
     bool getExiv2MetaData(Path *p,
                           struct timespec *ts, struct tm *tm,
                           int *width, int *height,
+                          Orientation *o,
                           vector<char> *hash,
                           string *metas);
     bool getFFMPEGMetaData(Path *p,
@@ -120,7 +122,7 @@ const char *toString(MediaType mt)
 }
 
 bool MediaHelper::exifEntry(Exiv2::ExifData::const_iterator i,
-                            struct timespec *ts, struct tm *tm, SHA256_CTX *sha256ctx)
+                            struct timespec *ts, struct tm *tm, Orientation *o, SHA256_CTX *sha256ctx)
 {
     debug(MEDIA,"    %s = %s\n", i->key().c_str(), i->value().toString().c_str());
     // Add the key to the hash.
@@ -133,36 +135,50 @@ bool MediaHelper::exifEntry(Exiv2::ExifData::const_iterator i,
     SHA256_Update(sha256ctx, buf, i->value().size());
 
     // Match both DateTime and DateTimeOriginal
-    if (i->key().find("Exif.Image.DateTime") != 0) return false;
-
-    // We have found DateTime or DateTimeOriginal
-    string v = i->value().toString();
-
-    debug(MEDIA, "    Found exif date: %s\n", v.c_str());
-
-    //if (i->typeName() == NULL || strcmp(i->typeName(),"Ascii")) return false;
-
-    const char *data = v.c_str();
-    memset(tm, 0, sizeof(*tm));
-    sscanf(data, "%d:%d:%d %d:%d:%d",
-           &tm->tm_year, &tm->tm_mon, &tm->tm_mday, &tm->tm_hour, &tm->tm_min, &tm->tm_sec);
-    if (tm->tm_year == 0)
+    if (i->key().find("Exif.Image.DateTime") == 0)
     {
-        // There was a date here, but it does not look ok...
-        debug(MEDIA, "Empty date: %s\n", v.c_str());
+        // We have found DateTime or DateTimeOriginal
+        string v = i->value().toString();
+
+        debug(MEDIA, "    Found exif date: %s\n", v.c_str());
+
+        const char *data = v.c_str();
+        memset(tm, 0, sizeof(*tm));
+        sscanf(data, "%d:%d:%d %d:%d:%d",
+               &tm->tm_year, &tm->tm_mon, &tm->tm_mday, &tm->tm_hour, &tm->tm_min, &tm->tm_sec);
+        if (tm->tm_year == 0)
+        {
+            // There was a date here, but it does not look ok...
+            debug(MEDIA, "Empty date: %s\n", v.c_str());
+            return false;
+        }
+        tm->tm_year -= 1900;
+        tm->tm_mon -= 1;
+        memset(ts, 0, sizeof(*ts));
+        ts->tv_sec = mktime(tm);
+        if (ts->tv_sec == -1)
+        {
+            // Oups the date is not a valid date!
+            debug(MEDIA, "Invalid date: %s\n", v.c_str());
+            return false;
+        }
+        // Datetime found!
+        return true;
+    }
+
+    if (i->key().find("Exif.Image.Orientation") == 0)
+    {
+        // We have an orientation
+        string v = i->value().toString();
+
+        if (v == "1") *o = Orientation::None;
+        if (v == "6") *o = Orientation::Deg90;
+        if (v == "3") *o = Orientation::Deg180;
+        if (v == "8") *o = Orientation::Deg270;
         return false;
     }
-    tm->tm_year -= 1900;
-    tm->tm_mon -= 1;
-    memset(ts, 0, sizeof(*ts));
-    ts->tv_sec = mktime(tm);
-    if (ts->tv_sec == -1)
-    {
-        // Oups the date is not a valid date!
-        debug(MEDIA, "Invalid date: %s\n", v.c_str());
-        return false;
-    }
-    return true;
+
+    return false;
 }
 
 bool MediaHelper::iptcEntry(Exiv2::IptcData::const_iterator i,
@@ -262,6 +278,7 @@ bool MediaHelper::xmpEntry(Exiv2::XmpData::const_iterator i,
 bool MediaHelper::getExiv2MetaData(Path *p,
                                    struct timespec *ts, struct tm *tm,
                                    int *width, int *height,
+                                   Orientation *o,
                                    vector<char> *hash,
                                    string *metas)
 {
@@ -274,7 +291,6 @@ bool MediaHelper::getExiv2MetaData(Path *p,
         image->readMetadata();
         *width = image->pixelWidth();
         *height = image->pixelHeight();
-
         bool meta_data_found = false;
 
         Exiv2::ExifData &exifData = image->exifData();
@@ -290,7 +306,7 @@ bool MediaHelper::getExiv2MetaData(Path *p,
         auto end = exifData.end();
         for (auto i = exifData.begin(); i != end; ++i)
         {
-            found_datetime |= exifEntry(i, ts, tm, &sha256ctx);
+            found_datetime |= exifEntry(i, ts, tm, o, &sha256ctx);
             if (ed_found == false)
             {
                 meta_data_found = true;
@@ -477,6 +493,19 @@ bool MediaHelper::getFFMPEGMetaData(Path *p,
     return found_creation_time;
 }
 
+void Media::calculateThmbSize()
+{
+    if (width_ == height_)
+    {
+        thmb_height_ = thmb_width_ = 256;
+    }
+    else
+    {
+        thmb_height_ = 256;
+        thmb_width_ = (int)(256.0*((double)width_)/((double)height_));
+    }
+}
+
 Path *Media::normalizedFile()
 {
     if (normalized_file_ != NULL) return normalized_file_;
@@ -494,9 +523,13 @@ Path *Media::normalizedFile()
               hex.c_str(),
               ext_.c_str());
 
+    calculateThmbSize();
+
     string thmb;
-    strprintf(thmb, "/thumbnails/%04d/%02d/%02d/thmb_%s_%04d%02d%02d_%02d%02d%02d_%dx%d_%zu_%lu.%lu_%s_%s.jpg",
-              tm_.tm_year+1900, tm_.tm_mon+1, tm_.tm_mday, toString(type_),
+    strprintf(thmb, "/thumbnails/%04d/%02d/%02d/thmb_%dx%d_%s_%04d%02d%02d_%02d%02d%02d_%dx%d_%zu_%lu.%lu_%s_%s.jpg",
+              tm_.tm_year+1900, tm_.tm_mon+1, tm_.tm_mday,
+              thmb_width_, thmb_height_,
+              toString(type_),
               tm_.tm_year+1900, tm_.tm_mon+1, tm_.tm_mday, tm_.tm_hour, tm_.tm_min, tm_.tm_sec,
               width_, height_, size_,
               ts_.tv_sec, ts_.tv_nsec,
@@ -632,7 +665,7 @@ bool Media::readFile(Path *p, FileStat *st, FileSystem *fs)
 
     if (media_helper_.img_suffixes_.count(ext) > 0)
     {
-        valid_date_from_exif = media_helper_.getExiv2MetaData(p, &exif_ts, &exif_tm, &width_, &height_, &hash_, &metas_);
+        valid_date_from_exif = media_helper_.getExiv2MetaData(p, &exif_ts, &exif_tm, &width_, &height_, &orientation_, &hash_, &metas_);
     }
 
     struct timespec ffmpeg_ts {};
@@ -688,6 +721,15 @@ bool Media::readFile(Path *p, FileStat *st, FileSystem *fs)
     normalized_stat_.st_mtim = ts_;
     normalized_stat_.st_atim = ts_;
     normalized_stat_.st_ctim = ts_;
+
+    if (orientation_ == Orientation::Deg90 ||
+        orientation_ == Orientation::Deg270)
+
+    {
+        int tmp = height_;
+        height_ = width_;
+        width_ = tmp;
+    }
 
     return true;
 }
@@ -805,6 +847,7 @@ Media *MediaDatabase::addFile(Path *p, FileStat *st)
     return NULL;
 }
 
+
 RC MediaDatabase::generateThumbnail(Media *m, Path *root)
 {
     if (m->type() == MediaType::THMB)
@@ -839,8 +882,29 @@ RC MediaDatabase::generateThumbnail(Media *m, Path *root)
         try {
             // Read a file into image object
             image.read(source->c_str());
-            // Crop the image to specified size (width, height, xOffset, yOffset)
-            image.resize( Magick::Geometry(256, 128, 0, 0) );
+            // Resize the image to specified size (width, height, xOffset, yOffset)
+            // Keep aspect ratio.
+            string s = image.attribute("EXIF:Orientation");
+            if (s != "1")
+            {
+                if (s == "6")
+                {
+                    printf("Rot 90\n");
+                    image.rotate(90);
+                }
+                else if (s == "3")
+                {
+                    printf("Rot 180\n");
+                    image.rotate(180);
+                }
+                else if (s == "8")
+                {
+                    printf("Rot 270\n");
+                    image.rotate(270);
+                }
+                image.attribute("EXIF:Orientation", "1");
+            }
+            image.scale( Magick::Geometry(m->thmbWidth(), m->thmbHeight()) );
             fs_->mkDirpWriteable(target->parent());
             image.write(target->c_str());
             fs_->utime(target, &original);

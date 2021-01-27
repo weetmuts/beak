@@ -47,11 +47,11 @@ struct IndexMedia
     Settings *settings_ {};
     Monitor *monitor_ {};
     FileSystem *fs_ {};
-
+    System *sys_ {};
     int num_ {};
 
     IndexMedia(BeakImplementation *beak, Settings *settings, Monitor *monitor, FileSystem *fs, System *sys)
-        : beak_(beak), db_(fs, sys), settings_(settings), monitor_(monitor), fs_(fs)
+        : beak_(beak), db_(fs, sys), settings_(settings), monitor_(monitor), fs_(fs), sys_(sys)
     {
     }
 
@@ -100,6 +100,182 @@ struct IndexMedia
     {
         info(INDEXMEDIA, "Will thumbnail and index %d files.\n", num_);
     }
+
+    void generateThumbnails(Path *root)
+    {
+        for (int year : years_)
+        {
+            info(INDEXMEDIA, "Thumbnailing %d\n", year);
+            for (Path *p : sorted_medias_)
+            {
+                Media *m = &medias_[p];
+                // Skip broken media.
+                if (m->width() == 0 && m->height() == 0) continue;
+
+                if (m->year() == year)
+                {
+                    db_.generateThumbnail(m, root);
+                }
+            }
+        }
+    }
+
+    void generateIndex(Path *root)
+    {
+        string prev_date;
+        int prev_year = 0;
+        int prev_month = 0;
+        int prev_day = 0;
+
+        for (int year : years_)
+        {
+            string &xmq = xmq_[year];
+            prev_month = 0;
+            prev_day = 0;
+            if (prev_year != year)
+            {
+                xmq += "div(class=year)="+to_string(year)+"\n";
+            }
+            info(INDEXMEDIA, "%d\n", year);
+            for (Path *p : sorted_medias_)
+            {
+                Media *m = &medias_[p];
+                // Skip broken media.
+                if (m->width() == 0 && m->height() == 0) continue;
+
+                if (m->year() == year)
+                {
+                    int month = m->month();
+                    int day = m->day();
+                    if (prev_month != month)
+                    {
+                        prev_month = month;
+                        prev_day = 0;
+                        xmq += "div(class='month m"+to_string(month)+"')\n";
+                    }
+                    if (prev_day != day)
+                    {
+                        prev_day = day;
+                        xmq += "div(class=day)="+to_string(day)+"\n";
+                    }
+                    string tmp;
+                    if (m->type() == MediaType::VID)
+                    {
+                        tmp = "span(class=playbtn) = '▶️'";
+                    }
+                    const char *templ = R"CSS(
+                        a(href='%s')
+                        {
+                            img(src='%s' width=%d height=%d) %s
+                        }
+                    )CSS";
+
+                    strprintf(tmp,
+                              templ,
+                              m->normalizedFile()->c_str()+1,
+                              m->thmbFile()->c_str()+1,
+                              m->thmbWidth(),
+                              m->thmbHeight(),
+                              tmp.c_str());
+                    xmq += tmp;
+                }
+            }
+        }
+
+        string top_xmq =
+            "html {\n"
+            "    head { link(rel=stylesheet href=style.css) }\n"
+            "    body {\n";
+
+        for (int year : years_)
+        {
+            string tmp;
+            strprintf(tmp,
+                      "    a(href=index_%d.html) = %d\n"
+                      "    br\n", year, year);
+            top_xmq += tmp;
+
+            tmp =
+                "html {\n"
+                "    head { link(rel=stylesheet href=style.css) }\n"
+                "    body {\n"+
+                xmq_[year]+
+                "    }\n"+
+                "}\n";
+
+            string filename;
+            strprintf(filename, "index_%d.xmq", year);
+            Path *index_xmq = root->append(filename);
+            strprintf(filename, "index_%d.html", year);
+            Path *index_html = root->append(filename);
+            vector<char> content(tmp.begin(), tmp.end());
+            fs_->createFile(index_xmq, &content);
+
+            vector<char> output;
+            vector<string> args;
+            args.push_back("--nopp");
+            args.push_back(index_xmq->str());
+            RC rc = sys_->invoke("xmq",
+                                 args,
+                                 &output);
+            if (rc.isOk())
+            {
+                fs_->createFile(index_html, &output);
+            }
+        }
+
+        top_xmq +=
+            "    }\n"
+            "}\n";
+        vector<char> topp(top_xmq.begin(), top_xmq.end());
+        Path *index_xmq = root->append("index.xmq");
+        fs_->createFile(index_xmq, &topp);
+
+        Path *index_html = root->append("index.html");
+
+        vector<char> output;
+        vector<string> args;
+        args.push_back("--nopp");
+        args.push_back(index_xmq->str());
+        RC rc = sys_->invoke("xmq",
+                          args,
+                          &output);
+        if (rc.isOk())
+        {
+            fs_->createFile(index_html, &output);
+        }
+
+        const char *css = R"CSS(
+img {
+    vertial-align: top;
+}
+body {
+    background: black;
+}
+a, a:link, a:visited, a:hover, a:active {
+    color:white;
+    position:relative;
+}
+h1 {
+color:white;
+}
+.playbtn {
+   position: absolute;
+   width: 96px;
+   height: 96px;
+   left: 50%;
+   top: 50%;
+   margin-left: -48px;
+   margin-top: -48px;
+   font-size: 32px;
+}
+)CSS";
+
+        vector<char> csss(css, css+strlen(css));
+
+        Path *style = root->append("style.css");
+        fs_->createFile(style, &csss);
+    }
 };
 
 RC BeakImplementation::indexMedia(Settings *settings, Monitor *monitor)
@@ -136,140 +312,9 @@ RC BeakImplementation::indexMedia(Settings *settings, Monitor *monitor)
 
     info(INDEXMEDIA, "Generating thumbnails and indexing media...\n");
 
-    string prev_date;
-    for (int year : index_media.years_)
-    {
-        info(INDEXMEDIA, "%d\n", year);
-        for (Path *p : index_media.sorted_medias_)
-        {
-            Media *m = &index_media.medias_[p];
-            if (m->year() == year)
-            {
-                string &xmq = index_media.xmq_[year];
-                if (prev_date != m->yymmdd())
-                {
-                    prev_date = m->yymmdd();
-                    string tmp;
-                    strprintf(tmp, "h1='%s'\n", m->yymmdd().c_str());
-                    xmq += tmp;
-                }
-                if (m->width() == 0 && m->height() == 0) continue;
-                index_media.db_.generateThumbnail(m, root);
-                string tmp;
-                if (m->type() == MediaType::VID)
-                {
-                    tmp = "span(class=playbtn) = '▶️'";
-                }
-    const char *templ = R"CSS(
-a(href='%s')
-{
-img(src='%s') %s
-}
-)CSS";
+    index_media.generateThumbnails(root);
+    index_media.generateIndex(root);
 
-                strprintf(tmp,
-                          templ,
-                          m->normalizedFile()->c_str()+1,
-                          m->thmbFile()->c_str()+1,
-                          tmp.c_str());
-                xmq += tmp;
-            }
-        }
-    }
-
-    string top_xmq =
-        "html {\n"
-        "    head { link(rel=stylesheet href=style.css) }\n"
-        "    body {\n";
-
-    for (int year : index_media.years_)
-    {
-        string tmp;
-        strprintf(tmp,
-                  "    a(href=index_%d.html) = %d\n"
-                  "    br\n", year, year);
-        top_xmq += tmp;
-
-        tmp =
-            "html {\n"
-            "    head { link(rel=stylesheet href=style.css) }\n"
-            "    body {\n"+
-            index_media.xmq_[year]+
-            "    }\n"+
-            "}\n";
-
-        string filename;
-        strprintf(filename, "index_%d.xmq", year);
-        Path *index_xmq = root->append(filename);
-        strprintf(filename, "index_%d.html", year);
-        Path *index_html = root->append(filename);
-        vector<char> content(tmp.begin(), tmp.end());
-        local_fs_->createFile(index_xmq, &content);
-
-        vector<char> output;
-        vector<string> args;
-        args.push_back("--nopp");
-        args.push_back(index_xmq->str());
-        RC rc = sys_->invoke("xmq",
-                       args,
-                       &output);
-        if (rc.isOk())
-        {
-            local_fs_->createFile(index_html, &output);
-        }
-    }
-
-    top_xmq +=
-        "    }\n"
-        "}\n";
-    vector<char> topp(top_xmq.begin(), top_xmq.end());
-    Path *index_xmq = root->append("index.xmq");
-    local_fs_->createFile(index_xmq, &topp);
-
-    Path *index_html = root->append("index.html");
-
-    vector<char> output;
-    vector<string> args;
-    args.push_back("--nopp");
-    args.push_back(index_xmq->str());
-    rc = sys_->invoke("xmq",
-                         args,
-                         &output);
-    if (rc.isOk())
-    {
-        local_fs_->createFile(index_html, &output);
-    }
-
-    const char *css = R"CSS(
-img {
-    vertial-align: top;
-}
-body {
-    background: black;
-}
-a, a:link, a:visited, a:hover, a:active {
-    color:white;
-    position:relative;
-}
-h1 {
-color:white;
-}
-.playbtn {
-   position: absolute;
-   width: 96px;
-   height: 96px;
-   left: 50%;
-   top: 50%;
-   margin-left: -48px;
-   margin-top: -48px;
-   font-size: 32px;
-}
-)CSS";
-
-    vector<char> csss(css, css+strlen(css));
-
-    Path *style = root->append("style.css");
-    local_fs_->createFile(style, &csss);
 
     return rc;
 }

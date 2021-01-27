@@ -20,6 +20,7 @@
 
 enum class MediaType { Unknown, IMG, VID, AUD, THMB };
 enum class DateFoundFrom { EXIF, IPTC, XMP, FFMPEG, PATH, STAT };
+enum class Orientation { None, Deg90, Deg180, Deg270 };
 
 class Media
 {
@@ -32,20 +33,26 @@ public:
     MediaType type() { return type_; }
     int width() { return width_; }
     int height() { return height_; }
+    int thmbWidth() { return thmb_width_; }
+    int thmbHeight() { return thmb_height_; }
     Path* normalizedFile();
     FileStat normalizedStat() { return normalized_stat_; }
     Path* sourceFile() { return source_file_; }
     FileStat sourceStat() { return source_stat_; }
     int year() { return tm_.tm_year+1900; }
+    int month() { return tm_.tm_mon+1; }
+    int day() { return tm_.tm_mday; }
     Path* thmbFile() {  return thmb_file_; }
     string ext() { return ext_; }
     string yymmdd() { return yymmdd_; }
+    Orientation orientation() { return orientation_; }
 
 protected:
     MediaType type_ {};
     struct timespec ts_ {};
     int width_ {};
     int height_ {};
+    Orientation orientation_ {};
     size_t size_ {};
     struct tm tm_ {};
     DateFoundFrom date_from_ {};
@@ -57,7 +64,11 @@ protected:
     Path *source_file_ {};
     FileStat source_stat_ {};
     Path *thmb_file_ {};
+    int thmb_width_ {};
+    int thmb_height_ {};
     string yymmdd_;
+
+    void calculateThmbSize();
 };
 
 class MediaDatabase
