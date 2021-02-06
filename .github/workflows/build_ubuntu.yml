@@ -8,14 +8,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - id: INSTALL_ADDITIONAL_BUILD_DEPENDENCIES
-      run: sudo apt-get install pkg-config fuse libfuse-dev librsync-dev libexiv2-dev libavformat-dev libmagick++-dev libgraphicsmagick++1-dev
-      run: sudo modprobe fuse
-      run: sudo chmod 666 /dev/fuse
-      run: sudo chown root:$USER /etc/fuse.conf
-    - id: CONFIGURE
-      run: ./configure
-    - id: MAKE
-      run: make
-    - id: TEST
-      run: make test
+    - run: sudo apt-get install pkg-config fuse libfuse-dev librsync-dev libexiv2-dev libavformat-dev libmagick++-dev libgraphicsmagick++1-dev
+    - run: |
+       sudo modprobe fuse
+       sudo chmod 666 /dev/fuse
+       sudo chown root:$USER /etc/fuse.conf
+    - run: ./configure
+    - run: make
+    - run: make test
