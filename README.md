@@ -7,9 +7,9 @@ stored backups between multiple client computers.
 
 Note! The storage format is still changing!
 
-| OS           | Status           |
+| System       | Status        |
 | ------------ |:-------------:|
-|GNU/Linux & MacOSX| [![Build Status](https://travis-ci.org/weetmuts/beak.svg?branch=master)](https://travis-ci.org/weetmuts/beak) |
+| Ubuntu | [![Build Ubuntu Status](https://github.com/weetmuts/beak/workflows/Build%20Ubuntu/badge.svg)](https://github.com/weetmuts/beak/actions)|
 
 ## Summary
 

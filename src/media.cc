@@ -492,7 +492,6 @@ bool MediaHelper::getFFMPEGMetaData(Path *p,
         if (rotate_tag)
         {
             string ct = rotate_tag->value;
-            printf("GURKA ROTATE %s\n", ct.c_str());
             if (ct == "90")
             {
                 *o = Orientation::Deg90;

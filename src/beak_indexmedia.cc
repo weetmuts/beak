@@ -166,7 +166,9 @@ struct IndexMedia
                     const char *templ = R"CSS(
                         a(href='%s')
                         {
-                            img(src='%s' width=%d height=%d) %s
+                            img(src='%s' width=%d height=%d)
+                            span(class=rotatebtn)=🔄
+                            %s
                         }
                     )CSS";
 
@@ -268,6 +270,18 @@ color:white;
    margin-left: -48px;
    margin-top: -48px;
    font-size: 32px;
+}
+.rotatebtn {
+   position: absolute;
+   display: hidden;
+   width: 96px;
+   height: 96px;
+   left:0px;
+   top: 0px;
+   font-size: 32px;
+}
+.rotatebtn:hover {
+ display: inline;
 }
 )CSS";
 
