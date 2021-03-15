@@ -317,7 +317,7 @@ else
     GCC_EXTRA_CXXFLAGS="-Wno-maybe-uninitialized"
 fi
 
-CXXFLAGS="-DPLATFORM_${PLATFORM} -D${MNEMONIC} -Wall -Werror -fmessage-length=0 -std=c++11 $GCC_EXTRA_CXXFLAGS -Wno-unused-function"
+CXXFLAGS="-DPLATFORM_${PLATFORM} -D${MNEMONIC} -Wall -Wno-warn=deprecated-declarations -Werror -Wno-error=deprecated-declarations -fmessage-length=0 -std=c++11 $GCC_EXTRA_CXXFLAGS -Wno-unused-function"
 
 CXXFLAGS_debug="-O0 -g ${ASAN_CFLAGS}
 CXXFLAGS_release="-Os

@@ -32,7 +32,8 @@ bool generateSignature(Path *old, FileSystem *old_fs,
 
     FILE *oldf = old_fs->openAsFILE(old, "rb");
     FILE *sigf = sig_fs->openAsFILE(sig, "rwb");
-    rs_result rc = rs_sig_file(oldf, sigf, block_len, strong_len, &stats);
+    rs_magic_number rmn;
+    rs_result rc = rs_sig_file(oldf, sigf, block_len, strong_len, rmn, &stats);
 
     fclose(sigf);
     fclose(oldf);
