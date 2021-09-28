@@ -274,6 +274,11 @@ To normalize the images and videos before you backup them, do:
 beak importmedia TempDir /home/you/Media
 ```
 
+Now generate thumbnails and index.html files to view your collection:
+```
+beak indexmedia /home/you/Media
+```
+
 Then you can do:
 ```
 firefox /home/you/Media/index.html
@@ -471,6 +476,9 @@ first to your find command to skip it, like this: `find . -name .beak -prune -o 
 ```
 beak store <origin> <storage>    beak restore <storage> <origin>
 beak stored <origin> <storage>
+
+beak importmedia <dir_with_media> <origin>
+beak indexmedia <origin>
 
 beak shell {<rule>|<storage>}
 

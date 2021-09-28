@@ -186,7 +186,7 @@ struct IndexMedia
 
         string top_xmq =
             "html {\n"
-            "    head { meta(http-equiv=content-type content=text/html;charset=utf-8) "
+            "    head { meta(http-equiv=content-type content='text/html;charset=utf-8') "
             "           title='Media' "
             "           link(rel=stylesheet href=style.css) }\n"
             "    body {\n";
@@ -201,7 +201,7 @@ struct IndexMedia
 
             tmp =
                 "html {\n"
-                "    head { meta(http-equiv=content-type content=text/html;charset=utf-8) "
+                "    head { meta(http-equiv=content-type content='text/html;charset=utf-8') "
                 "           title='Media' "
                 "           link(rel=stylesheet href=style.css) }\n"
                 "    body {\n"+
