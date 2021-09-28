@@ -65,8 +65,7 @@ TarEntry::TarEntry(size_t size, TarHeaderStyle ths)
     path_ = Path::lookupRoot();
     safepath_ = NULL;
     tar_header_style_ = ths;
-    fs_ = {};
-//    memset(&fs_, 0, sizeof(fs_));
+    memset(&fs_, 0, sizeof(fs_));
     fs_.st_size = size;
     is_hard_linked_ = false;
 

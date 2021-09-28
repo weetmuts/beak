@@ -457,6 +457,15 @@ to download index files when checking remote repositories, performing diffs
 and restores. You can clean the cache at any time when you are not mounting
 or otherwise executing a beak command.
 
+The ag search command will by default not look into the .beak directory, it skips
+all hidden directories and files.
+
+The du command will by default include the .beak directory and any local backup data,
+to skip do: `du -sh --exclude "./.beak"`
+
+The find command will be default go into the .beak directory, add `-name .beak -prune -o`
+first to your find command to skip it, like this: `find . -name .beak -prune -o -name "*tar"`
+
 ## Command summary
 
 ```

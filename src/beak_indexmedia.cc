@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2020 Fredrik Öhrström
+ Copyright (C) 2020-2021 Fredrik Öhrström
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -186,7 +186,9 @@ struct IndexMedia
 
         string top_xmq =
             "html {\n"
-            "    head { link(rel=stylesheet href=style.css) }\n"
+            "    head { meta(http-equiv=content-type content=text/html;charset=utf-8) "
+            "           title='Media' "
+            "           link(rel=stylesheet href=style.css) }\n"
             "    body {\n";
 
         for (int year : years_)
@@ -199,7 +201,9 @@ struct IndexMedia
 
             tmp =
                 "html {\n"
-                "    head { link(rel=stylesheet href=style.css) }\n"
+                "    head { meta(http-equiv=content-type content=text/html;charset=utf-8) "
+                "           title='Media' "
+                "           link(rel=stylesheet href=style.css) }\n"
                 "    body {\n"+
                 xmq_[year]+
                 "    }\n"+
