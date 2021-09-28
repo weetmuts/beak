@@ -8,6 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
+    - run: apt-get update --fix-missing
     - run: sudo apt-get install pkg-config fuse libfuse-dev librsync-dev libexiv2-dev libavformat-dev graphicsmagick-libmagick-dev-compat
     - run: |
        sudo modprobe fuse
