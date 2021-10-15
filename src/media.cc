@@ -918,7 +918,14 @@ RC MediaDatabase::generateThumbnail(Media *m, Path *root)
         Magick::Image image;
         try {
             // Read a file into image object
-            image.read(source->c_str());
+            try
+            {
+                image.read(source->c_str());
+            }
+            catch (Magick::Warning &w)
+            {
+                verbose(MEDIA, "Caught warning: %s\n", w.what());
+            }
             // Resize the image to specified size (width, height, xOffset, yOffset)
             // Keep aspect ratio.
             string s = image.attribute("EXIF:Orientation");
