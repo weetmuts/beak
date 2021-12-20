@@ -97,21 +97,28 @@ void parse_rclone_verbose_output(ProgressStatistics *st,
     // 2018/01/29 20:05:36 INFO  : code/src/s01_001517180913.689221661_11659264_b6f526ca4e988180fe6289213a338ab5a4926f7189dfb9dddff5a30ab50fc7f3_0.tar: Copied (new)
     // And look for stat lines like:
     // 2019/01/29 22:32:37 INFO  :       185M / 2.370 GBytes, 8%, 3.079 MBytes/s, ETA 12m8s (xfr#0/242)
-    size_t from, to;
-    // Find the beginning of the file path.
-    for (from=1; from<len-1; ++from) {
-        if (buf[from-1] == ' ' && buf[from] == ':' && buf[from+1] == ' ') {
-            from = from+2;
-            break;
-        }
+
+    // But sometimes rclone produces duplicate rows like these:
+    // vgc_backups_crypt:/FamilyMedia/2008/10/beak_s_1225474105.000000_57d987e7a3252d82bda07080bd124a8eb908f2d218eee8efc5b4996039584bfb_1-1_8011264_9000000.tar: Copied (new)
+    // <6>INFO  : 2008/10/beak_s_1225121433.000000_ab31f429080a370e49325b5f4abe092a74a94814a3b6a3f9288610cb44ba293f_1-1_8223744_9000000.tar
+
+    string line = string(buf, len);
+    size_t from = line.find("INFO  : ");
+
+    if (from == string::npos)
+    {
+        debug(RCLONE, "NOINFO \"%s\"\n", line.c_str());
+        return; // No INFO found.
     }
-    // Find the end of the file path.
-    for (to=len-2; to>from; --to) {
-        if (buf[to] == ':' && buf[to+1] == ' ') {
-            break;
-        }
+    from = from+8;
+    size_t to = line.find(" ", from);
+    if (to == string::npos) {
+        debug(RCLONE, "NOSPACE \"%s\"\n", line.c_str());
+        return; // Oups no " " found. Bad....
     }
-    if (from == to) {
+
+    if (line[to-1] != ':')
+    {
         // Perhaps a stat line
         // Sadly the stats are currently not usable.
         size_t slash = 0;
@@ -129,7 +136,11 @@ void parse_rclone_verbose_output(ProgressStatistics *st,
         } else {
             debug(RCLONE, "could not parse stat \"%s\"\n", size_hint_s.c_str());
         }
+        return;
     }
+
+    // We have a filename "foo/bar/xyz.tar: ", hopefully. Now skip the ": " at the end.
+    to = to-1;
     string file = storage->storage_location->str()+"/"+string(buf+from, to-from);
     TarFileName tfn;
     string dir;
@@ -150,8 +161,17 @@ void parse_rclone_verbose_output(ProgressStatistics *st,
         }
         else
         {
-            warning(RCLONE, "Error! No file size found for %s\n", path->c_str());
+            warning(RCLONE, "Error! No file size found for \"%s\"\n", path->c_str());
         }
+    }
+    size_t again = line.find("INFO  : ", to);
+    if (again != string::npos)
+    {
+        // Oups, we have a double line....
+        parse_rclone_verbose_output(st,
+                                    storage,
+                                    buf+to,
+                                    len-to);
     }
 }
 
