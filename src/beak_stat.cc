@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2016-2019 Fredrik Öhrström
+ Copyright (C) 2016-2021 Fredrik Öhrström
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -23,16 +23,15 @@
 #include "origintool.h"
 #include "storagetool.h"
 
-static ComponentId DIFF = registerLogComponent("diff");
+static ComponentId STATS = registerLogComponent("stats");
 
-RC BeakImplementation::diff(Settings *settings, Monitor *monitor)
+RC BeakImplementation::stat(Settings *settings, Monitor *monitor)
 {
     RC rc = RC::OK;
 
     assert(settings->from.type == ArgOrigin || settings->from.type == ArgRule || settings->from.type == ArgStorage);
-    assert(settings->to.type == ArgOrigin || settings->to.type == ArgRule || settings->to.type == ArgStorage);
 
-    auto progress = monitor->newProgressStatistics(buildJobName("diff", settings));
+    auto progress = monitor->newProgressStatistics(buildJobName("stats", settings));
 
     FileSystem *curr_fs = NULL;
     FileSystem *old_fs = NULL;
@@ -65,32 +64,16 @@ RC BeakImplementation::diff(Settings *settings, Monitor *monitor)
 
     unique_ptr<Restore> restore_old;
 
-    // Setup the old file system.
-    if (settings->to.type == ArgOrigin)
-    {
-        old_fs = origin_tool_->fs();
-        old_path = settings->to.origin;
-    }
-    else if (settings->to.type == ArgStorage)
-    {
-        restore_old = accessBackup_(&settings->to, settings->to.point_in_time, monitor);
-        auto point = restore_old->singlePointInTime();
-        if (!point) {
-            // The settings did not specify a point in time, lets use the most recent for the restore.
-            point = restore_old->setPointInTime("@0");
-        }
-
-        if (!restore_old) {
-            return RC::ERR;
-        }
-        old_fs = restore_old->asFileSystem();
-        old_path = NULL;
-    }
+    // Setup an empty old file system.
+    map<Path*,FileStat> contents;
+    auto ofs = newStatOnlyFileSystem(sys_, contents);
+    old_fs = ofs.get();
+    old_path = Path::lookupRoot();
 
     auto d = newDiff(settings->verbose, settings->depth);
     rc = d->diff(old_fs, old_path,
                  curr_fs, curr_path,
                  progress.get());
-    d->report(false);
+    d->report(true);
     return rc;
 }

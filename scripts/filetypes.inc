@@ -29,6 +29,12 @@ xml
 DiskImage:
 iso
 dmg
+vhd  # virtual hard disk ms
+vmdk # virtual machine disk vmware
+dsk  # virtual machine disk vmware
+vdi  # virtual disk image virtualbox
+qcow # qemu disk image
+qcow2 # qemu disk image
 
 Document:
 doc  # ms word

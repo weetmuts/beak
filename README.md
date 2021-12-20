@@ -490,6 +490,7 @@ beak push <rule>                 beak pull <rule>
 beak pushd <rule>
 
 beak diff {<storage>|<origin>|<rule>} {<storage>|<origin>|<rule>}
+beak stat {dir|<storage>|<origin>|<rule>}
 
 beak config
 

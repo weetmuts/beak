@@ -419,7 +419,6 @@ bool MediaHelper::getFFMPEGMetaData(Path *p,
                                     vector<char> *hash, string *metas)
 {
     AVFormatContext* av = avformat_alloc_context();
-    av_register_all();
     av_log_set_level(AV_LOG_FATAL);
     int rc = avformat_open_input(&av, p->c_str(), NULL, NULL);
 

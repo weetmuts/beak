@@ -69,7 +69,7 @@ public:
     bool isRemoved();
     bool isAdded();
 
-    void print(Path *p, bool hide_content);
+    void print(Path *p, bool hide_content, bool all_added);
 
 private:
 
@@ -86,7 +86,7 @@ public:
             FileSystem *curr_fs, Path *curr_path,
             ProgressStatistics *progress);
 
-    void report();
+    void report(bool all_added);
 
     DiffImplementation(bool detailed, int depth) {
         detailed_ = detailed;
@@ -346,7 +346,7 @@ RC DiffImplementation::diff(FileSystem *old_fs, Path *old_path,
     return rc;
 }
 
-void DiffImplementation::report()
+void DiffImplementation::report(bool all_added)
 {
     for (auto &d : dirs)
     {
@@ -354,7 +354,7 @@ void DiffImplementation::report()
         Path *p = d.first;
         if (!should_hide_(p)) {
             bool hc = should_hide_content_(p);
-            ds.print(p, hc);
+            ds.print(p, hc, all_added);
         }
     }
 
@@ -395,7 +395,7 @@ LIST_OF_FILETYPES
 #undef X
 };
 
-void DirSummary::print(Path *p, bool hide_content)
+void DirSummary::print(Path *p, bool hide_content, bool all_added)
 {
     map<pair<Action,FileType>,TypeSummary> *infos;
 
@@ -416,11 +416,25 @@ void DirSummary::print(Path *p, bool hide_content)
     {
         if (all_content_.size() > 0)
         {
-            printf("%s/... dir added\n", p->c_str_nls());
+            if (!all_added)
+            {
+                printf("%s/... dir added\n", p->c_str_nls());
+            }
+            else
+            {
+                printf("%s/...\n", p->c_str_nls());
+            }
         }
         else
         {
-            printf("%s/ dir added\n", p->c_str_nls());
+            if (!all_added)
+            {
+                printf("%s/ dir added\n", p->c_str_nls());
+            }
+            else
+            {
+                printf("%s/\n", p->c_str_nls());
+            }
             infos = &all_content_;
         }
         infos = &all_content_;
@@ -456,7 +470,14 @@ void DirSummary::print(Path *p, bool hide_content)
             if (ft != filetype) continue;
             TypeSummary *st = &a.second;
             // 32 sources added (java,c,perl)
-            printf("    %zu %s %s (", st->count, fileTypeName(ft, st->count > 1), actionName(act));
+            if (!all_added)
+            {
+                printf("    %zu %s %s (", st->count, fileTypeName(ft, st->count > 1), actionName(act));
+            }
+            else
+            {
+                printf("    %zu %s (", st->count, fileTypeName(ft, st->count > 1));
+            }
             bool comma = false;
             bool dotdotdot = false;
             int count = 0;

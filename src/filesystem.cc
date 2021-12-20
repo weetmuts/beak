@@ -418,7 +418,15 @@ static Path *interned_root;
 
 Path *Path::lookup(string p)
 {
-    assert(p.back() != '\n' && (p.back() != 0 || p.length() == 0));
+    if (p.back() == '\n')
+    {
+        p.pop_back();
+    }
+    if (!(p.back() != '\n' && (p.back() != 0 || p.length() == 0)))
+    {
+        printf("GURKA \"%s\"\n", p.c_str());
+        exit(0);
+    }
 /* #ifdef PLATFORM_WINAPI
     char *c = &p[0];
     while (c < &p[p.length()]) {

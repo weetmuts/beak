@@ -91,6 +91,7 @@ _beak()
         pushd) _beakrules ;;
         restore) _beakstorages ;;
         shell) _beakstorages ;;
+        stats) _filedir -d ;;
         status) _beakorigins ;;
         store) _beakstorages ;;
         stored) _beakstorages ;;
@@ -109,7 +110,7 @@ _beak()
     esac
 
     if [ -z "$COMPREPLY" ]; then
-        COMPREPLY=($(compgen -W "bmount config diff fsck genautocomplete genmounttrigger help prune importmedia indexmedia mount pull push pushd restore shell status store stored umount" -- $cur))
+        COMPREPLY=($(compgen -W "bmount config diff fsck genautocomplete genmounttrigger help prune importmedia indexmedia mount pull push pushd restore shell stats status store stored umount" -- $cur))
     fi
 }
 

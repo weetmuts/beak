@@ -135,14 +135,28 @@ ssize_t StatOnlyFileSystem::pread(Path *p, char *buf, size_t size, off_t offset)
 
 RC StatOnlyFileSystem::recurse(Path *root, std::function<RecurseOption(Path *path, FileStat *stat)> cb)
 {
-    assert(0);
-    return RC::ERR;
+    // This should perhaps be sorted in the proper order to simlulate depth first search?
+    for (auto &p : contents_)
+    {
+        RecurseOption ro = cb(p.first, &p.second);
+        // RecurseContinue,
+        // RecurseSkipSubTree,
+        // RecurseStop
+        if (ro == RecurseStop) break;
+    }
+    return RC::OK;
 }
 
 RC StatOnlyFileSystem::recurse(Path *root, std::function<RecurseOption(const char *path, const struct stat *sb)> cb)
 {
-    assert(0);
-    return RC::ERR;
+    // This should perhaps be sorted in the proper order to simlulate depth first search?
+    for (auto &p : contents_)
+    {
+        struct stat tmp;
+        p.second.storeIn(&tmp);
+        cb(p.first->c_str(), &tmp);
+    }
+    return RC::OK;
 }
 
 RC StatOnlyFileSystem::ctimeTouch(Path *p)

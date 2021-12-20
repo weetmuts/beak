@@ -27,7 +27,7 @@ struct Diff
     virtual RC diff(FileSystem *old_fs, Path *old_path,
                     FileSystem *new_fs, Path *new_path,
                     ProgressStatistics *progress) = 0;
-    virtual void report() = 0;
+    virtual void report(bool all_added) = 0;
 
     virtual ~Diff() = default;
 };
