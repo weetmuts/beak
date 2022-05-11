@@ -3,28 +3,66 @@
 beak \- a backup-mirror-share-rotation-pruning tool
 
 .SH SYNOPSIS
-.B beak
-<command>
-[\fB\-i\fR \fIPATTERN\fR]
-[\fB\-x\fR \fIPATTERN\fR]
-[\fB\-p\fR \fIDEPTH\fR]
-[\fB\-ta\fR \fISIZE\fR]
-[\fB\-tr\fR \fISIZE\fR]
-[\fB\-tx\fR \fIPATTERN\fR]
-[\fB\--log=<tags>\fR
-[\fB\-d\fR|\fB\--debug\fR]
-[\fB\-v\fR|\fB\--verbose\fR]
-[\fB\-V\fR|\fB\--version\fR]
-[\fB\-h\fR]
-\fI<args>\fR
+.B beak [command] {options} {origin|storage|rule} {origin|storage|rule}
 
 .SH DESCRIPTION
-.B beak
 
-Examples:    % beak store /home/you/Work /media/you/USBDrive
+The beak backup tool takes an \fBorigin\fR directory (/home/you/Work)
+and stores it into a backup \fBstorage\fR. A storage can be a
+filesystem directory: \fB/backups/WorkBackups\fR or an rclone remote:
+\fBbackups_crypt:\fR or rsync remote
+\fBbackup@192.168.1.2/backups/Work\fR. Some beak commands take as
+argument a \fBrule\fR which is a shorthand for a specific origin and
+storages as defined in the config file.
+
+A backup is a collection of archive files and an index file. The index
+specifies the content inside the archive files. The index has a
+timestamp and a hash of the meta data, however the timestamp is NOT
+the timestamp when you did the backup, it is the timestamp of the last
+modified file/dir in the origin directory.
+
+Beak trusts the timestamps in your filesystem.
+
+For example: % beak store /home/you/Work /media/you/USBDrive
+             % beak restore /media/youUSBDrive@1 /home/you/Work
+             % beak config
              % beak push work: s3_work_crypt:
              % beak mount /media/you/USBDrive@0 /home/you/Lookback
-             % beak importmedia Gphoto2ImportedPictures /home/you/MediaBackup
+             % beak importmedia DirWithGphoto2ImportedPictures /home/you/MediaBackup
+
+.SH COMMANDS
+
+beak store <origin> <storage>
+
+
+
+Eg. \fBbeak store /home/you/Work /media/you/USBDrive\fR
+
+beak restore <storage> <origin>
+
+beak importmedia <dir_with_media> <origin>
+
+beak indexmedia <origin>
+
+beak shell {<rule>|<storage>}
+
+beak mount <storage> <dir>       beak bmount <origin> <dir>
+
+beak fsck <storage>
+
+beak push <rule>
+
+beak pull <rule>
+
+beak diff {<storage>|<origin>|<rule>} {<storage>|<origin>|<rule>}
+
+beak stat {dir|<storage>|<origin>|<rule>}
+
+beak config
+
+beak status {<rule>|<storage>}
+
+beak prune {<rule>|<storage>}
 
 .SH OPTIONS
 .TP

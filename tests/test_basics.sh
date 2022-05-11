@@ -164,12 +164,12 @@ function performDiff {
     extra="$1"
     if [ -z "$test" ]; then
         # Normal test execution, execute the store
-        eval "${BEAK} diff $extra ${root} ${store} > $diff"
+        eval "${BEAK} diff $extra ${store} ${root} > $diff"
     else
         if [ -z "$gdb" ]; then
-            ${BEAK} diff --log=all $extra ${root} ${store} 2>&1 | tee $diff
+            ${BEAK} diff --log=all $extra ${store} ${root} 2>&1 | tee $diff
         else
-            gdb -ex=r --args ${BEAK} diff -f $extra ${root} ${store}
+            gdb -ex=r --args ${BEAK} diff -f $extra ${store} ${root}
         fi
     fi
 }

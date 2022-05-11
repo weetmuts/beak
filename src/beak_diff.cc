@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2016-2019 Fredrik Öhrström
+ Copyright (C) 2016-2022 Fredrik Öhrström
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -34,18 +34,18 @@ RC BeakImplementation::diff(Settings *settings, Monitor *monitor)
 
     auto progress = monitor->newProgressStatistics(buildJobName("diff", settings));
 
-    FileSystem *curr_fs = NULL;
     FileSystem *old_fs = NULL;
-    Path *curr_path =NULL;
-    Path *old_path = NULL;
+    FileSystem *curr_fs = NULL;
+    Path *old_path =NULL;
+    Path *curr_path = NULL;
 
     unique_ptr<Restore> restore_curr;
 
     // Setup the curr file system.
     if (settings->from.type == ArgOrigin)
     {
-        curr_fs = origin_tool_->fs();
-        curr_path = settings->from.origin;
+        old_fs = origin_tool_->fs();
+        old_path = settings->from.origin;
     }
     else if (settings->from.type == ArgStorage)
     {
@@ -59,8 +59,8 @@ RC BeakImplementation::diff(Settings *settings, Monitor *monitor)
         if (!restore_curr) {
             return RC::ERR;
         }
-        curr_fs = restore_curr->asFileSystem();
-        curr_path = NULL;
+        old_fs = restore_curr->asFileSystem();
+        old_path = NULL;
     }
 
     unique_ptr<Restore> restore_old;
@@ -68,8 +68,8 @@ RC BeakImplementation::diff(Settings *settings, Monitor *monitor)
     // Setup the old file system.
     if (settings->to.type == ArgOrigin)
     {
-        old_fs = origin_tool_->fs();
-        old_path = settings->to.origin;
+        curr_fs = origin_tool_->fs();
+        curr_path = settings->to.origin;
     }
     else if (settings->to.type == ArgStorage)
     {
@@ -83,8 +83,8 @@ RC BeakImplementation::diff(Settings *settings, Monitor *monitor)
         if (!restore_old) {
             return RC::ERR;
         }
-        old_fs = restore_old->asFileSystem();
-        old_path = NULL;
+        curr_fs = restore_old->asFileSystem();
+        curr_path = NULL;
     }
 
     auto d = newDiff(settings->verbose, settings->depth);

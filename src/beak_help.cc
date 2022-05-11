@@ -215,6 +215,8 @@ void BeakImplementation::printHelp(bool verbose, Command cmd)
     case diff_cmd:
         fprintf(stdout, "Display a summary of the differences between the two arguments.\n"
                 "The difference is by default grouped on the first subdirectory level.\n"
+                "Files that exist in the first argument but not in the second are reported\n"
+                "as removed and vice versa.\n"
                 "Add -v to show all files.\n"
                 "Add -d 1 to do the summary on the root level.\n\n");
         break;
