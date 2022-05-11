@@ -121,6 +121,7 @@ void OriginToolImplementation::addRestoreWork(ProgressStatistics *st,
         }
         else if (stat->disk_update == OtherIsNewer)
         {
+            verbose(ORIGINTOOL, "Skipping newer file: %s\n", path->c_str());
             st->stats.num_newer_files_to_skip++;
             st->stats.size_newer_files_to_skip += stat->st_size;
         }
