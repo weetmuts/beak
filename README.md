@@ -5,8 +5,6 @@ to co-exist with the cloud/remote storage (rclone, rsync) of your
 choice. Beak enables push/pull-merge to share the remotely
 stored backups between multiple client computers.
 
-Note! The storage format is still changing!
-
 | System       | Status        |
 | ------------ |:-------------:|
 | Ubuntu | [![Build Ubuntu Status](https://github.com/weetmuts/beak/workflows/Build%20Ubuntu/badge.svg)](https://github.com/weetmuts/beak/actions)|
@@ -378,20 +376,15 @@ Each chunk has a unique name that consists of the most recent modify timestamp
 of all the entries inside the tar, the size of the contents inside the archive
 file and the hash of the meta-data of the files inside the archive file. Like this:
 
-`s01_001501080787.579054757_1119232_8e919febd204393073e02a525270b79abdbfa7e4ba3911e28ae62e9298e044a1_0.tar`
+`beak_s_1575491997.351991_2dff0195a0a468e1eab4cffe0472956a5c8374cc7caa1c2ae08af5564f974cdf_1-1_16384_20000.tar`
 
-`s01_--seconds---.--nanos--_-size--_----------metadata-hash-----------------------------------------_0.tar`
+`beak_s_seconds.nanos_metadatahash_partnr_numparts_size_paddedsize.tar`
 
 The index file, similarily named, but uses the most recently modify timestamp
 of any of the archive files it indexes _and_ the modify timestamp of the containing directory.
-The hash is the hash of the all the archives pointed to by this index file.
+The hash is the hash of the all meta-data hashes (for the tars) pointed to by this index file.
 
-`z01_001504803295.504732149_0_cb56cc0ee219e54f7afceff6aae29843bc4a4bfa25c421b24cc5d918f524a6ff_0.gz`
-
-`z01_--seconds---.--nanos--_0_----------metadata-hash-----------------------------------------_0.gz`
-
-(Those y01[...]tar files stores directories and hard links and are only used
-when extracting the backup using the shell script.)
+`beak_z_--seconds---.--nanos--_----------metadata-hash-----------------------------------------_1-1_--size---_--paddedsize---0.gz`
 
 Assuming that your _origin_ directory `/home/you/Work/` above contained `rclonesrc/` and `gamesrc/`
 and you made the backup to `/home/you/Backup`. Now modify a file in `gamesrc/` and do another backup:
