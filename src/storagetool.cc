@@ -87,7 +87,7 @@ void add_backup_work(ProgressStatistics *progress,
                      Path *storage_location,
                      FileSystem *to_fs)
 {
-    Path *file_to_extract = path->prepend(storage_location);
+    Path *backup_file = path->prepend(storage_location);
 
     // The backup fs has already wrapped any non-regular files inside tars.
     // Thus we only want to send those to the cloud storage site.
@@ -96,13 +96,15 @@ void add_backup_work(ProgressStatistics *progress,
         // Remember the size of this file. This is necessary to
         // know how many bytes has been transferred when
         // rclone/rsync later reports that a file has been successfully sent.
-        assert(progress->stats.file_sizes.count(file_to_extract) == 0);
-        progress->stats.file_sizes[file_to_extract] = stat->st_size;
-        debug(STORAGETOOL, "Added backup work %s %zu\n", file_to_extract->c_str(), stat->st_size);
+        assert(progress->stats.file_sizes.count(backup_file) == 0);
+        progress->stats.file_sizes[backup_file] = stat->st_size;
+        debug(STORAGETOOL, "Added backup work %s %zu\n", backup_file->c_str(), stat->st_size);
         // Compare our local file with the stats of the one stored remotely.
-        stat->checkStat(to_fs, file_to_extract);
+        stat->checkStat(to_fs, backup_file);
 
-        if (stat->disk_update == Store) {
+        if (stat->disk_update == Store ||
+            stat->disk_update == OtherIsNewer) // Hmm, remote has bad timestamps, lets overwrite.
+        {
             // Yep, we need to store the local file remotely.
             // The remote might be missing, or it has the wrong size/date.
 

@@ -185,6 +185,8 @@ LIST_OF_COMMANDS
     X(OptionType::LOCAL_PRIMARY,x,exclude,std::vector<std::string>,true,"Paths matching glob are excluded. E.g. -exclude='beta/**'") \
     X(OptionType::LOCAL_SECONDARY,,yesorigin,bool,false,"The origin directory contains beak files and this is intended.")            \
     X(OptionType::LOCAL_PRIMARY,,yesprune,bool,false,"Respond yes to question if prune should be done.")            \
+    X(OptionType::LOCAL_PRIMARY,,yesrestore,bool,false,"Respond yes to question if restore should be done.")            \
+    X(OptionType::LOCAL_PRIMARY,,forceoverwritefiles,bool,false,"When restoring overwrite newer files.")            \
     X(OptionType::LOCAL_PRIMARY,nso,nosuch,bool,false,"No such option")
 
 enum Option {
@@ -206,7 +208,7 @@ LIST_OF_OPTIONS
     X(pull_cmd, (2, background_option, progress_option) ) \
     X(push_cmd, (2, background_option, delta_option, progress_option) )  \
     X(pushd_cmd, (2, background_option, delta_option, progress_option) ) \
-    X(restore_cmd, (2, background_option, progress_option) )
+    X(restore_cmd, (4, background_option, progress_option, yesrestore_option, forceoverwritefiles_option) )
 
 
 struct CommandOption

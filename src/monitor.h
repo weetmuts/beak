@@ -33,13 +33,25 @@ struct Stats
     size_t num_dirs {};
     size_t num_hard_links {};
     size_t num_symbolic_links {};
-    size_t num_nodes {};
+    size_t num_device_nodes {};
 
     size_t num_files_to_store {};
     size_t size_files_to_store {};
+    size_t num_newer_files_to_skip {};
+    size_t size_newer_files_to_skip {};
+    size_t num_dirs_to_update {};
+    size_t num_dirs_to_skip {};
+    size_t num_hard_links_to_store {};
+    size_t num_hard_links_to_skip {};
+    size_t num_symbolic_links_to_store {};
+    size_t num_symbolic_links_to_skip {};
+    size_t num_device_nodes_to_store {};
+    size_t num_device_nodes_to_skip {};
 
     size_t num_files_stored {};
     size_t size_files_stored {};
+    size_t num_newer_files_skipped {};
+    size_t size_newer_files_skipped {};
     size_t num_hard_links_stored {};
     size_t num_symbolic_links_stored {};
     size_t num_device_nodes_stored {};

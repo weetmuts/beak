@@ -49,7 +49,7 @@ TarFile::TarFile(TarContents tc)
     ondisk_last_part_size_ = 0;
     tar_contents_ = tc;
     memset(&mtim_, 0, sizeof(mtim_));
-    disk_update = NoUpdate;
+    disk_update = NoUpdateIdentical;
     num_parts_ = 1;
 }
 

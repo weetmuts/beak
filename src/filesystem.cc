@@ -887,19 +887,25 @@ RC FileSystem::listFilesBelow(Path *p, std::vector<pair<Path*,FileStat>> *files,
 
 void FileStat::checkStat(FileSystem *dst, Path *target)
 {
-    FileStat old_stat;
-    RC rc = dst->stat(target, &old_stat);
+    FileStat other_stat;
+    RC rc = dst->stat(target, &other_stat);
     if (rc.isErr()) { disk_update = Store; return; }
-    if (sameSize(&old_stat) && sameMTime(&old_stat))
+    if (sameSize(&other_stat) && sameMTime(&other_stat))
     {
-        if (!samePermissions(&old_stat))
+        if (!samePermissions(&other_stat))
         {
             disk_update = UpdatePermissions;
             return;
         }
-        disk_update = NoUpdate;
+        disk_update = NoUpdateIdentical;
         return;
     }
+    if (olderThanMTime(&other_stat))
+    {
+        disk_update = OtherIsNewer;
+        return;
+    }
+
     disk_update = Store;
 }
 

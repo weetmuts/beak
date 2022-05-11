@@ -535,6 +535,12 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
             case yesprune_option:
                 settings->yesprune = true;
                 break;
+            case yesrestore_option:
+                settings->yesrestore = true;
+                break;
+            case forceoverwritefiles_option:
+                settings->forceoverwritefiles = true;
+                break;
             case nosuch_option:
                 if ((*i)[0] == '-' && !options_completed) {
                     // It looks like an option, but we could not find it!

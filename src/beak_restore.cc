@@ -59,9 +59,54 @@ RC BeakImplementation::restore(Settings *settings, Monitor *monitor)
                                                                  point);
                                     return RecurseContinue; });
 
-    debug(RESTORE, "work to be done: num_files=%ju num_hardlinks=%ju num_symlinks=%ju num_nodes=%ju num_dirs=%ju\n",
-          progress->stats.num_files, progress->stats.num_hard_links, progress->stats.num_symbolic_links,
-          progress->stats.num_nodes, progress->stats.num_dirs);
+    bool work_to_do = false;
+    if (progress->stats.num_files_to_store > 0) {
+        string file_sizes = humanReadable(progress->stats.size_files_to_store);
+        info(RESTORE, "Restore %ju files for a total size of %s.\n", progress->stats.num_files_to_store, file_sizes.c_str());
+        work_to_do = true;
+    }
+    if (progress->stats.num_symbolic_links_to_store > 0) {
+        info(RESTORE, "Restore %ju symlinks.\n", progress->stats.num_symbolic_links_to_store);
+        work_to_do = true;
+    }
+    if (progress->stats.num_hard_links_to_store > 0) {
+        info(RESTORE, "Restore %ju hard links.\n", progress->stats.num_hard_links_to_store);
+        work_to_do = true;
+    }
+    if (progress->stats.num_device_nodes_to_store > 0) {
+        info(RESTORE, "Restore %ju fifo nodes.\n", progress->stats.num_device_nodes_to_store);
+        work_to_do = true;
+    }
+    if (progress->stats.num_dirs_updated > 0) {
+        info(RESTORE, "Update %ju dirs.\n", progress->stats.num_dirs_to_update);
+        work_to_do = true;
+    }
+    if (progress->stats.num_newer_files_to_skip > 0)
+    {
+        if (settings->forceoverwritefiles)
+        {
+            info(RESTORE, "Overwriting %d newer files with backup files!\n", progress->stats.num_newer_files_to_skip);
+            work_to_do = true;
+        }
+        else
+        {
+            info(RESTORE, "NOT restoring %d files with newer timestamps than the backup!\n", progress->stats.num_newer_files_to_skip);
+        }
+    }
+
+    if (!work_to_do)
+    {
+        info(RESTORE, "No restores are needed, everything is up to date.\n");
+        return RC::OK;
+    }
+
+    auto proceed = settings->yesrestore ? UIYes : UINo;
+
+    if (proceed == UINo && UI::isatty())
+    {
+        proceed = UI::yesOrNo("Proceed?");
+    }
+    if (proceed == UINo) return RC::ERR;
 
     origin_tool_->restoreFileSystem(backup_fs, backup_contents_fs, restore.get(), point, settings, progress.get());
 
@@ -71,8 +116,8 @@ RC BeakImplementation::restore(Settings *settings, Monitor *monitor)
     progress->finishProgress();
 
     if (progress->stats.num_files_stored == 0 && progress->stats.num_symbolic_links_stored == 0 &&
-        progress->stats.num_dirs_updated == 0) {
-        info(RESTORE, "No restores needed, everything was up to date.\n");
+        progress->stats.num_device_nodes_stored == 0 && progress->stats.num_dirs_updated == 0) {
+        info(RESTORE, "No restores were needed, everything was up to date.\n");
     } else {
         if (progress->stats.num_files_stored > 0) {
             string file_sizes = humanReadable(progress->stats.size_files_stored);
@@ -83,6 +128,9 @@ RC BeakImplementation::restore(Settings *settings, Monitor *monitor)
         }
         if (progress->stats.num_hard_links_stored > 0) {
             info(RESTORE, "Restored %ju hard links.\n", progress->stats.num_hard_links_stored);
+        }
+        if (progress->stats.num_device_nodes_stored > 0) {
+            info(RESTORE, "Restored %ju fifo nodes.\n", progress->stats.num_device_nodes_stored);
         }
         if (progress->stats.num_dirs_updated > 0) {
             info(RESTORE, "Updated %ju dirs.\n", progress->stats.num_dirs_updated);

@@ -50,9 +50,10 @@ struct FuseAPI;
 struct FileSystem;
 
 enum UpdateDisk {
-    NoUpdate,
-    UpdatePermissions,
-    Store
+    NoUpdateIdentical, // No need to write since the files are identical
+    UpdatePermissions, // The permissions differ, fix this.
+    OtherIsNewer, // Used when storing into origin to avoid overwriting newer files.
+    Store         // Yes, write/store the file.
 };
 
 struct FileStat {
@@ -81,6 +82,8 @@ struct FileStat {
     bool sameSize(FileStat *b) { return st_size == b->st_size; }
     bool sameMTime(FileStat *b) { return st_mtim.tv_sec == b->st_mtim.tv_sec &&
             st_mtim.tv_nsec == b->st_mtim.tv_nsec; }
+    bool olderThanMTime(FileStat *b) { return st_mtim.tv_sec < b->st_mtim.tv_sec ||
+            (st_mtim.tv_sec ==  b->st_mtim.tv_sec && st_mtim.tv_nsec < b->st_mtim.tv_nsec); }
     void checkStat(FileSystem *dst, Path *target);
 
     mode_t permissions() { return st_mode & 07777; }

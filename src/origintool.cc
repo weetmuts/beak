@@ -53,7 +53,8 @@ struct OriginToolImplementation : public OriginTool
     bool extractFileFromBackup(RestoreEntry *entry,
                                FileSystem *backup_fs, Path *tar_file, off_t tar_file_offset,
                                Path *file_to_extract, FileStat *stat,
-                               ptr<ProgressStatistics> statistics);
+                               ptr<ProgressStatistics> statistics,
+                               bool forceoverwrite);
     RecurseOption handleRegularFiles(Path *path, FileStat *stat,
                                      Restore *restore, PointInTime *point,
                                      Settings *settings, ptr<ProgressStatistics> st,
@@ -106,19 +107,66 @@ void OriginToolImplementation::addRestoreWork(ProgressStatistics *st,
 {
     RestoreEntry *entry = restore->findEntry(point, path);
     Path *file_to_extract = path->prepend(settings->to.origin);
-    if (entry->fs.hard_link) st->stats.num_hard_links++;
-    else if (stat->isRegularFile()) {
-        stat->checkStat(origin_fs_, file_to_extract);
-        if (stat->disk_update == Store) {
+    stat->checkStat(origin_fs_, file_to_extract);
+    if (entry->fs.hard_link)
+    {
+        st->stats.num_hard_links++;
+    }
+    else if (stat->isRegularFile())
+    {
+        if (stat->disk_update == Store)
+        {
             st->stats.num_files_to_store++;
             st->stats.size_files_to_store += stat->st_size;
+        }
+        else if (stat->disk_update == OtherIsNewer)
+        {
+            st->stats.num_newer_files_to_skip++;
+            st->stats.size_newer_files_to_skip += stat->st_size;
         }
         st->stats.num_files++;
         st->stats.size_files += stat->st_size;
     }
-    else if (stat->isSymbolicLink()) st->stats.num_symbolic_links++;
-    else if (stat->isDirectory()) st->stats.num_dirs++;
-    else if (stat->isFIFO()) st->stats.num_nodes++;
+    else if (stat->isSymbolicLink())
+    {
+        st->stats.num_symbolic_links++;
+        if (stat->disk_update == Store)
+        {
+            st->stats.num_symbolic_links_to_store++;
+        }
+        else if (stat->disk_update == OtherIsNewer)
+        {
+            st->stats.num_symbolic_links_to_skip++;
+        }
+    }
+    else if (stat->isDirectory())
+    {
+        st->stats.num_dirs++;
+        if (stat->disk_update == Store)
+        {
+            st->stats.num_dirs_to_update++;
+        }
+        else if (stat->disk_update == OtherIsNewer)
+        {
+            st->stats.num_dirs_to_skip++;
+        }
+    }
+    else if (stat->isFIFO())
+    {
+        st->stats.num_device_nodes++;
+        if (stat->disk_update == Store)
+        {
+            st->stats.num_device_nodes_to_store++;
+        }
+        else if (stat->disk_update == OtherIsNewer)
+        {
+            st->stats.num_device_nodes_to_skip++;
+        }
+    }
+    else
+    {
+        assert(0);
+    }
 }
 
 bool OriginToolImplementation::extractHardLink(Path *target,
@@ -165,10 +213,15 @@ bool OriginToolImplementation::extractHardLink(Path *target,
 bool OriginToolImplementation::extractFileFromBackup(RestoreEntry *entry,
                                                      FileSystem *backup_fs, Path *tar_file, off_t tar_file_offset,
                                                      Path *file_to_extract, FileStat *stat,
-                                                     ptr<ProgressStatistics> statistics)
+                                                     ptr<ProgressStatistics> statistics,
+                                                     bool forceoverwrite)
 {
-    if (stat->disk_update == NoUpdate) {
-        debug(ORIGINTOOL, "Skipping file \"%s\"\n", file_to_extract->c_str());
+    if (stat->disk_update == NoUpdateIdentical) {
+        debug(ORIGINTOOL, "Skipping identical file \"%s\"\n", file_to_extract->c_str());
+        return false;
+    }
+    if (stat->disk_update == OtherIsNewer && !forceoverwrite) {
+        debug(ORIGINTOOL, "Skipping newer file \"%s\"\n", file_to_extract->c_str());
         return false;
     }
     if (stat->disk_update == UpdatePermissions) {
@@ -293,6 +346,7 @@ bool OriginToolImplementation::extractNode(Path *file_to_extract, FileStat *stat
         origin_fs_->mkDirpWriteable(file_to_extract->parent());
         origin_fs_->createFIFO(file_to_extract, stat);
         origin_fs_->utime(file_to_extract, stat);
+        statistics->stats.num_device_nodes_stored++;
         verbose(ORIGINTOOL, "Stored fifo %s\n", file_to_extract->c_str());
         statistics->updateProgress();
     }
@@ -354,7 +408,7 @@ RecurseOption OriginToolImplementation::handleRegularFiles(Path *path, FileStat 
 
     if (!entry->fs.hard_link && stat->isRegularFile()) {
         extractFileFromBackup(entry, backup_fs, tar_file, tar_file_offset,
-                              file_to_extract, stat, st);
+                              file_to_extract, stat, st, settings->forceoverwritefiles);
         //st->num_files_handled++;
         //st->size_files_handled += stat->st_size;
     }

@@ -150,12 +150,12 @@ function performReStore {
     extra="$1"
     if [ -z "$test" ]; then
         # Normal test execution, execute the store
-        eval "${BEAK} restore $extra "${store}${subdir}" $check > $log"
+        eval "${BEAK} restore --yesrestore $extra "${store}${subdir}" $check > $log"
     else
         if [ -z "$gdb" ]; then
-            ${BEAK} restore --log=all $extra $store $check 2>&1 | tee $log
+            ${BEAK} restore --yesrestore --log=all $extra $store $check 2>&1 | tee $log
         else
-            gdb -ex=r --args ${BEAK} restore -f $extra $store $check
+            gdb -ex=r --args ${BEAK} restore --yesrestore -f $extra $store $check
         fi
     fi
 }
