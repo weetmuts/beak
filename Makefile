@@ -16,10 +16,31 @@
 
 $(shell mkdir -p build)
 
-COMMIT_HASH:=$(shell git log --pretty=format:'%H' -n 1)
-TAG:=$(shell git describe --tags)
-CHANGES:=$(shell git status -s | grep -v '?? ')
-TAG_COMMIT_HASH:=$(shell git show-ref --tags | grep $(TAG) | cut -f 1 -d ' ')
+define DQUOTE
+"
+endef
+
+#' make editor quote matching happy.
+
+SUPRE=
+SUPOST=
+ifneq ($(SUDO_USER),)
+# Git has a security check to prevent the wrong user from running inside the git repository.
+# When we run "sudo make install" this will create problems since git is running as root instead.
+# Use SUPRE/SUPOST to use su to switch back to the user for the git commands.
+SUPRE=su -c $(DQUOTE)
+SUPOST=$(DQUOTE) $(SUDO_USER)
+endif
+
+COMMIT_HASH?=$(shell $(SUPRE) git log --pretty=format:'%H' -n 1 $(SUPOST))
+TAG?=$(shell $(SUPRE) git describe --tags $(SUPOST))
+BRANCH?=$(shell $(SUPRE) git rev-parse --abbrev-ref HEAD $(SUPOST))
+CHANGES?=$(shell $(SUPRE) git status -s | grep -v '?? ' $(SUPOST))
+
+#COMMIT_HASH:=$(shell git log --pretty=format:'%H' -n 1)
+#TAG:=$(shell git describe --tags)
+#CHANGES:=$(shell git status -s | grep -v '?? ')
+#TAG_COMMIT_HASH:=$(shell git show-ref --tags | grep $(TAG) | cut -f 1 -d ' ')
 
 ifeq ($(COMMIT),$(TAG_COMMIT))
   # Exactly on the tagged commit. The version is the tag!
@@ -90,6 +111,10 @@ release:
 debug:
 	@echo Building debug for $(words $(BUILDDIRS)) host\(s\).
 	@for x in $(BUILDDIRS); do echo; echo Bulding $$(basename $$x) ; $(MAKE) --no-print-directory -C $$x debug ; done
+
+lcov:
+	@echo Generating code coverage $(words $(BUILDDIRS)) host\(s\).
+	@for x in $(BUILDDIRS); do echo; echo Bulding $$(basename $$x) ; $(MAKE) --no-print-directory -C $$x debug lcov ; done
 
 test: test_release
 

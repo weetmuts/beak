@@ -624,8 +624,10 @@ ac_includes_default="\
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
 LDFLAGSEND_release
+LDFLAGSBEGIN_release
 LDFLAGS_release
 LDFLAGSEND_debug
+LDFLAGSBEGIN_debug
 LDFLAGS_debug
 CXXFLAGS_release
 CXXFLAGS_debug
@@ -1369,7 +1371,8 @@ Optional Features:
   --disable-option-checking  ignore unrecognized --enable/--with options
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
-  --disable-asan          disable address sanitizer for debug builds [enabled]
+  --disable-asan-gcov     disable address sanitizer and code coverage for
+                          debug builds [enabled]
   --disable-fuse          disable libfuse (mount will not work) [enabled]
   --disable-media         disable importmedia [enabled]
 
@@ -4020,8 +4023,8 @@ fi
 
 fi
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for address/leak sanitizer" >&5
-$as_echo_n "checking for address/leak sanitizer... " >&6; }
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for address/leak sanitizer and code coverage" >&5
+$as_echo_n "checking for address/leak sanitizer and code coverage... " >&6; }
 
 # Check whether --enable-asan was given.
 if test "${enable_asan+set}" = set; then :
@@ -4032,9 +4035,9 @@ fi
 
 
 if test "x$ENABLE_ASAN" = xyes; then
-    ASAN_CFLAGS="-ggdb -fsanitize=address -fno-omit-frame-pointer"
-    ASAN_LDFLAGS="-fsanitize=address -static-libasan"
-    ASAN_LIBS="-lasan"
+    ASAN_CFLAGS="-O0 -ggdb -fsanitize=address -fno-omit-frame-pointer -fprofile-arcs -ftest-coverage"
+    ASAN_LDFLAGS=""
+    ASAN_LIBS="-lasan -lgcov --coverage"
     { $as_echo "$as_me:${as_lineno-$LINENO}: result: using ${with_asan}" >&5
 $as_echo "using ${with_asan}" >&6; }
 else
@@ -4698,9 +4701,12 @@ CXXFLAGS_release="-Os
 LDFLAGS=""
 LDFLAGS_debug="-g ${ASAN_LDFLAGS}"
 LDFLAGS_release="-Os"
-LDFLAGSEND_debug="${ASAN_LIBS}"
+LDFLAGSEND_debug=""
+LDFLAGSBEGIN_debug="${ASAN_LIBS}"
 
 CFLAGS=""
+
+
 
 
 

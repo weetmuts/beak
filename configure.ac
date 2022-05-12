@@ -98,17 +98,17 @@ if test "x$STRIP" = "x"; then
     AC_PATH_TOOL([STRIP], [strip], [:])
 fi
 
-AC_MSG_CHECKING([for address/leak sanitizer])
+AC_MSG_CHECKING([for address/leak sanitizer and code coverage])
 
 AC_ARG_ENABLE([asan],
-  [AS_HELP_STRING([--disable-asan],
-      [disable address sanitizer for debug builds @<:@enabled@:>@])],
+  [AS_HELP_STRING([--disable-asan-gcov],
+      [disable address sanitizer and code coverage for debug builds @<:@enabled@:>@])],
       [ENABLE_ASAN=${enable_asan}], [ENABLE_ASAN=${ASAN_DEFAULT}])
 
 if test "x$ENABLE_ASAN" = xyes; then
-    ASAN_CFLAGS="-ggdb -fsanitize=address -fno-omit-frame-pointer"
-    ASAN_LDFLAGS="-fsanitize=address -static-libasan"
-    ASAN_LIBS="-lasan"
+    ASAN_CFLAGS="-O0 -ggdb -fsanitize=address -fno-omit-frame-pointer -fprofile-arcs -ftest-coverage"
+    ASAN_LDFLAGS=""
+    ASAN_LIBS="-lasan -lgcov --coverage"
     AC_MSG_RESULT([using ${with_asan}])
 else
     AC_MSG_RESULT([explicitly disabled])
@@ -325,7 +325,8 @@ CXXFLAGS_release="-Os
 LDFLAGS=""
 LDFLAGS_debug="-g ${ASAN_LDFLAGS}"
 LDFLAGS_release="-Os"
-LDFLAGSEND_debug="${ASAN_LIBS}"
+LDFLAGSEND_debug=""
+LDFLAGSBEGIN_debug="${ASAN_LIBS}"
 
 CFLAGS=""
 
@@ -338,8 +339,10 @@ AC_SUBST(CXXFLAGS_debug)
 AC_SUBST(CXXFLAGS_release)
 AC_SUBST(LDFLAGS)
 AC_SUBST(LDFLAGS_debug)
+AC_SUBST(LDFLAGSBEGIN_debug)
 AC_SUBST(LDFLAGSEND_debug)
 AC_SUBST(LDFLAGS_release)
+AC_SUBST(LDFLAGSBEGIN_release)
 AC_SUBST(LDFLAGSEND_release)
 
 AC_CONFIG_FILES([$OUTPUT_ROOT/spec.gmk:$SRC_ROOT/autoconf/spec.gmk.in])

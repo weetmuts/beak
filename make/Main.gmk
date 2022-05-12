@@ -100,13 +100,13 @@ $(OUTPUT_ROOT)/$(TYPE)/%.o: $(SRC_ROOT)/src/%.cc
 $(OUTPUT_ROOT)/$(TYPE)/beak: $(BEAK_OBJS)
 	@echo Linking $(TYPE) $(CONF_MNEMONIC) $@
 	$(VERBOSE)$(CXX) -o $@ $(LDFLAGS_$(TYPE)) $(LDFLAGS) $(BEAK_OBJS) \
-                      $(OPENSSL_LIBS) $(ZLIB_LIBS) $(FUSE_LIBS) $(LIBRSYNC_LIBS) $(LIBEXIV2_LIBS) $(LIBAVFORMAT_LIBS) $(LDFLAGSEND_$(TYPE)) -lpthread $(MEDIA_LIBS)
+                      $(LDFLAGSBEGIN_$(TYPE)) $(OPENSSL_LIBS) $(ZLIB_LIBS) $(FUSE_LIBS) $(LIBRSYNC_LIBS) $(LIBEXIV2_LIBS) $(LIBAVFORMAT_LIBS) $(LDFLAGSEND_$(TYPE)) -lpthread $(MEDIA_LIBS)
 	$(VERBOSE)$(STRIP_COMMAND) $@
 
 $(OUTPUT_ROOT)/$(TYPE)/testinternals: $(TESTINTERNALS_OBJS)
 	@echo Linking $(TYPE) $(CONF_MNEMONIC) $@
 	$(VERBOSE)$(CXX) -o $@ $(LDFLAGS_$(TYPE)) $(LDFLAGS) $(TESTINTERNALS_OBJS) \
-                      $(OPENSSL_LIBS) $(ZLIB_LIBS) $(FUSE_LIBS) $(LIBRSYNC_LIBS) $(LIBEXIV2_LIBS) $(LIBAVFORMAT_LIBS) $(LDFLAGSEND_$(TYPE)) -lpthread $(MEDIA_LIBS)
+                      $(LDFLAGSBEGIN_$(TYPE)) $(OPENSSL_LIBS) $(ZLIB_LIBS) $(FUSE_LIBS) $(LIBRSYNC_LIBS) $(LIBEXIV2_LIBS) $(LIBAVFORMAT_LIBS) $(LDFLAGSEND_$(TYPE)) -lpthread $(MEDIA_LIBS)
 	$(VERBOSE)$(STRIP_COMMAND) $@
 
 $(OUTPUT_ROOT)/$(TYPE)/libgcc_s_seh-1.dll: /usr/lib/gcc/x86_64-w64-mingw32/5.3-win32/libgcc_s_seh-1.dll
@@ -132,6 +132,24 @@ ifeq ($(PLATFORM),winapi)
         cp $(OUTPUT_ROOT)/$(TYPE)/testinternals $(OUTPUT_ROOT)/$(TYPE)/testinternals.exe
 endif
 endif
+
+clean_cc:
+	find . -name "*.gcov" -delete
+	find . -name "*.gcda" -delete
+
+# This generates annotated source files ending in .gcov
+# inside the build_debug where non-executed source lines are marked #####
+gcov:
+	@if [ "$(TYPE)" != "debug" ]; then echo "You have to run \"make debug gcov\""; exit 1; fi
+	$(GCOV) -o build_debug $(PROG_OBJS) $(DRIVER_OBJS)
+	mv *.gcov build_debug
+
+# --no-external
+lcov:
+	@if [ "$(TYPE)" != "debug" ]; then echo "You have to run \"make debug lcov\""; exit 1; fi
+	lcov --directory . -c --output-file $(OUTPUT_ROOT)/$(TYPE)/lcov.info
+	(cd $(OUTPUT_ROOT)/$(TYPE); genhtml lcov.info)
+	xdg-open $(OUTPUT_ROOT)/$(TYPE)/src/index.html
 
 .PHONY: release debug
 
