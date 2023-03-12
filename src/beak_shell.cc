@@ -26,13 +26,16 @@ RC BeakImplementation::shell(Settings *settings, Monitor *monitor)
 {
     RC rc = RC::OK;
 
-    assert(settings->from.type == ArgStorage);
+    assert(settings->from.type == ArgStorage || settings->from.type == ArgRule);
 
     string storage = "";
-    if (settings->from.type == ArgStorage) {
+    if (settings->from.type == ArgStorage)
+    {
         storage = settings->from.storage->storage_location->str();
-    } else if (settings->from.type == ArgDir) {
-        storage = settings->from.dir->str();
+    }
+    else if (settings->from.type == ArgRule)
+    {
+        storage = settings->from.rule->name;
     }
 
     Path *mount = local_fs_->mkTempDir("beak_shell_");

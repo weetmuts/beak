@@ -17,10 +17,10 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-# You can run all tests: test.sh
-# You can list all tests: test.sh list
-# You can run a single test: test.sh test6
-# You can run a single test using gdb: test.sh test6 gdb
+# You can run all tests: ./tests/test_basics.sh . build/.../beak
+# You can list all tests: ./tests/test_basics.sh . build/.../beak list
+# You can run a single test: ./tests/test_basics.sh . build/.../beak test6
+# You can run a single test using gdb: ./tests/test_basics.sh . build/.../beak test6 gdb
 
 DIR=$1
 BEAK=$2
@@ -74,7 +74,7 @@ if_test_fail_msg=""
 
 THIS_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 
-if [ "$1" == "list" ]; then
+if [ "$3" == "list" ]; then
     grep '^setup ' $THIS_SCRIPT | grep -v grep | cut -f 2- -d ' '
     exit 0
 fi

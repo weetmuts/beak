@@ -181,11 +181,11 @@ string BeakImplementation::argsToVector_(int argc, char **argv, vector<string> *
     return argv[0];
 }
 
-unique_ptr<Restore> BeakImplementation::accessBackup_(Argument *storage,
-                                                      string pointintime,
-                                                      Monitor *monitor,
-                                                      FileSystem **out_backup_fs,
-                                                      Path **out_root)
+unique_ptr<Restore> BeakImplementation::accessSingleStorageBackup_(Argument *storage,
+                                                                   string pointintime,
+                                                                   Monitor *monitor,
+                                                                   FileSystem **out_backup_fs,
+                                                                   Path **out_root)
 {
     RC rc = RC::OK;
 
@@ -222,6 +222,43 @@ unique_ptr<Restore> BeakImplementation::accessBackup_(Argument *storage,
     }
 
     return restore;
+}
+
+vector<NamedRestore> BeakImplementation::accessMultipleStorageBackup_(Argument *storage,
+                                                                      string pointintime,
+                                                                      Monitor *monitor,
+                                                                      FileSystem **out_backup_fs,
+                                                                      Path **out_root)
+{
+    assert(storage->type == ArgRule);
+
+    Rule *rule = configuration_->rule(storage->rule->name);
+    assert(rule != NULL);
+
+    vector<Storage*> storages = rule->sortedStorages();
+
+    vector<NamedRestore> restores;
+
+    for (Storage* s : storages)
+    {
+        string name = s->storage_location->str();
+        printf("Creating restore for %s\n", name.c_str());
+
+        Argument st = *storage;
+        st.type = ArgStorage;
+        st.storage = new Storage();
+        st.storage->storage_location = s->storage_location;
+
+        restores.push_back( {
+                name,
+                accessSingleStorageBackup_(&st,
+                                           pointintime,
+                                           monitor,
+                                           out_backup_fs,
+                                           out_root) } );
+    }
+
+    return restores;
 }
 
 RC BeakImplementation::umountDaemon(Settings *settings)
@@ -287,15 +324,44 @@ RC BeakImplementation::mountRestore(Settings *settings, Monitor *monitor)
 
 RC BeakImplementation::mountRestoreInternal_(Settings *settings, bool daemon, Monitor *monitor)
 {
-    auto restore  = accessBackup_(&settings->from, settings->from.point_in_time, monitor);
-    if (!restore) {
-        return RC::ERR;
-    }
 
-    if (daemon) {
-        return sys_->mountDaemon(settings->to.dir, restore->asFuseAPI(), settings->foreground, settings->fusedebug);
-    } else {
-        restore_fuse_mount_ = sys_->mount(settings->to.dir, restore->asFuseAPI(), settings->fusedebug);
+    if (settings->from.type == ArgRule)
+    {
+        vector<NamedRestore> restores = accessMultipleStorageBackup_(&settings->from, settings->from.point_in_time, monitor);
+
+        if (restores.size() == 0)
+        {
+            return RC::ERR;
+        }
+
+        /*
+        if (daemon)
+        {
+            return sys_->mountDaemon(settings->to.dir, restore->asFuseAPI(), settings->foreground, settings->fusedebug);
+        }
+        else
+        {
+            restore_fuse_mount_ = sys_->mount(settings->to.dir, restore->asFuseAPI(), settings->fusedebug);
+        }
+        */
+    }
+    else
+    {
+        assert(settings->from.type == ArgStorage);
+
+        unique_ptr<Restore> restore = accessSingleStorageBackup_(&settings->from, settings->from.point_in_time, monitor);
+        if (!restore) {
+            return RC::ERR;
+        }
+
+        if (daemon)
+        {
+            return sys_->mountDaemon(settings->to.dir, restore->asFuseAPI(), settings->foreground, settings->fusedebug);
+        }
+        else
+        {
+            restore_fuse_mount_ = sys_->mount(settings->to.dir, restore->asFuseAPI(), settings->fusedebug);
+        }
     }
 
     return RC::OK;

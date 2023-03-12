@@ -52,7 +52,7 @@ struct FileSystem;
 enum UpdateDisk {
     NoUpdateIdentical, // No need to write since the files are identical
     UpdatePermissions, // The permissions differ, fix this.
-    OtherIsNewer, // Used when storing into origin to avoid overwriting newer files.
+    OtherIsNewer, // Used when restoring into origin to avoid overwriting newer files.
     Store         // Yes, write/store the file.
 };
 
@@ -390,8 +390,7 @@ std::unique_ptr<FileSystem> newDefaultFileSystem(System *sys);
 std::unique_ptr<FileSystem> newStatOnlyFileSystem(System *sys, std::map<Path*,FileStat> contents);
 
 // Access a fuse exported file system as a FileSystem.
-FileSystem *newFileSystem(System *sys, FuseAPI *api);
-
+//FileSystem *newFileSystem(System *sys, FuseAPI *api);
 
 Path *configurationFile();
 Path *cacheDir();

@@ -48,7 +48,7 @@ RC BeakImplementation::stat(Settings *settings, Monitor *monitor)
     }
     else if (settings->from.type == ArgStorage)
     {
-        restore_curr = accessBackup_(&settings->from, settings->from.point_in_time, monitor);
+        restore_curr = accessSingleStorageBackup_(&settings->from, settings->from.point_in_time, monitor);
         auto point = restore_curr->singlePointInTime();
         if (!point) {
             // The settings did not specify a point in time, lets use the most recent for the restore.

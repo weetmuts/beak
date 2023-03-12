@@ -25,7 +25,7 @@ and it is convenient to push/pull-merge the work between them since
 the work might not (yet) be stored in remote git repository nor in a
 distributed file system.
 
-I also like to have multiple backups in multiple locations, in the latop,
+I also like to have multiple backups in multiple locations, in the laptop,
 on a removable storage, on multiple remote cloud storages etc. The backups can be
 pruned with different rules for different storage locations.
 

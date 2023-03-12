@@ -48,8 +48,14 @@ extern vector<OptionEntry> option_entries_;
 
 bool hasCommandOption(Command cmd, Option option);
 
-struct BeakImplementation : Beak {
+struct NamedRestore
+{
+    string name;
+    unique_ptr<Restore> restore;
+};
 
+struct BeakImplementation : Beak
+{
     BeakImplementation(ptr<Configuration> configuration,
                        ptr<System> sys,
                        ptr<FileSystem> local_fs,
@@ -100,11 +106,16 @@ struct BeakImplementation : Beak {
     private:
 
     string argsToVector_(int argc, char **argv, vector<string> *args);
-    unique_ptr<Restore> accessBackup_(Argument *storage,
-                                      string pointintime,
-                                      Monitor *monitor,
-                                      FileSystem **out_backup_fs = NULL,
-                                      Path **out_root = NULL);
+    unique_ptr<Restore> accessSingleStorageBackup_(Argument *storage, // Use the storage to select the storage.
+                                                   string pointintime,
+                                                   Monitor *monitor,
+                                                   FileSystem **out_backup_fs = NULL,
+                                                   Path **out_root = NULL);
+    vector<NamedRestore> accessMultipleStorageBackup_(Argument *storage, // Use the rule to select the storages.
+                                                       string pointintime,
+                                                       Monitor *monitor,
+                                                       FileSystem **out_backup_fs = NULL,
+                                                       Path **out_root = NULL);
     RC mountRestoreInternal_(Settings *settings, bool daemon, Monitor *monitor);
     bool hasPointsInTime_(Path *path, FileSystem *fs);
 

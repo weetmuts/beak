@@ -33,7 +33,7 @@ RC BeakImplementation::restore(Settings *settings, Monitor *monitor)
     umask(0);
     RC rc = RC::OK;
 
-    auto restore  = accessBackup_(&settings->from, settings->to.point_in_time, monitor);
+    auto restore  = accessSingleStorageBackup_(&settings->from, settings->to.point_in_time, monitor);
 
     if (!restore) {
         return RC::ERR;

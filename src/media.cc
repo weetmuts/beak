@@ -63,6 +63,8 @@ struct MediaHelper
                            vector<char> *hash, string *metas);
     bool getDateFromStat(FileStat *st, struct timespec *ts, struct tm *tm);
     bool getDateFromPath(Path *p, struct timespec *ts, struct tm *tm);
+
+    bool isUnsupportedMedia(string &ext);
 };
 
 MediaHelper media_helper_;
@@ -106,6 +108,13 @@ MediaHelper::MediaHelper()
         img_suffixes_["PNG"] = "png";
 
         Magick::InitializeMagick(NULL);
+}
+
+bool MediaHelper::isUnsupportedMedia(string &ext)
+{
+    if (ext == "heic" || ext == "HEIC") return true;
+    if (ext == "webp" || ext == "WEBP") return true;
+    return false;
 }
 
 const char *toString(MediaType mt)

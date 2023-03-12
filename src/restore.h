@@ -202,6 +202,11 @@ struct Restore
     std::unique_ptr<FileSystem> contents_fs_;
 };
 
+struct MultipleRestores
+{
+    FuseAPI *asFuseApi();
+};
+
 // Restore from a file system containing a backup full of beak files
 std::unique_ptr<Restore> newRestore(ptr<FileSystem> backup_fs);
 

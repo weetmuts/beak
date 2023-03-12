@@ -79,10 +79,12 @@ struct FileSystemFuseAPIImplementation : FileSystem
     FuseAPI *api_;
 };
 
+/*
 FileSystem *newFileSystem(FuseAPI *api)
 {
     return new FileSystemFuseAPIImplementation(api);
 }
+*/
 
 FileSystemFuseAPIImplementation::FileSystemFuseAPIImplementation(FuseAPI *api)
     : FileSystem("FileSystemFuseAPIImplementation")
