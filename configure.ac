@@ -170,7 +170,7 @@ AC_ARG_WITH(openssl, [AS_HELP_STRING([--with-openssl],
 #x86_64-w64-mingw32-g++ -I../openssl-1.0.2l/include/ test.cc ../openssl-1.0.2l/libcrypto.a
 
 if test "x${with_openssl}" = "x"; then
-    OPENSSL_CFLAGS="$($PKG_CONFIG openssl --cflags)"
+    OPENSSL_CFLAGS="$($PKG_CONFIG openssl --cflags) -DOPENSSL_API_COMPAT=0x10100000L"
     OPENSSL_LIBS="$($PKG_CONFIG openssl --libs)"
     AC_MSG_RESULT([found])
 else
