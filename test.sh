@@ -6,7 +6,7 @@ cwddir=$(pwd)
 echo testinternals
 $builddir/testinternals
 
-beak="$builddir/beaknm"
+beak="$builddir/beak"
 testscripts=$(ls tests/test*.sh)
 testoutput=$(pwd)/test_output
 
@@ -15,7 +15,7 @@ mkdir -p $testoutput
 
 if [ "$OSTYPE" == "linux-gnu" ]
 then
-    ./tests/test_basics.sh "$cwddir" "$builddir/beaknm"
+    ./tests/test_basics.sh "$cwddir" "$builddir/beak"
     if [ "$?" != "0" ]; then echo ERRRROROROR in basic tests; exit 1; fi
 fi
 

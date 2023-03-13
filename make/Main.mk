@@ -113,13 +113,13 @@ $(OUTPUT_ROOT)/$(TYPE)/%.o: $(SRC_ROOT)/src/%.cc
 	$(VERBOSE)$(CXX) $(CXXFLAGS_$(TYPE)) $(CXXFLAGS) -I$(OUTPUT_ROOT) -I$(BUILD_ROOT) -MMD $< -c -o $@
 	$(VERBOSE)$(CXX) -E $(CXXFLAGS_$(TYPE)) $(CXXFLAGS) -I$(OUTPUT_ROOT) -I$(BUILD_ROOT) -MMD $< -c > $@.source
 
-$(OUTPUT_ROOT)/$(TYPE)/beak: $(BEAK_OBJS) $(BEAK_MEDIA_OBJS)
+$(OUTPUT_ROOT)/$(TYPE)/beakm: $(BEAK_OBJS) $(BEAK_MEDIA_OBJS)
 	@echo Linking $(TYPE) $(CONF_MNEMONIC) $@
 	$(VERBOSE)$(CXX) -o $@ $(LDFLAGS_$(TYPE)) $(LDFLAGS) $(BEAK_OBJS) $(BEAK_MEDIA_OBJS) \
                       $(LDFLAGSBEGIN_$(TYPE)) $(OPENSSL_LIBS) $(ZLIB_LIBS) $(FUSE_LIBS) $(LIBRSYNC_LIBS) $(LDFLAGSEND_$(TYPE)) $(MEDIA_LIBS) -lpthread
 	$(VERBOSE)$(STRIP_COMMAND) $@
 
-$(OUTPUT_ROOT)/$(TYPE)/beaknm: $(BEAK_OBJS) $(BEAK_NO_MEDIA_OBJS)
+$(OUTPUT_ROOT)/$(TYPE)/beak: $(BEAK_OBJS) $(BEAK_NO_MEDIA_OBJS)
 	@echo Linking $(TYPE) $(CONF_MNEMONIC) $@
 	$(VERBOSE)$(CXX) -o $@ $(LDFLAGS_$(TYPE)) $(LDFLAGS) $(BEAK_OBJS) $(BEAK_NO_MEDIA_OBJS) \
                       $(LDFLAGSBEGIN_$(TYPE)) $(OPENSSL_LIBS) $(ZLIB_LIBS) $(FUSE_LIBS) $(LIBRSYNC_LIBS) $(LDFLAGSEND_$(TYPE)) -lpthread
@@ -140,10 +140,10 @@ $(OUTPUT_ROOT)/$(TYPE)/libstdc++-6.dll: /usr/lib/gcc/x86_64-w64-mingw32/5.3-win3
 $(OUTPUT_ROOT)/$(TYPE)/libwinpthread-1.dll: /usr/x86_64-w64-mingw32/lib/libwinpthread-1.dll
 	cp $< $@
 
-BINARIES:=$(OUTPUT_ROOT)/$(TYPE)/beaknm $(OUTPUT_ROOT)/$(TYPE)/testinternals
+BINARIES:=$(OUTPUT_ROOT)/$(TYPE)/beak $(OUTPUT_ROOT)/$(TYPE)/testinternals
 
 ifeq ($(ENABLE_MEDIA),yes)
-BINARIES:=$(BINARIES) $(OUTPUT_ROOT)/$(TYPE)/beak
+BINARIES:=$(BINARIES) $(OUTPUT_ROOT)/$(TYPE)/beakm
 endif
 
 ifeq ($(CLEAN),clean)
