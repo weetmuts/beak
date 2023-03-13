@@ -414,8 +414,8 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
             case monitor_option:
                 settings->monitor = true;
                 break;
-            case noreadcheck_option:
-                settings->noreadcheck = true;
+            case writeonly_option:
+                settings->writeonly = true;
                 break;
             case now_option:
                 settings->now = value;

@@ -181,7 +181,7 @@ RC rcloneSendFiles(Storage *storage,
                    FileSystem *local_fs,
                    ptr<System> sys,
                    ProgressStatistics *st,
-                   bool noreadcheck)
+                   bool writeonly)
 {
     string files_to_send;
     for (auto& p : *files) {
@@ -195,7 +195,7 @@ RC rcloneSendFiles(Storage *storage,
     args.push_back("-v");
     args.push_back("--stats-one-line");
     args.push_back("--stats=10s");
-    if (noreadcheck) args.push_back("--s3-no-head");
+    if (writeonly) args.push_back("--s3-no-head");
     args.push_back("--include-from");
     args.push_back(tmp->c_str());
     args.push_back(local_dir->c_str());

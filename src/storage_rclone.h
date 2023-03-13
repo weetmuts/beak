@@ -47,7 +47,7 @@ RC rcloneSendFiles(Storage *storage,
                    FileSystem *local_fs,
                    ptr<System> sys,
                    ProgressStatistics *progress,
-                   bool noreadcheck);
+                   bool writeonly);
 
 RC rcloneDeleteFiles(Storage *storage,
                      std::vector<Path*> *files,
