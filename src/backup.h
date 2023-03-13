@@ -28,7 +28,7 @@
 #ifdef FUSE_USE_VERSION
 #include <fuse.h>
 #else
-#include "nofuse.h"
+#include "no_fuse.h"
 #endif
 #include <pthread.h>
 #include <stddef.h>

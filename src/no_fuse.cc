@@ -15,7 +15,7 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "nofuse.h"
+#include "no_fuse.h"
 
 FuseContext *fuse_get_context() {
     return NULL;

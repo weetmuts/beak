@@ -32,7 +32,7 @@
 #ifdef FUSE_USE_VERSION
 #include <fuse.h>
 #else
-#include "nofuse.h"
+#include "no_fuse.h"
 #endif
 
 #define MAX_FILE_NAME_LENGTH 255
