@@ -404,13 +404,16 @@ RC StorageToolImplementation::storeBackupIntoStorage(FileSystem *backup_fs,
                                  &beak_files_to_backup,
                                  mount,
                                  local_fs_,
-                                 sys_, progress);
+                                 sys_,
+                                 progress,
+                                 settings->noreadcheck);
         } else {
             rc = rsyncSendFiles(storage,
                                 &beak_files_to_backup,
                                 mount,
                                 local_fs_,
-                                sys_, progress);
+                                sys_,
+                                progress);
         }
 
         if (rc.isErr()) {
@@ -514,7 +517,9 @@ RC StorageToolImplementation::copyBackupIntoStorage(FileSystem *backup_fs,
                                  &beak_files_to_backup,
                                  backup_dir,
                                  local_fs_,
-                                 sys_, progress);
+                                 sys_,
+                                 progress,
+                                 settings->noreadcheck);
         } else {
             rc = rsyncSendFiles(storage,
                                 &beak_files_to_backup,
