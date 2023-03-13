@@ -80,7 +80,7 @@ help:
 	@echo "E.g.:  make debug winapi64"
 	@echo "       make release linux64"
 
-BUILDDIRS:=$(dir $(realpath $(wildcard build/*/spec.gmk)))
+BUILDDIRS:=$(dir $(realpath $(wildcard build/*/spec.mk)))
 
 ifeq (,$(BUILDDIRS))
     $(error Run configure first!)

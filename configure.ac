@@ -81,9 +81,7 @@ AC_SUBST(SRC_ROOT)
 AC_SUBST(OUTPUT_ROOT)
 AC_SUBST(BUILD_ROOT)
 
-AC_HEADER_STDC
 AC_HEADER_STAT
-AC_HEADER_TIME
 
 if test "x$CC" = "x"; then
     AC_PATH_TOOL([CC], [gcc], [:])
@@ -222,17 +220,6 @@ fi
 AC_SUBST(LIBRSYNC_CFLAGS)
 AC_SUBST(LIBRSYNC_LIBS)
 
-AC_MSG_CHECKING([for exiv2])
-AC_ARG_WITH(libexiv2, [AS_HELP_STRING([--with-exiv2],
-      [specify prefix directory for the exiv2 package
-      (expecting the libraries under PATH and the headers under PATH/src)])])
-
-if test "x${with_libexiv2}" = "x"; then
-    LIBEXIV2_CFLAGS=""
-    LIBEXIV2_LIBS="-lexiv2"
-    AC_MSG_RESULT([found])
-fi
-
 AC_MSG_CHECKING([for media support])
 
 AC_ARG_ENABLE([media],
@@ -244,27 +231,38 @@ AC_SUBST(ENABLE_MEDIA)
 AC_SUBST(MEDIA_CFLAGS)
 AC_SUBST(MEDIA_LIBS)
 
-AC_MSG_CHECKING([for libmagick++-dev])
+MEDIA_CFLAGS=""
 
-MEDIA_CFLAGS=
-MEDIA_LIBS=$(Magick++-config --libs)
+if test "${ENABLE_MEDIA}" = "yes"; then
+    MEDIA_CFLAGS="-DMEDIA_ENABLED"
+    MEDIA_LIBS=""
+    AC_MSG_RESULT([compiling media support])
 
-AC_SUBST(LIBEXIV2_CFLAGS)
-AC_SUBST(LIBEXIV2_LIBS)
-
-AC_MSG_CHECKING([for libavformat])
-AC_ARG_WITH(libavformat, [AS_HELP_STRING([--with-libavformat],
-      [specify prefix directory for the libavformat package
+    AC_MSG_CHECKING([for exiv2])
+    AC_ARG_WITH(libexiv2, [AS_HELP_STRING([--with-exiv2],
+      [specify prefix directory for the exiv2 package
       (expecting the libraries under PATH and the headers under PATH/src)])])
 
-if test "x${with_libavformat}" = "x"; then
-    LIBAVFORMAT_CFLAGS=""
-    LIBAVFORMAT_LIBS="-lavutil -lavformat -lavcodec"
-    AC_MSG_RESULT([found])
-fi
+    if test "x${with_libexiv2}" = "x"; then
+        MEDIA_LIBS="${MEDIA_LIBS} -lexiv2"
+        AC_MSG_RESULT([found])
+    fi
 
-AC_SUBST(LIBAVFORMAT_CFLAGS)
-AC_SUBST(LIBAVFORMAT_LIBS)
+    AC_MSG_CHECKING([for libmagick++-dev])
+
+    MEDIA_LIBS="${MEDIA_LIBS} $(Magick++-config --libs)"
+
+    AC_MSG_CHECKING([for libavformat])
+    AC_ARG_WITH(libavformat, [AS_HELP_STRING([--with-libavformat],
+        [specify prefix directory for the libavformat package
+         (expecting the libraries under PATH and the headers under PATH/src)])])
+
+    if test "x${with_libavformat}" = "x"; then
+        MEDIA_LIBS="${MEDIA_LIBS} -lavutil -lavformat -lavcodec"
+        AC_MSG_RESULT([found])
+    fi
+
+fi
 
 AC_MSG_CHECKING(for sizeof time_t)
 AC_CHECK_SIZEOF([time_t])
@@ -323,10 +321,10 @@ CXXFLAGS_debug="-O0 -g ${ASAN_CFLAGS}
 CXXFLAGS_release="-Os
 
 LDFLAGS=""
-LDFLAGS_debug="-g ${ASAN_LDFLAGS}"
+LDFLAGS_debug="-g ${ASAN_LDFLAGS} ${MEDIA_LIBS}"
 LDFLAGS_release="-Os"
 LDFLAGSEND_debug=""
-LDFLAGSBEGIN_debug="${ASAN_LIBS}"
+LDFLAGSBEGIN_debug="${ASAN_LIBS} ${MEDIA_LIBS}"
 
 CFLAGS=""
 
@@ -345,7 +343,7 @@ AC_SUBST(LDFLAGS_release)
 AC_SUBST(LDFLAGSBEGIN_release)
 AC_SUBST(LDFLAGSEND_release)
 
-AC_CONFIG_FILES([$OUTPUT_ROOT/spec.gmk:$SRC_ROOT/autoconf/spec.gmk.in])
+AC_CONFIG_FILES([$OUTPUT_ROOT/spec.mk:$SRC_ROOT/autoconf/spec.mk.in])
 AC_CONFIG_FILES([$OUTPUT_ROOT/Makefile:$SRC_ROOT/make/Makefile.in])
 # Make sure config.status ends up in the build directory instead of the src root.
 CONFIG_STATUS="$OUTPUT_ROOT/config.status"

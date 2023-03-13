@@ -26,6 +26,8 @@
 #include "storagetool.h"
 #include "system.h"
 
+static ComponentId SERVEMEDIA = registerLogComponent("servemedia");
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -39,7 +41,6 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 
-static ComponentId SERVEMEDIA = registerLogComponent("servemedia");
 
 struct ServeMedia
 {

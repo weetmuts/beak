@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2017 Fredrik Öhrström
+# Copyright (C) 2017-2023 Fredrik Öhrström
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -41,7 +41,7 @@ VERBOSE?=@
 
 WINAPI_SOURCES:=$(filter-out %posix.cc, $(wildcard $(SRC_ROOT)/src/*.cc))
 ifeq ($(ENABLE_FUSE),yes)
-WINAPI_SOURCES:=$(filter-out %nofuse.cc,$(WINAPI_SOURCES))
+WINAPI_SOURCES:=$(filter-out %no_fuse.cc,$(WINAPI_SOURCES))
 endif
 
 WINAPI_OBJS:=\
@@ -59,12 +59,26 @@ WINAPI_TESTINTERNALS_OBJS:=\
     $(filter-out %main.o,$(WINAPI_OBJS))
 
 POSIX_SOURCES:=$(filter-out %winapi.cc,$(wildcard $(SRC_ROOT)/src/*.cc))
+
 ifeq ($(ENABLE_FUSE),yes)
-POSIX_SOURCES:=$(filter-out %nofuse.cc,$(POSIX_SOURCES))
+POSIX_SOURCES:=$(filter-out %no_fuse.cc,$(POSIX_SOURCES))
 endif
+
+POSIX_SOURCES:=$(filter-out %media.cc,$(POSIX_SOURCES))
+
+MEDIA_SOURCES:=beak_importmedia.cc beak_servemedia.cc beak_indexmedia.cc media.cc
+MEDIA_SOURCES:=$(addprefix $(SRC_ROOT)/src/,$(MEDIA_SOURCES))
+NO_MEDIA_SOURCES:=no_beak_importmedia.cc no_beak_servemedia.cc no_beak_indexmedia.cc no_media.cc
+NO_MEDIA_SOURCES:=$(addprefix $(SRC_ROOT)/src/,$(NO_MEDIA_SOURCES))
 
 POSIX_OBJS:=\
     $(patsubst %.cc,%.o,$(subst $(SRC_ROOT)/src,$(OUTPUT_ROOT)/$(TYPE),$(POSIX_SOURCES)))
+
+POSIX_MEDIA_OBJS:=\
+    $(patsubst %.cc,%.o,$(subst $(SRC_ROOT)/src,$(OUTPUT_ROOT)/$(TYPE),$(MEDIA_SOURCES)))
+
+POSIX_NO_MEDIA_OBJS:=\
+    $(patsubst %.cc,%.o,$(subst $(SRC_ROOT)/src,$(OUTPUT_ROOT)/$(TYPE),$(NO_MEDIA_SOURCES)))
 
 POSIX_BEAK_OBJS:=\
     $(filter-out %testinternals.o,$(POSIX_OBJS))
@@ -87,6 +101,8 @@ $(OUTPUT_ROOT)/generated_filetypes.h: $(SRC_ROOT)/scripts/filetypes.inc
 	echo  >> $@
 
 BEAK_OBJS:=$($(PLATFORM)_BEAK_OBJS)
+BEAK_MEDIA_OBJS:=$($(PLATFORM)_MEDIA_OBJS)
+BEAK_NO_MEDIA_OBJS:=$($(PLATFORM)_NO_MEDIA_OBJS)
 TESTINTERNALS_OBJS:=$($(PLATFORM)_TESTINTERNALS_OBJS)
 
 $(OUTPUT_ROOT)/$(TYPE)/beak_genautocomp.o: $(OUTPUT_ROOT)/generated_autocomplete.h
@@ -97,16 +113,22 @@ $(OUTPUT_ROOT)/$(TYPE)/%.o: $(SRC_ROOT)/src/%.cc
 	$(VERBOSE)$(CXX) $(CXXFLAGS_$(TYPE)) $(CXXFLAGS) -I$(OUTPUT_ROOT) -I$(BUILD_ROOT) -MMD $< -c -o $@
 	$(VERBOSE)$(CXX) -E $(CXXFLAGS_$(TYPE)) $(CXXFLAGS) -I$(OUTPUT_ROOT) -I$(BUILD_ROOT) -MMD $< -c > $@.source
 
-$(OUTPUT_ROOT)/$(TYPE)/beak: $(BEAK_OBJS)
+$(OUTPUT_ROOT)/$(TYPE)/beak: $(BEAK_OBJS) $(BEAK_MEDIA_OBJS)
 	@echo Linking $(TYPE) $(CONF_MNEMONIC) $@
-	$(VERBOSE)$(CXX) -o $@ $(LDFLAGS_$(TYPE)) $(LDFLAGS) $(BEAK_OBJS) \
-                      $(LDFLAGSBEGIN_$(TYPE)) $(OPENSSL_LIBS) $(ZLIB_LIBS) $(FUSE_LIBS) $(LIBRSYNC_LIBS) $(LIBEXIV2_LIBS) $(LIBAVFORMAT_LIBS) $(LDFLAGSEND_$(TYPE)) -lpthread $(MEDIA_LIBS)
+	$(VERBOSE)$(CXX) -o $@ $(LDFLAGS_$(TYPE)) $(LDFLAGS) $(BEAK_OBJS) $(BEAK_MEDIA_OBJS) \
+                      $(LDFLAGSBEGIN_$(TYPE)) $(OPENSSL_LIBS) $(ZLIB_LIBS) $(FUSE_LIBS) $(LIBRSYNC_LIBS) $(LDFLAGSEND_$(TYPE)) $(MEDIA_LIBS) -lpthread
 	$(VERBOSE)$(STRIP_COMMAND) $@
 
-$(OUTPUT_ROOT)/$(TYPE)/testinternals: $(TESTINTERNALS_OBJS)
+$(OUTPUT_ROOT)/$(TYPE)/beaknm: $(BEAK_OBJS) $(BEAK_NO_MEDIA_OBJS)
 	@echo Linking $(TYPE) $(CONF_MNEMONIC) $@
-	$(VERBOSE)$(CXX) -o $@ $(LDFLAGS_$(TYPE)) $(LDFLAGS) $(TESTINTERNALS_OBJS) \
-                      $(LDFLAGSBEGIN_$(TYPE)) $(OPENSSL_LIBS) $(ZLIB_LIBS) $(FUSE_LIBS) $(LIBRSYNC_LIBS) $(LIBEXIV2_LIBS) $(LIBAVFORMAT_LIBS) $(LDFLAGSEND_$(TYPE)) -lpthread $(MEDIA_LIBS)
+	$(VERBOSE)$(CXX) -o $@ $(LDFLAGS_$(TYPE)) $(LDFLAGS) $(BEAK_OBJS) $(BEAK_NO_MEDIA_OBJS) \
+                      $(LDFLAGSBEGIN_$(TYPE)) $(OPENSSL_LIBS) $(ZLIB_LIBS) $(FUSE_LIBS) $(LIBRSYNC_LIBS) $(LDFLAGSEND_$(TYPE)) -lpthread
+	$(VERBOSE)$(STRIP_COMMAND) $@
+
+$(OUTPUT_ROOT)/$(TYPE)/testinternals: $(TESTINTERNALS_OBJS) $(BEAK_NO_MEDIA_OBJS)
+	@echo Linking $(TYPE) $(CONF_MNEMONIC) $@
+	$(VERBOSE)$(CXX) -o $@ $(LDFLAGS_$(TYPE)) $(LDFLAGS) $(TESTINTERNALS_OBJS) $(BEAK_NO_MEDIA_OBJS) \
+                      $(LDFLAGSBEGIN_$(TYPE)) $(OPENSSL_LIBS) $(ZLIB_LIBS) $(FUSE_LIBS) $(LIBRSYNC_LIBS) $(MEDIA_LIBS) $(LDFLAGSEND_$(TYPE)) -lpthread
 	$(VERBOSE)$(STRIP_COMMAND) $@
 
 $(OUTPUT_ROOT)/$(TYPE)/libgcc_s_seh-1.dll: /usr/lib/gcc/x86_64-w64-mingw32/5.3-win32/libgcc_s_seh-1.dll
@@ -118,6 +140,12 @@ $(OUTPUT_ROOT)/$(TYPE)/libstdc++-6.dll: /usr/lib/gcc/x86_64-w64-mingw32/5.3-win3
 $(OUTPUT_ROOT)/$(TYPE)/libwinpthread-1.dll: /usr/x86_64-w64-mingw32/lib/libwinpthread-1.dll
 	cp $< $@
 
+BINARIES:=$(OUTPUT_ROOT)/$(TYPE)/beaknm $(OUTPUT_ROOT)/$(TYPE)/testinternals
+
+ifeq ($(ENABLE_MEDIA),yes)
+BINARIES:=$(BINARIES) $(OUTPUT_ROOT)/$(TYPE)/beak
+endif
+
 ifeq ($(CLEAN),clean)
 # Clean!
 release debug:
@@ -126,7 +154,7 @@ release debug:
 	rm -f $(OUTPUT_ROOT)/$(TYPE)/generated_filetypes.h
 else
 # Build!
-release debug:$(OUTPUT_ROOT)/$(TYPE)/beak $(OUTPUT_ROOT)/$(TYPE)/testinternals $(EXTRA_LIBS)
+release debug: $(BINARIES) $(EXTRA_LIBS)
 ifeq ($(PLATFORM),winapi)
 	cp $(OUTPUT_ROOT)/$(TYPE)/beak $(OUTPUT_ROOT)/$(TYPE)/beak.exe
         cp $(OUTPUT_ROOT)/$(TYPE)/testinternals $(OUTPUT_ROOT)/$(TYPE)/testinternals.exe

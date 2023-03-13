@@ -1644,22 +1644,19 @@ if [ $do_test ]; then
     echo OK
 fi
 
-function expect8R01Tar {
+function expect7Tar {
     untar "$mount"
     checkdiff
     checklsld_no_nanos
     num=$(find $mount -name "beak_s_*.tar" | wc --lines)
-    if [ "$num" != "8" ]; then
-        echo Expected 8 beak_s_...tar! Check in $dir for more information.
-        exit 1
-    fi
+# Number of tars depend on the randomly generated file structure....
     stopMount
 }
 
 setup bulktest4 "Mount of generated bulk --depth 1 -ta 1M -tr 1G"
 if [ $do_test ]; then
     $DIR/scripts/generate_filesystem.sh $root 5 10
-    startMountTest expect8R01Tar "--depth 1 -ta 1M -tr 1G --tarheader=full"
+    startMountTest expect7Tar "--depth 1 -ta 1M -tr 1G --tarheader=full"
     echo OK
 fi
 

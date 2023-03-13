@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2020-2021 Fredrik Öhrström
+ Copyright (C) 2020-2023 Fredrik Öhrström
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -15,6 +15,7 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+// This must be before log.h since it declares a debug macro.
 #include <Magick++.h>
 
 #include "beak.h"
@@ -22,9 +23,12 @@
 #include "backup.h"
 #include "filesystem_helpers.h"
 #include "log.h"
-#include "media.h"
 #include "storagetool.h"
 #include "system.h"
+
+static ComponentId IMPORTMEDIA = registerLogComponent("importmedia");
+
+#include "media.h"
 
 extern "C" {
 #include <libavformat/avformat.h>
@@ -33,8 +37,6 @@ extern "C" {
 
 #include <exiv2/exiv2.hpp>
 #include <exiv2/error.hpp>
-
-static ComponentId IMPORTMEDIA = registerLogComponent("importmedia");
 
 struct ImportMediaData
 {

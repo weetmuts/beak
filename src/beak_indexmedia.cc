@@ -23,8 +23,11 @@
 #include "filesystem_helpers.h"
 #include "log.h"
 #include "media.h"
+
 #include "storagetool.h"
 #include "system.h"
+
+static ComponentId INDEXMEDIA = registerLogComponent("importmedia");
 
 extern "C" {
 #include <libavformat/avformat.h>
@@ -34,7 +37,6 @@ extern "C" {
 #include <exiv2/exiv2.hpp>
 #include <exiv2/error.hpp>
 
-static ComponentId INDEXMEDIA = registerLogComponent("importmedia");
 
 struct IndexMedia
 {
@@ -332,7 +334,6 @@ RC BeakImplementation::indexMedia(Settings *settings, Monitor *monitor)
 
     index_media.generateThumbnails(root);
     index_media.generateIndex(root);
-
 
     return rc;
 }
