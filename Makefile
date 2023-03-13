@@ -136,9 +136,9 @@ clean-all:
 
 DESTDIR?=/usr/local
 install:
-ifeq ($(ENABLE_MEDIA),yes)
-	install -Dm 755 -s build/x86_64-pc-linux-gnu/release/beakm $(DESTDIR)/bin/beakm
-endif
+	if [ -x build/x86_64-pc-linux-gnu/release/beakm ]; then \
+        install -Dm 755 -s build/x86_64-pc-linux-gnu/release/beakm $(DESTDIR)/bin/beakm ; \
+    fi
 	install -Dm 755 -s build/x86_64-pc-linux-gnu/release/beak $(DESTDIR)/bin/beak
 	install -Dm 644 doc/beak.1 $(DESTDIR)/man/man1/beak.1
 	install -Dm 644 ./scripts/autocompletion_for_beak.sh /etc/bash_completion.d/beak
