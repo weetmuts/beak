@@ -136,14 +136,21 @@ clean-all:
 
 DESTDIR?=/usr/local
 install:
+ifeq ($(ENABLE_MEDIA),yes)
 	install -Dm 755 -s build/x86_64-pc-linux-gnu/release/beak $(DESTDIR)/bin/beak
+endif
+	install -Dm 755 -s build/x86_64-pc-linux-gnu/release/beaknm $(DESTDIR)/bin/beaknm
 	install -Dm 644 doc/beak.1 $(DESTDIR)/man/man1/beak.1
+	install -Dm 644 doc/beak.1 $(DESTDIR)/man/man1/beaknm.1
 	install -Dm 644 ./scripts/autocompletion_for_beak.sh /etc/bash_completion.d/beak
+	install -Dm 644 ./scripts/autocompletion_for_beak.sh /etc/bash_completion.d/beaknm
 
 uninstall:
 	rm -f $(DESTDIR)/bin/beak
+	rm -f $(DESTDIR)/bin/beaknm
 	rm -f /etc/bash_completion.d/beak
 	rm -f $(DESTDIR)/man/man1/beak.1
+	rm -f $(DESTDIR)/man/man1/beaknm.1
 
 linux64:
 
