@@ -14,7 +14,7 @@ jobs:
       run: brew install fuse openssl
     - id: CONFIGURE
       run: ./configure --with-openssl=/usr/local/opt/openssl
-    - id: MAKE
+    - id: MAKE VERBOSE=
       run: make
     - id: TEST
       run: make test
