@@ -16,6 +16,8 @@ jobs:
       run: brew install --cask fuse
     - id: LIST_INSTALLS
       run: ls -l /usr/local/opt
+    - id: LIST_CASKS
+      run: ls -l /usr/local/Caskroom
     - id: CONFIGURE
       run: ./configure --with-openssl=/usr/local/opt/openssl --with-fuse=/usr/local/opt/libfuse
     - id: PrintSpec
