@@ -11,9 +11,11 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - id: INSTALL_ADDITIONAL_BUILD_DEPENDENCIES
-      run: brew install fuse openssl
+      run: brew install openssl
+      run: brew install --cask fuse
+      run: ls -l /usr/local/opt
     - id: CONFIGURE
-      run: ./configure --with-openssl=/usr/local/opt/openssl --with-fuse=/usr/local/opt/fuse
+      run: ./configure --with-openssl=/usr/local/opt/openssl --with-fuse=/usr/local/opt/libfuse
     - id: PrintSpec
       run: cat /Users/runner/work/beak/beak/build/x86_64-apple-darwin21.6.0/spec.mk
     - id: MAKE
