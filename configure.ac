@@ -172,7 +172,6 @@ if test "x${with_openssl}" = "x"; then
     OPENSSL_LIBS="$($PKG_CONFIG openssl --libs)"
     AC_MSG_RESULT([found])
 else
-    with_openssl=$(realpath ${with_openssl})
     OPENSSL_CFLAGS="-I${with_openssl}/include"
     OPENSSL_LIBS="${with_openssl}/libcrypto.a"
     AC_MSG_RESULT([using ${with_openssl}])
