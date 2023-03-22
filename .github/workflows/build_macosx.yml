@@ -13,7 +13,7 @@ jobs:
     - id: INSTALL_OPENSSL
       run: brew install openssl
     - id: INSTALL_FUSE
-      run: brew cask install osxfuse
+      run: brew install --cask osxfuse
     - id: LIST_INSTALLS
       run: ls -l /usr/local/opt
     - id: LIST_CASKS
