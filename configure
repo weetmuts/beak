@@ -4535,7 +4535,7 @@ printf "%s\n" "implicitly disabled" >&6; }
 printf "%s\n" "Please install fuse-dev, for example using: sudo apt install libfuse-dev" >&6; }
        fi
    else
-       with_fuse=$(realpath ${with_fuse})
+#       with_fuse=$(realpath ${with_fuse})
        if test ! -d "$with_fuse" ; then
            as_fn_error $? "No such directory \"$with_fuse\"" "$LINENO" 5
        fi
@@ -4570,7 +4570,6 @@ if test "x${with_openssl}" = "x"; then
     { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: found" >&5
 printf "%s\n" "found" >&6; }
 else
-    with_openssl=$(realpath ${with_openssl})
     OPENSSL_CFLAGS="-I${with_openssl}/include"
     OPENSSL_LIBS="${with_openssl}/libcrypto.a"
     { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: using ${with_openssl}" >&5

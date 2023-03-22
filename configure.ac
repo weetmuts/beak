@@ -145,7 +145,7 @@ if test "x$ENABLE_FUSE" = xyes; then
            AC_MSG_RESULT([Please install fuse-dev, for example using: sudo apt install libfuse-dev])
        fi
    else
-       with_fuse=$(realpath ${with_fuse})
+#       with_fuse=$(realpath ${with_fuse})
        if test ! -d "$with_fuse" ; then
            AC_MSG_ERROR([No such directory "$with_fuse"])
        fi
