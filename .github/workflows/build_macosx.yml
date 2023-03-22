@@ -17,9 +17,9 @@ jobs:
     - id: LIST_INSTALLS
       run: ls -l /usr/local/opt
     - id: LIST_CASKS
-      run: ls -l /usr/local/Caskroom
+      run: ls -l /usr/local/Caskroom/fuse
     - id: CONFIGURE
-      run: ./configure --with-openssl=/usr/local/opt/openssl --with-fuse=/usr/local/opt/libfuse
+      run: ./configure --with-openssl=/usr/local/opt/openssl --with-fuse=/usr/local/Caskroom/fuse
     - id: PrintSpec
       run: cat /Users/runner/work/beak/beak/build/x86_64-apple-darwin21.6.0/spec.mk
     - id: MAKE
