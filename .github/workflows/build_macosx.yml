@@ -17,7 +17,7 @@ jobs:
     - id: LIST_INSTALLS
       run: ls -l /usr/local/opt
     - id: LIST_CASKS
-      run: ls -l /usr/local/Caskroom/fuse
+      run: ls -l /usr/local/Caskroom/fuse/1.9.0
     - id: CONFIGURE
       run: ./configure --with-openssl=/usr/local/opt/openssl --with-fuse=/usr/local/Caskroom/fuse
     - id: PrintSpec
