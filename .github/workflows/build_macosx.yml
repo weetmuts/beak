@@ -10,9 +10,11 @@ jobs:
     runs-on: macOS-latest
     steps:
     - uses: actions/checkout@v3
-    - id: INSTALL_ADDITIONAL_BUILD_DEPENDENCIES
+    - id: INSTALL_OPENSSL
       run: brew install openssl
+    - id: INSTALL_FUSE
       run: brew install --cask fuse
+    - id: LIST_INSTALLS
       run: ls -l /usr/local/opt
     - id: CONFIGURE
       run: ./configure --with-openssl=/usr/local/opt/openssl --with-fuse=/usr/local/opt/libfuse
