@@ -117,6 +117,7 @@ void *handle_request(int fd)
 
 void ServeMedia::start()
 {
+    /*
     int sockfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
     struct sockaddr_in servaddr;
 
@@ -171,6 +172,7 @@ void ServeMedia::start()
         printf("HANDLING accept() %s\n", s);
         handle_request(cliefd);
     }
+    */
 }
 
 RC BeakImplementation::serveMedia(Settings *settings, Monitor *monitor)
