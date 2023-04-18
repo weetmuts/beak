@@ -155,7 +155,7 @@ void addRemoveComponent_(string co, set<int> *components)
         else
         {
             int c = findComponent(co.c_str());
-            if (c == -1) error(0,"No such log component: \"%s\"\n", co);
+            if (c == -1) error(0,"No such log component: \"%s\"\n", co.c_str());
             components->insert(c);
         }
     }

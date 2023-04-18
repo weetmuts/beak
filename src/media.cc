@@ -36,6 +36,11 @@ extern "C" {
 
 static ComponentId MEDIA = registerLogComponent("media");
 
+bool hasMediaFunctions()
+{
+    return true;
+}
+
 struct MediaHelper
 {
     map<string,string> img_suffixes_;

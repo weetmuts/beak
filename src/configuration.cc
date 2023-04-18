@@ -1065,7 +1065,7 @@ bool ConfigurationImplementation::isFileSystemStorage(Path *storage_location, Co
     {
         return false;
     }
-    return cmd == importmedia_cmd || has_index_files_or_is_empty_(fs_, storage_location);
+    return cmd == import_cmd || has_index_files_or_is_empty_(fs_, storage_location);
 }
 
 bool ConfigurationImplementation::isRCloneStorage(Path *storage_location, string *type)

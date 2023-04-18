@@ -62,13 +62,13 @@ struct BeakImplementation : Beak
                        ptr<StorageTool> storage_tool,
                        ptr<OriginTool> origin_tool);
 
-    void printCommands(bool verbose);
-    void printSettings(bool verbose, Command cmd);
+    void printCommands(bool verbose, bool has_media);
+    void printSettings(bool verbose, Command cmd, bool has_media);
 
     void captureStartTime() {  ::captureStartTime(); }
     Command parseCommandLine(int argc, char **argv, Settings *settings);
 
-    void printHelp(bool verbose, Command cmd);
+    void printHelp(bool verbose, Command cmd, bool has_media);
     void printVersion(bool verbose);
 
     RC configure(Settings *settings);

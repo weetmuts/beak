@@ -120,11 +120,11 @@ test: test_release
 
 test_release:
 	@echo Running tests on release
-	@for x in $(BUILDDIRS); do echo; ./test.sh $$x/release ; done
+	@for x in $(BUILDDIRS); do echo; ./test.sh $$x/release $(TEST) ; done
 
 test_debug:
 	@echo Running tests
-	@for x in $(BUILDDIRS); do echo; ./test.sh $$x/debug ; done
+	@for x in $(BUILDDIRS); do echo; ./test.sh $$x/debug $(TEST) ; done
 
 clean:
 	@echo Removing release and debug builds
@@ -136,15 +136,15 @@ clean-all:
 
 DESTDIR?=/usr/local
 install:
-	if [ -x build/x86_64-pc-linux-gnu/release/beakm ]; then \
-        install -Dm 755 -s build/x86_64-pc-linux-gnu/release/beakm $(DESTDIR)/bin/beakm ; \
+	if [ -x build/x86_64-pc-linux-gnu/release/beak-media ]; then \
+        install -Dm 755 -s build/x86_64-pc-linux-gnu/release/beak-media $(DESTDIR)/bin/beak-media ; \
     fi
 	install -Dm 755 -s build/x86_64-pc-linux-gnu/release/beak $(DESTDIR)/bin/beak
 	install -Dm 644 doc/beak.1 $(DESTDIR)/man/man1/beak.1
 	install -Dm 644 ./scripts/autocompletion_for_beak.sh /etc/bash_completion.d/beak
 
 uninstall:
-	rm -f $(DESTDIR)/bin/beakm
+	rm -f $(DESTDIR)/bin/beak-media
 	rm -f $(DESTDIR)/bin/beak
 	rm -f /etc/bash_completion.d/beak
 	rm -f $(DESTDIR)/man/man1/beak.1

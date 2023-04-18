@@ -18,6 +18,7 @@
 #include "beak.h"
 #include "beak_implementation.h"
 #include "log.h"
+#include "media.h"
 #include "origintool.h"
 
 using namespace std;
@@ -119,7 +120,7 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
         Path *storage_location = Path::lookup(arg);
         Storage *storage = configuration_->findStorageFrom(storage_location, cmd);
 
-        if (!storage && (cmd == store_cmd || cmd == importmedia_cmd))
+        if (!storage && (cmd == store_cmd || cmd == import_cmd))
         {
             // If we are storing, then try to create a missing directory.
             storage = configuration_->createStorageFrom(storage_location);
@@ -316,6 +317,17 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
         assert(0);
     }
     settings->depth = 2; // Default value
+
+    if (hasMediaFunctions() && cmde->cmdtype != CommandType::MEDIA)
+    {
+        usageError(COMMANDLINE, "This is beak-media, please use plain beak for the command \"%s\"\n", args[0].c_str());
+        assert(0);
+    }
+    if (!hasMediaFunctions() && cmde->cmdtype == CommandType::MEDIA)
+    {
+        usageError(COMMANDLINE, "This is beak, please use beak-media for the command \"%s\"\n", args[0].c_str());
+        assert(0);
+    }
 
     auto i = args.begin();
     i = args.erase(i);

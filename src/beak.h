@@ -48,7 +48,7 @@ struct Storage;
 struct StorageTool;
 struct OriginTool;
 
-enum class CommandType { PRIMARY, SECONDARY };
+enum class CommandType { PRIMARY, SECONDARY, MEDIA };
 enum class OptionType { GLOBAL_PRIMARY, LOCAL_PRIMARY, GLOBAL_SECONDARY, LOCAL_SECONDARY };
 
 
@@ -87,10 +87,10 @@ struct Beak
     virtual RC mountRestore(Settings *settings, Monitor *monitor) = 0;
     virtual RC umountRestore(Settings *settings) = 0;
 
-    virtual void printHelp(bool verbose, Command cmd) = 0;
+    virtual void printHelp(bool verbose, Command cmd, bool has_media) = 0;
     virtual void printVersion(bool verbose) = 0;
-    virtual void printCommands(bool verbose) = 0;
-    virtual void printSettings(bool verbose, Command cmd) = 0;
+    virtual void printCommands(bool verbose, bool has_media) = 0;
+    virtual void printSettings(bool verbose, Command cmd, bool has_media) = 0;
 
     virtual void genAutoComplete(std::string filename) = 0;
 
@@ -137,9 +137,9 @@ enum ArgumentType
     X(restore,CommandType::PRIMARY,"Restore from a backup into your file system.",ArgStorage,ArgOrigin) \
     X(shell,CommandType::PRIMARY,"Mount your backup(s) and spawn a shell. Exit the shell to unmount.",ArgStorageOrRule,ArgNone) \
     X(stat,CommandType::PRIMARY,"Show file type statistics for a directory or a backup.",ArgORS,ArgNone) \
-    X(importmedia,CommandType::PRIMARY,"Find media files in the source dir then rename and store them normalized into the target dir.",ArgOrigin,ArgStorage) \
-    X(indexmedia,CommandType::PRIMARY,"Scan imported media and generate thumbnails and index.html.",ArgOrigin,ArgNone) \
-    X(servemedia,CommandType::PRIMARY,"Serve imported media to a web-browser.",ArgOrigin,ArgNone) \
+    X(import,CommandType::MEDIA,"Find media files in the source dir then rename and store them normalized into the target dir.",ArgOrigin,ArgStorage) \
+    X(index,CommandType::MEDIA,"Scan imported media and generate thumbnails and index.html.",ArgOrigin,ArgNone) \
+    X(serve,CommandType::MEDIA,"Serve imported media to a web-browser.",ArgOrigin,ArgNone) \
     X(status,CommandType::PRIMARY,"Show the backup status of your configured rules.",ArgRuleOrNone,ArgNone) \
     X(store,CommandType::PRIMARY,"Store your file system into a backup.",ArgOrigin,ArgStorage) \
     X(stored,CommandType::PRIMARY,"Store your file system into a backup using delta compression.",ArgOrigin,ArgStorage) \

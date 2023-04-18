@@ -101,9 +101,9 @@ int main(int argc, char *argv[])
         testSHA256();
 
         if (!err_found_) {
-            printf("OK\n");
+            printf("OK: testinternals\n");
         } else {
-            printf("Errors detected!\n");
+            printf("ERROR: testinernals\n");
         }
     }
     catch (string e) {

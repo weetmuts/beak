@@ -17,6 +17,7 @@
 
 #include "beak.h"
 #include "beak_implementation.h"
+#include "media.h"
 #include "version.h"
 
 const char *argName(ArgumentType at) {
@@ -40,14 +41,16 @@ const char *argName(ArgumentType at) {
     return "?";
 }
 
-void BeakImplementation::printCommands(bool verbose)
+void BeakImplementation::printCommands(bool verbose, bool has_media)
 {
     fprintf(stdout, "Available Commands:\n");
 
     size_t max = 0;
     for (auto &e : command_entries_)
     {
-        if (verbose == false && e.cmdtype != CommandType::PRIMARY) continue;
+        if (e.cmd == nosuch_cmd) continue;
+        if (has_media && e.cmdtype != CommandType::MEDIA) continue;
+        if (!has_media && verbose == false && e.cmdtype != CommandType::PRIMARY) continue;
         size_t l = strlen(e.name);
         if (l > max) max = l;
     }
@@ -55,7 +58,8 @@ void BeakImplementation::printCommands(bool verbose)
     for (auto &e : command_entries_)
     {
         if (e.cmd == nosuch_cmd) continue;
-        if (verbose == false && e.cmdtype != CommandType::PRIMARY) continue;
+        if (has_media && e.cmdtype != CommandType::MEDIA) continue;
+        if (!has_media && verbose == false && e.cmdtype != CommandType::PRIMARY) continue;
         size_t l = strlen(e.name);
         char verb = ' ';
         if (e.cmdtype == CommandType::SECONDARY) verb = '*';
@@ -80,7 +84,7 @@ bool isExperimental(OptionEntry &e)
     return false;
 }
 
-void BeakImplementation::printSettings(bool verbose, Command cmd)
+void BeakImplementation::printSettings(bool verbose, Command cmd, bool has_media)
 {
     bool local = true;
 
@@ -173,15 +177,18 @@ void BeakImplementation::printSettings(bool verbose, Command cmd)
     }
 }
 
-void BeakImplementation::printHelp(bool verbose, Command cmd)
+void BeakImplementation::printHelp(bool verbose, Command cmd, bool has_media)
 {
+    const char *binary_name = "beak";
+    if (has_media) binary_name = "beak-media";
+
     CommandEntry *ce {};
     if (cmd == nosuch_cmd)
     {
         fprintf(stdout,
-                "usage: beak <command> [options] [<args>]\n"
-                "\n");
-        printCommands(verbose);
+                "Usage: %s <command> [options] [<args>]\n"
+                "\n", binary_name);
+        printCommands(verbose, hasMediaFunctions());
         fprintf(stdout,"\n");
     }
     else
@@ -200,7 +207,7 @@ void BeakImplementation::printHelp(bool verbose, Command cmd)
             help += argName(ce->expected_to);
         }
 
-        fprintf(stdout, "%s\n\nusage: beak %s\n\n", ce->info, help.c_str());
+        fprintf(stdout, "%s\n\nUsage: beak %s\n\n", ce->info, help.c_str());
     }
     switch (cmd) {
     case bmount_cmd:
@@ -226,7 +233,7 @@ void BeakImplementation::printHelp(bool verbose, Command cmd)
     default:
         break;
     }
-    printSettings(verbose, cmd);
+    printSettings(verbose, cmd, has_media);
     fprintf(stdout,"\n");
 }
 

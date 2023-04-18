@@ -20,6 +20,7 @@
 #include "configuration.h"
 #include "filesystem.h"
 #include "log.h"
+#include "media.h"
 #include "origintool.h"
 #include "storagetool.h"
 #include "system.h"
@@ -178,15 +179,15 @@ int run(int argc, char *argv[])
         rc = beak->shell(&settings, monitor.get());
         break;
 
-    case importmedia_cmd:
+    case import_cmd:
         rc = beak->importMedia(&settings, monitor.get());
         break;
 
-    case indexmedia_cmd:
+    case index_cmd:
         rc = beak->indexMedia(&settings, monitor.get());
         break;
 
-    case servemedia_cmd:
+    case serve_cmd:
         rc = beak->serveMedia(&settings, monitor.get());
         break;
 
@@ -216,7 +217,7 @@ int run(int argc, char *argv[])
         break;
 
     case help_cmd:
-        beak->printHelp(settings.verbose, settings.help_me_on_this_cmd);
+        beak->printHelp(settings.verbose, settings.help_me_on_this_cmd, hasMediaFunctions());
         break;
 
     case nosuch_cmd:

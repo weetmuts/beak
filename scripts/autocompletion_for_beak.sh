@@ -115,3 +115,4 @@ _beak()
 }
 
 complete -F _beak beak
+complete -F _beak beak-media
