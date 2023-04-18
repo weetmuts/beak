@@ -250,6 +250,7 @@ if test "${ENABLE_MEDIA}" = "yes"; then
 
     AC_MSG_CHECKING([for libmagick++-dev])
 
+    MEDIA_CFLAGS="${MEDIA_CFLAGS} $(Magick++-config --cppflags)"
     MEDIA_LIBS="${MEDIA_LIBS} $(Magick++-config --libs)"
 
     AC_MSG_CHECKING([for libavformat])

@@ -4676,6 +4676,7 @@ printf "%s\n" "found" >&6; }
     { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for libmagick++-dev" >&5
 printf %s "checking for libmagick++-dev... " >&6; }
 
+    MEDIA_CFLAGS="${MEDIA_CFLAGS} $(Magick++-config --cppflags)"
     MEDIA_LIBS="${MEDIA_LIBS} $(Magick++-config --libs)"
 
     { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for libavformat" >&5
