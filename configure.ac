@@ -173,7 +173,7 @@ if test "x${with_openssl}" = "x"; then
     AC_MSG_RESULT([found])
 else
     with_openssl=$(realpath ${with_openssl})
-    OPENSSL_CFLAGS="-I${with_openssl}/include"
+    OPENSSL_CFLAGS="-I${with_openssl}/include -DOPENSSL_API_COMPAT=0x10100000L"
     OPENSSL_LIBS="${with_openssl}/lib/libcrypto.a"
     AC_MSG_RESULT([using ${with_openssl}])
 fi
