@@ -174,7 +174,7 @@ if test "x${with_openssl}" = "x"; then
 else
     with_openssl=$(realpath ${with_openssl})
     OPENSSL_CFLAGS="-I${with_openssl}/include"
-    OPENSSL_LIBS="${with_openssl}/libcrypto.a"
+    OPENSSL_LIBS="${with_openssl}/lib/libcrypto.a"
     AC_MSG_RESULT([using ${with_openssl}])
 fi
 

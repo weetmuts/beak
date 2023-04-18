@@ -4572,7 +4572,7 @@ printf "%s\n" "found" >&6; }
 else
     with_openssl=$(realpath ${with_openssl})
     OPENSSL_CFLAGS="-I${with_openssl}/include"
-    OPENSSL_LIBS="${with_openssl}/libcrypto.a"
+    OPENSSL_LIBS="${with_openssl}/lib/libcrypto.a"
     { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: using ${with_openssl}" >&5
 printf "%s\n" "using ${with_openssl}" >&6; }
 fi
