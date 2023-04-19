@@ -12,6 +12,8 @@ jobs:
       run: brew install openssl imagemagick ffmpeg exiv2
     - id: CONFIGURE
       run: ./configure --with-openssl=/usr/local/Cellar/openssl@3 --disable-fuse
+    - id: CHECK
+      run: find /usr/local -name openssl
     - id: MAKE
       run: make
     - id: TEST
