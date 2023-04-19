@@ -11,9 +11,11 @@ jobs:
     - id: INSTALL_ADDITIONAL_BUILD_DEPENDENCIES
       run: brew install openssl imagemagick ffmpeg exiv2
     - id: CONFIGURE
-      run: ./configure --with-openssl=usr/local/Cellar/openssl@3/3.1.0/ --disable-fuse
+      run: ./configure --with-openssl=/usr/local/Cellar/openssl@3/3.1.0 --disable-fuse
     - id: CHECK
       run: find /usr/local -name sha.h
+    - id: CAT
+      run: cat build/x86_64-apple-darwin*/spec.gmk
     - id: MAKE
       run: make VERBOSE=
     - id: TEST
