@@ -15,7 +15,7 @@ jobs:
     - id: CHECK
       run: find build -name spec.mk
     - id: CAT
-      run: cat build/x86_64-apple-darwin22.2.0/spec.mk
+      run: cat build/x86_64-apple-darwin21.6.0/spec.mk
     - id: MAKE
       run: make VERBOSE=
     - id: TEST
