@@ -13,9 +13,9 @@ jobs:
     - id: CONFIGURE
       run: ./configure --with-openssl=/usr/local/Cellar/openssl@3/3.1.0 --disable-fuse
     - id: CHECK
-      run: find /usr/local -name sha.h
+      run: find build -name spec.mk
     - id: CAT
-      run: cat build/x86_64-apple-darwin*/spec.gmk
+      run: cat build/x86_64-apple-darwin22.2.0/spec.mk
     - id: MAKE
       run: make VERBOSE=
     - id: TEST
