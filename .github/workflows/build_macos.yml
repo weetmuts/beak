@@ -10,6 +10,8 @@ jobs:
     - uses: actions/checkout@v3
     - id: INSTALL_ADDITIONAL_BUILD_DEPENDENCIES
       run: brew install coreutils rsync openssl imagemagick ffmpeg exiv2
+    - id: FINDRSYNC
+      run: find /usr/local -name "*librsync*"
     - id: CONFIGURE
       run: ./configure --with-openssl=/usr/local/Cellar/openssl@3/3.1.0 --disable-fuse
     - id: CHECK
