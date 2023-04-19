@@ -9,7 +9,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - id: INSTALL_ADDITIONAL_BUILD_DEPENDENCIES
-      run: brew install coreutils rsync openssl imagemagick ffmpeg exiv2
+      run: brew install coreutils rsync librsync openssl imagemagick ffmpeg exiv2
     - id: FINDRSYNC
       run: find /usr/local -name "*librsync*"
     - id: CONFIGURE
