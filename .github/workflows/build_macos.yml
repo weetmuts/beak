@@ -14,7 +14,7 @@ jobs:
       run: ./configure --with-openssl=usr/local/Cellar/openssl@3/3.1.0/ --disable-fuse
     - id: CHECK
       run: find /usr/local -name sha.h
-    - id: MAKE
+    - id: MAKE VERBOSE=
       run: make
     - id: TEST
       run: make test
