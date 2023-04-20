@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 IFS=$'\n\t'
 set -eu
 #
@@ -20,10 +20,15 @@ set -eu
 
 dir=$(mktemp -d /tmp/beak_restoreXXXXXXXX)
 
-IS_BASH=$(echo $SHELL | grep -o bash)
-if [ "$IS_BASH" != "bash" ]
+if [ "$BASH_VERSION" = "" ]
 then
-    echo You have to run this script with bash!
+    echo "You have to run this script with bash!"
+    exit 1
+fi
+
+if [[ $BASH_VERSION =~ ^3\. ]]
+then
+    echo "You have to run an up to date bash! This is version $BASH_VERSION but you should use 5 or later."
     exit 1
 fi
 
@@ -33,7 +38,7 @@ function findGnuProgram()
     local CHECK=$(($PROG --version 2>&1 || true) | grep -o GNU | uniq)
     if [ "$CHECK" != "GNU" ]
     then
-        PROG=$(whereis -b $2 | cut -f 2 -d ':')
+        PROG=$(whereis -b $2 | cut -f 2 -d ' ')
         local CHECK=$(($PROG --version 2>/dev/null || true) | grep -o GNU | uniq)
         if [ "$CHECK" != "GNU" ]
         then
