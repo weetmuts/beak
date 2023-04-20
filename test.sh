@@ -13,11 +13,8 @@ testoutput=$(pwd)/test_output
 rm -rf $testoutput
 mkdir -p $testoutput
 
-if [ "$OSTYPE" == "linux-gnu" ]
-then
-    ./tests/test_basics.sh "$cwddir" "$builddir/beak" "$test"
-    if [ "$?" != "0" ]; then echo "ERROR: basics" ; exit 1; fi
-fi
+./tests/test_basics.sh "$cwddir" "$builddir/beak" "$test"
+if [ "$?" != "0" ]; then echo "ERROR: basics" ; exit 1; fi
 
 for i in $testscripts
 do

@@ -2,7 +2,7 @@
 IFS=$'\n\t'
 set -eu
 #
-#    Copyright (C) 2016 Fredrik Öhrström
+#    Copyright (C) 2016-2023 Fredrik Öhrström
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -19,6 +19,35 @@ set -eu
 #
 
 dir=$(mktemp -d /tmp/beak_restoreXXXXXXXX)
+
+IS_BASH=$(echo $SHELL | grep -o bash)
+if [ "$IS_BASH" != "bash" ]
+then
+    echo You have to run this script with bash!
+    exit 1
+fi
+
+function findGnuProgram()
+{
+    PROG=$(whereis -b $1 | cut -f 2 -d ' ' )
+    local CHECK=$(($PROG --version 2>&1 || true) | grep -o GNU | uniq)
+    if [ "$CHECK" != "GNU" ]
+    then
+        PROG=$(whereis -b $2 | cut -f 2 -d ':')
+        local CHECK=$(($PROG --version 2>/dev/null || true) | grep -o GNU | uniq)
+        if [ "$CHECK" != "GNU" ]
+        then
+            >&2 echo "This script requires either $1 or $2 to be the GNU version!"
+            exit 1
+        fi
+    fi
+    echo $PROG
+}
+
+SED=$(findGnuProgram sed gsed)
+TAR=$(findGnuProgram tar gtar)
+AWK=$(findGnuProgram awk gawk)
+DATE=$(findGnuProgram date gdate)
 
 function finish {
     if [ "$debug" == "" ]
@@ -40,7 +69,6 @@ realpath() {
 }
 
 function Help() {
-    echo
     echo Usage: beak-restore {-d} {-c} [x\|t]{a}{v} [DirWithTars] [TargetDir]
     echo
     echo Example:
@@ -178,9 +206,9 @@ else
         echo Select a generation using -g
         n=0
         while IFS='' read i; do
-            msg=$(gunzip -c "$i" 2>/dev/null | head -2 | grep \#message | sed 's/#message //')
-            secs=$(echo "$i" | sed "s/.*beak_z_\([0-9]\+\).*/\1/")
-            dat=$(date --date "@$secs")
+            msg=$(gunzip -c "$i" 2>/dev/null | head -2 | grep \#message | $SED 's/#message //')
+            secs=$(echo "$i" | $SED "s/.*beak_z_\([0-9]\+\).*/\1/")
+            dat=$($DATE--date "@$secs")
             echo -e "@$n\t$dat\t$msg"
             n=$((n+1))
         done <"$dir/generations"
@@ -188,14 +216,14 @@ else
     else
         gen="${gen##@}"
         gen=$((gen+1))
-        generation=$(sed -n ${gen}p "$dir/generations")
+        generation=$($SED -n ${gen}p "$dir/generations")
     fi
 fi
 
 # Check the internal checksum of the index file.
 # (2373686132353620 is hex for "#end ")
 CALC_CHECK=$(zcat < "$generation" 2>/dev/null | xxd -p | tr -d '\n' | \
-                    sed 's/23656e6420.*//' | xxd -r -p | sha256sum | cut -f 1 -d ' ')
+                    $SED 's/23656e6420.*//' | xxd -r -p | sha256sum | cut -f 1 -d ' ')
 READ_CHECK=$(zcat < "$generation" 2>/dev/null | tr -d '\0' | grep "#end" | cut -f 2 -d ' ')
 
 if [ ! "$CALC_CHECK" = "$READ_CHECK" ]
@@ -213,16 +241,16 @@ gunzip -c "$generation" 2>/dev/null \
     | grep -a -v \#parts  > "$dir/aa"
 
 # Extract the paths to the tarfiles
-cat "$dir/aa" | sed 's/.*\x00//'  > "$dir/tarfiles"
+cat "$dir/aa" | $SED 's/.*\x00//'  > "$dir/tarfiles"
 
 # Extract the backup location for each tarfile
-cat "$dir/aa" | sed 's/\x00\([^\x00]*\)\x00.*/\1/' > "$dir/backup_locations"
+cat "$dir/aa" | $SED 's/\x00\([^\x00]*\)\x00.*/\1/' > "$dir/backup_locations"
 
 # Extract the potential basis_tarfile for each tarfile
-cat "$dir/aa" | sed 's/\x00\[^\x00]*\x00\([^\x00]*\).*/\1/' > "$dir/basis_tarfiles"
+cat "$dir/aa" | $SED 's/\x00\[^\x00]*\x00\([^\x00]*\).*/\1/' > "$dir/basis_tarfiles"
 
 # Extract the potential delta_tarfile for each tarfile
-cat "$dir/aa" | sed 's/\x00\[^\x00]*\x00\[^\x00]*\x00\([^\x00]*\).*/\1/' > "$dir/delta_tarfiles"
+cat "$dir/aa" | $SED 's/\x00\[^\x00]*\x00\[^\x00]*\x00\([^\x00]*\).*/\1/' > "$dir/delta_tarfiles"
 
 # Generate slashes
 cat "$dir/backup_locations" | tr -c -d '/\n' | tr / a > "$dir/slashes"
@@ -261,8 +289,8 @@ do
     if [ "$(echo "$tar_file" | grep -o " \\.\\.\\. ")" = " ... " ]
     then
         tmp="$tar_file"
-        tar_file="$(echo "$tar_file" | sed 's/\(.*\)\ \.\.\.\ .*/\1/')"
-        last_file="$(echo "$tmp" | sed 's/.*\ \.\.\.\ \(.*\)/\1/')"
+        tar_file="$(echo "$tar_file" | $SED 's/\(.*\)\ \.\.\.\ .*/\1/')"
+        last_file="$(echo "$tmp" | $SED 's/.*\ \.\.\.\ \(.*\)/\1/')"
         if [ "$debug" == "true" ]
         then
             echo "Split file"
@@ -273,7 +301,6 @@ do
 
     # Extract directory in which the tar file resides.
     target_dir="$target/$backup_location"
-
     # Rename the top directory . into the empty string.
     target_dir_prefix="${backup_location#.}"
 
@@ -290,11 +317,11 @@ do
         pushDir
         POS=$(zcat < "$file" | grep -ab "#end" | cut -f 1 -d ':')
         zcat < "$file" | dd skip=$((POS + 72)) ibs=1 2> /dev/null > ${dir}/beak_restore.tar
-        # zcat < "$file" 2>/dev/null | xxd -p  | tr -d '\n' | sed 's/.*23656e6420.\{128\}0a00//' | xxd -r -p > /tmp/beak_restoree.tar
+        # zcat < "$file" 2>/dev/null | xxd -p  | tr -d '\n' | $SED 's/.*23656e6420.\{128\}0a00//' | xxd -r -p > /tmp/beak_restoree.tar
 
         if [ -s ${dir}/beak_restore.tar ]
         then
-            CMD="tar ${cmd}f ${dir}/beak_restore.tar --preserve-permissions"
+            CMD="$TAR ${cmd}f ${dir}/beak_restore.tar --preserve-permissions"
             if [ "$verbose" == "true" ]; then echo CMD="$CMD"; fi
             eval $CMD > $dir/tmplist
             if [ "$?" != "0" ]; then
@@ -303,10 +330,10 @@ do
             if [ "$extract" == "true" ]; then
                 # GNU Tar simply prints the filename when extracting verbosely.
                 # Simply prefix the tar dir.
-                awk -v prefix="$target_dir_prefix" '{print prefix $0}' $dir/tmplist
+                $AWK -v prefix="$target_dir_prefix" '{print prefix $0}' $dir/tmplist
             else
                 # GNU Tar prints permissions, date etc when viewing verbosely.
-                awk '{p=match($0," [0-9][0-9]:[0-9][0-9] "); print substr($0,0,p+6)"'" $target_dir_prefix"'"substr($0,p+7)}' $dir/tmplist
+                $AWK '{p=match($0," [0-9][0-9]:[0-9][0-9] "); print substr($0,0,p+6)"'" $target_dir_prefix"'"substr($0,p+7)}' $dir/tmplist
             fi
             rm $dir/tmplist
             popDir
@@ -318,7 +345,7 @@ do
             echo "Single file"
         fi
         # Single part file.
-        CMD="tar ${cmd}f \"$file\" --warning=no-alone-zero-block --preserve-permissions"
+        CMD="$TAR ${cmd}f \"$file\" --warning=no-alone-zero-block --preserve-permissions"
         pushDir
         if [ "$verbose" = "true" ]; then echo CMD="$CMD"; fi
         eval $CMD > $dir/tmplist
@@ -328,10 +355,10 @@ do
         if [ "$extract" == "true" ]; then
             # GNU Tar simply prints the filename when extracting verbosely.
             # Simply prefix the tar dir.
-            awk -v prefix="$target_dir_prefix" '{print prefix $0}' $dir/tmplist
+            $AWK -v prefix="$target_dir_prefix" '{print prefix $0}' $dir/tmplist
         else
             # GNU Tar prints permissions, date etc when viewing verbosely.
-            awk '{p=match($0," [0-9][0-9]:[0-9][0-9] "); print substr($0,0,p+6)"'" $target_dir_prefix"'"substr($0,p+7)}' $dir/tmplist
+            $AWK '{p=match($0," [0-9][0-9]:[0-9][0-9] "); print substr($0,0,p+6)"'" $target_dir_prefix"'"substr($0,p+7)}' $dir/tmplist
         fi
         rm $dir/tmplist
         popDir
@@ -341,24 +368,24 @@ do
             echo "Multi part file"
         fi
         # Multi part file!
-        prefix=$(echo "$tar_file" | sed 's/\(.*_\)[0-9a-f]\+-.*/\1/')
+        prefix=$(echo "$tar_file" | $SED 's/\(.*_\)[0-9a-f]\+-.*/\1/')
         suffix=".tar"
-        first=$(echo "$tar_file" | sed 's/.*_\([0-9a-f]\+\)-.*/\1/')
+        first=$(echo "$tar_file" | $SED 's/.*_\([0-9a-f]\+\)-.*/\1/')
         first=$((0x$first))
-        numx=$(echo "$tar_file" | sed 's/.*-\([0-9a-f]\+\)_.*/\1/')
+        numx=$(echo "$tar_file" | $SED 's/.*-\([0-9a-f]\+\)_.*/\1/')
         num=$((0x$numx))
-        disksize=$(echo "$tar_file" | sed 's/.*_\([0-9]\+\)\.tar/\1/')
-        size=$(echo "$tar_file" | sed 's/.*_\([0-9]\+\)_[0-9]\+\.tar/\1/')
+        disksize=$(echo "$tar_file" | $SED 's/.*_\([0-9]\+\)\.tar/\1/')
+        size=$(echo "$tar_file" | $SED 's/.*_\([0-9]\+\)_[0-9]\+\.tar/\1/')
         partnrwidth=$(echo -n $numx | wc --c)
 
         if [ "$(echo "$last_file" | grep -o "$prefix")" = "$prefix" ]
         then
-            last=$(echo "$last_file" | sed 's/.*_\([0-9a-f]\+\)-.*/\1/')
+            last=$(echo "$last_file" | $SED 's/.*_\([0-9a-f]\+\)-.*/\1/')
             last=$((0x$last))
-            nummx=$(echo "$last_file" | sed 's/.*-\([0-9a-f]\+\)_.*/\1/')
+            nummx=$(echo "$last_file" | $SED 's/.*-\([0-9a-f]\+\)_.*/\1/')
             numm=$((0x$nummx))
-            disklastsize=$(echo "$last_file" | sed "s/.*_\([0-9]\+\)\.tar/\1/")
-            lastsize=$(echo "$last_file" | sed 's/.*_\([0-9]\+\)_[0-9]\+\.tar/\1/')
+            disklastsize=$(echo "$last_file" | $SED "s/.*_\([0-9]\+\)\.tar/\1/")
+            lastsize=$(echo "$last_file" | $SED 's/.*_\([0-9]\+\)_[0-9]\+\.tar/\1/')
 
             newvolumescript="${dir}/beak_tarvolchange.sh"
             cat > ${newvolumescript} <<EOF
@@ -398,7 +425,7 @@ EOF
             # Cut the file to partsize (no padding), otherwise tar will be unhappy.
             dd if="${root}/${tar_file}" of="${dir}/beak_part" bs=512 count=$((size / 512)) > /dev/null 2>&1
             # Invoke the tar command and or with true, to hide the silly failed return value from tar.
-            (tar ${cmd}Mf "${dir}/beak_part" -F ${newvolumescript} > /dev/null 2>&1) || true
+            ($TAR ${cmd}Mf "${dir}/beak_part" -F ${newvolumescript} > /dev/null 2>&1) || true
             popDir
         else
             echo Broken multipart listing in index file, prefix not found.
@@ -415,7 +442,7 @@ POS=$(zcat < "$generation" | grep -ab "#end" | cut -f 1 -d ':')
 zcat < "$generation" | dd skip=$((POS + 72)) ibs=1 2> /dev/null > ${dir}/beak_restore.tar
 if [ -s ${dir}/beak_restore.tar ]
 then
-    CMD="tar ${cmd}f ${dir}/beak_restore.tar --preserve-permissions"
+    CMD="$TAR ${cmd}f ${dir}/beak_restore.tar --preserve-permissions"
     if [ "$verbose" == "true" ]; then echo CMD="$CMD"; fi
     pushDir
     eval $CMD > $dir/tmplist
@@ -425,10 +452,10 @@ then
     if [ "$extract" == "true" ]; then
         # GNU Tar simply prints the filename when extracting verbosely.
         # Simply prefix the tar dir.
-        awk -v prefix="$target_dir_prefix" '{print prefix $0}' $dir/tmplist
+        $AWK -v prefix="$target_dir_prefix" '{print prefix $0}' $dir/tmplist
     else
         # GNU Tar prints permissions, date etc when viewing verbosely.
-        awk '{p=match($0," [0-9][0-9]:[0-9][0-9] "); print substr($0,0,p+6)"'" $target_dir_prefix"'"substr($0,p+7)}' $dir/tmplist
+        $AWK '{p=match($0," [0-9][0-9]:[0-9][0-9] "); print substr($0,0,p+6)"'" $target_dir_prefix"'"substr($0,p+7)}' $dir/tmplist
     fi
     rm $dir/tmplist
     popDir
