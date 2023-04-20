@@ -54,6 +54,7 @@ TAR=$(findGnuProgram tar gtar)
 AWK=$(findGnuProgram awk gawk)
 DATE=$(findGnuProgram date gdate)
 TR=$(findGnuProgram tr gtr)
+ZCAT=$(findGnuProgram zcat gzcat)
 
 function finish {
     if [ "$debug" == "" ]
@@ -228,9 +229,9 @@ fi
 
 # Check the internal checksum of the index file.
 # (2373686132353620 is hex for "#end ")
-CALC_CHECK=$(zcat < "$generation" 2>/dev/null | xxd -p | $TR -d '\n' | \
+CALC_CHECK=$($ZCAT < "$generation" 2>/dev/null | xxd -p | $TR -d '\n' | \
                     $SED 's/23656e6420.*//' | xxd -r -p | sha256sum | cut -f 1 -d ' ')
-READ_CHECK=$(zcat < "$generation" 2>/dev/null | $TR -d '\0' | grep "#end" | cut -f 2 -d ' ')
+READ_CHECK=$($ZCAT < "$generation" 2>/dev/null | $TR -d '\0' | grep "#end" | cut -f 2 -d ' ')
 
 if [ ! "$CALC_CHECK" = "$READ_CHECK" ]
 then
@@ -321,9 +322,9 @@ do
     then
         # Extract the directory and hard links and rdiff patches.
         pushDir
-        POS=$(zcat < "$file" | grep -ab "#end" | cut -f 1 -d ':')
-        zcat < "$file" | dd skip=$((POS + 72)) ibs=1 2> /dev/null > ${dir}/beak_restore.tar
-        # zcat < "$file" 2>/dev/null | xxd -p  | $TR -d '\n' | $SED 's/.*23656e6420.\{128\}0a00//' | xxd -r -p > /tmp/beak_restoree.tar
+        POS=$($ZCAT < "$file" | grep -ab "#end" | cut -f 1 -d ':')
+        $ZCAT < "$file" | dd skip=$((POS + 72)) ibs=1 2> /dev/null > ${dir}/beak_restore.tar
+        # $ZCAT < "$file" 2>/dev/null | xxd -p  | $TR -d '\n' | $SED 's/.*23656e6420.\{128\}0a00//' | xxd -r -p > /tmp/beak_restoree.tar
 
         if [ -s ${dir}/beak_restore.tar ]
         then
@@ -444,8 +445,8 @@ done <"$dir/sorted_tars"
 target_dir="$target/$backup_location"
 target_dir_prefix="/"
 
-POS=$(zcat < "$generation" | grep -ab "#end" | cut -f 1 -d ':')
-zcat < "$generation" | dd skip=$((POS + 72)) ibs=1 2> /dev/null > ${dir}/beak_restore.tar
+POS=$($ZCAT < "$generation" | grep -ab "#end" | cut -f 1 -d ':')
+$ZCAT < "$generation" | dd skip=$((POS + 72)) ibs=1 2> /dev/null > ${dir}/beak_restore.tar
 if [ -s ${dir}/beak_restore.tar ]
 then
     CMD="$TAR ${cmd}f ${dir}/beak_restore.tar --preserve-permissions"
