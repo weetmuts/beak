@@ -9,13 +9,13 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - id: INSTALL_ADDITIONAL_BUILD_DEPENDENCIES
-      run: brew install coreutils rsync librsync openssl imagemagick ffmpeg exiv2
-    - id: FINDRSYNC
-      run: find /usr/local -name "*librsync*"
+      run: brew install --cask macfuse
+    - id: INSTALL_ADDITIONAL_BUILD_DEPENDENCIES
+      run: brew install coreutils rsync librsync openssl imagemagick ffmpeg exiv2 gawk gnu-sed gnu-tar
     - id: CONFIGURE
       run: ./configure --with-openssl=/usr/local/Cellar/openssl@3/3.1.0 --disable-fuse
     - id: CHECK
-      run: find build -name spec.mk
+      run: find build -name "libfuse*"
     - id: CAT
       run: cat build/x86_64-apple-darwin21.6.0/spec.mk
     - id: MAKE
