@@ -30,6 +30,38 @@ function finish {
 }
 trap finish EXIT
 
+if [ "$BASH_VERSION" = "" ]
+then
+    echo "You have to run this script with bash!"
+    exit 1
+fi
+
+if [[ $BASH_VERSION =~ ^3\. ]]
+then
+    echo "You have to run an up to date bash! This is version $BASH_VERSION but you should use 5 or later."
+    exit 1
+fi
+
+function findGnuProgram()
+{
+    PROG=$(whereis -b $1 | cut -f 2 -d ' ' )
+    local CHECK=$(($PROG --version 2>&1 || true) | grep -o GNU | uniq)
+    if [ "$CHECK" != "GNU" ]
+    then
+        PROG=$(whereis -b $2 | cut -f 2 -d ' ')
+        local CHECK=$(($PROG --version 2>/dev/null || true) | grep -o GNU | uniq)
+        if [ "$CHECK" != "GNU" ]
+        then
+            >&2 echo "This script requires either $1 or $2 to be the GNU version!"
+            exit 1
+        fi
+    fi
+    echo $PROG
+}
+
+LS=$(findGnuProgram ls gls)
+FIND=$(findGnuProgram find gfind)
+
 function Help() {
     echo Usage: beak-integrity-test {-d} {-onlypart2} {-f [find-expression]} [root] [mount] {time}
     echo
@@ -93,7 +125,7 @@ fi
 if [ "$onlypart2" = "" ]
 then
     # Find all files under root (using a potential filter)
-    (cd $root && eval "find . $filter -printf '%M\0%u/%g\0%s\0%TY-%Tm-%Td\0%TH:%TM\0%p\0%l\n'") \
+    (cd $root && eval "$FIND . $filter -printf '%M\0%u/%g\0%s\0%TY-%Tm-%Td\0%TH:%TM\0%p\0%l\n'") \
         > $dir/test_root_raw.txt
 
     cat $dir/test_root_raw.txt | perl ${PERL_PREFIX}format_find.pl $root > $dir/test_root.txt
@@ -111,6 +143,11 @@ then
         echo OK
     else
         cat $dir/difff
+        echo "============== $dir/test_root_sorted.txt"
+        cat $dir/test_root_sorted.txt
+        echo "============== $dir/test_tar_sorted.txt"
+        cat $dir/test_tar_sorted.txt
+
         debug='true'
         exit 1
     fi
@@ -138,7 +175,7 @@ then
     cd $dir/Check
 
     # Now only extract standard files.
-    (cd $root && eval "find . -type f $filter -printf '%p\n'") > $dir/files.txt
+    (cd $root && eval "$FIND . -type f $filter -printf '%p\n'") > $dir/files.txt
 
     while (( $time_diff < $time ))
     do
