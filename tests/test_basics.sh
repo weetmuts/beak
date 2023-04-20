@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 #
-#    Copyright (C) 2016-2023 Fredrik Öhrström
+#    Copyright (C) 2016-2020 Fredrik Öhrström
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -105,9 +105,17 @@ LS=$(findGnuProgram ls gls)
 CHMOD=$(findGnuProgram chmod gchmod)
 FIND=$(findGnuProgram find gfind)
 TOUCH=$(findGnuProgram touch gtouch)
+TR=$(findGnuProgram tr gtr)
 
 UMOUNT="fusermount -u"
 
+if echo "$OSTYPE" | grep -o darwin
+then
+    IS_MAC=true
+else
+    IS_MAC=false
+fi
+	 
 if ! command umount 2>/dev/null
 then
     UMOUNT=umount
@@ -170,7 +178,7 @@ function performFsckExpectOK {
     if [ -z "$test" ]; then
         # Normal test execution, execute the store
         eval "${BEAK} fsck $extra $store > $log"
-        FSCK_LOG=$(cat $log | tr -d '\n' | tr -s ' ' | grep -o "OK")
+        FSCK_LOG=$(cat $log | $TR -d '\n' | $TR -s ' ' | grep -o "OK")
         if [ ! "$FSCK_LOG" = "OK" ]; then
             echo -------------------
             cat $log
@@ -568,7 +576,7 @@ if [ $do_test ]; then
     echo HEJSAN > $root/Alfa/file_from_the_future
     $TOUCH -d '2030-01-01' $root/Alfa/file_from_the_future
     performStore
-    CHECK=$(cat $log | tr -d '\n' | tr -s ' ' | grep -o "Cowardly refusing")
+    CHECK=$(cat $log | $TR -d '\n' | $TR -s ' ' | grep -o "Cowardly refusing")
     if [ ! "$CHECK" = "Cowardly refusing" ]; then
         echo ---------------------
         cat $log
@@ -576,7 +584,7 @@ if [ $do_test ]; then
         echo Expected beak to refuse to store backup with future dated files.
     fi
     performStore "--relaxtimechecks"
-    CHECK=$(cat $log | tr -d '\n' | tr -s ' ' | grep -o "Full store:")
+    CHECK=$(cat $log | $TR -d '\n' | $TR -s ' ' | grep -o "Full store:")
     if [ ! "$CHECK" = "Full store:" ]; then
         echo ---------------------
         cat $log
@@ -621,7 +629,7 @@ if [ $do_test ]; then
     fi
     echo SVEJSAN > $root/Alfa/Gamma/gurka.cc
     performDiff "--depth 1"
-    CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
+    CHECK=$(cat $diff | $TR -d '\n' | $TR -s ' ')
     if [ ! "$CHECK" = "Alfa/Gamma/ 1 source added (cc)" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
@@ -630,7 +638,7 @@ if [ $do_test ]; then
     fi
     echo SVEJSAN > $root/Alfa/Gamma/banan.txt
     performDiff "--depth 1"
-    CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
+    CHECK=$(cat $diff | $TR -d '\n' | $TR -s ' ')
     if [ ! "$CHECK" = "Alfa/Gamma/ 1 source added (cc) 1 document changed (txt)" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
@@ -639,7 +647,7 @@ if [ $do_test ]; then
     fi
     rm $root/Alfa/Beta/gurka.cc
     performDiff "--depth 1"
-    CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
+    CHECK=$(cat $diff | $TR -d '\n' | $TR -s ' ')
     if [ ! "$CHECK" = "Alfa/Beta/ 1 source removed (cc)Alfa/Gamma/ 1 source added (cc) 1 document changed (txt)" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
@@ -648,7 +656,7 @@ if [ $do_test ]; then
     fi
     $CHMOD a-w $root/Alfa/Gamma/toppen.h
     performDiff "--depth 1"
-    CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
+    CHECK=$(cat $diff | $TR -d '\n' | $TR -s ' ')
     if [ ! "$CHECK" = "Alfa/Beta/ 1 source removed (cc)Alfa/Gamma/ 1 source permission changed (h) 1 source added (cc) 1 document changed (txt)" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
@@ -673,7 +681,7 @@ if [ $do_test ]; then
     fi
     echo SVEJSAN > $root/Alfa/Gamma/banana.pdf
     performDiff "--depth 1"
-    CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
+    CHECK=$(cat $diff | $TR -d '\n' | $TR -s ' ')
     if [ ! "$CHECK" = "Alfa/Beta/ 1 document changed (pdf)Alfa/Gamma/ 1 document changed (pdf)" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
@@ -692,7 +700,7 @@ if [ $do_test ]; then
     rm $root/Alfa/Gamma/banana.pdf
     echo SVEJSAN > $root/Alfa/Gamma/banana.pdf
     performDiff "--depth 1"
-    CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
+    CHECK=$(cat $diff | $TR -d '\n' | $TR -s ' ')
     if [ ! "$CHECK" = "Alfa/Gamma/ 1 document changed (pdf)" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
@@ -701,7 +709,7 @@ if [ $do_test ]; then
     fi
     performStore
     performDiffInsideBackup "--depth 1"
-    CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
+    CHECK=$(cat $diff | $TR -d '\n' | $TR -s ' ')
     if [ ! "$CHECK" = "Alfa/Gamma/ 1 document changed (pdf)" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
@@ -730,7 +738,7 @@ if [ $do_test ]; then
     fi
     echo SVEJSAN > $root/Alfa/Gamma/.git/content/sxkxkxkx
     performDiff "--depth 1"
-    CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
+    CHECK=$(cat $diff | $TR -d '\n' | $TR -s ' ')
     if [ ! "$CHECK" = "Alfa/Gamma/.git/... 1 other file added (...)" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
@@ -739,7 +747,7 @@ if [ $do_test ]; then
     fi
     rm -rf $root/Alfa/Gamma
     performDiff "--depth 1"
-    CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
+    CHECK=$(cat $diff | $TR -d '\n' | $TR -s ' ')
     if [ ! "$CHECK" = "Alfa/Gamma/... dir removed 3 sources removed (c,h,bas) 1 other file removed (...)" ]; then
         cat $diff
         echo CHECK=\"${CHECK}\"
@@ -763,7 +771,7 @@ if [ $do_test ]; then
     rm -f $ALFA/beak_s_*.tar
     echo SVEJSAN > $ALFA/xyzzy
     performFsck
-    CHECK=$(cat $log | grep -o -E 'Broken|OK' | tr -d '\n' | tr -s ' ')
+    CHECK=$(cat $log | grep -o -E 'Broken|OK' | $TR -d '\n' | $TR -s ' ')
     if [ ! "$CHECK" = "BrokenBrokenOK" ]; then
         echo ----------------
         cat $dest
@@ -785,7 +793,7 @@ if [ $do_test ]; then
     $FIND $root -exec $TOUCH -d '-1 hour' '{}' +
     performStore
     performPrune "--yesprune -k 'all:forever'"
-    CHECK=$(cat $log | tr -d '\n' | tr -s ' ' | grep -o "No pruning needed.")
+    CHECK=$(cat $log | $TR -d '\n' | $TR -s ' ' | grep -o "No pruning needed.")
     if [ ! "$CHECK" = "No pruning needed." ]; then
         echo ------------------
         cat $log
@@ -795,14 +803,14 @@ if [ $do_test ]; then
         exit 1
     fi
     performFsckExpectOK
-    COUNTBEFORE=$($LS $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    COUNTBEFORE=$($LS $store/beak_z_*.gz | wc | $TR -s ' ' | cut -f 2 -d ' ')
     if [ ! "$COUNTBEFORE" = "2" ]
     then
         echo Oups! Expected there to be two points in time!
         exit 1
     fi
     performPrune "--yesprune -k 'all:1w'"
-    CHECK=$(cat $log | tr -d '\n' | tr -s ' ' | grep -o "Backup is now pruned.")
+    CHECK=$(cat $log | $TR -d '\n' | $TR -s ' ' | grep -o "Backup is now pruned.")
     if [ ! "$CHECK" = "Backup is now pruned." ]; then
         echo ------------------
         cat $dest
@@ -812,7 +820,7 @@ if [ $do_test ]; then
         exit 1
     fi
     performFsckExpectOK
-    COUNTAFTER=$($LS $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    COUNTAFTER=$($LS $store/beak_z_*.gz | wc | $TR -s ' ' | cut -f 2 -d ' ')
     if [ ! "$COUNTAFTER" = "1" ]
     then
         echo One point in time should have been pruned leaving 1!
@@ -833,7 +841,7 @@ if [ $do_test ]; then
     $FIND $root -exec $TOUCH -d '-1 minutes' '{}' +
     performStore
     performPrune "-v -k 'all:forever'"
-    CHECK=$(cat $log | tr -d '\n' | tr -s ' ' | grep -o "No pruning needed.")
+    CHECK=$(cat $log | $TR -d '\n' | $TR -s ' ' | grep -o "No pruning needed.")
     if [ ! "$CHECK" = "No pruning needed." ]; then
         echo ------------------
         cat $log
@@ -843,14 +851,14 @@ if [ $do_test ]; then
         exit 1
     fi
     performFsckExpectOK
-    COUNTBEFORE=$($LS $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    COUNTBEFORE=$($LS $store/beak_z_*.gz | wc | $TR -s ' ' | cut -f 2 -d ' ')
     if [ ! "$COUNTBEFORE" = "2" ]
     then
         echo Oups! Expected there to be two points in time in dir: $store
         exit 1
     fi
     performPrune "--yesprune -k 'all:1w'"
-    CHECK=$(cat $log | tr -d '\n' | tr -s ' ' | grep -o "Backup is now pruned.")
+    CHECK=$(cat $log | $TR -d '\n' | $TR -s ' ' | grep -o "Backup is now pruned.")
     if [ ! "$CHECK" = "Backup is now pruned." ]; then
         echo ------------------
         cat $log
@@ -860,7 +868,7 @@ if [ $do_test ]; then
         exit 1
     fi
     performFsckExpectOK
-    COUNTAFTER=$($LS $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    COUNTAFTER=$($LS $store/beak_z_*.gz | wc | $TR -s ' ' | cut -f 2 -d ' ')
     if [ ! "$COUNTAFTER" = "1" ]
     then
         echo One point in time should have been pruned leaving 1!
@@ -925,7 +933,7 @@ if [ $do_test ]; then
     $FIND $root -exec $TOUCH -d '2019-03-20 10:10' '{}' +
     performStore
     performFsckExpectOK
-    COUNTBEFORE=$($LS $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    COUNTBEFORE=$($LS $store/beak_z_*.gz | wc | $TR -s ' ' | cut -f 2 -d ' ')
     if [ ! "$COUNTBEFORE" = "25" ]
     then
         echo Oups! Expected there to be 25 points in time, but found $COUNTBEFORE
@@ -946,7 +954,7 @@ if [ $do_test ]; then
         exit 1
     fi
     performFsckExpectOK
-    COUNTAFTER=$($LS $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    COUNTAFTER=$($LS $store/beak_z_*.gz | wc | $TR -s ' ' | cut -f 2 -d ' ')
     if [ ! "$COUNTAFTER" = "22" ]
     then
         echo Oups! Expected there to be 15 points in time after prune, but found $COUNTAFTER
@@ -967,7 +975,7 @@ if [ $do_test ]; then
         exit 1
     fi
     performFsckExpectOK
-    COUNTAFTER=$($LS $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    COUNTAFTER=$($LS $store/beak_z_*.gz | wc | $TR -s ' ' | cut -f 2 -d ' ')
     if [ ! "$COUNTAFTER" = "4" ]
     then
         echo Oups! Expected there to be 4 points in time after prune, but found $COUNTAFTER
@@ -989,7 +997,7 @@ if [ $do_test ]; then
         exit 1
     fi
     performFsckExpectOK
-    COUNTAFTER=$($LS $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    COUNTAFTER=$($LS $store/beak_z_*.gz | wc | $TR -s ' ' | cut -f 2 -d ' ')
     if [ ! "$COUNTAFTER" = "2" ]
     then
         echo Oups! Expected there to be 2 points in time after prune, but found $COUNTAFTER
@@ -1011,7 +1019,7 @@ if [ $do_test ]; then
         exit 1
     fi
     performFsckExpectOK
-    COUNTAFTER=$($LS $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    COUNTAFTER=$($LS $store/beak_z_*.gz | wc | $TR -s ' ' | cut -f 2 -d ' ')
     if [ ! "$COUNTAFTER" = "1" ]
     then
         echo Oups! Expected there to be 1 points in time after prune, but found $COUNTAFTER
@@ -1028,7 +1036,7 @@ if [ $do_test ]; then
     $FIND $root -exec $TOUCH -d '+10 days minutes' '{}' +
     performStore "--relaxtimechecks"
     performPrune "--yesprune -k 'all:forever'"
-    CHECK=$(cat $log | tr -d '\n' | tr -s ' ' | grep -o "Cowardly refusing")
+    CHECK=$(cat $log | $TR -d '\n' | $TR -s ' ' | grep -o "Cowardly refusing")
     if [ ! "$CHECK" = "Cowardly refusing" ]; then
         echo ---------------------
         cat $log
@@ -1054,7 +1062,7 @@ if [ $do_test ]; then
 fi
 
 setup splitpartslongname "Split large file with long file name into multiple small parts"
-if [ $do_test ]; then
+if [ $do_test ] && [ "$IS_MAC" = false ] ; then
     dir=$root/'aaaa/bbbb/cccc/dddd/eeee/ffff/gggg/hhhh/iiii/jjjj/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'
     filename="${dir}/0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345.txt"
     mkdir -p "$dir"
@@ -1110,7 +1118,7 @@ if [ $do_test ]; then
 fi
 
 setup symlink "Symbolic link"
-if [ $do_test ]; then
+if [ $do_test ] && [ "$IS_MAC" = false ] ; then
     echo HEJSAN > $root/test
     ln -s $root/test $root/link
     performStore  --tarheader=full
@@ -1126,7 +1134,7 @@ if [ $do_test ]; then
 fi
 
 setup symlink_long "Symbolic link to long target"
-if [ $do_test ]; then
+if [ $do_test ] && [ "$IS_MAC" = false ] ; then
     tmp=$root/01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789
     echo HEJSAN > $tmp
     ln -s $tmp $root/link
@@ -1600,7 +1608,7 @@ function txTriggerTest {
 }
 
 setup trigger_tarred_dirs "Test -tx to trigger tarred directories"
-if [ $do_test ]; then
+if [ $do_test ] && [ "$IS_MAC" = false ] ; then
     mkdir -p $root/Alfa/snapshot_2016-12-30
     echo HEJSAN > $root/Alfa/a
     cp -a $root/Alfa/a $root/Alfa/snapshot_2016-12-30
@@ -1660,7 +1668,7 @@ if [ $do_test ]; then
 fi
 
 setup bulktest2 "Mount of generated bulk, pack using xz, decompress and untar."
-if [ $do_test ]; then
+if [ $do_test ] && [ "$IS_MAC" = false ] ; then
     $DIR/scripts/generate_filesystem.sh $root 5 10
     startMountTest standardPackedTest --tarheader=full
     echo OK
@@ -1679,7 +1687,7 @@ function expectOneBigR01Tar {
 }
 
 setup bulktest3 "Mount of generated bulk --depth 1 -ta 1G"
-if [ $do_test ]; then
+if [ $do_test ] && [ "$IS_MAC" = false ] ; then
     $DIR/scripts/generate_filesystem.sh $root 5 10
     startMountTest expectOneBigR01Tar "--depth 1 -ta 1G --tarheader=full"
     echo OK
@@ -1695,7 +1703,7 @@ function expect7Tar {
 }
 
 setup bulktest4 "Mount of generated bulk --depth 1 -ta 1M -tr 1G"
-if [ $do_test ]; then
+if [ $do_test ] && [ "$IS_MAC" = false ] ; then
     $DIR/scripts/generate_filesystem.sh $root 5 10
     startMountTest expect7Tar "--depth 1 -ta 1M -tr 1G --tarheader=full"
     echo OK

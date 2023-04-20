@@ -53,6 +53,7 @@ SED=$(findGnuProgram sed gsed)
 TAR=$(findGnuProgram tar gtar)
 AWK=$(findGnuProgram awk gawk)
 DATE=$(findGnuProgram date gdate)
+TR=$(findGnuProgram tr gtr)
 
 function finish {
     if [ "$debug" == "" ]
@@ -191,7 +192,7 @@ then
     Help
 fi
 
-numgzs=$(ls "$root"/beak_z_*.gz | sort -r | wc | tr -s ' ' | cut -f 2 -d ' ')
+numgzs=$(ls "$root"/beak_z_*.gz | sort -r | wc | $TR -s ' ' | cut -f 2 -d ' ')
 
 if [ "$numgzs" = "0" ]; then
     echo No beakfs found in "$root"
@@ -227,9 +228,9 @@ fi
 
 # Check the internal checksum of the index file.
 # (2373686132353620 is hex for "#end ")
-CALC_CHECK=$(zcat < "$generation" 2>/dev/null | xxd -p | tr -d '\n' | \
+CALC_CHECK=$(zcat < "$generation" 2>/dev/null | xxd -p | $TR -d '\n' | \
                     $SED 's/23656e6420.*//' | xxd -r -p | sha256sum | cut -f 1 -d ' ')
-READ_CHECK=$(zcat < "$generation" 2>/dev/null | tr -d '\0' | grep "#end" | cut -f 2 -d ' ')
+READ_CHECK=$(zcat < "$generation" 2>/dev/null | $TR -d '\0' | grep "#end" | cut -f 2 -d ' ')
 
 if [ ! "$CALC_CHECK" = "$READ_CHECK" ]
 then
@@ -258,7 +259,7 @@ cat "$dir/aa" | $SED 's/\x00\[^\x00]*\x00\([^\x00]*\).*/\1/' > "$dir/basis_tarfi
 cat "$dir/aa" | $SED 's/\x00\[^\x00]*\x00\[^\x00]*\x00\([^\x00]*\).*/\1/' > "$dir/delta_tarfiles"
 
 # Generate slashes
-cat "$dir/backup_locations" | tr -c -d '/\n' | tr / a > "$dir/slashes"
+cat "$dir/backup_locations" | $TR -c -d '/\n' | $TR / a > "$dir/slashes"
 
 # Sort them on the number of slashes, ie handle the
 # deepest directories first, finish with the root
@@ -322,7 +323,7 @@ do
         pushDir
         POS=$(zcat < "$file" | grep -ab "#end" | cut -f 1 -d ':')
         zcat < "$file" | dd skip=$((POS + 72)) ibs=1 2> /dev/null > ${dir}/beak_restore.tar
-        # zcat < "$file" 2>/dev/null | xxd -p  | tr -d '\n' | $SED 's/.*23656e6420.\{128\}0a00//' | xxd -r -p > /tmp/beak_restoree.tar
+        # zcat < "$file" 2>/dev/null | xxd -p  | $TR -d '\n' | $SED 's/.*23656e6420.\{128\}0a00//' | xxd -r -p > /tmp/beak_restoree.tar
 
         if [ -s ${dir}/beak_restore.tar ]
         then
