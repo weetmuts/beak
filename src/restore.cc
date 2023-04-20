@@ -452,12 +452,19 @@ struct RestoreFuseAPI : FuseAPI
             stbuf->st_atim.tv_nsec = restore_->mostRecentPointInTime()->ts()->tv_nsec;
             stbuf->st_ctim.tv_sec = restore_->mostRecentPointInTime()->ts()->tv_sec;
             stbuf->st_ctim.tv_nsec = restore_->mostRecentPointInTime()->ts()->tv_nsec;
+#elif HAS_ST_MTIMESPEC
+            stbuf->st_mtimespec.tv_sec = restore_->mostRecentPointInTime()->ts()->tv_sec;
+            stbuf->st_mtimespec.tv_nsec = restore_->mostRecentPointInTime()->ts()->tv_nsec;
+            stbuf->st_atimespec.tv_sec = restore_->mostRecentPointInTime()->ts()->tv_sec;
+            stbuf->st_atimespec.tv_nsec = restore_->mostRecentPointInTime()->ts()->tv_nsec;
+            stbuf->st_ctimespec.tv_sec = restore_->mostRecentPointInTime()->ts()->tv_sec;
+            stbuf->st_ctimespec.tv_nsec = restore_->mostRecentPointInTime()->ts()->tv_nsec;
 #elif HAS_ST_MTIME
             stbuf->st_mtime = restore_->mostRecentPointInTime()->ts()->tv_sec;
             stbuf->st_atime = restore_->mostRecentPointInTime()->ts()->tv_sec;
             stbuf->st_ctime = restore_->mostRecentPointInTime()->ts()->tv_sec;
 #else
-#error
+#error Missing HAS_ST_MTIM... #error
 #endif
 
             goto ok;
@@ -483,6 +490,13 @@ struct RestoreFuseAPI : FuseAPI
                 stbuf->st_atim.tv_nsec = point->ts()->tv_nsec;
                 stbuf->st_ctim.tv_sec = point->ts()->tv_sec;
                 stbuf->st_ctim.tv_nsec = point->ts()->tv_nsec;
+#elif HAS_ST_MTIMESPEC
+                stbuf->st_mtimespec.tv_sec = point->ts()->tv_sec;
+                stbuf->st_mtimespec.tv_nsec = point->ts()->tv_nsec;
+                stbuf->st_atimespec.tv_sec = point->ts()->tv_sec;
+                stbuf->st_atimespec.tv_nsec = point->ts()->tv_nsec;
+                stbuf->st_ctimespec.tv_sec = point->ts()->tv_sec;
+                stbuf->st_ctimespec.tv_nsec = point->ts()->tv_nsec;
 #elif HAS_ST_MTIME
                 stbuf->st_mtime = point->ts()->tv_sec;
                 stbuf->st_atime = point->ts()->tv_sec;
@@ -516,12 +530,19 @@ struct RestoreFuseAPI : FuseAPI
             stbuf->st_atim.tv_nsec = e->fs.st_mtim.tv_nsec;
             stbuf->st_ctim.tv_sec = e->fs.st_mtim.tv_sec;
             stbuf->st_ctim.tv_nsec = e->fs.st_mtim.tv_nsec;
+#elif HAS_ST_MTIMESPEC
+            stbuf->st_mtimespec.tv_sec = e->fs.st_mtim.tv_sec;
+            stbuf->st_mtimespec.tv_nsec = e->fs.st_mtim.tv_nsec;
+            stbuf->st_atimespec.tv_sec = e->fs.st_mtim.tv_sec;
+            stbuf->st_atimespec.tv_nsec = e->fs.st_mtim.tv_nsec;
+            stbuf->st_ctimespec.tv_sec = e->fs.st_mtim.tv_sec;
+            stbuf->st_ctimespec.tv_nsec = e->fs.st_mtim.tv_nsec;
 #elif HAS_ST_MTIME
             stbuf->st_mtime = e->fs.st_mtim.tv_sec;
             stbuf->st_atime = e->fs.st_mtim.tv_sec;
             stbuf->st_ctime = e->fs.st_mtim.tv_sec;
 #else
-#error
+#error Missing HAS_ST_MTIM...
 #endif
             goto ok;
         }
@@ -538,12 +559,19 @@ struct RestoreFuseAPI : FuseAPI
         stbuf->st_atim.tv_nsec = e->fs.st_mtim.tv_nsec;
         stbuf->st_ctim.tv_sec = e->fs.st_mtim.tv_sec;
         stbuf->st_ctim.tv_nsec = e->fs.st_mtim.tv_nsec;
+#elif HAS_ST_MTIMESPEC
+        stbuf->st_mtimespec.tv_sec = e->fs.st_mtim.tv_sec;
+        stbuf->st_mtimespec.tv_nsec = e->fs.st_mtim.tv_nsec;
+        stbuf->st_atimespec.tv_sec = e->fs.st_mtim.tv_sec;
+        stbuf->st_atimespec.tv_nsec = e->fs.st_mtim.tv_nsec;
+        stbuf->st_ctimespec.tv_sec = e->fs.st_mtim.tv_sec;
+        stbuf->st_ctimespec.tv_nsec = e->fs.st_mtim.tv_nsec;
 #elif HAS_ST_MTIME
         stbuf->st_mtime = e->fs.st_mtim.tv_sec;
         stbuf->st_atime = e->fs.st_mtim.tv_sec;
         stbuf->st_ctime = e->fs.st_mtim.tv_sec;
 #else
-#error
+#error Missing HAS_ST_MTIM...
 #endif
         stbuf->st_rdev = e->fs.st_rdev;
         goto ok;

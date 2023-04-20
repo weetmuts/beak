@@ -273,6 +273,21 @@ AC_MSG_CHECKING(for sizeof time_t)
 AC_CHECK_SIZEOF([time_t])
 AC_CHECK_SIZEOF([size_t])
 
+# Old stat name only has seconds resolution.
+AC_MSG_CHECKING(for st_mtime in struct stat)
+AC_COMPILE_IFELSE(
+[AC_LANG_PROGRAM([#include <time.h>
+#include <sys/time.h>
+#include <sys/stat.h>],
+[struct stat sb; sb.st_mtime = 0;])],
+have_st_mtime=yes, have_st_mtime=no)
+AC_MSG_RESULT($have_st_mtime)
+
+if test "x${have_st_mtime}" = "xyes"; then
+    AC_DEFINE(HAS_ST_MTIME,1,Stat structure has st_mtime)
+fi
+
+# New Linux has nanoseconds in st_mtim
 AC_MSG_CHECKING(for st_mtim.tv_nsec in struct stat)
 AC_COMPILE_IFELSE(
 [AC_LANG_PROGRAM([#include <time.h>
@@ -286,17 +301,18 @@ if test "x${have_st_mtim}" = "xyes"; then
     AC_DEFINE(HAS_ST_MTIM,1,Stat structure has st_mtim)
 fi
 
-AC_MSG_CHECKING(for st_mtime in struct stat)
+# MacOS ADFS has nanoseconds in st_mtimespec
+AC_MSG_CHECKING(for st_mtimespec.tv_nsec in struct stat)
 AC_COMPILE_IFELSE(
 [AC_LANG_PROGRAM([#include <time.h>
 #include <sys/time.h>
 #include <sys/stat.h>],
-[struct stat sb; sb.st_mtime = 0;])],
-have_st_mtime=yes, have_st_mtime=no)
-AC_MSG_RESULT($have_st_mtime)
+[struct stat sb; sb.st_mtimespec.tv_nsec = 0;])],
+have_st_mtimespec=yes, have_st_mtimespec=no)
+AC_MSG_RESULT($have_st_mtimespec)
 
-if test "x${have_st_mtime}" = "xyes"; then
-    AC_DEFINE(HAS_ST_MTIME,1,Stat structure has st_mtime)
+if test "x${have_st_mtimespec}" = "xyes"; then
+    AC_DEFINE(HAS_ST_MTIMESPEC,1,Stat structure has st_mtimespec)
 fi
 
 AC_LANG_PUSH([C++])

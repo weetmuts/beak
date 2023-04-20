@@ -4799,6 +4799,39 @@ printf "%s\n" "#define SIZEOF_SIZE_T $ac_cv_sizeof_size_t" >>confdefs.h
 
 
 
+# Old stat name only has seconds resolution.
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for st_mtime in struct stat" >&5
+printf %s "checking for st_mtime in struct stat... " >&6; }
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <time.h>
+#include <sys/time.h>
+#include <sys/stat.h>
+int
+main (void)
+{
+struct stat sb; sb.st_mtime = 0;
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"
+then :
+  have_st_mtime=yes
+else $as_nop
+  have_st_mtime=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $have_st_mtime" >&5
+printf "%s\n" "$have_st_mtime" >&6; }
+
+if test "x${have_st_mtime}" = "xyes"; then
+
+printf "%s\n" "#define HAS_ST_MTIME 1" >>confdefs.h
+
+fi
+
+# New Linux has nanoseconds in st_mtim
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for st_mtim.tv_nsec in struct stat" >&5
 printf %s "checking for st_mtim.tv_nsec in struct stat... " >&6; }
 cat confdefs.h - <<_ACEOF >conftest.$ac_ext
@@ -4830,8 +4863,9 @@ printf "%s\n" "#define HAS_ST_MTIM 1" >>confdefs.h
 
 fi
 
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for st_mtime in struct stat" >&5
-printf %s "checking for st_mtime in struct stat... " >&6; }
+# MacOS ADFS has nanoseconds in st_mtimespec
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for st_mtimespec.tv_nsec in struct stat" >&5
+printf %s "checking for st_mtimespec.tv_nsec in struct stat... " >&6; }
 cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 #include <time.h>
@@ -4840,24 +4874,24 @@ cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 int
 main (void)
 {
-struct stat sb; sb.st_mtime = 0;
+struct stat sb; sb.st_mtimespec.tv_nsec = 0;
   ;
   return 0;
 }
 _ACEOF
 if ac_fn_c_try_compile "$LINENO"
 then :
-  have_st_mtime=yes
+  have_st_mtimespec=yes
 else $as_nop
-  have_st_mtime=no
+  have_st_mtimespec=no
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $have_st_mtime" >&5
-printf "%s\n" "$have_st_mtime" >&6; }
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $have_st_mtimespec" >&5
+printf "%s\n" "$have_st_mtimespec" >&6; }
 
-if test "x${have_st_mtime}" = "xyes"; then
+if test "x${have_st_mtimespec}" = "xyes"; then
 
-printf "%s\n" "#define HAS_ST_MTIME 1" >>confdefs.h
+printf "%s\n" "#define HAS_ST_MTIMESPEC 1" >>confdefs.h
 
 fi
 

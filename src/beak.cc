@@ -381,6 +381,9 @@ void update_mctim_maxes(const struct stat *sb)
 #if HAS_ST_MTIM
     const struct timespec *mt = &sb->st_mtim;
     const struct timespec *ct = &sb->st_ctim;
+#elif HAS_ST_MTIMESPEC
+    const struct timespec *mt = &sb->st_mtimespec;
+    const struct timespec *ct = &sb->st_ctimespec;
 #elif HAS_ST_MTIME
     struct timespec smt {};
     smt.tv_sec = sb->st_mtime;
@@ -389,7 +392,7 @@ void update_mctim_maxes(const struct stat *sb)
     sct.tv_sec = sb->st_ctime;
     const struct timespec *ct = &sct;
 #else
-#error
+#error Missing HAS_ST_MTIM...
 #endif
 
     if (mt->tv_sec > mtim_max.tv_sec || (mt->tv_sec == mtim_max.tv_sec && mt->tv_nsec > mtim_max.tv_nsec))

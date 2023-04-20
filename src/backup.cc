@@ -1046,10 +1046,12 @@ struct BackupFuseAPI : FuseAPI
 #endif
 #if HAS_ST_MTIM
                 memcpy(&stbuf->st_mtim, tar->mtim(), sizeof(stbuf->st_mtim));
+#elif HAS_ST_MTIMESPEC
+                memcpy(&stbuf->st_mtimespec, tar->mtim(), sizeof(stbuf->st_mtimespec));
 #elif HAS_ST_MTIME
                 stbuf->st_mtime = tar->mtim()->tv_sec;
 #else
-#error
+#error Missing HAS_ST_MTIM... 
 #endif
                 goto ok;
             }

@@ -785,6 +785,10 @@ void FileStat::loadFrom(const struct stat *sb)
     st_atim = sb->st_atim;
     st_mtim = sb->st_mtim;
     st_ctim = sb->st_ctim;
+#elif HAS_ST_MTIMESPEC
+    st_atim = sb->st_atimespec;
+    st_mtim = sb->st_mtimespec;
+    st_ctim = sb->st_ctimespec;
 #elif HAS_ST_MTIME
     st_atim.tv_sec = sb->st_atime;
     st_mtim.tv_sec = sb->st_mtime;
@@ -793,7 +797,7 @@ void FileStat::loadFrom(const struct stat *sb)
     st_mtim.tv_nsec = 0;
     st_ctim.tv_nsec = 0;
 #else
-#error HAS_ST_MTIM or HAS_ST_TIME must be true!
+#error Missing HAS_ST_MTIM...
 #endif
 }
 
@@ -811,12 +815,16 @@ void FileStat::storeIn(struct stat *sb)
     sb->st_atim = st_atim;
     sb->st_mtim = st_mtim;
     sb->st_ctim = st_ctim;
+#elif HAS_ST_MTIMESPEC
+    sb->st_atimespec = st_atim;
+    sb->st_mtimespec = st_mtim;
+    sb->st_ctimespec = st_ctim;
 #elif HAS_ST_MTIME
     sb->st_atime = st_atim.tv_sec;
     sb->st_mtime = st_mtim.tv_sec;
     sb->st_ctime = st_ctim.tv_sec;
 #else
-#error HAS_ST_MTIM or HAS_ST_TIME must be true!
+#error Missing HAS_ST_MTIM...
 #endif
 }
 

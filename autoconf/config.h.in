@@ -6,6 +6,9 @@
 /* Stat structure has st_mtime */
 #undef HAS_ST_MTIME
 
+/* Stat structure has st_mtimespec */
+#undef HAS_ST_MTIMESPEC
+
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
