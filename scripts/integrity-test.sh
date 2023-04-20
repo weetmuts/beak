@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
-#    Copyright (C) 2017-2020 Fredrik Öhrström
+#    Copyright (C) 2017-2023 Fredrik Öhrström
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -31,7 +31,7 @@ function finish {
 trap finish EXIT
 
 function Help() {
-    echo Usage: tarrredfs-integrity-test {-d} {-onlypart2} {-f [find-expression]} [root] [mount] {time}
+    echo Usage: beak-integrity-test {-d} {-onlypart2} {-f [find-expression]} [root] [mount] {time}
     echo
     echo Check that the contents listed in the tar files inside mount
     echo corresponds exactly to the contents listed in root.
@@ -71,8 +71,8 @@ do
     esac
 done
 
-root="$(realpath $1)"
-mount="$(realpath $2)"
+root="$1"
+mount="$2"
 time="$3"
 
 if [ "$root" == "" ] || [ "$mount" == "" ]; then

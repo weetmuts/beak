@@ -1018,9 +1018,11 @@ struct BackupFuseAPI : FuseAPI
             TarEntry *te = backup_->directories[path];
             if (te) {
                 memset(stbuf, 0, sizeof(struct stat));
-                stbuf->st_mode = S_IFDIR | 0500;
+                stbuf->st_mode = S_IFDIR | S_IRUSR | S_IXUSR;
                 stbuf->st_nlink = 2;
                 stbuf->st_size = 0;
+                stbuf->st_uid = geteuid();
+                stbuf->st_gid = getegid();
 #ifdef PLATFORM_POSIX
                 stbuf->st_blksize = 512;
                 stbuf->st_blocks = 0;
@@ -1051,7 +1053,7 @@ struct BackupFuseAPI : FuseAPI
 #elif HAS_ST_MTIME
                 stbuf->st_mtime = tar->mtim()->tv_sec;
 #else
-#error Missing HAS_ST_MTIM... 
+#error Missing HAS_ST_MTIM...
 #endif
                 goto ok;
             }

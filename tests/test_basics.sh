@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 #
 #    Copyright (C) 2016-2020 Fredrik Öhrström
@@ -71,6 +71,47 @@ subdir=""
 beakfs=""
 # if_test_fail_msg: Message tuned to the failure of the test.
 if_test_fail_msg=""
+
+if [ "$BASH_VERSION" = "" ]
+then
+    echo "You have to run this script with bash!"
+    exit 1
+fi
+
+if [[ $BASH_VERSION =~ ^3\. ]]
+then
+    echo "You have to run an up to date bash! This is version $BASH_VERSION but you should use 5 or later."
+    exit 1
+fi
+
+function findGnuProgram()
+{
+    PROG=$(whereis -b $1 | cut -f 2 -d ' ' )
+    local CHECK=$(($PROG --version 2>&1 || true) | grep -o GNU | uniq)
+    if [ "$CHECK" != "GNU" ]
+    then
+        PROG=$(whereis -b $2 | cut -f 2 -d ' ')
+        local CHECK=$(($PROG --version 2>/dev/null || true) | grep -o GNU | uniq)
+        if [ "$CHECK" != "GNU" ]
+        then
+            >&2 echo "This script requires either $1 or $2 to be the GNU version!"
+            exit 1
+        fi
+    fi
+    echo $PROG
+}
+
+LS=$(findGnuProgram ls gls)
+CHMOD=$(findGnuProgram chmod gchmod)
+FIND=$(findGnuProgram find gfind)
+TOUCH=$(findGnuProgram touch gtouch)
+
+UMOUNT="fusermount -u"
+
+if ! command umount 2>/dev/null
+then
+    UMOUNT=umount
+fi
 
 THIS_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 
@@ -275,16 +316,16 @@ function startMountTestExpectFail {
 }
 
 function stopMount {
-    (cd $mount; find . -exec ls -ld \{\} \; >> $log)
-    fusermount -u $mount
+    (cd $mount; $FIND . -exec $LS -ld \{\} \; >> $log)
+    $UMOUNT $mount
     if [ -n "$test" ]; then
         sleep 2
     fi
 }
 
 function stopMountArchive {
-    (cd $check; find . -exec ls -ld \{\} \; >> $log)
-    fusermount -u $check
+    (cd $check; $FIND . -exec $LS -ld \{\} \; >> $log)
+    $UMOUNT $check
     if [ -n "$test" ]; then
         sleep 2
     fi
@@ -315,10 +356,10 @@ function startTwoFS {
 }
 
 function stopTwoFS {
-    (cd $mount; find . -exec ls -ld \{\} \; >> $log)
-    (cd $mountreverse; find . -exec ls -ld \{\} \; >> $logreverse)
-    fusermount -u $mountreverse
-    fusermount -u $mount
+    (cd $mount; $FIND . -exec $LS -ld \{\} \; >> $log)
+    (cd $mountreverse; $FIND . -exec $LS -ld \{\} \; >> $logreverse)
+    $UMOUNT $mountreverse
+    $UMOUNT $mount
     if [ -n "$test" ]; then
         sleep 2
     fi
@@ -349,8 +390,8 @@ function checkdiff {
 }
 
 function checklsld {
-    (cd $root$1; find . ! -path . -exec ls -ld --time-style='+%Y-%m-%d %H:%M:%S.%N %s' \{\} \; > $org)
-    (cd $check; find . ! -path . -exec ls -ld --time-style='+%Y-%m-%d %H:%M:%S.%N %s' \{\} \; > $dest)
+    (cd $root$1; $FIND . ! -path . -exec $LS -ld --time-style='+%Y-%m-%d %H:%M:%S.%N %s' \{\} \; > $org)
+    (cd $check; $FIND . ! -path . -exec $LS -ld --time-style='+%Y-%m-%d %H:%M:%S.%N %s' \{\} \; > $dest)
     diff $org $dest
     if [ $? -ne 0 ]; then
         echo "$if_test_fail_msg"
@@ -360,8 +401,8 @@ function checklsld {
 }
 
 function checklsld_no_nanos {
-    (cd $root$1; find . ! -path . -exec ls -ld --time-style='+%Y-%m-%d %H:%M:%S %s' \{\} \; > $org)
-    (cd $check; find . ! -path . -exec ls -ld --time-style='+%Y-%m-%d %H:%M:%S %s' \{\} \; > $dest)
+    (cd $root$1; $FIND . ! -path . -exec $LS -ld --time-style='+%Y-%m-%d %H:%M:%S %s' \{\} \; > $org)
+    (cd $check; $FIND . ! -path . -exec $LS -ld --time-style='+%Y-%m-%d %H:%M:%S %s' \{\} \; > $dest)
     diff $org $dest
     if [ $? -ne 0 ]; then
         echo "$if_test_fail_msg"
@@ -429,7 +470,7 @@ function fifoTest {
 }
 
 function cleanCheck {
-    find "$check" -type d ! -perm /u+w -exec chmod u+w \{\} \;
+    $FIND "$check" -type d ! -perm /u+w -exec $CHMOD u+w \{\} \;
     rm -rf "$check"
     mkdir -p "$check"
 }
@@ -437,7 +478,7 @@ function cleanCheck {
 setup short_simple_file "Short simple file"
 if [ $do_test ]; then
     echo HEJSAN > $root/hello.txt
-    chmod 400 $root/hello.txt
+    $CHMOD 400 $root/hello.txt
 
     performStore --tarheader=full
     standardStoreUntarTest
@@ -525,7 +566,7 @@ setup check_store_future_files "Beak should block when trying to store files dat
 if [ $do_test ]; then
     mkdir -p $root/Alfa
     echo HEJSAN > $root/Alfa/file_from_the_future
-    touch -d '2030-01-01' $root/Alfa/file_from_the_future
+    $TOUCH -d '2030-01-01' $root/Alfa/file_from_the_future
     performStore
     CHECK=$(cat $log | tr -d '\n' | tr -s ' ' | grep -o "Cowardly refusing")
     if [ ! "$CHECK" = "Cowardly refusing" ]; then
@@ -605,7 +646,7 @@ if [ $do_test ]; then
         echo Failed beak diff! Expected one added, one removed and one changed. Check in $dir for more information.
         exit 1
     fi
-    chmod a-w $root/Alfa/Gamma/toppen.h
+    $CHMOD a-w $root/Alfa/Gamma/toppen.h
     performDiff "--depth 1"
     CHECK=$(cat $diff | tr -d '\n' | tr -s ' ')
     if [ ! "$CHECK" = "Alfa/Beta/ 1 source removed (cc)Alfa/Gamma/ 1 source permission changed (h) 1 source added (cc) 1 document changed (txt)" ]; then
@@ -738,10 +779,10 @@ setup basicprune "Prune small simple backup"
 if [ $do_test ]; then
     mkdir -p $root/Alfa/Beta
     echo HEJSAN > $root/Alfa/Beta/gurka.c
-    find $root -exec touch -d '-720 days' '{}' +
+    $FIND $root -exec $TOUCH -d '-720 days' '{}' +
     performStore
     echo HEJSAN > $root/Alfa/Beta/banan.cc
-    find $root -exec touch -d '-1 hour' '{}' +
+    $FIND $root -exec $TOUCH -d '-1 hour' '{}' +
     performStore
     performPrune "--yesprune -k 'all:forever'"
     CHECK=$(cat $log | tr -d '\n' | tr -s ' ' | grep -o "No pruning needed.")
@@ -754,7 +795,7 @@ if [ $do_test ]; then
         exit 1
     fi
     performFsckExpectOK
-    COUNTBEFORE=$(ls $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    COUNTBEFORE=$($LS $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
     if [ ! "$COUNTBEFORE" = "2" ]
     then
         echo Oups! Expected there to be two points in time!
@@ -771,7 +812,7 @@ if [ $do_test ]; then
         exit 1
     fi
     performFsckExpectOK
-    COUNTAFTER=$(ls $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    COUNTAFTER=$($LS $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
     if [ ! "$COUNTAFTER" = "1" ]
     then
         echo One point in time should have been pruned leaving 1!
@@ -785,11 +826,11 @@ setup basicsplitprune "Prune backup with split files"
 if [ $do_test ]; then
     mkdir -p $root/Alfa/Beta
     dd if=/dev/urandom of=$root'/Alfa/largefile' count=71 bs=1000000 > /dev/null 2>&1
-    find $root -exec touch -d '-720 days' '{}' +
+    $FIND $root -exec $TOUCH -d '-720 days' '{}' +
     performStore
     performFsckExpectOK
     echo HEJSAN > $root/Alfa/largefile
-    find $root -exec touch -d '-1 minutes' '{}' +
+    $FIND $root -exec $TOUCH -d '-1 minutes' '{}' +
     performStore
     performPrune "-v -k 'all:forever'"
     CHECK=$(cat $log | tr -d '\n' | tr -s ' ' | grep -o "No pruning needed.")
@@ -802,7 +843,7 @@ if [ $do_test ]; then
         exit 1
     fi
     performFsckExpectOK
-    COUNTBEFORE=$(ls $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    COUNTBEFORE=$($LS $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
     if [ ! "$COUNTBEFORE" = "2" ]
     then
         echo Oups! Expected there to be two points in time in dir: $store
@@ -819,7 +860,7 @@ if [ $do_test ]; then
         exit 1
     fi
     performFsckExpectOK
-    COUNTAFTER=$(ls $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    COUNTAFTER=$($LS $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
     if [ ! "$COUNTAFTER" = "1" ]
     then
         echo One point in time should have been pruned leaving 1!
@@ -833,58 +874,58 @@ setup multipleprunes "Prune multiple times"
 if [ $do_test ]; then
     mkdir -p $root/Alfa/Beta
     echo HEJSAN > $root/Alfa/Beta/gurka
-    find $root -exec touch -d '2017-04-01 12:32' '{}' +
+    $FIND $root -exec $TOUCH -d '2017-04-01 12:32' '{}' +
     performStore
-    find $root -exec touch -d '2017-04-02 11:33' '{}' +
+    $FIND $root -exec $TOUCH -d '2017-04-02 11:33' '{}' +
     performStore
-    find $root -exec touch -d '2017-05-29 07:00' '{}' +
+    $FIND $root -exec $TOUCH -d '2017-05-29 07:00' '{}' +
     performStore
-    find $root -exec touch -d '2018-01-02 22:32' '{}' +
+    $FIND $root -exec $TOUCH -d '2018-01-02 22:32' '{}' +
     performStore
-    find $root -exec touch -d '2018-02-16 08:20' '{}' +
+    $FIND $root -exec $TOUCH -d '2018-02-16 08:20' '{}' +
     performStore
-    find $root -exec touch -d '2018-03-20 16:00' '{}' +
+    $FIND $root -exec $TOUCH -d '2018-03-20 16:00' '{}' +
     performStore
-    find $root -exec touch -d '2018-12-12 17:30' '{}' +
+    $FIND $root -exec $TOUCH -d '2018-12-12 17:30' '{}' +
     performStore
-    find $root -exec touch -d '2019-01-01 01:01' '{}' +
+    $FIND $root -exec $TOUCH -d '2019-01-01 01:01' '{}' +
     performStore
-    find $root -exec touch -d '2019-01-02 13:33' '{}' +
+    $FIND $root -exec $TOUCH -d '2019-01-02 13:33' '{}' +
     performStore
-    find $root -exec touch -d '2019-01-15 11:20' '{}' +
+    $FIND $root -exec $TOUCH -d '2019-01-15 11:20' '{}' +
     performStore
-    find $root -exec touch -d '2019-02-23 12:10' '{}' +
+    $FIND $root -exec $TOUCH -d '2019-02-23 12:10' '{}' +
     performStore
-    find $root -exec touch -d '2019-02-27 10:02' '{}' +
+    $FIND $root -exec $TOUCH -d '2019-02-27 10:02' '{}' +
     performStore
-    find $root -exec touch -d '2019-03-01 07:07' '{}' +
+    $FIND $root -exec $TOUCH -d '2019-03-01 07:07' '{}' +
     performStore
-    find $root -exec touch -d '2019-03-12 03:21' '{}' +
+    $FIND $root -exec $TOUCH -d '2019-03-12 03:21' '{}' +
     performStore
-    find $root -exec touch -d '2019-03-15 17:32' '{}' +
+    $FIND $root -exec $TOUCH -d '2019-03-15 17:32' '{}' +
     performStore
-    find $root -exec touch -d '2019-03-16 17:33' '{}' +
+    $FIND $root -exec $TOUCH -d '2019-03-16 17:33' '{}' +
     performStore
-    find $root -exec touch -d '2019-03-17 16:00' '{}' +
+    $FIND $root -exec $TOUCH -d '2019-03-17 16:00' '{}' +
     performStore
-    find $root -exec touch -d '2019-03-18 14:22' '{}' +
+    $FIND $root -exec $TOUCH -d '2019-03-18 14:22' '{}' +
     performStore
-    find $root -exec touch -d '2019-03-19 10:00' '{}' +
+    $FIND $root -exec $TOUCH -d '2019-03-19 10:00' '{}' +
     performStore
-    find $root -exec touch -d '2019-03-19 12:00' '{}' +
+    $FIND $root -exec $TOUCH -d '2019-03-19 12:00' '{}' +
     performStore
-    find $root -exec touch -d '2019-03-19 22:00' '{}' +
+    $FIND $root -exec $TOUCH -d '2019-03-19 22:00' '{}' +
     performStore
-    find $root -exec touch -d '2019-03-20 01:01' '{}' +
+    $FIND $root -exec $TOUCH -d '2019-03-20 01:01' '{}' +
     performStore
-    find $root -exec touch -d '2019-03-20 02:02' '{}' +
+    $FIND $root -exec $TOUCH -d '2019-03-20 02:02' '{}' +
     performStore
-    find $root -exec touch -d '2019-03-20 03:03' '{}' +
+    $FIND $root -exec $TOUCH -d '2019-03-20 03:03' '{}' +
     performStore
-    find $root -exec touch -d '2019-03-20 10:10' '{}' +
+    $FIND $root -exec $TOUCH -d '2019-03-20 10:10' '{}' +
     performStore
     performFsckExpectOK
-    COUNTBEFORE=$(ls $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    COUNTBEFORE=$($LS $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
     if [ ! "$COUNTBEFORE" = "25" ]
     then
         echo Oups! Expected there to be 25 points in time, but found $COUNTBEFORE
@@ -905,7 +946,7 @@ if [ $do_test ]; then
         exit 1
     fi
     performFsckExpectOK
-    COUNTAFTER=$(ls $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    COUNTAFTER=$($LS $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
     if [ ! "$COUNTAFTER" = "22" ]
     then
         echo Oups! Expected there to be 15 points in time after prune, but found $COUNTAFTER
@@ -926,7 +967,7 @@ if [ $do_test ]; then
         exit 1
     fi
     performFsckExpectOK
-    COUNTAFTER=$(ls $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    COUNTAFTER=$($LS $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
     if [ ! "$COUNTAFTER" = "4" ]
     then
         echo Oups! Expected there to be 4 points in time after prune, but found $COUNTAFTER
@@ -948,7 +989,7 @@ if [ $do_test ]; then
         exit 1
     fi
     performFsckExpectOK
-    COUNTAFTER=$(ls $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    COUNTAFTER=$($LS $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
     if [ ! "$COUNTAFTER" = "2" ]
     then
         echo Oups! Expected there to be 2 points in time after prune, but found $COUNTAFTER
@@ -970,7 +1011,7 @@ if [ $do_test ]; then
         exit 1
     fi
     performFsckExpectOK
-    COUNTAFTER=$(ls $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
+    COUNTAFTER=$($LS $store/beak_z_*.gz | wc | tr -s ' ' | cut -f 2 -d ' ')
     if [ ! "$COUNTAFTER" = "1" ]
     then
         echo Oups! Expected there to be 1 points in time after prune, but found $COUNTAFTER
@@ -984,7 +1025,7 @@ setup prune_with_future_date_files "Check that prune gracefully fails when stora
 if [ $do_test ]; then
     mkdir -p $root/Alfa
     echo HEJSAN > $root/Alfa/largefile
-    find $root -exec touch -d '+10 days minutes' '{}' +
+    $FIND $root -exec $TOUCH -d '+10 days minutes' '{}' +
     performStore "--relaxtimechecks"
     performPrune "--yesprune -k 'all:forever'"
     CHECK=$(cat $log | tr -d '\n' | tr -s ' ' | grep -o "Cowardly refusing")
@@ -1154,7 +1195,7 @@ if [ $do_test ]; then
 fi
 
 function filterCheck {
-    F=$(cd $check; find . -printf "%p ")
+    F=$(cd $check; $FIND . -printf "%p ")
     if [ "$F" != ". ./Beta ./Beta/delta " ]; then
         echo Failed filter test $1! Check in $dir for more information.
         exit 1
@@ -1223,7 +1264,7 @@ if [ $do_test ]; then
     mkdir -p $root/Gamma
     echo HEJSAN > $root/Gamma/Delta
     echo HEJSAN > $root/Gamma/Tau
-    chmod a-w $root/Gamma
+    $CHMOD a-w $root/Gamma
     performStore --tarheader=full
     standardStoreUntarTest
     cleanCheck
@@ -1243,12 +1284,12 @@ if [ $do_test ]; then
     mkdir -p $root/Gamma
     echo HEJSAN > $root/Gamma/Delta
     echo HEJSAN > $root/Gamma/Tau
-    chmod a-w $root/Gamma
+    $CHMOD a-w $root/Gamma
     performStore
     standardStoreRestoreTest
-    chmod u+w $root/Gamma
+    $CHMOD u+w $root/Gamma
     echo HEJSAN > $root/Gamma/Ypsilon
-    chmod u-w $root/Gamma
+    $CHMOD u-w $root/Gamma
     performStore
     standardStoreRestoreTest
     cleanCheck
@@ -1263,12 +1304,12 @@ if [ $do_test ]; then
     echo HEJSAN > $root/Beta
     mkdir -p $root/Gamma
     echo HEJSAN > $root/Gamma/Delta
-    chmod a-w $root/Gamma/Delta
+    $CHMOD a-w $root/Gamma/Delta
     performStore
 #    standardStoreRestoreTest
-    chmod u+w $root/Gamma/Delta
+    $CHMOD u+w $root/Gamma/Delta
     echo HEJSAN > $root/Gamma/Delta
-    chmod u-w $root/Gamma/Delta
+    $CHMOD u-w $root/Gamma/Delta
     performStore
 #    standardStoreRestoreTest
     cleanCheck
@@ -1309,12 +1350,12 @@ if [ $do_test ]; then
     echo HEJSAN > $root/TEXTS/skrifter.zip
     echo HEJSAN > $root/TEXTS/skrifter/alfa
     echo HEJSAN > $root/TEXTS/skrifter/beta
-    touch -d "2 hours ago" $root/TEXTS/skrifter.zip $root/TEXTS/skrifter/alfa $root/TEXTS/skrifter/beta $root/TEXTS/skrifter
+    $TOUCH -d "2 hours ago" $root/TEXTS/skrifter.zip $root/TEXTS/skrifter/alfa $root/TEXTS/skrifter/beta $root/TEXTS/skrifter
     mkdir -p $root/libtar/.git
     echo HEJSAN > $root/libtar/.git/config
     echo HEJSAN > $root/libtar/.git/hooks
     echo HEJSAN > $root/libtar/.gitignore
-    touch -d "2 hours ago" $root/libtar/.git/config $root/libtar/.git/hooks $root/libtar/.gitignore $root/libtar/.git
+    $TOUCH -d "2 hours ago" $root/libtar/.git/config $root/libtar/.git/hooks $root/libtar/.gitignore $root/libtar/.git
 
     performStore --tarheader=full
     standardStoreUntarTest
@@ -1329,21 +1370,21 @@ if [ $do_test ]; then
 fi
 
 function mtimeTestPart1 {
-    (cd $mount; find . -exec ls -ld \{\} \; > $org)
+    (cd $mount; $FIND . -exec $LS -ld \{\} \; > $org)
     stopMount
-    touch -d "2015-03-03 03:03:03.1235" $root/beta/zz
+    $TOUCH -d "2015-03-03 03:03:03.1235" $root/beta/zz
     startMountTest mtimeTestPart2 "--depth 1"
 }
 
 function mtimeTestPart2 {
-    (cd $mount; find . -exec ls -ld \{\} \; > $dest)
+    (cd $mount; $FIND . -exec $LS -ld \{\} \; > $dest)
     cat $org | sed 's/beak_.*//' > ${org}.1
     cat $dest | sed 's/beak_.*//' > ${dest}.1
     rc=$(diff -d ${org}.1 ${dest}.1)
 
     if [ "$rc" != "" ]; then
         echo "****$rc****"
-        echo Comparison should be empty since the nanoseconds do not show in ls -ld.
+        echo Comparison should be empty since the nanoseconds do not show in $LS -ld.
         echo Check in $dir for more information.
         exit 1
     fi
@@ -1370,21 +1411,21 @@ if [ $do_test ]; then
     echo HEJSAN > $root/alfa/yy
     echo HEJSAN > $root/beta/zz
     echo HEJSAN > $root/beta/ww
-    touch -d "2015-03-03 03:03:03.1234" $root/alfa/* $root/beta/* $root/alfa $root/beta $root
+    $TOUCH -d "2015-03-03 03:03:03.1234" $root/alfa/* $root/beta/* $root/alfa $root/beta $root
     startMountTest mtimeTestPart1 "--depth 1"
     echo OK
 fi
 
 
 function timestampHashTest1 {
-    rc1=$(ls $mount/TJO/beak_s_*.tar)
+    rc1=$($LS $mount/TJO/beak_s_*.tar)
     stopMount
-    touch -d "2015-03-03 03:03:03.1235" $root/TJO/alfa
+    $TOUCH -d "2015-03-03 03:03:03.1235" $root/TJO/alfa
     startMountTest timestampHashTest2
 }
 
 function timestampHashTest2 {
-    rc2=$(ls $mount/TJO/beak_s_*.tar)
+    rc2=$($LS $mount/TJO/beak_s_*.tar)
     if [ "$rc1" = "$rc2" ]; then
         echo "$rc1"
         echo Change in timestamp should change the virtual tar file name!
@@ -1404,7 +1445,7 @@ function timestampHashTest2 {
 setup mtime_hash "check that timestamps influence file hash"
 if [ $do_test ]; then
     mkdir -p $root/TJO
-    touch -d "2015-03-03 03:03:03.1234" $root/TJO/alfa $root/TJO $root
+    $TOUCH -d "2015-03-03 03:03:03.1234" $root/TJO/alfa $root/TJO $root
     startMountTest timestampHashTest1
     echo OK
 fi
@@ -1462,8 +1503,8 @@ function percentageTest {
         echo Failed percentage integrity test $1! Check in $dir for more information.
         exit 1
     fi
-    if [[ $(find "$dir/test_root.txt" -type f -size +200c 2>/dev/null) ]] ||
-       [[ $(find "$dir/test_mount.txt" -type f -size +200c 2>/dev/null) ]] ; then
+    if [[ $($FIND "$dir/test_root.txt" -type f -size +200c 2>/dev/null) ]] ||
+       [[ $($FIND "$dir/test_mount.txt" -type f -size +200c 2>/dev/null) ]] ; then
         echo Percentage in filename was not handled properly! Check in $dir for more information.
         exit 1
     fi
@@ -1568,15 +1609,15 @@ if [ $do_test ]; then
 fi
 
 function noAvalancheTestPart1 {
-    (cd $mount; find . -exec ls -ld \{\} \; > $org)
+    (cd $mount; $FIND . -exec $LS -ld \{\} \; > $org)
     stopMount
     dd if=/dev/zero of="$root/s200" bs=1024 count=60 > /dev/null 2>&1
-    touch -d "2015-03-03 03:03:03.1235" "$root/s200"
+    $TOUCH -d "2015-03-03 03:03:03.1235" "$root/s200"
     startMountTest noAvalancheTestPart2 "-ta 1M -tr 1M"
 }
 
 function noAvalancheTestPart2 {
-    (cd $mount; find . -exec ls -ld \{\} \; > $dest)
+    (cd $mount; $FIND . -exec $LS -ld \{\} \; > $dest)
     diff $org $dest | grep \< > ${org}.1
     diff $org $dest | grep \> > ${org}.2
 
@@ -1595,15 +1636,15 @@ setup no_avalanche "Test that added file does not create avalanche"
 if [ $do_test ]; then
     for i in s{1..199}; do
         dd if=/dev/zero of="$root/$i" bs=1024 count=60 > /dev/null 2>&1
-        touch -d "2015-03-03 03:03:03.1234" "$root/$i"
+        $TOUCH -d "2015-03-03 03:03:03.1234" "$root/$i"
     done
     for i in m{1..49}; do
         dd if=/dev/zero of="$root/$i" bs=1024 count=400 > /dev/null 2>&1
-        touch -d "2015-03-03 03:03:03.1234" "$root/$i"
+        $TOUCH -d "2015-03-03 03:03:03.1234" "$root/$i"
     done
     for i in l{1..2}; do
         dd if=/dev/zero of="$root/$i" bs=1024 count=10240 > /dev/null 2>&1
-        touch -d "2015-03-03 03:03:03.1234" "$root/$i"
+        $TOUCH -d "2015-03-03 03:03:03.1234" "$root/$i"
     done
     startMountTest noAvalancheTestPart1 "-ta 1M -tr 1M"
     echo OK
@@ -1629,7 +1670,7 @@ function expectOneBigR01Tar {
     untar "$mount"
     checkdiff
     checklsld_no_nanos
-    num=$(find $mount -name "beak_s_*.tar" | wc --lines)
+    num=$($FIND $mount -name "beak_s_*.tar" | wc -l)
     if [ "$num" != "1" ]; then
         echo Expected a single big beak_s_...tar! Check in $dir for more information.
         exit 1
@@ -1648,7 +1689,7 @@ function expect7Tar {
     untar "$mount"
     checkdiff
     checklsld_no_nanos
-    num=$(find $mount -name "beak_s_*.tar" | wc --lines)
+    num=$($FIND $mount -name "beak_s_*.tar" | wc -l)
 # Number of tars depend on the randomly generated file structure....
     stopMount
 }
@@ -1679,7 +1720,7 @@ fi
 
 function pointInTimeTestPart1 {
     cp -r "$mount"/* "$packed"
-    chmod -R u+w "$packed"/*
+    $CHMOD -R u+w "$packed"/*
     stopMount nook
     dd if=/dev/zero of="$root/s200" bs=1024 count=60 > /dev/null 2>&1
     startMountTest pointInTimeTestPart2 --tarheader=full
@@ -1687,7 +1728,7 @@ function pointInTimeTestPart1 {
 
 function pointInTimeTestPart2 {
     cp -r "$mount"/* "$packed"
-    chmod -R u+w "$packed"/*
+    $CHMOD -R u+w "$packed"/*
     stopMount nook
     startMountTestArchive pointInTimeTestPart3 "@0"
 }

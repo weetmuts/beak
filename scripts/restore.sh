@@ -381,7 +381,7 @@ do
         num=$((0x$numx))
         disksize=$(echo "$tar_file" | $SED 's/.*_\([0-9]\+\)\.tar/\1/')
         size=$(echo "$tar_file" | $SED 's/.*_\([0-9]\+\)_[0-9]\+\.tar/\1/')
-        partnrwidth=$(echo -n $numx | wc --c)
+        partnrwidth=$(echo -n $numx | wc -c)
 
         if [ "$(echo "$last_file" | grep -o "$prefix")" = "$prefix" ]
         then
