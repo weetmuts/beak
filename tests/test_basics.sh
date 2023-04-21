@@ -121,7 +121,7 @@ then
     UMOUNT=umount
 fi
 
-TESTMOUNT=false
+TESTMOUNT=true
 
 KEXTSTAT=$(whereis -b kextstat 2>/dev/null)
 if [ "$KEXTSTAT" != "" ]
