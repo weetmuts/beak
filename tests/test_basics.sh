@@ -126,7 +126,7 @@ TESTMOUNT=true
 KEXTSTAT=$(whereis -b kextstat 2>/dev/null)
 if [ "$KEXTSTAT" != "" ]
 then
-    MACFUSE_LOADED=$(kextstat 2>/dev/null | grep -o io.macfuse || true)
+    MACFUSE=$(kextstat 2>/dev/null | grep -o io.macfuse || true)
     if [ "$MACFUSE" != "io.macfuse" ]
     then
         TESTMOUNT=false
