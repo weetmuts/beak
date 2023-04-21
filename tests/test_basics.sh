@@ -115,10 +115,22 @@ then
 else
     IS_MAC=false
 fi
-	 
+
 if ! command umount 2>/dev/null
 then
     UMOUNT=umount
+fi
+
+TESTMOUNT=false
+
+KEXTSTAT=$(whereis -b kextstat 2>/dev/null)
+if [ "$KEXTSTAT" != "" ]
+then
+    MACFUSE_LOADED=$(kextstat 2>/dev/null | grep -o io.macfuse || true)
+    if [ "$MACFUSE" != "io.macfuse" ]
+    then
+        TESTMOUNT=false
+    fi
 fi
 
 THIS_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
@@ -266,113 +278,134 @@ function performDiffInsideBackup {
 }
 
 function startMountTest {
-    run="$1"
-    extra="$2"
-    if [ -z "$test" ]; then
-        # Normal test execution, spawn the beakfs fuse daemon
-        eval "${BEAK} bmount $extra $root $mount > $log"
-        # Then run the test
-        ${run}
-    else
-        if [ -z "$gdb" ]; then
-            # Running a chosen test, we want to see the debug output from beak.
-            # Spawn the daemon in foreground, delay start of the test by 2 seconds.
-            (sleep 2; eval ${run}) &
-            eval "${BEAK} bmount -f $extra $root $mount 2>&1 | tee $log &"
+    if [ "$TESTMOUNT" = "true" ]
+    then
+        run="$1"
+        extra="$2"
+        if [ -z "$test" ]; then
+            # Normal test execution, spawn the beakfs fuse daemon
+            eval "${BEAK} bmount $extra $root $mount > $log"
+            # Then run the test
+            ${run}
         else
-            # Running a chosen test in gdb. The gdb session must be in the foreground.
-            # Delay start of the test by 3 seconds.
-            (sleep 3; eval ${run}) &
-            eval "gdb -ex=r --args ${BEAK} bmount -f $extra $root $mount"
+            if [ -z "$gdb" ]; then
+                # Running a chosen test, we want to see the debug output from beak.
+                # Spawn the daemon in foreground, delay start of the test by 2 seconds.
+                (sleep 2; eval ${run}) &
+                eval "${BEAK} bmount -f $extra $root $mount 2>&1 | tee $log &"
+            else
+                # Running a chosen test in gdb. The gdb session must be in the foreground.
+                # Delay start of the test by 3 seconds.
+                (sleep 3; eval ${run}) &
+                eval "gdb -ex=r --args ${BEAK} bmount -f $extra $root $mount"
+            fi
         fi
     fi
 }
 
 function startMountTestArchive {
-    run="$1"
-    point="$2"
-    if [ -z "$test" ]; then
-        ${BEAK} mount ${packed}${point} $check > $log
-        ${run}
-    else
-        if [ -z "$gdb" ]; then
-            (sleep 2; eval ${run}) &
-            ${BEAK} mount -f ${packed}${point} $check 2>&1 | tee $log &
+    if [ "$TESTMOUNT" = "true" ]
+    then
+        run="$1"
+        point="$2"
+        if [ -z "$test" ]; then
+            ${BEAK} mount ${packed}${point} $check > $log
+            ${run}
         else
-            (sleep 3; eval ${run}) &
-            gdb -ex=r --args ${BEAK} mount -f ${packed}${point} $check
+            if [ -z "$gdb" ]; then
+                (sleep 2; eval ${run}) &
+                ${BEAK} mount -f ${packed}${point} $check 2>&1 | tee $log &
+            else
+                (sleep 3; eval ${run}) &
+                gdb -ex=r --args ${BEAK} mount -f ${packed}${point} $check
+            fi
         fi
     fi
 }
 
 function startMountTestExpectFail {
-    run="$1"
-    extra="$2"
-    env="$3"
-    if [ -z "$test" ]; then
-        "$env" ${BEAK} bmount $extra $root $mount > $log 2>&1
-        ${run}
-    else
-        if [ -z "$gdb" ]; then
-            (sleep 2; eval ${run}) &
-            "$env" ${BEAK} bmount -f $extra $root $mount 2>&1 | tee $log &
+    if [ "$TESTMOUNT" = "true" ]
+    then
+        run="$1"
+        extra="$2"
+        env="$3"
+        if [ -z "$test" ]; then
+            "$env" ${BEAK} bmount $extra $root $mount > $log 2>&1
+            ${run}
         else
-            (sleep 3; eval ${run}) &
-            gdb -ex=r --args "$env" ${BEAK} bmount -f $extra $root $mount
+            if [ -z "$gdb" ]; then
+                (sleep 2; eval ${run}) &
+                "$env" ${BEAK} bmount -f $extra $root $mount 2>&1 | tee $log &
+            else
+                (sleep 3; eval ${run}) &
+                gdb -ex=r --args "$env" ${BEAK} bmount -f $extra $root $mount
+            fi
         fi
     fi
 }
 
 function stopMount {
-    (cd $mount; $FIND . -exec $LS -ld \{\} \; >> $log)
-    $UMOUNT $mount
-    if [ -n "$test" ]; then
-        sleep 2
+    if [ "$TESTMOUNT" = "true" ]
+    then
+        (cd $mount; $FIND . -exec $LS -ld \{\} \; >> $log)
+        $UMOUNT $mount
+        if [ -n "$test" ]; then
+            sleep 2
+        fi
     fi
 }
 
 function stopMountArchive {
-    (cd $check; $FIND . -exec $LS -ld \{\} \; >> $log)
-    $UMOUNT $check
-    if [ -n "$test" ]; then
-        sleep 2
+    if [ "$TESTMOUNT" = "true" ]
+    then
+        (cd $check; $FIND . -exec $LS -ld \{\} \; >> $log)
+        $UMOUNT $check
+        if [ -n "$test" ]; then
+            sleep 2
+        fi
     fi
 }
 
 function startTwoFS {
-    run="$1"
-    extra="$2"
-    point="$3"
-    if [ -z "$test" ]; then
-        ${BEAK} bmount $extra $root $mount > $log
-        sleep 2
-        ${BEAK} mount ${mount}${point} $mountreverse > $log
-        ${run}
-    else
-        if [ -z "$gdb" ]; then
-            (sleep 4; eval ${run}) &
-            ${BEAK} bmount $extra $root $mount 2>&1 | tee $log &
-            sleep 2
-            ${BEAK} mount -f ${mount}${point} $mountreverse 2>&1 | tee $logreverse &
-        else
-            (sleep 5; eval ${run}) &
+    if [ "$TESTMOUNT" = "true" ]
+    then
+        run="$1"
+        extra="$2"
+        point="$3"
+        if [ -z "$test" ]; then
             ${BEAK} bmount $extra $root $mount > $log
             sleep 2
-            gdb -ex=r --args ${BEAK} mount -f ${mount}${point} $mountreverse
+            ${BEAK} mount ${mount}${point} $mountreverse > $log
+            ${run}
+        else
+            if [ -z "$gdb" ]; then
+                (sleep 4; eval ${run}) &
+                ${BEAK} bmount $extra $root $mount 2>&1 | tee $log &
+                sleep 2
+                ${BEAK} mount -f ${mount}${point} $mountreverse 2>&1 | tee $logreverse &
+            else
+                (sleep 5; eval ${run}) &
+                ${BEAK} bmount $extra $root $mount > $log
+                sleep 2
+                gdb -ex=r --args ${BEAK} mount -f ${mount}${point} $mountreverse
+            fi
         fi
     fi
 }
 
 function stopTwoFS {
-    (cd $mount; $FIND . -exec $LS -ld \{\} \; >> $log)
-    (cd $mountreverse; $FIND . -exec $LS -ld \{\} \; >> $logreverse)
-    $UMOUNT $mountreverse
-    $UMOUNT $mount
-    if [ -n "$test" ]; then
-        sleep 2
-    fi
-    if [ "$1" != "nook" ]; then
-        echo OK
+    if [ "$TESTMOUNT" = "true" ]
+    then
+        (cd $mount; $FIND . -exec $LS -ld \{\} \; >> $log)
+        (cd $mountreverse; $FIND . -exec $LS -ld \{\} \; >> $logreverse)
+        $UMOUNT $mountreverse
+        $UMOUNT $mount
+        if [ -n "$test" ]; then
+            sleep 2
+        fi
+        if [ "$1" != "nook" ]; then
+            echo OK
+        fi
     fi
 }
 
@@ -434,10 +467,13 @@ function standardStoreRestoreTest {
 }
 
 function compareStoreAndMount {
-    diff -rq $store $mount
-    if [ $? -ne 0 ]; then
-        echo Store and Mount generated different beak filesystems! Check in $dir for more information.
-        exit 1
+    if [ "$TESTMOUNT" = "true" ]
+    then
+        diff -rq $store $mount
+        if [ $? -ne 0 ]; then
+            echo Store and Mount generated different beak filesystems! Check in $dir for more information.
+            exit 1
+        fi
     fi
 }
 
@@ -1781,3 +1817,8 @@ fi
 #fi
 
 echo All tests succeeded!
+
+if [ "$TESTMOUNT" != "true" ]
+then
+    echo "However the mount tests could not be run!"
+fi
