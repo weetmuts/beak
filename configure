@@ -4580,6 +4580,10 @@ else
     with_openssl=$(realpath ${with_openssl})
     OPENSSL_CFLAGS="-I${with_openssl}/include -DOPENSSL_API_COMPAT=0x10100000L"
     OPENSSL_LIBS="${with_openssl}/lib/libcrypto.a"
+    if ! test -r ${with_openssl}/include/openssl/sha.h
+    then
+        as_fn_error $? "Expected openssl/sha.h to be find!" "$LINENO" 5
+    fi
     { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: using ${with_openssl}" >&5
 printf "%s\n" "using ${with_openssl}" >&6; }
 fi

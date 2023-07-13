@@ -178,6 +178,10 @@ else
     with_openssl=$(realpath ${with_openssl})
     OPENSSL_CFLAGS="-I${with_openssl}/include -DOPENSSL_API_COMPAT=0x10100000L"
     OPENSSL_LIBS="${with_openssl}/lib/libcrypto.a"
+    if ! test -r ${with_openssl}/include/openssl/sha.h
+    then
+        AC_MSG_ERROR([Expected openssl/sha.h to be find!])
+    fi
     AC_MSG_RESULT([using ${with_openssl}])
 fi
 
