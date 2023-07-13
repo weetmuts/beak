@@ -99,10 +99,10 @@ RC BeakImplementation::fsck(Settings *settings, Monitor *monitor)
                 }
             }
             if (missing) {
-                warning(FSCK, "Broken %s\n", i.datetime.c_str());
+                info(FSCK, "Broken %s\n", i.datetime.c_str());
                 broken_points_in_time.push_back(Path::lookup(i.filename));
             } else {
-                warning(FSCK, "OK     %s\n", i.datetime.c_str());
+                info(FSCK, "OK     %s\n", i.datetime.c_str());
             }
         }
     } else {

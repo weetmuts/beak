@@ -8,6 +8,7 @@ stored backups between multiple client computers.
 | System       | Status        |
 | ------------ |:-------------:|
 | Ubuntu | [![Build Ubuntu Status](https://github.com/weetmuts/beak/workflows/Build%20Ubuntu/badge.svg)](https://github.com/weetmuts/beak/actions)|
+| Ubuntu | [![Build MacOS Status](https://github.com/weetmuts/beak/workflows/Build%20MacOS/badge.svg)](https://github.com/weetmuts/beak/actions)|
 
 ## Summary
 
@@ -42,6 +43,8 @@ into a normalized structure:
 ```
 This normalized structure will also contain thumbnails and html files
 which makes it easy to browse the content without a specific program.
+
+A second binary `beak-media` is linked to all media libraries necessary to perform this import.
 
 ## Short short manual
 
@@ -269,12 +272,12 @@ When you import media using for example: `(mkdir TempDir; cd TempDir; gphoto2 --
 You get a lot of media files with names that are dependent on the camera that took them.
 To normalize the images and videos before you backup them, do:
 ```
-beak importmedia TempDir /home/you/Media
+beak-media import TempDir /home/you/Media
 ```
 
 Now generate thumbnails and index.html files to view your collection:
 ```
-beak indexmedia /home/you/Media
+beak-media index /home/you/Media
 ```
 
 Then you can do:
@@ -309,21 +312,22 @@ For example:
 /home/you/Work/gamesrc/a lot of files and subdirectories
 /home/you/Work/only the two subdirectories above.
 becomes
-/home/you/Work/rclonesrc/s01[...]tar y01.tar z01[...]gz
-/home/you/Work/gamesrc/s01[...]tar y01[...]tar z01[...]gz
-/home/you/Work/y01[...]tar z01[...]gz
+/home/you/Work/rclonesrc/beak_[...]tar beak_z_[...]gz
+/home/you/Work/gamesrc/beak_[...]tar beak_z[...]gz
+/home/you/Work/beak_z_[...]gz
 ```
 
-The order and selection of the chunky directories is deterministic (and depth first),
-which means that as long as you do not modify the contents of the
-_origin_ directory, then the created virtual chunky file system will
-be the same.
+The order and selection of the chunky directories is deterministic
+(and depth first), which means that as long as you do not modify the
+contents of the _origin_ directory, then the created virtual chunky
+file system will be the same.
 
 The index provides for quick access to the contents of the chunks.  As
 a precaution, the chunks also happen to be valid GNU tar files.  If
 the index file is lost, then it is still possible to extract the data
 using tar.  Tthere is a shell script that can do the proper
 extraction for you, you do not need the beak binary.
+Also a chunked directory is by itself a self-contained backup.
 
 Why discuss the storage format? Because the storage format _is_ the
 backup system.  There are no other meta-data files needed. Try:

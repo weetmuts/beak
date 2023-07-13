@@ -221,7 +221,7 @@ void usageError(ComponentId ci, const char* fmt, ...) {
     }
     va_end(args);
     va_start(args, fmt);
-    vfprintf(stdout, fmt, args);
+    vfprintf(stderr, fmt, args);
     va_end(args);
     exit(1);
 }
@@ -246,7 +246,7 @@ void warning(ComponentId ci, const char* fmt, ...) {
         va_end(args);
     }
     va_start(args, fmt);
-    vfprintf(stdout, fmt, args);
+    vfprintf(stderr, fmt, args);
     va_end(args);
 }
 
@@ -267,8 +267,8 @@ void logDebug(ComponentId ci, const char* fmt, ...) {
 	    syslog(LOG_INFO, "(%s) ", all_components_[ci]);
             vsyslog(LOG_DEBUG, fmt, args);
         } else {
-	    fprintf(stdout, "(%s) ", all_components_[ci]);
-            vfprintf(stdout, fmt, args);
+	    fprintf(stderr, "(%s) ", all_components_[ci]);
+            vfprintf(stderr, fmt, args);
         }
         va_end(args);
     }
@@ -284,8 +284,8 @@ void logTrace(ComponentId ci, const char* fmt, ...) {
 	    syslog(LOG_INFO, "(%s) ", all_components_[ci]);
             vsyslog(LOG_DEBUG, fmt, args);
         } else {
-	    fprintf(stdout, "(%s) ", all_components_[ci]);
-            vfprintf(stdout, fmt, args);
+	    fprintf(stderr, "(%s) ", all_components_[ci]);
+            vfprintf(stderr, fmt, args);
         }
         va_end(args);
     }
@@ -302,7 +302,7 @@ void logVerbose(ComponentId ci, const char* fmt, ...) {
             va_end(args);
         }
         va_start(args, fmt);
-        vfprintf(stdout, fmt, args);
+        vfprintf(stderr, fmt, args);
         va_end(args);
     }
 }

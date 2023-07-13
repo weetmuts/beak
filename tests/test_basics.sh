@@ -60,6 +60,7 @@ checkpack=""
 check=""
 
 log=""
+log_stderr=""
 org=""
 dest=""
 do_test=""
@@ -158,6 +159,7 @@ function setup {
         check=$dir/Check
         packed=$dir/Packed
         log=$dir/log.txt
+        log_stderr=$dir/log_stderr.txt
         logreverse=$dir/logreverse.txt
         org=$dir/org.txt
         dest=$dir/dest.txt
@@ -175,7 +177,7 @@ function performStore {
     extra="$1"
     if [ -z "$test" ]; then
         # Normal test execution, execute the store
-        eval "${BEAK} store $extra $root $store > $log"
+        eval "${BEAK} store $extra $root $store > $log 2> $log_stderr"
     else
         if [ -z "$gdb" ]; then
             ${BEAK} store --log=all $extra $root $store 2>&1 | tee $log
@@ -225,7 +227,7 @@ function performDiff {
     extra="$1"
     if [ -z "$test" ]; then
         # Normal test execution, execute the store
-        eval "${BEAK} diff $extra ${store} ${root} > $diff"
+        eval "${BEAK} diff $extra ${store} ${root} > $diff 2> $log_stderr"
     else
         if [ -z "$gdb" ]; then
             ${BEAK} diff --log=all $extra ${store} ${root} 2>&1 | tee $diff
@@ -239,7 +241,7 @@ function performPrune {
     extra="$1"
     if [ -z "$test" ]; then
         # Normal test execution, execute the prune
-        eval "${BEAK} prune $extra ${store} > $log"
+        eval "${BEAK} prune $extra ${store} > $log 2> $log_stderr"
     else
         if [ -z "$gdb" ]; then
             ${BEAK} prune --log=all $extra ${store} 2>&1 | tee $log
@@ -612,7 +614,7 @@ if [ $do_test ]; then
     echo HEJSAN > $root/Alfa/file_from_the_future
     $TOUCH -d '2030-01-01' $root/Alfa/file_from_the_future
     performStore
-    CHECK=$(cat $log | $TR -d '\n' | $TR -s ' ' | grep -o "Cowardly refusing")
+    CHECK=$(cat $log_stderr | $TR -d '\n' | $TR -s ' ' | grep -o "Cowardly refusing")
     if [ ! "$CHECK" = "Cowardly refusing" ]; then
         echo ---------------------
         cat $log
@@ -784,9 +786,11 @@ if [ $do_test ]; then
     rm -rf $root/Alfa/Gamma
     performDiff "--depth 1"
     CHECK=$(cat $diff | $TR -d '\n' | $TR -s ' ')
-    if [ ! "$CHECK" = "Alfa/Gamma/... dir removed 3 sources removed (c,h,bas) 1 other file removed (...)" ]; then
+    EXPECTS="Alfa/Gamma/... dir removed 3 sources removed (bas,c,h) 1 other file removed (...)"
+    if [ ! "$CHECK" =  "$EXPECTS" ]; then
         cat $diff
-        echo CHECK=\"${CHECK}\"
+        echo "  CHECK=\"${CHECK}\""
+        echo "EXPECTS=\"${EXPECTS}\""
         echo Failed beak diff! Expected Alfa/Gamma removed. Check in $dir for more information.
         exit 1
     fi
@@ -808,11 +812,13 @@ if [ $do_test ]; then
     echo SVEJSAN > $ALFA/xyzzy
     performFsck
     CHECK=$(cat $log | grep -o -E 'Broken|OK' | $TR -d '\n' | $TR -s ' ')
-    if [ ! "$CHECK" = "BrokenBrokenOK" ]; then
+    EXPECTS="BrokenBrokenOK"
+    if [ ! "$CHECK" = "$EXPECTS" ]; then
         echo ----------------
         cat $dest
         echo ----------------
-        echo "CHECK=\"$CHECK\""
+        echo "CHECK  =\"$CHECK\""
+        echo "EXPECTS=\"$EXPECTS\""
         echo Failed beak fsck! Expected two broken and one ok. Check in $dir for more information.
         exit 1
     fi
