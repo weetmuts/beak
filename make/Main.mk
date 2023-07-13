@@ -31,8 +31,13 @@ TYPE:=debug
 STRIP_COMMAND:=true
 endif
 
+ifeq (asan,$(findstring asan,$(MAKECMDGOALS)))
+TYPE:=asan
+STRIP_COMMAND:=true
+endif
+
 ifeq ($(TYPE),)
-    $(error You must specify "make release" or "make debug")
+    $(error You must specify "make release" or "make debug" or "make asan")
 endif
 
 $(shell mkdir -p $(OUTPUT_ROOT)/$(TYPE))
@@ -154,7 +159,7 @@ release debug:
 	rm -f $(OUTPUT_ROOT)/$(TYPE)/generated_filetypes.h
 else
 # Build!
-release debug: $(BINARIES) $(EXTRA_LIBS)
+release debug asan: $(BINARIES) $(EXTRA_LIBS)
 ifeq ($(PLATFORM),winapi)
 	cp $(OUTPUT_ROOT)/$(TYPE)/beak $(OUTPUT_ROOT)/$(TYPE)/beak.exe
         cp $(OUTPUT_ROOT)/$(TYPE)/testinternals $(OUTPUT_ROOT)/$(TYPE)/testinternals.exe

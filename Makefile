@@ -1,4 +1,5 @@
-# Copyright (C) 2017-2019 Fredrik Öhrström
+#
+# Copyright (C) 2017-2023 Fredrik Öhrström
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -74,10 +75,11 @@ endif
 all: release
 
 help:
-	@echo "Usage: make (release|debug|clean|clean-all)"
+	@echo "Usage: make (release|debug|asan|clean|clean-all)"
 	@echo "       if you have both linux64, winapi64 and arm32 configured builds,"
 	@echo "       then add linux64, winapi64 or arm32 to build only for that particular host."
 	@echo "E.g.:  make debug winapi64"
+	@echo "E.g.:  make asan linux64"
 	@echo "       make release linux64"
 
 BUILDDIRS:=$(dir $(realpath $(wildcard build/*/spec.mk)))
@@ -112,23 +114,31 @@ debug:
 	@echo Building debug for $(words $(BUILDDIRS)) host\(s\).
 	@for x in $(BUILDDIRS); do echo; echo Bulding $$(basename $$x) ; $(MAKE) --no-print-directory -C $$x debug ; done
 
+asan:
+	@echo Building asan for $(words $(BUILDDIRS)) host\(s\).
+	@for x in $(BUILDDIRS); do echo; echo Bulding $$(basename $$x) ; $(MAKE) --no-print-directory -C $$x asan ; done
+
 lcov:
 	@echo Generating code coverage $(words $(BUILDDIRS)) host\(s\).
 	@for x in $(BUILDDIRS); do echo; echo Bulding $$(basename $$x) ; $(MAKE) --no-print-directory -C $$x debug lcov ; done
 
-test: test_release
+test: testr
 
-test_release:
+testr:
 	@echo Running tests on release
 	@for x in $(BUILDDIRS); do echo; ./test.sh $$x/release $(TEST) ; done
 
-test_debug:
-	@echo Running tests
+testd:
+	@echo Running tests on debug
 	@for x in $(BUILDDIRS); do echo; ./test.sh $$x/debug $(TEST) ; done
 
+testa:
+	@echo Running tests on asan
+	@for x in $(BUILDDIRS); do echo; ./test.sh $$x/asan $(TEST) ; done
+
 clean:
-	@echo Removing release and debug builds
-	@for x in $(BUILDDIRS); do echo; rm -rf $$x/release $$x/debug $$x/generated_autocomplete.h; done
+	@echo Removing release, debug and asan builds
+	@for x in $(BUILDDIRS); do echo; rm -rf $$x/release $$x/debug $$x/asan $$x/generated_autocomplete.h; done
 
 clean-all:
 	@echo Removing configuration and artifacts
@@ -155,7 +165,7 @@ arm32:
 
 winapi64:
 
-.PHONY: all release debug test test_release test_debug clean clean-all help linux64 winapi64 arm32
+.PHONY: all release debug asan test test_release test_debug clean clean-all help linux64 winapi64 arm32
 
 server:
 	(cd sdf; node ../templates/server.js)

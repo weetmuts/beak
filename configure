@@ -656,8 +656,12 @@ LDFLAGS_release
 LDFLAGSEND_debug
 LDFLAGSBEGIN_debug
 LDFLAGS_debug
+LDFLAGSEND_asan
+LDFLAGSBEGIN_asan
+LDFLAGS_asan
 CXXFLAGS_release
 CXXFLAGS_debug
+CXXFLAGS_asan
 CLANG
 ac_ct_CXX
 CXXFLAGS
@@ -2973,7 +2977,6 @@ else
 fi
 
 PKG_CONFIG="$(which pkg-config)"
-echo PKG_CONFIG=$PKG_CONFIG
 if test "$PKG_CONFIG" = ""; then
     PKG_CONFIG=/bin/false
     as_fn_error $? "You need pkg-config to build. Please install." "$LINENO" 5
@@ -5321,16 +5324,24 @@ fi
 
 CXXFLAGS="-DPLATFORM_${PLATFORM} ${CXXFLAGS_EXTRAS} -D${MNEMONIC} -Wall -Wno-error=deprecated-declarations -fmessage-length=0 -std=c++11 $GCC_EXTRA_CXXFLAGS -Wno-unused-function"
 
-CXXFLAGS_debug="-O0 -g ${ASAN_CFLAGS}
-CXXFLAGS_release="-Os
+CXXFLAGS_asan="-O0 -g ${ASAN_CFLAGS}"
+CXXFLAGS_debug="-O0 -g"
+CXXFLAGS_release="-Os"
 
 LDFLAGS=""
-LDFLAGS_debug="-g ${ASAN_LDFLAGS} ${MEDIA_LIBS}"
+LDFLAGS_asan="-g ${ASAN_LDFLAGS} ${MEDIA_LIBS}"
+LDFLAGS_debug="-g ${MEDIA_LIBS}"
 LDFLAGS_release="-Os"
+LDFLAGSEND_asan=""
+LDFLAGSBEGIN_asan="${ASAN_LIBS} ${MEDIA_LIBS}"
 LDFLAGSEND_debug=""
-LDFLAGSBEGIN_debug="${ASAN_LIBS} ${MEDIA_LIBS}"
+LDFLAGSBEGIN_debug="${MEDIA_LIBS}"
 
 CFLAGS=""
+
+
+
+
 
 
 

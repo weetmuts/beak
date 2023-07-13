@@ -69,7 +69,6 @@ else
 fi
 
 PKG_CONFIG="$(which pkg-config)"
-echo PKG_CONFIG=$PKG_CONFIG
 if test "$PKG_CONFIG" = ""; then
     PKG_CONFIG=/bin/false
     AC_MSG_ERROR([You need pkg-config to build. Please install.])
@@ -338,14 +337,18 @@ fi
 
 CXXFLAGS="-DPLATFORM_${PLATFORM} ${CXXFLAGS_EXTRAS} -D${MNEMONIC} -Wall -Wno-error=deprecated-declarations -fmessage-length=0 -std=c++11 $GCC_EXTRA_CXXFLAGS -Wno-unused-function"
 
-CXXFLAGS_debug="-O0 -g ${ASAN_CFLAGS}
-CXXFLAGS_release="-Os
+CXXFLAGS_asan="-O0 -g ${ASAN_CFLAGS}"
+CXXFLAGS_debug="-O0 -g"
+CXXFLAGS_release="-Os"
 
 LDFLAGS=""
-LDFLAGS_debug="-g ${ASAN_LDFLAGS} ${MEDIA_LIBS}"
+LDFLAGS_asan="-g ${ASAN_LDFLAGS} ${MEDIA_LIBS}"
+LDFLAGS_debug="-g ${MEDIA_LIBS}"
 LDFLAGS_release="-Os"
+LDFLAGSEND_asan=""
+LDFLAGSBEGIN_asan="${ASAN_LIBS} ${MEDIA_LIBS}"
 LDFLAGSEND_debug=""
-LDFLAGSBEGIN_debug="${ASAN_LIBS} ${MEDIA_LIBS}"
+LDFLAGSBEGIN_debug="${MEDIA_LIBS}"
 
 CFLAGS=""
 
@@ -354,9 +357,13 @@ AC_SUBST(CXX)
 AC_SUBST(LD)
 AC_SUBST(CFLAGS)
 AC_SUBST(CXXFLAGS)
+AC_SUBST(CXXFLAGS_asan)
 AC_SUBST(CXXFLAGS_debug)
 AC_SUBST(CXXFLAGS_release)
 AC_SUBST(LDFLAGS)
+AC_SUBST(LDFLAGS_asan)
+AC_SUBST(LDFLAGSBEGIN_asan)
+AC_SUBST(LDFLAGSEND_asan)
 AC_SUBST(LDFLAGS_debug)
 AC_SUBST(LDFLAGSBEGIN_debug)
 AC_SUBST(LDFLAGSEND_debug)

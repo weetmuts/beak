@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 #
-#    Copyright (C) 2016-2020 Fredrik Öhrström
+#    Copyright (C) 2016-2023 Fredrik Öhrström
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -123,7 +123,7 @@ fi
 
 TESTMOUNT=true
 
-KEXTSTAT=$(whereis -b kextstat 2>/dev/null)
+KEXTSTAT=$(whereis -b kextstat 2>/dev/null | cut -f 2 -d ':')
 if [ "$KEXTSTAT" != "" ]
 then
     MACFUSE=$(kextstat 2>/dev/null | grep -o io.macfuse || true)

@@ -1,5 +1,8 @@
 #!/bin/sh
 
+sudo apt-get install gcc-mingw-w64
+sudo apt-get install gcc-arm-linux-gnueabihf
+
 if [ ! -d openssl-1.0.2-winapi ]; then
     echo
     echo Fetching OpenSSL
@@ -21,6 +24,8 @@ if [ ! -f ssleay32.dll ]; then
     make
 fi
 cd ..
+
+exit 0
 
 cd openssl-1.0.2-arm
 if [ ! -f libssl.a ]; then
