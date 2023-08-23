@@ -45,7 +45,7 @@ struct IndexMedia
     map<Path*,Media> medias_;
     vector<Path*> sorted_medias_;
     set<int> years_;
-    map<int,string> xmq_;
+    map<int,string> htmq_;
     Settings *settings_ {};
     Monitor *monitor_ {};
     FileSystem *fs_ {};
@@ -131,7 +131,7 @@ struct IndexMedia
 
         for (int year : years_)
         {
-            string &xmq = xmq_[year];
+            string &xmq = htmq_[year];
             prev_month = 0;
             prev_day = 0;
             if (prev_year != year)
@@ -207,12 +207,12 @@ struct IndexMedia
                 "           title='Media' "
                 "           link(rel=stylesheet href=style.css) }\n"
                 "    body {\n"+
-                xmq_[year]+
+                htmq_[year]+
                 "    }\n"+
                 "}\n";
 
             string filename;
-            strprintf(filename, "index_%d.xmq", year);
+            strprintf(filename, "index_%d.htmq", year);
             Path *index_xmq = root->append(filename);
             strprintf(filename, "index_%d.html", year);
             Path *index_html = root->append(filename);
@@ -221,8 +221,9 @@ struct IndexMedia
 
             vector<char> output;
             vector<string> args;
-            args.push_back("--nopp");
             args.push_back(index_xmq->str());
+            args.push_back("fo");
+            args.push_back("--html");
             RC rc = sys_->invoke("xmq",
                                  args,
                                  &output);
@@ -243,8 +244,9 @@ struct IndexMedia
 
         vector<char> output;
         vector<string> args;
-        args.push_back("--nopp");
         args.push_back(index_xmq->str());
+        args.push_back("fo");
+        args.push_back("--html");
         RC rc = sys_->invoke("xmq",
                           args,
                           &output);
