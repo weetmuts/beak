@@ -205,7 +205,7 @@ LIST_OF_OPTIONS
     X(store_cmd, (14, background_option, contentsplit_option, delta_option, depth_option, splitsize_option, targetsize_option, triggersize_option, triggerglob_option, exclude_option, include_option, padding_option, progress_option, relaxtimechecks_option, tarheader_option, yesorigin_option) ) \
     X(stored_cmd, (14, background_option, contentsplit_option, delta_option, depth_option, splitsize_option, targetsize_option, triggersize_option, triggerglob_option, exclude_option, include_option, padding_option, progress_option, relaxtimechecks_option, tarheader_option, yesorigin_option) ) \
     X(mount_cmd, (3, progress_option,foreground_option, fusedebug_option ) )  \
-    X(prune_cmd, (3, keep_option, now_option, yesprune_option) ) \
+    X(prune_cmd, (4, keep_option, now_option, dryrun_option, yesprune_option) ) \
     X(pull_cmd, (2, background_option, progress_option) ) \
     X(push_cmd, (2, background_option, delta_option, progress_option) )  \
     X(pushd_cmd, (2, background_option, delta_option, progress_option) ) \

@@ -31,6 +31,8 @@ struct PruneImplementation : public Prune
 public:
     void addPointInTime(uint64_t p);
     void prune(std::map<uint64_t,bool> *result);
+    void pointHasLostFiles(uint64_t point, int num_files, size_t size_files);
+    void verbosePruneDecisions();
     uint64_t mostRecentWeeklyBackup();
 
     PruneImplementation(uint64_t now, const Keep &keep) { now_ = now; keep_ = keep; }
@@ -40,6 +42,8 @@ private:
     Keep keep_;
     uint64_t prev_ {};
     map<uint64_t,bool> points_;
+    map<uint64_t,int> num_lost_files_;
+    map<uint64_t,size_t> size_lost_files_;
     uint64_t latest_;
     set<uint64_t> all_;
     map<uint64_t,uint64_t> daily_max_;
@@ -128,6 +132,12 @@ bool PruneImplementation::isMonthlyMax(uint64_t p)
     return false;
 }
 
+void PruneImplementation::pointHasLostFiles(uint64_t point, int num_files, size_t size_lost_files)
+{
+    num_lost_files_[point] = num_files;
+    size_lost_files_[point] = size_lost_files;
+}
+
 void PruneImplementation::addPointInTime(uint64_t p)
 {
     assert(p <= now_);
@@ -184,7 +194,11 @@ void PruneImplementation::prune(std::map<uint64_t,bool> *result)
     for (auto& e : daily_max_) { points_[e.second] = true; }
     for (auto& e : weekly_max_) { points_[e.second] = true; }
     for (auto& e : monthly_max_) { points_[e.second] = true; }
+    *result = points_;
+}
 
+void PruneImplementation::verbosePruneDecisions()
+{
     // Print the pruning decisions...
     verbose(PRUNE, "Action     Date       Time      Daynr  Weeknr     Monthnr\n");
     for (auto& e : points_)
@@ -210,10 +224,14 @@ void PruneImplementation::prune(std::map<uint64_t,bool> *result)
         if (isDailyMax(p)) verbose(PRUNE, " DAY");
         if (isWeeklyMax(p)) verbose(PRUNE, " WEEK");
         if (isMonthlyMax(p)) verbose(PRUNE, " MONTH");
+
+        if (num_lost_files_.count(p) > 0)
+        {
+            int n = num_lost_files_[p];
+            verbose(PRUNE, " ! WARNING ! LOST %d files", n);
+        }
         verbose(PRUNE, " \n");
     }
     string nows = timeToString(now_);
     verbose(PRUNE, "now        %s\n", nows.c_str());
-
-    *result = points_;
 }

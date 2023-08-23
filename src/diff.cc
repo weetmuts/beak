@@ -20,6 +20,7 @@
 #include"fileinfo.h"
 #include"log.h"
 
+#include<algorithm>
 #include<map>
 #include<set>
 #include<utility>
@@ -52,6 +53,16 @@ struct TypeSummary
         suffixes.insert(suffix);
         if (f) files.push_back(f);
         assert(suffix);
+    }
+
+    void getSortedSuffixes(vector<const char*> *suffix_list)
+    {
+        suffix_list->clear();
+        for (auto s : suffixes) suffix_list->insert(suffix_list->end(), s);
+        std::sort(suffix_list->begin(), suffix_list->end(),
+              [](const char *a, const char *b)->bool {
+                  return strcmp(a, b) < 0;
+	      });
     }
 };
 
@@ -481,7 +492,11 @@ void DirSummary::print(Path *p, bool hide_content, bool all_added)
             bool comma = false;
             bool dotdotdot = false;
             int count = 0;
-            for (auto s: st->suffixes) {
+            vector<const char*> suffix_list;
+            st->getSortedSuffixes(&suffix_list);
+
+            for (auto s: suffix_list)
+            {
                 if (++count > 10) {
                     dotdotdot = true;
                     break;

@@ -26,6 +26,8 @@ struct Prune
 {
     virtual void addPointInTime(uint64_t p) = 0;
     virtual void prune(std::map<uint64_t,bool> *result) = 0;
+    virtual void pointHasLostFiles(uint64_t point, int num_files, size_t size_files) = 0;
+    virtual void verbosePruneDecisions() = 0;
     virtual uint64_t mostRecentWeeklyBackup() = 0;
 
     virtual ~Prune() = default;

@@ -76,21 +76,7 @@ RC BeakImplementation::prune(Settings *settings, Monitor *monitor)
     // Perform the prune calculation
     prune->prune(&keeps);
 
-    int num_kept_points_in_time = 0;
-
-    for (PointInTime& i : restore->historyOldToNew())
-    {
-        if (keeps[i.point()]) {
-            // We should keep this point in time, lets remember all the tars required.
-            num_kept_points_in_time++;
-            for (auto& t : *(i.tarfiles())) {
-                required_beak_files.insert(t);
-            }
-            Path *p = Path::lookup(i.filename);
-            required_beak_files.insert(p);
-        }
-    }
-
+    // List all existing beak storage files.
     vector<pair<Path*,FileStat>> existing_beak_files;
     backup_fs->listFilesBelow(root, &existing_beak_files, SortOrder::Unspecified);
 
@@ -100,18 +86,49 @@ RC BeakImplementation::prune(Settings *settings, Monitor *monitor)
         set_of_existing_beak_files.insert(p.first);
     }
 
+    int num_kept_points_in_time = 0;
+
+    for (PointInTime& i : restore->historyOldToNew())
+    {
+        if (keeps[i.point()])
+        {
+            // We should keep this point in time, lets remember all the tars required.
+            num_kept_points_in_time++;
+            int num_lost_files = 0;
+
+            for (auto& t : *(i.tarfiles()))
+            {
+                if (set_of_existing_beak_files.count(t) == 0)
+                {
+                    debug(PRUNE, "storage lost: %s\n", t->c_str());
+                    i.addLostFile(t);
+                    num_lost_files++;
+                }
+                required_beak_files.insert(t);
+            }
+            // Add the gz file to the required files.
+            Path *gz_index_file = Path::lookup(i.filename);
+            required_beak_files.insert(gz_index_file);
+
+            if (num_lost_files > 0)
+            {
+                prune->pointHasLostFiles(i.point(), num_lost_files, 0);
+            }
+        }
+    }
+
     vector<Path*> beak_files_to_delete;
     size_t total_size_removed = 0;
     size_t total_size_kept = 0;
+    int total_num_lost_files = 0;
 
-    int num_lost = 0;
     // Check that all expected tars actually exist in the storage location.
     for (auto p : required_beak_files)
     {
         if (set_of_existing_beak_files.count(p) == 0)
         {
-            warning(PRUNE, "storage lost: %s\n", p->c_str());
-            num_lost++;
+            //debug(PRUNE, "storage lost: %s\n", p->c_str());
+            total_num_lost_files++;
         }
     }
 
@@ -137,6 +154,8 @@ RC BeakImplementation::prune(Settings *settings, Monitor *monitor)
         }
     }
 
+    prune->verbosePruneDecisions();
+
     string removed_size = humanReadableTwoDecimals(total_size_removed);
     string last_size = humanReadableTwoDecimals(restore->historyOldToNew().back().size);
     string kept_size = humanReadableTwoDecimals(total_size_kept);
@@ -151,16 +170,27 @@ RC BeakImplementation::prune(Settings *settings, Monitor *monitor)
     }
     else
     {
-        UI::output("Prune will delete %s (%d points in time) and keep %s (%d).\n",
-                   removed_size.c_str(),
-                   num_existing_points_in_time - num_kept_points_in_time,
-                   kept_size.c_str(),
-                   num_kept_points_in_time);
+        int points_to_delete = num_existing_points_in_time - num_kept_points_in_time;
+        if (total_size_removed > 0 && points_to_delete == 0)
+        {
+            UI::output("Prune will only delete %s of superfluous data (no more points in time will be removed) and keep %s (%d).\n",
+                       removed_size.c_str(),
+                       kept_size.c_str(),
+                       num_kept_points_in_time);
+        }
+        else
+        {
+            UI::output("Prune will delete %s (%d points in time) and keep %s (%d).\n",
+                       removed_size.c_str(),
+                       num_existing_points_in_time - num_kept_points_in_time,
+                       kept_size.c_str(),
+                       num_kept_points_in_time);
+        }
     }
 
-    if (num_lost > 0)
+    if (total_num_lost_files > 0)
     {
-        warning(PRUNE, "Warning! Lost %d backup files!!\n", num_lost);
+        warning(PRUNE, "Warning! Lost %d backup files!!\n", total_num_lost_files);
     }
 
     if (settings->dryrun == false)

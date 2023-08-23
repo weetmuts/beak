@@ -120,11 +120,15 @@ struct PointInTime {
     bool hasGzFiles() { return gz_files_.size() != 0; }
     void addGzFile(Path *parent, Path *gzfile)
     {
-        //fprintf(stderr, "GURKA Add gz file %s to dir %s\n", gzfile->c_str(), parent->c_str());
         gz_files_[parent] = gzfile;
+    }
+    void addLostFile(Path *f)
+    {
+        lost_files_.insert(f);
     }
     Path *getGzFile(Path *dir) { if (gz_files_.count(dir) == 1) { return gz_files_[dir]; } else { return NULL; } }
     std::vector<Path*> *tarfiles() { return &tars_; }
+    std::set<Path*> *lostFiles() { return &lost_files_; }
 
     const struct timespec *ts() { return &ts_; }
     uint64_t point() { return point_; }
@@ -143,6 +147,7 @@ private:
     std::map<Path*,RestoreEntry,depthFirstSortPath> entries_;
     std::map<Path*,Path*> gz_files_;
     std::set<Path*> loaded_gz_files_;
+    std::set<Path*> lost_files_;
 };
 
 struct Restore
