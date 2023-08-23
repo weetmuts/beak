@@ -160,8 +160,7 @@ RC BeakImplementation::prune(Settings *settings, Monitor *monitor)
 
     if (num_lost > 0)
     {
-        usageError(PRUNE, "Warning! Lost %d backup files! First run fsck.\n", num_lost);
-        assert(0);
+        warning(PRUNE, "Warning! Lost %d backup files!!\n", num_lost);
     }
 
     if (settings->dryrun == false)

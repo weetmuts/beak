@@ -571,11 +571,8 @@ size_t Backup::groupFilesIntoTars()
     {
         TarEntry *te = e.second;
 
-        if (count % 100 == 0)
-        {
-            UI::clearLine();
-            info(BACKUP, "Organizing files into %zu/%zu dirs.", count, total);
-        }
+        UI::clearLine();
+        info(BACKUP, "Organizing files into %zu/%zu dirs.", count, total);
         count++;
 
         debug(BACKUP, "TAR COLLECTION DIR >%s< >%s<\n", e.first->c_str(), te->path()->c_str());
