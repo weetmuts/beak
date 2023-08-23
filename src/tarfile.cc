@@ -57,6 +57,50 @@ TarFile::~TarFile()
 {
 }
 
+void TarFile::addHardLink(TarEntry *entry)
+{
+    hard_links_.insert(hard_links_.end(), entry);
+}
+
+void TarFile::prependHardLinks()
+{
+    size_t prepended_block_size = 0;
+
+    for (auto te : hard_links_)
+    {
+        prepended_block_size += te->blockedSize();
+    }
+
+    map<size_t, TarEntry*> newc;
+    vector<size_t> newo;
+    size_t offset = 0;
+    for (auto te : hard_links_)
+    {
+        te->updateMtim(&mtim_);
+        te->registerTarFile(this, offset);
+        newc[offset] = te;
+        newo.push_back(offset);
+        offset += te->blockedSize();
+    }
+    for (auto & a : contents_)
+    {
+        size_t o = a.first + prepended_block_size;
+        newc[o] = a.second;
+        newo.push_back(o);
+        a.second->registerTarFile(this, o);
+    }
+    contents_ = newc;
+    offsets = newo;
+
+    debug(TARFILE, "Prepended %zu hard links with blocked size %zu\n",
+          hard_links_.size(),
+          prepended_block_size);
+
+    hard_links_.clear();
+
+    current_tar_offset_ += prepended_block_size;
+}
+
 void TarFile::addEntryLast(TarEntry *entry)
 {
     entry->updateMtim(&mtim_);

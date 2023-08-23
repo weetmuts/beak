@@ -614,7 +614,7 @@ size_t Backup::groupFilesIntoTars()
             }
             else if (entry->isHardLink())
             {
-            	te->tazFile()->addEntryFirst(entry);
+            	te->tazFile()->addHardLink(entry);
             }
             else
             {
@@ -650,6 +650,9 @@ size_t Backup::groupFilesIntoTars()
                 }
             }
         }
+
+        // Move all the hard links to the beginning of the tar file.
+        te->tazFile()->prependHardLinks();
 
         // Finalize the tar files and add them to the contents listing.
         for (auto & t : te->largeTars())
@@ -853,9 +856,10 @@ size_t Backup::groupFilesIntoTars()
         size_t taz_size = te->tazFile()->contentSize();
         if (taz_size > 0)
         {
-            char buf[taz_size];
+            char *buf = (char*)malloc(taz_size);
             te->tazFile()->readVirtualTar(buf, taz_size, 0, origin_fs_, 0);
             gzfile_contents.append(string(buf, taz_size));
+            free(buf);
         }
 
         vector<char> compressed_gzfile_contents;

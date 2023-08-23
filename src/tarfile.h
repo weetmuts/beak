@@ -187,6 +187,8 @@ struct TarFile
     void fixSize(size_t split_size, TarHeaderStyle ths, TarFilePaddingStyle padding, size_t target_size);
     void addEntryLast(TarEntry *entry);
     void addEntryFirst(TarEntry *entry);
+    void addHardLink(TarEntry *entry);
+    void prependHardLinks();
 
     void finishHash();
     std::pair<TarEntry*, size_t> findTarEntry(size_t offset);
@@ -239,6 +241,7 @@ private:
     // But the default is to round the disk file size to nice boundaries.
     size_t content_size_;
     std::map<size_t, TarEntry*> contents_;
+    std::vector<TarEntry*> hard_links_;
     std::vector<size_t> offsets;
     size_t current_tar_offset_ = 0;
     // The mtim_->tv_nsec is always moved up to nearest microsecond boundary in the future.
