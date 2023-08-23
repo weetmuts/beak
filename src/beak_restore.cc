@@ -116,7 +116,8 @@ RC BeakImplementation::restore(Settings *settings, Monitor *monitor)
     progress->finishProgress();
 
     if (progress->stats.num_files_stored == 0 && progress->stats.num_symbolic_links_stored == 0 &&
-        progress->stats.num_device_nodes_stored == 0 && progress->stats.num_dirs_updated == 0) {
+        progress->stats.num_device_nodes_stored == 0 && progress->stats.num_dirs_updated == 0 &&
+        progress->stats.num_hard_links_stored == 0) {
         info(RESTORE, "No restores were needed, everything was up to date.\n");
     } else {
         if (progress->stats.num_files_stored > 0) {

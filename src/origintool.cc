@@ -107,10 +107,18 @@ void OriginToolImplementation::addRestoreWork(ProgressStatistics *st,
 {
     RestoreEntry *entry = restore->findEntry(point, path);
     Path *file_to_extract = path->prepend(settings->to.origin);
+
+    // Now calculate state->disk_update to reflect how to update the origin.
+    // Identical -> no change, Store -> create, Update -> overwrite
     stat->checkStat(origin_fs_, file_to_extract);
+
     if (entry->fs.hard_link)
     {
         st->stats.num_hard_links++;
+        if (stat->disk_update != NoUpdateIdentical)
+        {
+            st->stats.num_hard_links_to_store++;
+        }
     }
     else if (stat->isRegularFile())
     {

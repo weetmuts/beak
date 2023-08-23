@@ -900,7 +900,7 @@ void FileStat::checkStat(FileSystem *dst, Path *target)
     FileStat other_stat;
     RC rc = dst->stat(target, &other_stat);
     if (rc.isErr()) { disk_update = Store; return; }
-    if (sameSize(&other_stat) && sameMTime(&other_stat))
+    if ((hard_link != 0 || sameSize(&other_stat)) && sameMTime(&other_stat))
     {
         if (!samePermissions(&other_stat))
         {
