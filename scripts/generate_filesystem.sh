@@ -8,7 +8,7 @@ maxdepth=5
 rndname()
 {
     len=$((($RANDOM % 32)+1));
-    cat /dev/urandom | tr -dc "[:alpha:]" | head -c $len
+    cat /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | fold -w $len | head -n 1
 }
 
 createdir()
@@ -25,7 +25,7 @@ createfs()
     then
         numsubdirs=$((($RANDOM % 3)));
         numfiles=$((($RANDOM % 32)));
-        
+
         i=0
         while [ $i -lt $numfiles ]
         do
@@ -34,7 +34,7 @@ createfs()
             dd if=/dev/urandom of="$currdir/$name" bs=$blocksize count=$len > /dev/null 2>&1
             ((i++))
         done
-        
+
         i=0
         while [ $i -lt $numsubdirs ]
         do
