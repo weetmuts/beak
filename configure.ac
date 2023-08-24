@@ -59,7 +59,7 @@ else
    if test "${host_vendor}" = "apple"; then
        CONF_MNEMONIC="osx64"
        MNEMONIC="OSX64"
-       CXXFLAGS_EXTRAS=-D_DARWIN_FEATURE_64_BIT_INODE
+       CXXFLAGS_EXTRAS=-D_DARWIN_FEATURE_64_BIT_INODE $(brew --prefix)/include
    fi
    if test "${host_vendor}" = "pc"; then
        CONF_MNEMONIC="linux64"
@@ -171,9 +171,23 @@ AC_ARG_WITH(openssl, [AS_HELP_STRING([--with-openssl],
 #x86_64-w64-mingw32-g++ -I../openssl-1.0.2l/include/ test.cc ../openssl-1.0.2l/libcrypto.a
 
 if test "x${with_openssl}" = "x"; then
-    OPENSSL_CFLAGS="$($PKG_CONFIG openssl --cflags) -DOPENSSL_API_COMPAT=0x10100000L"
-    OPENSSL_LIBS="$($PKG_CONFIG openssl --libs)"
-    AC_MSG_RESULT([found])
+    if $PKG_CONFIG openssl --cflags > /dev/null 2>&1
+    then
+        OPENSSL_CFLAGS="$($PKG_CONFIG openssl --cflags) -DOPENSSL_API_COMPAT=0x10100000L"
+        OPENSSL_LIBS="$($PKG_CONFIG openssl --libs)"
+        AC_MSG_RESULT([found])
+   else
+      if test "$(uname -s)" = "Darwin"
+      then
+          OPENSSL_CFLAGS="-I$(brew --prefix)/opt/openssl@3/include -DOPENSSL_API_COMPAT=0x10100000L"
+          OPENSSL_LIBS="-L$(brew --prefix)/opt/openssl@3/lib -lcrypto"
+          if ! test -r $(brew --prefix)/opt/openssl@3/include/openssl/sha.h
+          then
+              AC_MSG_ERROR([Expected openssl/sha.h to be found in brew install!])
+          fi
+          AC_MSG_RESULT([found])
+      fi
+    fi
 else
     with_openssl=$(realpath ${with_openssl})
     OPENSSL_CFLAGS="-I${with_openssl}/include -DOPENSSL_API_COMPAT=0x10100000L"
