@@ -33,15 +33,17 @@ SUPRE=su -c $(DQUOTE)
 SUPOST=$(DQUOTE) $(SUDO_USER)
 endif
 
-COMMIT_HASH?=$(shell $(SUPRE) git log --pretty=format:'%H' -n 1 $(SUPOST))
-TAG?=$(shell $(SUPRE) git describe --tags $(SUPOST))
-BRANCH?=$(shell $(SUPRE) git rev-parse --abbrev-ref HEAD $(SUPOST))
-CHANGES?=$(shell $(SUPRE) git status -s | grep -v '?? ' $(SUPOST))
-
-#COMMIT_HASH:=$(shell git log --pretty=format:'%H' -n 1)
-#TAG:=$(shell git describe --tags)
-#CHANGES:=$(shell git status -s | grep -v '?? ')
-#TAG_COMMIT_HASH:=$(shell git show-ref --tags | grep $(TAG) | cut -f 1 -d ' ')
+ifneq ($(shell git status > /dev/null),)
+    COMMIT_HASH?=$(shell $(SUPRE) git log --pretty=format:'%H' -n 1 $(SUPOST))
+    TAG?=$(shell $(SUPRE) git describe --tags $(SUPOST))
+    BRANCH?=$(shell $(SUPRE) git rev-parse --abbrev-ref HEAD $(SUPOST))
+    CHANGES?=$(shell $(SUPRE) git status -s | grep -v '?? ' $(SUPOST))
+else
+    COMMIT_HASH:=hash
+    TAG:=tag
+    BRANCH:=branch
+    CHANGES:=
+endif
 
 ifeq ($(COMMIT),$(TAG_COMMIT))
   # Exactly on the tagged commit. The version is the tag!
