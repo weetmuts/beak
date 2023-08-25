@@ -123,18 +123,21 @@ $(OUTPUT_ROOT)/$(TYPE)/beak-media: $(BEAK_OBJS) $(BEAK_MEDIA_OBJS)
 	$(VERBOSE)$(CXX) -o $@ $(LDFLAGS_$(TYPE)) $(LDFLAGS) $(BEAK_OBJS) $(BEAK_MEDIA_OBJS) \
                       $(LDFLAGSBEGIN_$(TYPE)) $(OPENSSL_LIBS) $(ZLIB_LIBS) $(FUSE_LIBS) $(LIBRSYNC_LIBS) $(LDFLAGSEND_$(TYPE)) $(MEDIA_LIBS) -lpthread
 	$(VERBOSE)$(STRIP_COMMAND) $@
+	@echo Done linking $(TYPE) $(CONF_MNEMONIC) $@
 
 $(OUTPUT_ROOT)/$(TYPE)/beak: $(BEAK_OBJS) $(BEAK_NO_MEDIA_OBJS)
 	@echo Linking $(TYPE) $(CONF_MNEMONIC) $@
 	$(VERBOSE)$(CXX) -o $@ $(LDFLAGS_$(TYPE)) $(LDFLAGS) $(BEAK_OBJS) $(BEAK_NO_MEDIA_OBJS) \
                       $(LDFLAGSBEGIN_$(TYPE)) $(OPENSSL_LIBS) $(ZLIB_LIBS) $(FUSE_LIBS) $(LIBRSYNC_LIBS) $(LDFLAGSEND_$(TYPE)) -lpthread
 	$(VERBOSE)$(STRIP_COMMAND) $@
+	@echo Done linking $(TYPE) $(CONF_MNEMONIC) $@
 
 $(OUTPUT_ROOT)/$(TYPE)/testinternals: $(TESTINTERNALS_OBJS) $(BEAK_NO_MEDIA_OBJS)
 	@echo Linking $(TYPE) $(CONF_MNEMONIC) $@
 	$(VERBOSE)$(CXX) -o $@ $(LDFLAGS_$(TYPE)) $(LDFLAGS) $(TESTINTERNALS_OBJS) $(BEAK_NO_MEDIA_OBJS) \
                       $(LDFLAGSBEGIN_$(TYPE)) $(OPENSSL_LIBS) $(ZLIB_LIBS) $(FUSE_LIBS) $(LIBRSYNC_LIBS) $(MEDIA_LIBS) $(LDFLAGSEND_$(TYPE)) -lpthread
 	$(VERBOSE)$(STRIP_COMMAND) $@
+	@echo Done linking $(TYPE) $(CONF_MNEMONIC) $@
 
 $(OUTPUT_ROOT)/$(TYPE)/libgcc_s_seh-1.dll: /usr/lib/gcc/x86_64-w64-mingw32/5.3-win32/libgcc_s_seh-1.dll
 	cp /usr/lib/gcc/x86_64-w64-mingw32/5.3-win32/libgcc_s_seh-1.dll $@

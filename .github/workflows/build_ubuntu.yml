@@ -15,5 +15,6 @@ jobs:
        sudo chmod 666 /dev/fuse
        sudo chown root:$USER /etc/fuse.conf
     - run: ./configure
-    - run: make
+    - run: make VERBOSE=
+    - run: echo "DONE BUILDING"
     - run: make test
