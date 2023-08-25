@@ -32,6 +32,7 @@ const char *argName(ArgumentType at) {
     case ArgStorageOrRule: return "<storage>|<rule>";
     case ArgDir: return "<dir>";
     case ArgFile: return "<file>";
+    case ArgFileOrDir: return "<file>|<dir>";
     case ArgFileOrNone: return "[<file>]";
     case ArgORS: return "<origin>|<rule>|<storage>";
     case ArgNORS: return "[<origin>|<rule>|<storage>]";

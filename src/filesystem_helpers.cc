@@ -93,6 +93,10 @@ bool ReadOnlyFileSystem::deleteFile(Path *path)
     return false;
 }
 
+void ReadOnlyFileSystem::allowAccessTimeUpdates()
+{
+}
+
 RC ReadOnlyFileSystem::enableWatch()
 {
     return RC::ERR;

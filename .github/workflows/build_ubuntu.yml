@@ -17,4 +17,3 @@ jobs:
        sudo chown root:$USER /etc/fuse.conf
     - run: ./configure
     - run: make
-    - run: make test

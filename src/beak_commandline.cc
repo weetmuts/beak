@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2016-2019 Fredrik Öhrström
+ Copyright (C) 2016-2023 Fredrik Öhrström
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -77,6 +77,32 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
         }
         argument.point_in_time = point;
         debug(COMMANDLINE, "found point in time (%s) after storage %s\n", point.c_str(), arg.c_str());
+    }
+
+    // Check if the argument is a directory or a file.
+    if (expected_type == ArgFileOrDir)
+    {
+        Path *fd = Path::lookup(arg);
+        Path *rp = fd->realpath();
+        if (!rp)
+        {
+            usageError(COMMANDLINE, "Expected file or directory. Got \"%s\" instead.\n", arg.c_str());
+            assert(0);
+        }
+
+        FileStat fs;
+        local_fs_->stat(rp, &fs);
+        if (fs.isDirectory())
+        {
+            argument.dir = rp;
+            argument.type = ArgDir;
+            debug(COMMANDLINE, "found directory arg \"%s\", as expected.\n", fd->c_str());
+            return argument;
+        }
+        argument.file = rp;
+        argument.type = ArgFile;
+        debug(COMMANDLINE, "found file arg \"%s\", as expected.\n", fd->c_str());
+        return argument;
     }
 
     // Check if the argument is a directory.
@@ -247,6 +273,8 @@ const char *arg_name_(ArgumentType at) {
         return "dir";
     case ArgFile:
         return "file";
+    case ArgFileOrDir:
+        return "file or dir";
     case ArgFileOrNone:
         return "file or none";
     case ArgORS:

@@ -51,6 +51,7 @@ struct FileSystemFuseAPIImplementation : FileSystem
     bool createFIFO(Path *path, FileStat *stat);
     bool readLink(Path *file, string *target);
     bool deleteFile(Path *file);
+    void allowAccessTimeUpdates();
     RC mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground=false, bool debug=false);
     unique_ptr<FuseMount> mount(Path *dir, FuseAPI *fuseapi, bool debug=false);
     RC umount(ptr<FuseMount> fuse_mount);
@@ -210,6 +211,9 @@ bool FileSystemFuseAPIImplementation::deleteFile(Path *path)
     return false;
 }
 
+void FileSystemFuseAPIImplementation::allowAccessTimeUpdates()
+{
+}
 
 size_t basepos(string &s)
 {

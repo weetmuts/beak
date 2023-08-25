@@ -361,6 +361,9 @@ struct FileSystem
 
     virtual bool deleteFile(Path *file) = 0;
 
+    // Its ok if pread will update the access time of the file.
+    virtual void allowAccessTimeUpdates() = 0;
+
     // Enable watching of filesystem changes. Used to warn the user
     // that the filesystem was changed during backup...
     virtual RC enableWatch() = 0;

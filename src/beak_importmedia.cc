@@ -51,6 +51,11 @@ struct ImportMediaData
     {
     }
 
+    void countFile(Path*p, FileStat *st)
+    {
+        db_.countFile(p, st);
+    }
+
     void scanFile(Path *p, FileStat *st, MapFileSystem *map_fs)
     {
         Media *m = db_.addFile(p, st);
@@ -96,28 +101,82 @@ RC BeakImplementation::importMedia(Settings *settings, Monitor *monitor)
 {
     RC rc = RC::OK;
 
-    assert(settings->from.type == ArgOrigin);
+    assert(settings->from.type == ArgDir || settings->from.type == ArgFile);
     assert(settings->to.type == ArgStorage);
 
-    ImportMediaData import_media(this, settings, monitor, local_fs_, sys_);
+    // When importing, do not worry if the access times get updated.
+    local_fs_->allowAccessTimeUpdates();
+
+    std::vector<std::pair<Filter,Match>> filters;
+    for (auto &e : settings->include) {
+        Match m;
+        bool rc = m.use(e);
+        if (!rc) {
+            error(IMPORTMEDIA, "Not a valid glob \"%s\"\n", e.c_str());
+        }
+        filters.push_back(pair<Filter,Match>(Filter(e.c_str(), INCLUDE), m));
+        debug(IMPORTMEDIA, "Includes \"%s\"\n", e.c_str());
+    }
+    for (auto &e : settings->exclude) {
+        Match m;
+        bool rc = m.use(e);
+        if (!rc) {
+            error(IMPORTMEDIA, "Not a valid glob \"%s\"\n", e.c_str());
+        }
+        filters.push_back(pair<Filter,Match>(Filter(e.c_str(), EXCLUDE), m));
+        debug(IMPORTMEDIA, "Excludes \"%s\"\n", e.c_str());
+    }
 
     auto map_fs = newMapFileSystem(local_fs_);
     MapFileSystem *fs = map_fs.get();
 
-    FileStat origin_dir_stat;
-    local_fs_->stat(settings->from.origin, &origin_dir_stat);
-    if (!origin_dir_stat.isDirectory())
-    {
-        usageError(IMPORTMEDIA, "Not a directory: %s\n", settings->from.origin->c_str());
-    }
+    ImportMediaData import_media(this, settings, monitor, local_fs_, sys_);
 
     info(IMPORTMEDIA, "Importing media into %s\n",
          settings->to.storage->storage_location->c_str());
 
-    local_fs_->recurse(settings->from.origin, [&import_media,fs](Path *p, FileStat *st) {
-            import_media.scanFile(p, st, fs);
-            return RecurseOption::RecurseContinue;
-        });
+    if (settings->from.type == ArgDir)
+    {
+        local_fs_->recurse(settings->from.dir, [&import_media,fs,&filters](Path *p, FileStat *st) {
+                int status = 0;
+                for (auto & f : filters) {
+                    bool match  = f.second.match(p->c_str());
+                    int rc = (match)?0:1;
+                    if (f.first.type == INCLUDE) {
+                        status |= rc;
+                    } else {
+                        status |= !rc;
+                    }
+                }
+                if (!status) {
+                    import_media.countFile(p, st);
+                }
+                return RecurseOption::RecurseContinue;
+            });
+
+        local_fs_->recurse(settings->from.dir, [&import_media,fs,&filters](Path *p, FileStat *st) {
+                int status = 0;
+                for (auto & f : filters) {
+                    bool match  = f.second.match(p->c_str());
+                    int rc = (match)?0:1;
+                    if (f.first.type == INCLUDE) {
+                        status |= rc;
+                    } else {
+                        status |= !rc;
+                    }
+                }
+                if (!status) {
+                    import_media.scanFile(p, st, fs);
+                }
+                return RecurseOption::RecurseContinue;
+            });
+    }
+    else
+    {
+        FileStat st;
+        local_fs_->stat(settings->from.file, &st);
+        import_media.scanFile(settings->from.file, &st, fs);
+    }
 
     UI::clearLine();
     string st = import_media.db_.status("ed");

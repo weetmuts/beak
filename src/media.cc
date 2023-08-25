@@ -670,6 +670,31 @@ bool Media::parseFileName(Path *p)
     return false;
 }
 
+void MediaDatabase::countFile(Path *p, FileStat *st)
+{
+    if (!st->isRegularFile()) return;
+
+    debug(MEDIA, "counting %s\n", p->c_str());
+
+    string ext = p->name()->ext_c_str_();
+
+    if (media_helper_.img_suffixes_.count(ext) != 0)
+    {
+        ext = media_helper_.img_suffixes_[ext];
+        img_suffix_precount_[ext]++;
+    }
+    else if (media_helper_.vid_suffixes_.count(ext) != 0)
+    {
+        ext = media_helper_.vid_suffixes_[ext];
+        vid_suffix_precount_[ext]++;
+    }
+    else if (media_helper_.aud_suffixes_.count(ext) != 0)
+    {
+        ext = media_helper_.aud_suffixes_[ext];
+        aud_suffix_precount_[ext]++;
+    }
+}
+
 bool Media::readFile(Path *p, FileStat *st, FileSystem *fs)
 {
     source_file_ = p;
@@ -790,17 +815,20 @@ string MediaDatabase::status(const char *tense)
     for (auto &p : vid_suffix_count_)
     {
         string s = humanReadable(vid_suffix_size_[p.first]);
-        info += p.first+"("+to_string(p.second)+":"+s+") ";
+        size_t precount = vid_suffix_precount_[p.first];
+        info += p.first+"("+to_string(p.second)+"/"+to_string(precount)+":"+s+") ";
     }
     for (auto &p : img_suffix_count_)
     {
         string s = humanReadable(img_suffix_size_[p.first]);
-        info += p.first+"("+to_string(p.second)+":"+s+") ";
+        size_t precount = img_suffix_precount_[p.first];
+        info += p.first+"("+to_string(p.second)+"/"+to_string(precount)+":"+s+") ";
     }
     for (auto &p : aud_suffix_count_)
     {
         string s = humanReadable(aud_suffix_size_[p.first]);
-        info += p.first+"("+to_string(p.second)+":"+s+") ";
+        size_t precount = aud_suffix_precount_[p.first];
+        info += p.first+"("+to_string(p.second)+"/"+to_string(precount)+":"+s+") ";
     }
     if (unknown_suffix_count_.size() > 0)
     {

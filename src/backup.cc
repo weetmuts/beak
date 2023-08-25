@@ -1510,6 +1510,9 @@ struct BeakFS : FileSystem
     {
         return false;
     }
+    void allowAccessTimeUpdates()
+    {
+    }
     RC enableWatch()
     {
         return RC::ERR;

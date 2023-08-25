@@ -80,6 +80,7 @@ protected:
 class MediaDatabase
 {
 public:
+    void countFile(Path *p, FileStat *st);
     Media *addFile(Path *p, FileStat *st);
     std::string status(const char *tense);
     std::string statusUnknowns();
@@ -98,6 +99,10 @@ protected:
     int num_media_files_ {};
     int num_unknown_files_ {};
     size_t unknown_size_ {};
+
+    std::map<std::string,int> img_suffix_precount_;
+    std::map<std::string,int> vid_suffix_precount_;
+    std::map<std::string,int> aud_suffix_precount_;
 
     std::map<std::string,int> img_suffix_count_;
     std::map<std::string,int> vid_suffix_count_;

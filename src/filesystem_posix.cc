@@ -136,6 +136,7 @@ struct FileSystemImplementationPosix : FileSystem
     bool createFIFO(Path *path, FileStat *stat);
     bool readLink(Path *path, string *target);
     bool deleteFile(Path *file);
+    void allowAccessTimeUpdates();
 
     RC enableWatch();
     RC addWatch(Path *dir);
@@ -152,6 +153,7 @@ private:
 
     System *sys_ {};
     Path *temp_dir_;
+    bool allow_access_time_updates_ {};
     //int inotify_fd_ {};
 };
 
@@ -205,16 +207,30 @@ bool FileSystemImplementationPosix::readdir(Path *p, vector<Path*> *vec)
 
 ssize_t FileSystemImplementationPosix::pread(Path *p, char *buf, size_t size, off_t offset)
 {
-    int fd = open(p->c_str(), O_RDONLY | O_NOATIME);
-    if (fd == -1) {
-        // This might be a file not owned by you, if so, open fails if O_NOATIME is enabled.
+    int fd = -1;
+
+    if (allow_access_time_updates_)
+    {
         fd = open(p->c_str(), O_RDONLY);
         if (fd == -1) {
             // Give up permanently.
             return -1;
         }
-        UI::clearLine();
-        info(FILESYSTEM,"You are not the owner of \"%s\" so backing up causes its access time to be updated.\n", p->c_str());
+    }
+    else
+    {
+        // Try to open without updating the access time. This is what you usually want from a backup tool.
+        fd = open(p->c_str(), O_RDONLY | O_NOATIME);
+        if (fd == -1) {
+            // This might be a file not owned by you, if so, open fails if O_NOATIME is enabled.
+            fd = open(p->c_str(), O_RDONLY);
+            if (fd == -1) {
+                // Give up permanently.
+                return -1;
+            }
+            UI::clearLine();
+            info(FILESYSTEM,"You are not the owner of \"%s\" so backing up causes its access time to be updated.\n", p->c_str());
+        }
     }
     ssize_t n = ::pread(fd, buf, size, offset);
     close(fd);
@@ -558,6 +574,11 @@ bool FileSystemImplementationPosix::deleteFile(Path *file)
         error(FILESYSTEM, "Could not delete file \"%s\"\n", file->c_str());
     }
     return true;
+}
+
+void FileSystemImplementationPosix::allowAccessTimeUpdates()
+{
+    allow_access_time_updates_ = true;
 }
 
 void FileSystemImplementationPosix::initTempDir()

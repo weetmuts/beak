@@ -112,6 +112,7 @@ enum ArgumentType
     ArgStorageOrRule,
     ArgDir,
     ArgFile,
+    ArgFileOrDir,
     ArgFileOrNone,
     ArgORS,  // Origin, Rule or Storage
     ArgNORS, // None, Origin, Rule or Storage
@@ -136,7 +137,7 @@ enum ArgumentType
     X(restore,CommandType::PRIMARY,"Restore from a backup into your file system.",ArgStorage,ArgOrigin) \
     X(shell,CommandType::PRIMARY,"Mount your backup(s) and spawn a shell. Exit the shell to unmount.",ArgStorageOrRule,ArgNone) \
     X(stat,CommandType::PRIMARY,"Show file type statistics for a directory or a backup.",ArgORS,ArgNone) \
-    X(import,CommandType::MEDIA,"Find media files in the source dir then rename and store them normalized into the target dir.",ArgOrigin,ArgStorage) \
+    X(import,CommandType::MEDIA,"Find media files in the source dir then rename and store them normalized into the target dir.",ArgFileOrDir,ArgStorage) \
     X(index,CommandType::MEDIA,"Scan imported media and generate thumbnails and index.html.",ArgOrigin,ArgNone) \
     X(serve,CommandType::MEDIA,"Serve imported media to a web-browser.",ArgOrigin,ArgNone) \
     X(status,CommandType::PRIMARY,"Show the backup status of your configured rules.",ArgRuleOrNone,ArgNone) \
@@ -201,6 +202,7 @@ LIST_OF_OPTIONS
     X(diff_cmd, (1, depth_option) ) \
     X(stat_cmd, (1, depth_option) ) \
     X(fsck_cmd, (1, deepcheck_option) ) \
+    X(import_cmd, (2, include_option, exclude_option) ) \
     X(store_cmd, (14, background_option, contentsplit_option, delta_option, depth_option, splitsize_option, targetsize_option, triggersize_option, triggerglob_option, exclude_option, include_option, padding_option, progress_option, relaxtimechecks_option, tarheader_option, yesorigin_option) ) \
     X(stored_cmd, (14, background_option, contentsplit_option, delta_option, depth_option, splitsize_option, targetsize_option, triggersize_option, triggerglob_option, exclude_option, include_option, padding_option, progress_option, relaxtimechecks_option, tarheader_option, yesorigin_option) ) \
     X(mount_cmd, (3, progress_option,foreground_option, fusedebug_option ) )  \

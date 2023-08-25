@@ -180,6 +180,10 @@ struct RestoreFileSystem : FileSystem
         return false;
     }
 
+    void allowAccessTimeUpdates()
+    {
+    }
+
     RC mountDaemon(Path *dir, FuseAPI *fuseapi, bool foreground=false, bool debug=false)
     {
         return RC::ERR;

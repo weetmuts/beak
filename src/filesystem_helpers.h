@@ -45,6 +45,7 @@ struct ReadOnlyFileSystem : FileSystem
     bool createHardLink(Path *path, FileStat *stat, Path *target);
     bool createFIFO(Path *path, FileStat *stat);
     bool deleteFile(Path *file);
+    void allowAccessTimeUpdates();
     RC enableWatch();
     RC addWatch(Path *dir);
     int endWatch();
