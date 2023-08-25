@@ -77,6 +77,8 @@ int run(int argc, char *argv[])
 
     setStackSize();
 
+    ::captureStartTime();
+
     // First create the OS interface to invoke external commands like rclone and rsync.
     auto sys = newSystem();
     // Next create the interface to the local file system where we find:
@@ -101,8 +103,6 @@ int run(int argc, char *argv[])
 
     // Now create the beak backup software.
     auto beak = newBeak(configuration, sys, local_fs, storage_tool, origin_tool);
-
-    beak->captureStartTime();
 
     // Configure the settings by parsing the command line and extract the command.
     Settings settings;

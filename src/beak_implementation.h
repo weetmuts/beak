@@ -65,7 +65,6 @@ struct BeakImplementation : Beak
     void printCommands(bool verbose, bool has_media);
     void printSettings(bool verbose, Command cmd, bool has_media);
 
-    void captureStartTime() {  ::captureStartTime(); }
     Command parseCommandLine(int argc, char **argv, Settings *settings);
 
     void printHelp(bool verbose, Command cmd, bool has_media);

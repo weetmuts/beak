@@ -57,7 +57,6 @@ void findAndSetLogging(int argc, char **argv);
 
 struct Beak
 {
-    virtual void captureStartTime() = 0;
     virtual Command parseCommandLine(int argc, char **argv, Settings *settings) = 0;
 
     virtual RC store(Settings *settings, Monitor *monitor) = 0;

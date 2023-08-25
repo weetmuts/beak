@@ -71,11 +71,6 @@ RecurseOption Backup::addTarEntry(Path *abspath, FileStat *st)
     if(S_ISSOCK(st->st_mode)) { return RecurseContinue; }
     #endif
 
-    if (isInTheFuture(&st->st_mtim)) {
-        warning(BACKUP, "Found future dated file %s\n", path->c_str());
-        found_future_dated_file_ = true;
-    }
-
     // Ignore any directory that has a subdir named .beak
     if(S_ISDIR(st->st_mode) && abspath->depth() > root_dir_path->depth())
     {
@@ -97,6 +92,12 @@ RecurseOption Backup::addTarEntry(Path *abspath, FileStat *st)
     // case for that we should not enter the .beak directory inside
     // the configured beak source dir that we are scanning.
     if (abspath->name()->str() == ".beak") return RecurseSkipSubTree;
+
+    // Check if the files is in the future....
+    if (isInTheFuture(&st->st_mtim)) {
+        warning(BACKUP, "Found future dated file >%s<\n", abspath->c_str());
+        found_future_dated_file_ = true;
+    }
 
     size_t len = strlen(path->c_str());
     char name[len+2];
