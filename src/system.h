@@ -63,6 +63,8 @@ struct System
     virtual RC umount(ptr<FuseMount> fuse_mount) = 0;
     // The current user running the beak software.
     virtual std::string userName() = 0;
+    // Increase the stack size.
+    virtual void setStackSize() = 0;
 
     virtual ~System() = default;
 };

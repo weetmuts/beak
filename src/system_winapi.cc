@@ -40,6 +40,7 @@ struct SystemImplementationWinapi : System
     std::unique_ptr<FuseMount> mount(Path *dir, FuseAPI *fuseapi, bool debug);
     RC umount(ptr<FuseMount> fuse_mount);
     string userName();
+    void setStackSize();
 
 private:
     int *rooot {};
@@ -104,4 +105,8 @@ RC SystemImplementationWinapi::umount(ptr<FuseMount> fuse_mount)
 string SystemImplementationWinapi::userName()
 {
     return "";
+}
+
+void SystemImplementationWinapi::setStackSize()
+{
 }

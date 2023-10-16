@@ -112,7 +112,7 @@ the cloud, before you stuff your laptop in your bag.
 The store created a _point in time_, which is defined to be the modify
 timestamp of the most recently changed file/directory within the
 _origin_ directory that was backed up. (I.e. it is not the time when
-the store was initiated.)
+the store was initiated.) Note that the timestamp is truncated to microseconds.
 
 `work:` a beak _rule_ that you have created to backup the _origin_ directory /home/you/Work to
 the local backup /home/you/Work/.beak/local and then to the remote cloud storage location s3_work_crypt:
@@ -382,13 +382,13 @@ file and the hash of the meta-data of the files inside the archive file. Like th
 
 `beak_s_1575491997.351991_2dff0195a0a468e1eab4cffe0472956a5c8374cc7caa1c2ae08af5564f974cdf_1-1_16384_20000.tar`
 
-`beak_s_seconds.nanos_metadatahash_partnr_numparts_size_paddedsize.tar`
+`beak_s_seconds.micros_metadatahash_partnr_numparts_size_paddedsize.tar`
 
 The index file, similarily named, but uses the most recently modify timestamp
 of any of the archive files it indexes _and_ the modify timestamp of the containing directory.
 The hash is the hash of the all meta-data hashes (for the tars) pointed to by this index file.
 
-`beak_z_--seconds---.--nanos--_----------metadata-hash-----------------------------------------_1-1_--size---_--paddedsize---0.gz`
+`beak_z_--seconds---.--micros--_----------metadata-hash-----------------------------------------_1-1_--size---_--paddedsize---0.gz`
 
 Assuming that your _origin_ directory `/home/you/Work/` above contained `rclonesrc/` and `gamesrc/`
 and you made the backup to `/home/you/Backup`. Now modify a file in `gamesrc/` and do another backup:
@@ -510,7 +510,6 @@ beak pack {<rule>|<storage>}
 Hosts supported:
 * x86_64-pc-linux-gnu
 * x86_64-w64-mingw32
-* arm-linux-gnueabihf
 * x86_64-apple-darwin18.2.0
 
 To have beak print detailed debug information do: `export BEAK_DEBUG_hardlinks=true`
@@ -528,13 +527,10 @@ You can have multiple configurations enabled at the same time.
 * `make debug` builds debug for all configured hosts.
 * `make debug linux64` builds only debug for gnu/linux x86_64 hosts.
 * `make debug winapi64` builds only debug for winapi 64 bit hosts.
-* `make debug arm32` builds only debug for gnu/linux arm 32 bit hosts.
 
 `./configure`
 
-`./configure --host=x86_64-w64-mingw32 --with-zlib=3rdparty/zlib-1.2.11-winapi --with-openssl=3rdparty/openssl-1.0.2-winapi`
-
-`./configure --host=arm-linux-gnueabihf --with-fuse=3rdparty/libfuse-arm/usr --with-openssl=3rdparty/openssl-1.0.2-arm --with-zlib=3rdparty/zlib-1.2.11-arm`
+`./configure --host=x86_64-w64-mingw32 --disable-media --with-zlib=3rdparty/zlib-1.3-winapi --with-openssl=3rdparty/openssl-1.0.2-winapi --with-librsync=3rdparty/librsync-winapi`
 
 ### Compiling on Darwin
 

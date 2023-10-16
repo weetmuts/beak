@@ -44,13 +44,30 @@ $(shell mkdir -p $(OUTPUT_ROOT)/$(TYPE))
 
 VERBOSE?=@
 
+ifeq ($(PLATFORM),WINAPI)
+STRIP_COMMAND:=true
+endif
+
+MEDIA_SOURCES:=beak_importmedia.cc beak_servemedia.cc beak_indexmedia.cc media.cc
+MEDIA_SOURCES:=$(addprefix $(SRC_ROOT)/src/,$(MEDIA_SOURCES))
+NO_MEDIA_SOURCES:=no_beak_importmedia.cc no_beak_servemedia.cc no_beak_indexmedia.cc no_media.cc
+NO_MEDIA_SOURCES:=$(addprefix $(SRC_ROOT)/src/,$(NO_MEDIA_SOURCES))
+
 WINAPI_SOURCES:=$(filter-out %posix.cc, $(wildcard $(SRC_ROOT)/src/*.cc))
 ifeq ($(ENABLE_FUSE),yes)
 WINAPI_SOURCES:=$(filter-out %no_fuse.cc,$(WINAPI_SOURCES))
 endif
 
+WINAPI_SOURCES:=$(filter-out %media.cc,$(WINAPI_SOURCES))
+
 WINAPI_OBJS:=\
     $(patsubst %.cc,%.o,$(subst $(SRC_ROOT)/src,$(OUTPUT_ROOT)/$(TYPE),$(WINAPI_SOURCES)))
+
+WINAPI_MEDIA_OBJS:=\
+    $(patsubst %.cc,%.o,$(subst $(SRC_ROOT)/src,$(OUTPUT_ROOT)/$(TYPE),$(MEDIA_SOURCES)))
+
+WINAPI_NO_MEDIA_OBJS:=\
+    $(patsubst %.cc,%.o,$(subst $(SRC_ROOT)/src,$(OUTPUT_ROOT)/$(TYPE),$(NO_MEDIA_SOURCES)))
 
 WINAPI_BEAK_OBJS:=\
     $(filter-out %testinternals.o,$(WINAPI_OBJS))
@@ -59,6 +76,7 @@ WINAPI_LIBS := \
 $(OUTPUT_ROOT)/$(TYPE)/libgcc_s_seh-1.dll \
 $(OUTPUT_ROOT)/$(TYPE)/libstdc++-6.dll \
 $(OUTPUT_ROOT)/$(TYPE)/libwinpthread-1.dll
+
 
 WINAPI_TESTINTERNALS_OBJS:=\
     $(filter-out %main.o,$(WINAPI_OBJS))
@@ -70,11 +88,6 @@ POSIX_SOURCES:=$(filter-out %no_fuse.cc,$(POSIX_SOURCES))
 endif
 
 POSIX_SOURCES:=$(filter-out %media.cc,$(POSIX_SOURCES))
-
-MEDIA_SOURCES:=beak_importmedia.cc beak_servemedia.cc beak_indexmedia.cc media.cc
-MEDIA_SOURCES:=$(addprefix $(SRC_ROOT)/src/,$(MEDIA_SOURCES))
-NO_MEDIA_SOURCES:=no_beak_importmedia.cc no_beak_servemedia.cc no_beak_indexmedia.cc no_media.cc
-NO_MEDIA_SOURCES:=$(addprefix $(SRC_ROOT)/src/,$(NO_MEDIA_SOURCES))
 
 POSIX_OBJS:=\
     $(patsubst %.cc,%.o,$(subst $(SRC_ROOT)/src,$(OUTPUT_ROOT)/$(TYPE),$(POSIX_SOURCES)))
@@ -115,8 +128,8 @@ $(OUTPUT_ROOT)/$(TYPE)/fileinfo.o: $(OUTPUT_ROOT)/generated_filetypes.h
 
 $(OUTPUT_ROOT)/$(TYPE)/%.o: $(SRC_ROOT)/src/%.cc
 	@echo Compiling $(TYPE) $(CONF_MNEMONIC) $$(basename $<)
-	$(VERBOSE)$(CXX) $(CXXFLAGS_$(TYPE)) $(CXXFLAGS) -I$(OUTPUT_ROOT) -I$(BUILD_ROOT) -MMD $< -c -o $@
-	$(VERBOSE)$(CXX) -E $(CXXFLAGS_$(TYPE)) $(CXXFLAGS) -I$(OUTPUT_ROOT) -I$(BUILD_ROOT) -MMD $< -c > $@.source
+	$(VERBOSE)$(CXX) -I$(OUTPUT_ROOT) -I$(BUILD_ROOT) $(CXXFLAGS_$(TYPE)) $(CXXFLAGS) -MMD $< -c -o $@
+	$(VERBOSE)$(CXX) -E  -I$(OUTPUT_ROOT) -I$(BUILD_ROOT) $(CXXFLAGS_$(TYPE)) $(CXXFLAGS) -MMD $< -c > $@.source
 
 $(OUTPUT_ROOT)/$(TYPE)/beak-media: $(BEAK_OBJS) $(BEAK_MEDIA_OBJS)
 	@echo Linking $(TYPE) $(CONF_MNEMONIC) $@
@@ -125,6 +138,7 @@ $(OUTPUT_ROOT)/$(TYPE)/beak-media: $(BEAK_OBJS) $(BEAK_MEDIA_OBJS)
 	$(VERBOSE)$(STRIP_COMMAND) $@
 	@echo Done linking $(TYPE) $(CONF_MNEMONIC) $@
 
+$(info BEAK_NO_MEDIA_OBJS=$(BEAK_NO_MEDIA_OBJS))
 $(OUTPUT_ROOT)/$(TYPE)/beak: $(BEAK_OBJS) $(BEAK_NO_MEDIA_OBJS)
 	@echo Linking $(TYPE) $(CONF_MNEMONIC) $@
 	$(VERBOSE)$(CXX) -o $@ $(LDFLAGS_$(TYPE)) $(LDFLAGS) $(BEAK_OBJS) $(BEAK_NO_MEDIA_OBJS) \
@@ -139,11 +153,11 @@ $(OUTPUT_ROOT)/$(TYPE)/testinternals: $(TESTINTERNALS_OBJS) $(BEAK_NO_MEDIA_OBJS
 	$(VERBOSE)$(STRIP_COMMAND) $@
 	@echo Done linking $(TYPE) $(CONF_MNEMONIC) $@
 
-$(OUTPUT_ROOT)/$(TYPE)/libgcc_s_seh-1.dll: /usr/lib/gcc/x86_64-w64-mingw32/5.3-win32/libgcc_s_seh-1.dll
-	cp /usr/lib/gcc/x86_64-w64-mingw32/5.3-win32/libgcc_s_seh-1.dll $@
+$(OUTPUT_ROOT)/$(TYPE)/libgcc_s_seh-1.dll: /usr/lib/gcc/x86_64-w64-mingw32/10-win32/libgcc_s_seh-1.dll
+	cp /usr/lib/gcc/x86_64-w64-mingw32/10-win32/libgcc_s_seh-1.dll $@
 
-$(OUTPUT_ROOT)/$(TYPE)/libstdc++-6.dll: /usr/lib/gcc/x86_64-w64-mingw32/5.3-win32/libstdc++-6.dll
-	cp /usr/lib/gcc/x86_64-w64-mingw32/5.3-win32/libstdc++-6.dll $@
+$(OUTPUT_ROOT)/$(TYPE)/libstdc++-6.dll: /usr/lib/gcc/x86_64-w64-mingw32/10-win32/libstdc++-6.dll
+	cp /usr/lib/gcc/x86_64-w64-mingw32/10-win32/libstdc++-6.dll $@
 
 $(OUTPUT_ROOT)/$(TYPE)/libwinpthread-1.dll: /usr/x86_64-w64-mingw32/lib/libwinpthread-1.dll
 	cp $< $@

@@ -120,6 +120,7 @@ struct FileSystemImplementationWinapi : FileSystem
     RC addWatch(Path *dir);
     int endWatch();
     FILE *openAsFILE(Path *p, const char *mode);
+    void allowAccessTimeUpdates();
 
     FileSystemImplementationWinapi() : FileSystem("FileSystemImplementationWinapi") {}
 
@@ -495,4 +496,8 @@ int  FileSystemImplementationWinapi::endWatch()
 FILE *FileSystemImplementationWinapi::openAsFILE(Path *p, const char *mode)
 {
     return fopen(p->c_str(), mode);
+}
+
+void FileSystemImplementationWinapi::allowAccessTimeUpdates()
+{
 }

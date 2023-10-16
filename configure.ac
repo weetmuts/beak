@@ -1,4 +1,4 @@
-# Copyright (C) 2017 Fredrik Öhrström
+# Copyright (C) 2017-2023 Fredrik Öhrström
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -191,7 +191,7 @@ if test "x${with_openssl}" = "x"; then
 else
     with_openssl=$(realpath ${with_openssl})
     OPENSSL_CFLAGS="-I${with_openssl}/include -DOPENSSL_API_COMPAT=0x10100000L"
-    OPENSSL_LIBS="${with_openssl}/lib/libcrypto.a"
+    OPENSSL_LIBS="${with_openssl}/libcrypto.a"
     if ! test -r ${with_openssl}/include/openssl/sha.h
     then
         AC_MSG_ERROR([Expected openssl/sha.h to be find!])
@@ -284,6 +284,8 @@ if test "${ENABLE_MEDIA}" = "yes"; then
         AC_MSG_RESULT([found])
     fi
 
+else
+    echo "media disabled"
 fi
 
 AC_MSG_CHECKING(for sizeof time_t)
