@@ -156,6 +156,10 @@ int run(int argc, char *argv[])
         rc = beak->shell(&settings, monitor.get());
         break;
 
+    case stash_cmd:
+        rc = beak->stash(&settings, monitor.get());
+        break;
+
     case import_cmd:
         rc = beak->importMedia(&settings, monitor.get());
         break;

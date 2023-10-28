@@ -471,8 +471,10 @@ first to your find command to skip it, like this: `find . -name .beak -prune -o 
 ## Command summary
 
 ```
-beak store <origin> <storage>    beak restore <storage> <origin>
+beak store <origin> <storage>   beak restore <storage> <origin>
 beak stored <origin> <storage>
+
+beak stash                      beak unstash
 
 beak importmedia <dir_with_media> <origin>
 beak indexmedia <origin>

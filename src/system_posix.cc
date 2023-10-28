@@ -231,6 +231,7 @@ struct SystemImplementation : System
     ~SystemImplementation() = default;
 
     void setStackSize();
+    Path *cwd();
 
     private:
 
@@ -586,4 +587,12 @@ void SystemImplementation::setStackSize()
     }
 
     // ...
+}
+
+Path *SystemImplementation::cwd()
+{
+    const char *p = getcwd(NULL, 0);
+    Path *rp = Path::lookup(p);
+    free((void*)p);
+    return rp;
 }

@@ -99,6 +99,7 @@ struct BeakImplementation : Beak
     RC monitor(Settings *settings, Monitor *monitor);
     RC store(Settings *settings, Monitor *monitor);
     RC restore(Settings *settings, Monitor *monitor);
+    RC stash(Settings *settings, Monitor *monitor);
 
     void genAutoComplete(string filename);
 

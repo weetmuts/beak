@@ -425,6 +425,10 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
                           "less than 0, ie the root.\n");
                 }
                 break;
+            case diff_option:
+                settings->diff = true;
+                settings->diff_supplied = true;
+                break;
             case dryrun_option:
                 settings->dryrun = true;
                 settings->dryrun_supplied = true;
@@ -450,6 +454,10 @@ Command BeakImplementation::parseCommandLine(int argc, char **argv, Settings *se
             case listlog_option:
                 listLogComponents();
                 exit(0);
+                break;
+            case list_option:
+                settings->list = true;
+                settings->list_supplied = true;
                 break;
             case monitor_option:
                 settings->monitor = true;

@@ -65,6 +65,8 @@ struct System
     virtual std::string userName() = 0;
     // Increase the stack size.
     virtual void setStackSize() = 0;
+    // Get the current working directory.
+    virtual Path *cwd() = 0;
 
     virtual ~System() = default;
 };

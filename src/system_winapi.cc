@@ -41,6 +41,7 @@ struct SystemImplementationWinapi : System
     RC umount(ptr<FuseMount> fuse_mount);
     string userName();
     void setStackSize();
+    Path *cwd();
 
 private:
     int *rooot {};

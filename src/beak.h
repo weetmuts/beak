@@ -76,6 +76,7 @@ struct Beak
     virtual RC monitor(Settings *settings, Monitor *monitor) = 0;
     virtual RC push(Settings *settings, Monitor *monitor) = 0;
     virtual RC pull(Settings *settings, Monitor *monitor) = 0;
+    virtual RC stash(Settings *settings, Monitor *monitor) = 0;
 
     virtual RC umountDaemon(Settings *settings) = 0;
 
@@ -141,6 +142,7 @@ enum ArgumentType
     X(index,CommandType::MEDIA,"Scan imported media and generate thumbnails and index.html.",ArgOrigin,ArgNone) \
     X(serve,CommandType::MEDIA,"Serve imported media to a web-browser.",ArgOrigin,ArgNone) \
     X(status,CommandType::PRIMARY,"Show the backup status of your configured rules.",ArgRuleOrNone,ArgNone) \
+    X(stash,CommandType::PRIMARY,"Stash the current directory into a local temporary backup.",ArgNone,ArgNone) \
     X(store,CommandType::PRIMARY,"Store your file system into a backup.",ArgOrigin,ArgStorage) \
     X(stored,CommandType::PRIMARY,"Store your file system into a backup using delta compression.",ArgOrigin,ArgStorage) \
     X(umount,CommandType::PRIMARY,"Unmount a virtual file system.",ArgDir,ArgNone) \
@@ -159,12 +161,14 @@ LIST_OF_COMMANDS
     X(OptionType::LOCAL_PRIMARY,,deepcheck,bool,false,"Do deep checking of backup integrity.") \
     X(OptionType::LOCAL_PRIMARY,,delta,bool,true,"Use delta compression.")    \
     X(OptionType::LOCAL_PRIMARY,,depth,int,true,"Force all dirs at this depth to contain tars. 1 is the root, 2 is the first subdir. The default is 2.")    \
+    X(OptionType::LOCAL_PRIMARY,,diff,bool,false,"Diff against stash.") \
     X(OptionType::LOCAL_PRIMARY,,dryrun,bool,false,"Print what would be done, do not actually perform the prune/store.") \
     X(OptionType::LOCAL_SECONDARY,f,foreground,bool,false,"When mounting do not spawn a daemon.")   \
     X(OptionType::LOCAL_SECONDARY,fd,fusedebug,bool,false,"Enable fuse debug mode, this also triggers foreground.") \
     X(OptionType::LOCAL_PRIMARY,bg,background,bool,false,"Enter background mode, the progress can be monitored using \"beak monitor\".") \
     X(OptionType::LOCAL_PRIMARY,i,include,std::vector<std::string>,true,"Only matching paths are inluded. E.g. -i '*.c'") \
     X(OptionType::LOCAL_PRIMARY,k,keep,std::string,true,"Keep rule for prune.") \
+    X(OptionType::LOCAL_PRIMARY,,list,bool,false,"List stashes.") \
     X(OptionType::GLOBAL_SECONDARY,l,log,std::string,true,"Log debug messages for these parts. E.g. --log=backup,hashing --log=all,-lock") \
     X(OptionType::GLOBAL_SECONDARY,ll,listlog,bool,false,"List all log parts available.") \
     X(OptionType::LOCAL_PRIMARY,,monitor,bool,false,"Display download progress of cache downloads.") \
@@ -210,7 +214,8 @@ LIST_OF_OPTIONS
     X(pull_cmd, (2, background_option, progress_option) ) \
     X(push_cmd, (2, background_option, delta_option, progress_option) )  \
     X(pushd_cmd, (2, background_option, delta_option, progress_option) ) \
-    X(restore_cmd, (4, background_option, progress_option, yesrestore_option, forceoverwritefiles_option) )
+    X(restore_cmd, (4, background_option, progress_option, yesrestore_option, forceoverwritefiles_option) )  \
+    X(stash_cmd, (1, diff_option, list_option) )
 
 
 struct CommandOption
