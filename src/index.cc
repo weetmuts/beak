@@ -184,6 +184,10 @@ RC Index::loadIndex(vector<char> &v,
             break;
         }
         // Remove the newline at the end.
+        if (tar_file.length() == 0) {
+            failure(INDEX, "File format error gz file. [%d]\n", __LINE__);
+            break;
+        }
         tar_file.pop_back();
         if (tar_file.length()==0) continue;
         auto dots = tar_file.find(" ... ");
