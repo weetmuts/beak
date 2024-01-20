@@ -4699,12 +4699,6 @@ fi
 printf "%s\n" "found" >&6; }
     fi
 
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for libmagick++-dev" >&5
-printf %s "checking for libmagick++-dev... " >&6; }
-
-    MEDIA_CFLAGS="${MEDIA_CFLAGS} $(Magick++-config --cppflags)"
-    MEDIA_LIBS="${MEDIA_LIBS} $(Magick++-config --libs)"
-
     { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for libavformat" >&5
 printf %s "checking for libavformat... " >&6; }
 
@@ -4720,6 +4714,36 @@ fi
         { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: found" >&5
 printf "%s\n" "found" >&6; }
     fi
+
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for Imagemagick MagickCore" >&5
+printf %s "checking for Imagemagick MagickCore... " >&6; }
+    if $PKG_CONFIG MagickCore --cflags > /dev/null 2>&1
+    then
+        MAGICKCORE_CFLAGS="$($PKG_CONFIG MagickCore --cflags)"
+        MAGICKCORE_LIBS="$($PKG_CONFIG MagickCore --libs)"
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: found" >&5
+printf "%s\n" "found" >&6; }
+    else
+        as_fn_error $? "Could not find MagickCore!" "$LINENO" 5
+    fi
+
+    MEDIA_CFLAGS="${MEDIA_CFLAGS} ${MAGICKCORE_CFLAGS}"
+    MEDIA_LIBS="${MEDIA_LIBS} ${MAGICKCORE_LIBS}"
+
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for Imagemagick Magick++" >&5
+printf %s "checking for Imagemagick Magick++... " >&6; }
+    if $PKG_CONFIG Magick++ --cflags > /dev/null 2>&1
+    then
+        MAGICKPP_CFLAGS="$($PKG_CONFIG Magick++ --cflags)"
+        MAGICKPP_LIBS="$($PKG_CONFIG Magick++ --libs)"
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: found" >&5
+printf "%s\n" "found" >&6; }
+    else
+        as_fn_error $? "Could not find Magick++!" "$LINENO" 5
+    fi
+
+    MEDIA_CFLAGS="${MEDIA_CFLAGS} ${MAGICKPP_CFLAGS}"
+    MEDIA_LIBS="${MEDIA_LIBS} ${MAGICKPP_LIBS}"
 
 else
     echo "media disabled"

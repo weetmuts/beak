@@ -16,6 +16,7 @@
  */
 
 // This must be before log.h since it declares a debug macro.
+#include <assert.h>
 #include <Magick++.h>
 
 #include "beak.h"

@@ -1,4 +1,4 @@
-# Copyright (C) 2017-2023 Fredrik Öhrström
+# Copyright (C) 2017-2024 Fredrik Öhrström
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -269,11 +269,6 @@ if test "${ENABLE_MEDIA}" = "yes"; then
         AC_MSG_RESULT([found])
     fi
 
-    AC_MSG_CHECKING([for libmagick++-dev])
-
-    MEDIA_CFLAGS="${MEDIA_CFLAGS} $(Magick++-config --cppflags)"
-    MEDIA_LIBS="${MEDIA_LIBS} $(Magick++-config --libs)"
-
     AC_MSG_CHECKING([for libavformat])
     AC_ARG_WITH(libavformat, [AS_HELP_STRING([--with-libavformat],
         [specify prefix directory for the libavformat package
@@ -283,6 +278,32 @@ if test "${ENABLE_MEDIA}" = "yes"; then
         MEDIA_LIBS="${MEDIA_LIBS} -lavutil -lavformat -lavcodec"
         AC_MSG_RESULT([found])
     fi
+
+    AC_MSG_CHECKING([for Imagemagick MagickCore])
+    if $PKG_CONFIG MagickCore --cflags > /dev/null 2>&1
+    then
+        MAGICKCORE_CFLAGS="$($PKG_CONFIG MagickCore --cflags)"
+        MAGICKCORE_LIBS="$($PKG_CONFIG MagickCore --libs)"
+        AC_MSG_RESULT([found])
+    else
+        AC_MSG_ERROR([Could not find MagickCore!])
+    fi
+
+    MEDIA_CFLAGS="${MEDIA_CFLAGS} ${MAGICKCORE_CFLAGS}"
+    MEDIA_LIBS="${MEDIA_LIBS} ${MAGICKCORE_LIBS}"
+
+    AC_MSG_CHECKING([for Imagemagick Magick++])
+    if $PKG_CONFIG Magick++ --cflags > /dev/null 2>&1
+    then
+        MAGICKPP_CFLAGS="$($PKG_CONFIG Magick++ --cflags)"
+        MAGICKPP_LIBS="$($PKG_CONFIG Magick++ --libs)"
+        AC_MSG_RESULT([found])
+    else
+        AC_MSG_ERROR([Could not find Magick++!])
+    fi
+
+    MEDIA_CFLAGS="${MEDIA_CFLAGS} ${MAGICKPP_CFLAGS}"
+    MEDIA_LIBS="${MEDIA_LIBS} ${MAGICKPP_LIBS}"
 
 else
     echo "media disabled"

@@ -15,7 +15,9 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
 #include <Magick++.h>
+#include <magick/MagickCore.h>
 
 #include "beak.h"
 #include "beak_implementation.h"
@@ -967,6 +969,7 @@ RC MediaDatabase::generateThumbnail(Media *m, Path *root)
             {
                 verbose(MEDIA, "Caught warning: %s\n", w.what());
             }
+            //MagickCore::GetImagePerceptualHash(image, sdf);
             // Resize the image to specified size (width, height, xOffset, yOffset)
             // Keep aspect ratio.
             string s = image.attribute("EXIF:Orientation");
