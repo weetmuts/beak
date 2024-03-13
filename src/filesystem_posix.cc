@@ -161,12 +161,20 @@ FileSystem *default_file_system_ {};
 
 Path *cache_dir_ {};
 
+Path *backups_dir_ {};
+
 Path *configuration_file_ {};
 
 Path *initCacheDir_()
 {
     Path *home = Path::lookup(getenv("HOME"));
     return home->append(".cache/beak");
+}
+
+Path *initBackupsDir_()
+{
+    Path *home = Path::lookup(getenv("HOME"));
+    return home->append(".backups/beak");
 }
 
 Path *initConfigurationFile_()
@@ -179,6 +187,9 @@ unique_ptr<FileSystem> newDefaultFileSystem(System *sys)
 {
     if (!cache_dir_) {
         cache_dir_ = initCacheDir_();
+    }
+    if (!backups_dir_) {
+        backups_dir_ = initBackupsDir_();
     }
     if (!configuration_file_) {
         configuration_file_ = initConfigurationFile_();
@@ -699,6 +710,11 @@ Path *configurationFile()
 Path *cacheDir()
 {
     return cache_dir_;
+}
+
+Path *backupsDir()
+{
+    return backups_dir_;
 }
 
 RC FileSystemImplementationPosix::enableWatch()

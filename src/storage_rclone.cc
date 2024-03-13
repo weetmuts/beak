@@ -192,7 +192,7 @@ RC rcloneSendFiles(Storage *storage,
 
     vector<string> args;
     args.push_back("copy");
-    args.push_back("-v");
+    args.push_back("-vv");
     args.push_back("--stats-one-line");
     args.push_back("--stats=10s");
     if (writeonly) args.push_back("--s3-no-head");

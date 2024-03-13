@@ -442,14 +442,9 @@ Storage* Rule::storage(Path *storage_location)
 
 void Rule::generateDefaultSettingsBasedOnPath()
 {
-    cache_path = realPath(origin_path, ".beak/cache");
-
-    cache_path = Path::lookup(".beak/cache");
+    cache_path = cacheDir()->append(name);
     cache_size = 10ul+1024*1024*1024;
-
-    string keep = DEFAULT_LOCAL_KEEP_RULE;
-
-    local = { FileSystemStorage, Path::lookup(".beak/local"), keep };
+    local = { FileSystemStorage, backupsDir()->append(name), DEFAULT_LOCAL_KEEP_RULE };
 }
 
 void ConfigurationImplementation::editName(Rule *r)

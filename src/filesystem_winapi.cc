@@ -134,6 +134,8 @@ private:
 
 Path *cache_dir_ {};
 
+Path *backups_dir_ {};
+
 Path *configuration_file_ {};
 
 Path *initCacheDir_()
@@ -151,6 +153,23 @@ Path *initCacheDir_()
     string homes = string(homedrive)+string(homepath);
     Path *homep = Path::lookup(homes);
     return homep->append(".cache/beak");
+}
+
+Path *initBackupsDir_()
+{
+    const char *homedrive = getenv("HOMEDRIVE");
+    const char *homepath = getenv("HOMEPATH");
+
+    if (homedrive == NULL) {
+        error(FILESYSTEM, "Could not find home drive!\n");
+    }
+    if (homepath == NULL) {
+        error(FILESYSTEM, "Could not find home directory!\n");
+    }
+
+    string homes = string(homedrive)+string(homepath);
+    Path *homep = Path::lookup(homes);
+    return homep->append(".backups/beak");
 }
 
 Path *initConfigurationFile_()
@@ -175,6 +194,9 @@ unique_ptr<FileSystem> newDefaultFileSystem(System *sys)
 {
     if (!cache_dir_) {
         cache_dir_ = initCacheDir_();
+    }
+    if (!backups_dir_) {
+        backups_dir_ = initBackupsDir_();
     }
     if (!configuration_file_) {
         configuration_file_ = initConfigurationFile_();

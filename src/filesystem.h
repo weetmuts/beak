@@ -397,6 +397,7 @@ std::unique_ptr<FileSystem> newStatOnlyFileSystem(System *sys, std::map<Path*,Fi
 
 Path *configurationFile();
 Path *cacheDir();
+Path *backupsDir();
 
 dev_t MakeDev(int maj, int min);
 int MajorDev(dev_t d);
