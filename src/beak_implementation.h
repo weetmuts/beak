@@ -71,6 +71,7 @@ struct BeakImplementation : Beak
     void printVersion(bool verbose);
 
     RC configure(Settings *settings);
+    RC delta(Settings *settings, Monitor *monitor);
     RC diff(Settings *settings, Monitor *monitor);
     RC stat(Settings *settings, Monitor *monitor);
     RC fsck(Settings *settings, Monitor *monitor);

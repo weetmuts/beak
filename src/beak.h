@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2016-2020 Fredrik Öhrström
+ Copyright (C) 2016-2024 Fredrik Öhrström
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -68,6 +68,7 @@ struct Beak
     virtual RC prune(Settings *settings, Monitor *monitor) = 0;
 
     virtual RC diff(Settings *settings, Monitor *monitor) = 0;
+    virtual RC delta(Settings *settings, Monitor *monitor) = 0;
     virtual RC stat(Settings *settings, Monitor *monitor) = 0;
     virtual RC fsck(Settings *settings, Monitor *monitor) = 0;
     virtual RC configure(Settings *settings) = 0;
@@ -124,6 +125,7 @@ enum ArgumentType
 #define LIST_OF_COMMANDS \
     X(bmount,CommandType::SECONDARY,"Mount your file system as a backup.",ArgOrigin,ArgDir) \
     X(config,CommandType::PRIMARY,"Configure backup rules.",ArgNone,ArgNone)               \
+    X(delta,CommandType::PRIMARY,"Create new delta files in to storage for beak files not in from storage.",ArgStorage,ArgStorage) \
     X(diff,CommandType::PRIMARY,"Show differences between backups and/or origins.",ArgORS,ArgORS) \
     X(fsck,CommandType::PRIMARY,"Check the integrity of your backup.",ArgStorage,ArgNone) \
     X(genautocomplete,CommandType::SECONDARY,"Output bash completion script for beak.",ArgFileOrNone,ArgNone) \
@@ -203,6 +205,7 @@ LIST_OF_OPTIONS
 #define LIST_OF_OPTIONS_PER_COMMAND \
     X(bmount_cmd, (16, contentsplit_option, depth_option, foreground_option, fusedebug_option, splitsize_option, tarheader_option, targetsize_option, triggersize_option, triggerglob_option, exclude_option, include_option, progress_option, padding_option, relaxtimechecks_option, tarheader_option, yesorigin_option) ) \
     X(config_cmd, (0) ) \
+    X(delta_cmd, (0) ) \
     X(diff_cmd, (1, depth_option) ) \
     X(stat_cmd, (1, depth_option) ) \
     X(fsck_cmd, (1, deepcheck_option) ) \
