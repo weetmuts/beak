@@ -83,6 +83,7 @@ struct TarFileName
     std::string header_hash {};
     uint part_nr {};
     uint num_parts {};
+    bool old_style {}; // no human readable date time
 
     TarFileName() : version(2) {};
     TarFileName(const TarFileName&tfn) : type(tfn.type),

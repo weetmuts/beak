@@ -285,6 +285,7 @@ bool TarFileName::parseFileName(string &name, string *dir)
 
 bool TarFileName::parseFileNameVersion_(string &name, size_t p1)
 {
+    // old style beak_z_1597335691.456088_4626d1b74c82f446e1ab01f746b10b83bbfcf33ee6f56f9fd5978f5df0d55033_1-1_1536_2000.gz
     // beak_z_1597335691.456088.2024-01-13.1232_4626d1b74c82f446e1ab01f746b10b83bbfcf33ee6f56f9fd5978f5df0d55033_1-1_1536_2000.gz
     bool k;
     size_t p2 = name.find('.', p1+1); if (p2 == string::npos) return false;
@@ -305,7 +306,11 @@ bool TarFileName::parseFileNameVersion_(string &name, size_t p1)
     if (len < 6) return false;
     k = digitsOnly(&name[p2+1], 6, &usecss);
     if (!k) return false;
-    if (len == 22)
+    if (len == 6)
+    {
+        old_style = true;
+    }
+    else
     {
         // Check the contents of the date string as well.
     }
@@ -362,13 +367,18 @@ void TarFileName::writeTarFileNameIntoBufferVersion_(char *buf, size_t buf_len, 
     long usec = nsec/1000;
     snprintf(secs_and_micros, 32, "%" PRINTF_TIME_T "u.%06lu", sec, usec);
 
-    char date_time[18];
-    // YYYY-MM-DD.HHMMSS
+    char date_time[20];
+    // .YYYY-MM-DD.HHMMSS
     memset(date_time, 0, sizeof(date_time));
     struct tm tmp;
     memset(&tmp, 0, sizeof(tmp));
     gmtime_r(&sec, &tmp);
-    strftime(date_time, 18, "%Y-%m-%d.%H%M%S", &tmp);
+    strftime(date_time, 20, ".%Y-%m-%d.%H%M%S", &tmp);
+
+    if (old_style)
+    {
+        date_time[0] = 0;
+    }
 
     // Add 1 to part_nr, to make the index count from 1 in the file names.
     string partnr = toHex(part_nr+1, num_parts);
@@ -376,7 +386,7 @@ void TarFileName::writeTarFileNameIntoBufferVersion_(char *buf, size_t buf_len, 
 
     if (dir == NULL)
     {
-        snprintf(buf, buf_len, "beak_%c_%s.%s_%s_%s-%x_%s_%s.%s",
+        snprintf(buf, buf_len, "beak_%c_%s%s_%s_%s-%x_%s_%s.%s",
                  TarFileName::chartype(type),
                  secs_and_micros,
                  date_time,
@@ -390,7 +400,7 @@ void TarFileName::writeTarFileNameIntoBufferVersion_(char *buf, size_t buf_len, 
     else
     {
         const char *slashornot = dir->str().length() > 0 ? "/" : "";
-        snprintf(buf, buf_len, "%s%sbeak_%c_%s.%s_%s_%s-%x_%s_%s.%s",
+        snprintf(buf, buf_len, "%s%sbeak_%c_%s%s_%s_%s-%x_%s_%s.%s",
                  dir->c_str(),
                  slashornot,
                  TarFileName::chartype(type),
