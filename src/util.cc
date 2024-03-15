@@ -868,6 +868,18 @@ bool digitsOnly(char *p, size_t len, string *s) {
     return true;
 }
 
+bool digitsDotsAndMinusOnly(char *p, size_t len, string *s) {
+    while (len-- > 0) {
+        char c = *p++;
+        if (!c) return false;
+        if (!isdigit(c) &&
+            c != '.' &&
+            c != '-') return false;
+        s->push_back(c);
+    }
+    return true;
+}
+
 bool hexDigitsOnly(char *p, size_t len, string *s) {
     while (len-- > 0) {
         char c = *p++;

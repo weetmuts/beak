@@ -116,6 +116,9 @@ void printContents(std::map<Path*,FileStat> &contents);
 // Extract the leading digits from buf and store into s.
 bool digitsOnly(char *buf, size_t len, std::string *s);
 
+// Extract for example a human readable UTC timestamp 2024-01-01.1451
+bool digitsDotsAndMinusOnly(char *p, size_t len, std::string *s);
+
 // Extract the leading hex digits from buf and store into s.
 bool hexDigitsOnly(char *buf, size_t len, std::string *s);
 

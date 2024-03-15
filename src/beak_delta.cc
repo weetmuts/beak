@@ -27,7 +27,7 @@ static ComponentId DELTA = registerLogComponent("delta");
 RC BeakImplementation::delta(Settings *settings, Monitor *monitor)
 {
     RC rc = RC::OK;
-
+    /*
     // From is usually the remote that has fewer beak files.
     assert(settings->from.type == ArgStorage);
     // To is the local storage with more beak files.
@@ -160,6 +160,6 @@ RC BeakImplementation::delta(Settings *settings, Monitor *monitor)
             UI::output("Broken points in time are now deleted. Run fsck again.\n");
         }
     }
-
+    */
     return rc;
 }

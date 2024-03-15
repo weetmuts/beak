@@ -102,6 +102,10 @@ int run(int argc, char *argv[])
         rc = beak->configure(&settings);
         break;
 
+    case delta_cmd:
+        rc = beak->delta(&settings, monitor.get());
+        break;
+
     case diff_cmd:
         rc = beak->diff(&settings, monitor.get());
         break;
