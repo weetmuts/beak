@@ -125,9 +125,11 @@ RC BeakImplementation::fsck(Settings *settings, Monitor *monitor)
 
         if (proceed == UIYes)
         {
+            progress->startDisplayOfProgress();
             storage_tool_->removeBackupFiles(settings->from.storage,
                                              superfluous_files,
                                              progress.get());
+            progress->finishProgress();
             UI::output("Superflous files are now deleted.\n");
         }
     }
@@ -142,9 +144,11 @@ RC BeakImplementation::fsck(Settings *settings, Monitor *monitor)
 
         if (proceed == UIYes)
         {
+            progress->startDisplayOfProgress();
             storage_tool_->removeBackupFiles(settings->from.storage,
                                              broken_points_in_time,
                                              progress.get());
+            progress->finishProgress();
             UI::output("Broken points in time are now deleted. Run fsck again.\n");
         }
     }
