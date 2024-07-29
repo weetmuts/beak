@@ -329,14 +329,16 @@ struct FileSystem
     virtual ssize_t pread(Path *p, char *buf, size_t size, off_t offset) = 0;
     virtual RC recurse(Path *p, std::function<RecurseOption(Path *path, FileStat *stat)> cb) = 0;
     virtual RC recurse(Path *p, std::function<RecurseOption(const char *path, const struct stat *sb)> cb) = 0;
-    // List all files below p, sort on CTimeDesc
-    virtual RC listFilesBelow(Path *p, std::vector<std::pair<Path*,FileStat>> *files, SortOrder so);
+    // List all directories below p.
+    virtual RC listDirsBelow(Path *p, std::vector<std::pair<Path*,FileStat>> *files, SortOrder so, int max_depth = 0);
+    // List all files below p.
+    virtual RC listFilesBelow(Path *p, std::vector<std::pair<Path*,FileStat>> *files, SortOrder so, int max_depth = 0);
     // Touch the meta data of the file to trigger an update of the ctime to NOW.
     virtual RC ctimeTouch(Path *file) = 0;
     virtual RC stat(Path *p, FileStat *fs) = 0;
     virtual RC chmod(Path *p, FileStat *stat) = 0;
     virtual RC utime(Path *p, FileStat *stat) = 0;
-    virtual Path *tempDir() = 0;
+    virtual Path *userRunDir() = 0;
     virtual Path *mkTempFile(std::string prefix, std::string content) = 0;
     virtual Path *mkTempDir(std::string prefix) = 0;
             bool mkDirpWriteable(Path *p);
@@ -350,9 +352,11 @@ struct FileSystem
     // file: The filename to be created or overwritten.
     // stat: The size and permissions of the to be created file.
     // cb: Callback to fetch the data to be written into the file.
+    // buffer_size: how large chunks to read and write
     virtual bool createFile(Path *file,
                             FileStat *stat,
-                            std::function<size_t(off_t offset, char *buffer, size_t len)> cb) = 0;
+                            std::function<size_t(off_t offset, char *buffer, size_t len)> cb,
+                            size_t buffer_size = 65536) = 0;
 
     virtual bool createSymbolicLink(Path *file, FileStat *stat, std::string target) = 0;
     virtual bool createHardLink(Path *file, FileStat *stat, Path *target) = 0;

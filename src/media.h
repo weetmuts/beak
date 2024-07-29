@@ -52,6 +52,8 @@ public:
     std::string ext() { return ext_; }
     std::string yymmdd() { return yymmdd_; }
     Orientation orientation() { return orientation_; }
+    size_t size() { return size_; }
+    time_t timestamp() { return ts_.tv_sec; }
 
 protected:
     MediaType type_ {};
@@ -124,5 +126,8 @@ protected:
     // Remember media files that could not be decoded.
     std::set<Path*> failed_to_understand_;
 };
+
+std::string normalizeMediaSuffix(Path *p);
+std::string normalizeMediaSuffix(const char *ext);
 
 #endif

@@ -956,6 +956,21 @@ RC parseYYYYMMDDhhmmss(string dt, struct tm *tp)
     return RC::OK;
 }
 
+RC parseYYYY_MM_DD_hh_mm_ss(string dt, struct tm *tp)
+{
+    // 2019-03-20 15:32:12
+    int n = sscanf(dt.c_str(), "%04d-%02d-%02d %02d:%02d:%02d",
+                   &tp->tm_year, &tp->tm_mon, &tp->tm_mday,
+                   &tp->tm_hour, &tp->tm_min, &tp->tm_sec);
+    if (n<3) {
+        return RC::ERR;
+    }
+    tp->tm_year -= 1900;
+    tp->tm_mon -= 1;
+
+    return RC::OK;
+}
+
 RC parseDateTimeUTCNanos(string dt, time_t *tv_sec, long *tv_nsec)
 {
     struct tm tp {};

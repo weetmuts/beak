@@ -43,12 +43,16 @@ std::unique_ptr<ThreadCallback> newRegularThreadCallback(int millis, std::functi
 
 struct System
 {
+    virtual RC run(std::string program,
+                   std::vector<std::string> args,
+                   int *out_rc = NULL) = 0;
     // Invoke another program within the OS
     virtual RC invoke(std::string program,
-                       std::vector<std::string> args,
-                       std::vector<char> *output = NULL,
-                       Capture capture = CaptureStdout,
-                       std::function<void(char *buf, size_t len)> output_cb = NULL) = 0;
+                      std::vector<std::string> args,
+                      std::vector<char> *output = NULL,
+                      Capture capture = CaptureStdout,
+                      std::function<void(char *buf, size_t len)> output_cb = NULL,
+                      int *out_rc = NULL) = 0;
 
     virtual RC invokeShell(Path *init_file) = 0;
     // Check if pid exists.
@@ -67,6 +71,8 @@ struct System
     virtual void setStackSize() = 0;
     // Get the current working directory.
     virtual Path *cwd() = 0;
+    // Get user real uid.
+    virtual uid_t getUID() = 0;
 
     virtual ~System() = default;
 };
@@ -78,5 +84,7 @@ static RC invoke(std::string program,
                  std::vector<char> *output,
                  Capture capture,
                  std::function<void(char *buf, size_t len)> cb);
+
+void onTerminated(std::string msg, std::function<void()> cb);
 
 #endif

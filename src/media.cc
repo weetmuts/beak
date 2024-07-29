@@ -1043,3 +1043,29 @@ RC MediaDatabase::generateThumbnail(Media *m, Path *root)
 
     return RC::OK;
 }
+
+string normalizeMediaSuffix(Path *p)
+{
+    string ext = p->name()->ext_c_str_();
+
+    return normalizeMediaSuffix(ext.c_str());
+}
+
+string normalizeMediaSuffix(const char *suffix)
+{
+    string ext = suffix;
+    if (media_helper_.img_suffixes_.count(ext) != 0)
+    {
+        ext = media_helper_.img_suffixes_[ext];
+    }
+    else if (media_helper_.vid_suffixes_.count(ext) != 0)
+    {
+        ext = media_helper_.vid_suffixes_[ext];
+    }
+    else if (media_helper_.aud_suffixes_.count(ext) != 0)
+    {
+        ext = media_helper_.aud_suffixes_[ext];
+    }
+
+    return ext;
+}

@@ -31,7 +31,7 @@ RC BeakImplementation::stat(Settings *settings, Monitor *monitor)
 
     assert(settings->from.type == ArgOrigin || settings->from.type == ArgRule || settings->from.type == ArgStorage);
 
-    auto progress = monitor->newProgressStatistics(buildJobName("stats", settings));
+    auto progress = monitor->newProgressStatistics(buildJobName("stats", settings), "stat");
 
     FileSystem *curr_fs = NULL;
     FileSystem *old_fs = NULL;

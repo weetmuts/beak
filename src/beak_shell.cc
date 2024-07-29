@@ -55,7 +55,7 @@ RC BeakImplementation::shell(Settings *settings, Monitor *monitor)
     settings->fuse_args.push_back(mount->str());
     settings->updateFuseArgsArray();
 
-    auto progress = monitor->newProgressStatistics(buildJobName("shell", settings));
+    auto progress = monitor->newProgressStatistics(buildJobName("shell", settings), "store");
 
     rc = mountRestore(settings, monitor);
     if (rc.isErr()) goto cleanup;

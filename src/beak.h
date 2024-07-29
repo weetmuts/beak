@@ -62,6 +62,7 @@ struct Beak
     virtual RC store(Settings *settings, Monitor *monitor) = 0;
     virtual RC restore(Settings *settings, Monitor *monitor) = 0;
     virtual RC shell(Settings *settings, Monitor *monitor) = 0;
+    virtual RC cameraMedia(Settings *settings, Monitor *monitor) = 0;
     virtual RC importMedia(Settings *settings, Monitor *monitor) = 0;
     virtual RC indexMedia(Settings *settings, Monitor *monitor) = 0;
     virtual RC serveMedia(Settings *settings, Monitor *monitor) = 0;
@@ -124,6 +125,7 @@ enum ArgumentType
 
 #define LIST_OF_COMMANDS \
     X(bmount,CommandType::SECONDARY,"Mount your file system as a backup.",ArgOrigin,ArgDir) \
+    X(camera,CommandType::MEDIA,"Find camera devices and import media from them into the selected target dir.",ArgDir,ArgDir) \
     X(config,CommandType::PRIMARY,"Configure backup rules.",ArgNone,ArgNone)               \
     X(delta,CommandType::PRIMARY,"Create new delta files in to storage for beak files not in from storage.",ArgStorage,ArgStorage) \
     X(diff,CommandType::PRIMARY,"Show differences between backups and/or origins.",ArgORS,ArgORS) \

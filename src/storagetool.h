@@ -45,7 +45,8 @@ struct StorageTool
                                      Path *backup_dir,
                                      Storage *storage,
                                      Settings *settings,
-                                     ProgressStatistics *progress) = 0;
+                                     ProgressStatistics *progress,
+                                     size_t buffer_size = 65536) = 0;
 
     virtual FileSystem *asCachedReadOnlyFS(Storage *storage,
                                            Monitor *monitor) = 0;

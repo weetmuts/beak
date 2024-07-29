@@ -26,11 +26,15 @@ using namespace std;
 
 struct SystemImplementationWinapi : System
 {
+    RC run(string program,
+           vector<string> args,
+           int *out_rc);
     RC invoke(string program,
-               vector<string> args,
-               vector<char> *output,
-               Capture capture,
-               function<void(char *buffer, size_t len)> cb);
+              vector<string> args,
+              vector<char> *output,
+              Capture capture,
+              function<void(char *buffer, size_t len)> cb,
+              int *out_rc);
 
     RC invokeShell(Path *init_file);
     bool processExists(pid_t pid);
@@ -42,6 +46,7 @@ struct SystemImplementationWinapi : System
     string userName();
     void setStackSize();
     Path *cwd();
+    uid_t getUID() {  return 0; }
 
 private:
     int *rooot {};
@@ -55,6 +60,13 @@ unique_ptr<System> newSystem()
 string protect_(string arg)
 {
     return arg;
+}
+
+RC SystemImplementation::run(string program,
+                             vector<string> args,
+                             int *out_rc)
+{
+    return RC::ERR;
 }
 
 RC SystemImplementationWinapi::invoke(string program,

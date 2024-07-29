@@ -41,7 +41,7 @@ RC BeakImplementation::store(Settings *settings, Monitor *monitor)
     storage_fs->recurse(Path::lookupRoot(),
                         [](Path *path, FileStat *stat) { return RecurseContinue; });
 
-    unique_ptr<ProgressStatistics> progress = monitor->newProgressStatistics(buildJobName("store", settings));
+    unique_ptr<ProgressStatistics> progress = monitor->newProgressStatistics(buildJobName("store", settings), "store");
     progress->startDisplayOfProgress();
 
     unique_ptr<Backup> backup  = newBackup(origin_tool_->fs());

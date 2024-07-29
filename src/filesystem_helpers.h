@@ -33,14 +33,15 @@ struct ReadOnlyFileSystem : FileSystem
 
     RC chmod(Path *p, FileStat *stat);
     RC utime(Path *p, FileStat *stat);
-    Path *tempDir();
+    Path *userRunDir();
     Path *mkTempFile(std::string prefix, std::string content);
     Path *mkTempDir(std::string prefix);
     Path *mkDir(Path *path, std::string name, int permissions);
     RC rmDir(Path *path);
     RC createFile(Path *file, std::vector<char> *buf);
     bool createFile(Path *path, FileStat *stat,
-                    std::function<size_t(off_t offset, char *buffer, size_t len)> cb);
+                    std::function<size_t(off_t offset, char *buffer, size_t len)> cb,
+                    size_t buffer_size);
     bool createSymbolicLink(Path *path, FileStat *stat, std::string target);
     bool createHardLink(Path *path, FileStat *stat, Path *target);
     bool createFIFO(Path *path, FileStat *stat);

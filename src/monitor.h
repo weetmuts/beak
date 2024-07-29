@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2019 Fredrik Öhrström
+ Copyright (C) 2019-2024 Fredrik Öhrström
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -90,7 +90,7 @@ enum class ProgressDisplayType
 
 struct Monitor
 {
-    virtual std::unique_ptr<ProgressStatistics> newProgressStatistics(std::string job) = 0;
+    virtual std::unique_ptr<ProgressStatistics> newProgressStatistics(std::string job, std::string what) = 0;
 
     virtual void updateJob(pid_t pid, std::string info) = 0;
     virtual std::string lastUpdate(pid_t pid) = 0;

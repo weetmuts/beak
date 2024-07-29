@@ -208,11 +208,15 @@ void onTerminated(string msg, function<void()> cb)
 
 struct SystemImplementation : System
 {
+    RC run(string program,
+           vector<string> args,
+           int *out_rc = NULL);
     RC invoke(string program,
-               vector<string> args,
+              vector<string> args,
               std::vector<char> *output = NULL,
               Capture capture = CaptureStdout,
-              std::function<void(char *buf, size_t len)> output_cb = NULL);
+              std::function<void(char *buf, size_t len)> output_cb = NULL,
+              int *out_rc = NULL);
 
     RC invokeShell(Path *init_file);
     bool processExists(pid_t pid);
@@ -232,6 +236,7 @@ struct SystemImplementation : System
 
     void setStackSize();
     Path *cwd();
+    uid_t getUID() {  return getuid(); }
 
     private:
 
@@ -273,7 +278,8 @@ static RC invoke(string program,
                  vector<string> args,
                  vector<char> *output,
                  Capture capture,
-                 function<void(char *buf, size_t len)> cb)
+                 function<void(char *buf, size_t len)> cb,
+                 int *out_rc)
 {
     int link[2];
     const char **argv = new const char*[args.size()+2];
@@ -344,9 +350,16 @@ static RC invoke(string program,
             int rc = WEXITSTATUS(status);
             debug(SYSTEM,"%s: return code %d\n", program.c_str(), rc);
             if (rc != 0) {
-                warning(SYSTEM,"%s exited with non-zero return code: %d\n", program.c_str(), rc);
-                delete[] argv;
-                return RC::ERR;
+                if (out_rc == NULL)
+                {
+                    warning(SYSTEM,"%s exited with non-zero return code: %d\n", program.c_str(), rc);
+                    delete[] argv;
+                    return RC::ERR;
+                }
+                else
+                {
+                    *out_rc = rc;
+                }
             }
         }
     }
@@ -355,12 +368,46 @@ static RC invoke(string program,
 }
 
 RC SystemImplementation::invoke(string program,
-                                 vector<string> args,
-                                 vector<char> *output,
-                                 Capture capture,
-                                 function<void(char *buf, size_t len)> cb)
+                                vector<string> args,
+                                vector<char> *output,
+                                Capture capture,
+                                function<void(char *buf, size_t len)> cb,
+                                int *out_rc)
 {
-    return ::invoke(program, args, output, capture, cb);
+    return ::invoke(program, args, output, capture, cb, out_rc);
+}
+
+RC SystemImplementation::run(string program,
+                             vector<string> args,
+                             int *out_rc)
+{
+    size_t num_args = 2+args.size(); // program + null
+
+    char **argv = (char**)calloc(sizeof(char*), num_args);
+    argv[0] = (char*)malloc(1024);
+    strcpy(argv[0], program.c_str());
+    size_t na = 0;
+    for (; na < args.size(); ++na)
+    {
+        argv[na+1] = (char*)malloc(1024);
+        strcpy(argv[na+1], args[na].c_str());
+    }
+    argv[na+1] = NULL;
+    debug(SYSTEM, "run: \"%s\"\n", argv[0]);
+    for (na = 0; na < args.size(); ++na) debug(SYSTEM, "    arg: \"%s\"\n", argv[na+1]);
+
+    int pid = fork();
+
+    if (pid == 0) {
+        // This is the child process, run the shell here.
+        execvp(argv[0], (char*const*)argv);
+    }
+    waitpid(pid, out_rc, 0);
+    debug(SYSTEM, "run exited with %d!\n", *out_rc);
+
+    for (size_t i = 0; i < num_args-1; ++i) free(argv[i]);
+    free(argv);
+    return RC::OK;
 }
 
 RC SystemImplementation::invokeShell(Path *init_file)

@@ -115,7 +115,7 @@ struct RestoreFileSystem : FileSystem
         return RC::ERR;
     }
 
-    Path *tempDir()
+    Path *userRunDir()
     {
         return NULL;
     }
@@ -150,7 +150,8 @@ struct RestoreFileSystem : FileSystem
         return RC::ERR;
     }
     bool createFile(Path *path, FileStat *stat,
-                     std::function<size_t(off_t offset, char *buffer, size_t len)> cb)
+                    std::function<size_t(off_t offset, char *buffer, size_t len)> cb,
+                    size_t buffer_size)
     {
         return false;
     }

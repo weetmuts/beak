@@ -98,6 +98,10 @@ int run(int argc, char *argv[])
         rc = beak->mountBackupDaemon(&settings);
         break;
 
+    case camera_cmd:
+        rc = beak->cameraMedia(&settings, monitor.get());
+        break;
+
     case config_cmd:
         rc = beak->configure(&settings);
         break;

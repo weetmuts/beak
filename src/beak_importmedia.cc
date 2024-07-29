@@ -185,7 +185,7 @@ RC BeakImplementation::importMedia(Settings *settings, Monitor *monitor)
 
     import_media.printTodo();
 
-    unique_ptr<ProgressStatistics> progress = monitor->newProgressStatistics(buildJobName("import", settings));
+    unique_ptr<ProgressStatistics> progress = monitor->newProgressStatistics(buildJobName("import", settings), "import");
 
     progress->startDisplayOfProgress();
     storage_tool_->copyBackupIntoStorage(map_fs.get(),

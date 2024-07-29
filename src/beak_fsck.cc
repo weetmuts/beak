@@ -30,7 +30,7 @@ RC BeakImplementation::fsck(Settings *settings, Monitor *monitor)
 
     assert(settings->from.type == ArgStorage);
 
-    auto progress = monitor->newProgressStatistics(buildJobName("fsck", settings));
+    auto progress = monitor->newProgressStatistics(buildJobName("fsck", settings), "store");
     FileSystem *backup_fs;
     Path *root;
     auto restore = accessSingleStorageBackup_(&settings->from, "", monitor, &backup_fs, &root);

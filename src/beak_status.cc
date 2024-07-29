@@ -41,7 +41,7 @@ RC BeakImplementation::status(Settings *settings, Monitor *monitor)
     memset(&mtim_max, 0, sizeof(mtim_max));
     memset(&ctim_max, 0, sizeof(ctim_max));
     uint64_t start = clockGetTimeMicroSeconds();
-    auto progress = monitor->newProgressStatistics(buildJobName("status", settings));
+    auto progress = monitor->newProgressStatistics(buildJobName("status", settings), "status");
     rc = origin_tool_->fs()->recurse(rule->origin_path,
                                      [=](const char *path, const struct stat *sb) {
                                          update_mctim_maxes(sb);

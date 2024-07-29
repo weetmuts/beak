@@ -30,7 +30,7 @@ RC BeakImplementation::prune(Settings *settings, Monitor *monitor)
 
     assert(settings->from.type == ArgStorage);
 
-    auto progress = monitor->newProgressStatistics(buildJobName("prune", settings));
+    auto progress = monitor->newProgressStatistics(buildJobName("prune", settings), "store");
     FileSystem *backup_fs;
     Path *root;
     auto restore = accessSingleStorageBackup_(&settings->from, "", monitor, &backup_fs, &root);

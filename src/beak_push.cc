@@ -68,7 +68,7 @@ RC BeakImplementation::storeRuleLocallyThenRemotely(Rule *rule, Settings *settin
         return RC::ERR;
     }
 
-    unique_ptr<ProgressStatistics> progress = monitor->newProgressStatistics(buildJobName("store", settings));
+    unique_ptr<ProgressStatistics> progress = monitor->newProgressStatistics(buildJobName("store", settings), "store");
 
     unique_ptr<Backup> backup  = newBackup(origin_tool_->fs());
 
@@ -108,7 +108,7 @@ RC BeakImplementation::storeRuleLocallyThenRemotely(Rule *rule, Settings *settin
 
     for (auto & p : rule->storages)
     {
-        unique_ptr<ProgressStatistics> progress = monitor->newProgressStatistics(buildJobName("copy", settings));
+        unique_ptr<ProgressStatistics> progress = monitor->newProgressStatistics(buildJobName("copy", settings), "store");
         progress->startDisplayOfProgress();
         info(PUSH, "Copying local backup into %s\n", p.second.storage_location->c_str());
         storage_tool_->copyBackupIntoStorage(local_fs_, // copy from file system.
@@ -129,7 +129,7 @@ RC BeakImplementation::storeRuleRemotely(Rule *rule, Settings *settings, Monitor
 {
     RC rc = RC::OK;
 
-    unique_ptr<ProgressStatistics> progress = monitor->newProgressStatistics(buildJobName("store", settings));
+    unique_ptr<ProgressStatistics> progress = monitor->newProgressStatistics(buildJobName("store", settings), "store");
 
     unique_ptr<Backup> backup  = newBackup(origin_tool_->fs());
 

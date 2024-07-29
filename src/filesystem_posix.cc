@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2017-2018 Fredrik Öhrström
+ Copyright (C) 2017-2024 Fredrik Öhrström
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -48,12 +48,12 @@
 #define FTW_STOP 2
 #define FTW_ACTIONRETVAL 3
 
-#define BEAK_SHARED_DIR "/tmp"
+#define BEAK_USER_RUN_DIR_NO_UID "/tmp"
 
 #else
 #include<linux/kdev_t.h>
 
-#define BEAK_SHARED_DIR "/dev/shm"
+#define BEAK_USER_RUN_DIR_ADD_UID "/run/user"
 #endif
 
 using namespace std;
@@ -122,7 +122,7 @@ struct FileSystemImplementationPosix : FileSystem
     RC stat(Path *p, FileStat *fs);
     RC chmod(Path *p, FileStat *stat);
     RC utime(Path *p, FileStat *stat);
-    Path *tempDir();
+    Path *userRunDir();
     Path *mkTempFile(string prefix, string content);
     Path *mkTempDir(string prefix);
     Path *mkDir(Path *p, string name, int permissions);
@@ -130,7 +130,8 @@ struct FileSystemImplementationPosix : FileSystem
     RC loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
     RC createFile(Path *file, std::vector<char> *buf);
     bool createFile(Path *path, FileStat *stat,
-                     std::function<size_t(off_t offset, char *buffer, size_t len)> cb);
+                    std::function<size_t(off_t offset, char *buffer, size_t len)> cb,
+                    size_t buffer_size);
     bool createSymbolicLink(Path *path, FileStat *stat, string target);
     bool createHardLink(Path *path, FileStat *stat, Path *target);
     bool createFIFO(Path *path, FileStat *stat);
@@ -149,10 +150,10 @@ struct FileSystemImplementationPosix : FileSystem
 
 private:
 
-    void initTempDir();
+    void initUserRunDir();
 
     System *sys_ {};
-    Path *temp_dir_;
+    Path *user_run_dir_ {};
     bool allow_access_time_updates_ {};
     //int inotify_fd_ {};
 };
@@ -356,12 +357,13 @@ RC FileSystemImplementationPosix::utime(Path *p, FileStat *fs)
     return RC::OK;
 }
 
-Path *FileSystemImplementationPosix::tempDir()
+Path *FileSystemImplementationPosix::userRunDir()
 {
-    if (temp_dir_ == NULL) {
-        initTempDir();
+    if (user_run_dir_ == NULL)
+    {
+        initUserRunDir();
     }
-    return temp_dir_;
+    return user_run_dir_;
 }
 
 Path *FileSystemImplementationPosix::mkTempFile(string prefix, string content)
@@ -496,9 +498,11 @@ RC FileSystemImplementationPosix::createFile(Path *file, vector<char> *buf)
 bool FileSystemImplementationPosix::createFile(Path *file,
                                                FileStat *stat,
                                                std::function<size_t(off_t offset, char *buffer, size_t len)>
-                                                       acquire_bytes)
+                                               acquire_bytes,
+                                               size_t buffer_size)
 {
-    char buf[65536];
+    char *buffer = (char*)malloc(buffer_size);
+
     off_t offset = 0;
     size_t remaining = stat->st_size;
 
@@ -515,6 +519,7 @@ bool FileSystemImplementationPosix::createFile(Path *file,
         }
         if (fd == -1) {
             failure(FILESYSTEM,"Could not create file %s from callback(errno=%d)\n", file->c_str(), errno);
+            free(buffer);
             return false;
         }
     }
@@ -522,21 +527,23 @@ bool FileSystemImplementationPosix::createFile(Path *file,
     debug(FILESYSTEM,"writing %ju bytes to file %s\n", remaining, file->c_str());
 
     while (remaining > 0) {
-        size_t read = (remaining > sizeof(buf)) ? sizeof(buf) : remaining;
-        size_t len = acquire_bytes(offset, buf, read);
-        ssize_t n = write(fd, buf, len);
+        size_t read = (remaining > buffer_size) ? buffer_size : remaining;
+        size_t len = acquire_bytes(offset, buffer, read);
+        ssize_t n = write(fd, buffer, len);
         if (n == -1) {
             if (errno == EINTR) {
                 continue;
             }
             failure(FILESYSTEM,"Could not write to file %s errno=%d\n", file->c_str(), errno);
             close(fd);
+            free(buffer);
             return false;
         }
 	offset += n;
 	remaining -= n;
     }
     close(fd);
+    free(buffer);
     return true;
 }
 
@@ -592,34 +599,41 @@ void FileSystemImplementationPosix::allowAccessTimeUpdates()
     allow_access_time_updates_ = true;
 }
 
-void FileSystemImplementationPosix::initTempDir()
+void FileSystemImplementationPosix::initUserRunDir()
 {
-    Path *tmp = Path::lookup(BEAK_SHARED_DIR);
+#ifdef BEAK_USER_RUN_DIR_ADD_UID
+    Path *tmp = Path::lookup(BEAK_USER_RUN_DIR_ADD_UID);
+    string shd;
+    strprintf(shd, "%d", sys_->getUID());
+    user_run_dir_ = tmp->append(shd);
+#else
+    Path *tmp = Path::lookup(BEAK_USER_RUN_DIR_NO_UID);
     string shd;
     strprintf(shd, "beak_%s", sys_->userName().c_str());
-    temp_dir_ = tmp->append(shd);
+    user_run_dir_ = tmp->append(shd);
+#endif
+
     FileStat stat;
-    RC rc = this->stat(temp_dir_, &stat);
+    RC rc = this->stat(user_run_dir_, &stat);
     if (rc.isErr())
     {
         // Directory does not exist, lets create it.
-        mkDir(temp_dir_, "", 0700);
+        mkDir(user_run_dir_, "", 0700);
     }
     else
     {
         // Something is there...
         if (!stat.isDirectory())
         {
-            error(FILESYSTEM, "Expected \"%s\" to be a directory or not exist!\n", temp_dir_->c_str());
+            error(FILESYSTEM, "Expected \"%s\" to be a directory or not exist!\n", user_run_dir_->c_str());
         }
         if ((stat.st_mode & 0777) != 0700)
         {
-            error(FILESYSTEM, "Expected \"%s\" to be accessible only by you!\n", temp_dir_->c_str());
+            error(FILESYSTEM, "Expected \"%s\" to be accessible only by you!\n", user_run_dir_->c_str());
         }
-        // We ignore group sharing for the moment.
         if (stat.st_uid != geteuid())
         {
-            error(FILESYSTEM, "Expected \"%s\" to owned by you!\n", temp_dir_->c_str());
+            error(FILESYSTEM, "Expected \"%s\" to owned by you!\n", user_run_dir_->c_str());
         }
     }
 }

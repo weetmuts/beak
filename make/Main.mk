@@ -48,9 +48,9 @@ ifeq ($(PLATFORM),WINAPI)
 STRIP_COMMAND:=true
 endif
 
-MEDIA_SOURCES:=beak_importmedia.cc beak_servemedia.cc beak_indexmedia.cc media.cc
+MEDIA_SOURCES:=beak_importmedia.cc beak_cameramedia.cc beak_servemedia.cc beak_indexmedia.cc media.cc
 MEDIA_SOURCES:=$(addprefix $(SRC_ROOT)/src/,$(MEDIA_SOURCES))
-NO_MEDIA_SOURCES:=no_beak_importmedia.cc no_beak_servemedia.cc no_beak_indexmedia.cc no_media.cc
+NO_MEDIA_SOURCES:=no_beak_importmedia.cc no_beak_cameramedia.cc no_beak_servemedia.cc no_beak_indexmedia.cc no_media.cc
 NO_MEDIA_SOURCES:=$(addprefix $(SRC_ROOT)/src/,$(NO_MEDIA_SOURCES))
 
 WINAPI_SOURCES:=$(filter-out %posix.cc, $(wildcard $(SRC_ROOT)/src/*.cc))

@@ -99,7 +99,7 @@ struct FileSystemImplementationWinapi : FileSystem
     RC stat(Path *p, FileStat *fs);
     RC chmod(Path *p, FileStat *fs);
     RC utime(Path *p, FileStat *fs);
-    Path *tempDir();
+    Path *userRunDir();
     Path *mkTempFile(string prefix, string content);
     Path *mkTempDir(string prefix);
     Path *mkDir(Path *p, string name, int permissions);
@@ -109,7 +109,8 @@ struct FileSystemImplementationWinapi : FileSystem
     RC createFile(Path *file, std::vector<char> *buf);
     bool createFile(Path *file,
                     FileStat *stat,
-                    std::function<size_t(off_t offset, char *buffer, size_t len)> cb);
+                    std::function<size_t(off_t offset, char *buffer, size_t len)> cb,
+                    size_t buffer_size);
     bool createSymbolicLink(Path *file, FileStat *stat, string target);
     bool createHardLink(Path *file, FileStat *stat, Path *target);
     bool createFIFO(Path *file, FileStat *stat);
@@ -294,14 +295,9 @@ RC FileSystemImplementationWinapi::utime(Path *p, FileStat *fs)
     return RC::ERR;
 }
 
-Path *FileSystemImplementationWinapi::tempDir()
+Path *FileSystemImplementationWinapi::userRunDir()
 {
-    return Path::lookup("TEMP");
-    /*if (temp_dir_ == NULL) {
-        // initTempDir();
-        temp_dir_ = Path::lookup("TEMP");
-    }
-    return temp_dir_;*/
+    return NULL;
 }
 
 Path *FileSystemImplementationWinapi::mkTempFile(string prefix, string content)
@@ -422,7 +418,8 @@ RC FileSystemImplementationWinapi::createFile(Path *file, vector<char> *buf)
 
 bool FileSystemImplementationWinapi::createFile(Path *file,
                                                 FileStat *stat,
-                                                std::function<size_t(off_t offset, char *buffer, size_t len)> cb)
+                                                std::function<size_t(off_t offset, char *buffer, size_t len)> cb,
+                                                size_t buffer_size)
 {
     return false;
 }

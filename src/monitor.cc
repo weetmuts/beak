@@ -31,18 +31,12 @@
 
 #include <unistd.h>
 
-#ifdef OSX64
-#define BEAK_SHARED_DIR "/tmp"
-#else
-#define BEAK_SHARED_DIR "/dev/shm"
-#endif
-
 static ComponentId MONITOR = registerLogComponent("monitor");
 static ComponentId STATISTICS = registerLogComponent("statistics");
 
 struct MonitorImplementation : Monitor
 {
-    unique_ptr<ProgressStatistics> newProgressStatistics(string job);
+    unique_ptr<ProgressStatistics> newProgressStatistics(string job, string what);
     void updateJob(pid_t pid, string info);
     string lastUpdate(pid_t pid);
     int startDisplay(function<bool()> regular_cb);
@@ -80,20 +74,17 @@ MonitorImplementation::MonitorImplementation(System *s, FileSystem *fs, Progress
 {
 }
 
-unique_ptr<ProgressStatistics> newwProgressStatistics(ProgressDisplayType t, MonitorImplementation *monitor, std::string job);
+unique_ptr<ProgressStatistics> newwProgressStatistics(ProgressDisplayType t, MonitorImplementation *monitor, std::string job, std::string what);
 
 unique_ptr<ProgressStatistics>
-MonitorImplementation::newProgressStatistics(string job)
+MonitorImplementation::newProgressStatistics(string job, string what)
 {
-    return newwProgressStatistics(pdt_, this, job);
+    return newwProgressStatistics(pdt_, this, job, what);
 }
 
 void MonitorImplementation::checkSharedDir()
 {
-    Path *tmp = Path::lookup(BEAK_SHARED_DIR);
-    string shd;
-    strprintf(shd, "beak-%s", sys_->userName().c_str());
-    shared_dir_ = tmp->append(shd);
+    shared_dir_ = fs_->userRunDir()->append("beak")->append("pids");
     FileStat stat;
     RC rc = fs_->stat(shared_dir_, &stat);
     if (rc.isErr())
@@ -230,7 +221,7 @@ using namespace std;
 
 struct ProgressStatisticsImplementation : ProgressStatistics
 {
-    ProgressStatisticsImplementation(ProgressDisplayType t, MonitorImplementation *m, string job) : pdt_(t), monitor_(m), job_(job), mid_(-1) {}
+    ProgressStatisticsImplementation(ProgressDisplayType t, MonitorImplementation *m, string job, string what) : pdt_(t), monitor_(m), job_(job), what_(what), mid_(-1) {}
     ~ProgressStatisticsImplementation() = default;
     void setProgress(string msg);
 
@@ -246,6 +237,7 @@ private:
     ProgressDisplayType pdt_ {};
     MonitorImplementation *monitor_ {};
     string job_;
+    string what_;
     int mid_;
 
     bool redrawLine();
@@ -354,8 +346,10 @@ bool ProgressStatisticsImplementation::redrawLine()
         estimated_total = "";
     }
     string info;
-    strprintf(info, "%s store: %s %2d" "%%" " (%ju/%ju) %s/s | %s%s",
-              msg.c_str(), mibs.c_str(),
+    strprintf(info, "%s %s: %s %2d" "%%" " (%ju/%ju) %s/s | %s%s",
+              msg.c_str(),
+              what_.c_str(),
+              mibs.c_str(),
               percentage, copy.num_files_stored, copy.num_files_to_store,
               average_speed.c_str(),
               elapsed.c_str(), estimated_total.c_str());
@@ -408,7 +402,7 @@ void ProgressStatisticsImplementation::finishProgress()
     monitor_->stopDisplay(mid_);
 }
 
-unique_ptr<ProgressStatistics> newwProgressStatistics(ProgressDisplayType t, MonitorImplementation *monitor, std::string job)
+unique_ptr<ProgressStatistics> newwProgressStatistics(ProgressDisplayType t, MonitorImplementation *monitor, std::string job, std::string what)
 {
-    return unique_ptr<ProgressStatisticsImplementation>(new ProgressStatisticsImplementation(t, monitor, job));
+    return unique_ptr<ProgressStatisticsImplementation>(new ProgressStatisticsImplementation(t, monitor, job, what));
 }

@@ -32,7 +32,7 @@ RC BeakImplementation::diff(Settings *settings, Monitor *monitor)
     assert(settings->from.type == ArgOrigin || settings->from.type == ArgRule || settings->from.type == ArgStorage);
     assert(settings->to.type == ArgOrigin || settings->to.type == ArgRule || settings->to.type == ArgStorage);
 
-    auto progress = monitor->newProgressStatistics(buildJobName("diff", settings));
+    auto progress = monitor->newProgressStatistics(buildJobName("diff", settings), "diff");
 
     FileSystem *old_fs = NULL;
     FileSystem *curr_fs = NULL;

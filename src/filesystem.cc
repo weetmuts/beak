@@ -37,7 +37,7 @@ struct FileSystemFuseAPIImplementation : FileSystem
     RC stat(Path *p, FileStat *fs);
     RC chmod(Path *p, FileStat *stat);
     RC utime(Path *p, FileStat *stat);
-    Path *tempDir();
+    Path *userRunDir();
     Path *mkTempFile(string prefix, string content);
     Path *mkTempDir(string prefix);
     Path *mkDir(Path *path, string name, int permissions);
@@ -45,7 +45,8 @@ struct FileSystemFuseAPIImplementation : FileSystem
     RC loadVector(Path *file, size_t blocksize, std::vector<char> *buf);
     RC createFile(Path *file, std::vector<char> *buf);
     bool createFile(Path *path, FileStat *stat,
-                    std::function<size_t(off_t offset, char *buffer, size_t len)> cb);
+                    std::function<size_t(off_t offset, char *buffer, size_t len)> cb,
+                    size_t buffer_size);
     bool createSymbolicLink(Path *path, FileStat *stat, string target);
     bool createHardLink(Path *path, FileStat *stat, Path *target);
     bool createFIFO(Path *path, FileStat *stat);
@@ -145,7 +146,7 @@ RC FileSystemFuseAPIImplementation::utime(Path *p, FileStat *fs)
     return RC::ERR;
 }
 
-Path *FileSystemFuseAPIImplementation::tempDir()
+Path *FileSystemFuseAPIImplementation::userRunDir()
 {
     return NULL;
 }
@@ -181,7 +182,8 @@ RC FileSystemFuseAPIImplementation::createFile(Path *file, std::vector<char> *bu
 }
 
 bool FileSystemFuseAPIImplementation::createFile(Path *path, FileStat *stat,
-                                                 std::function<size_t(off_t offset, char *buffer, size_t len)> cb)
+                                                 std::function<size_t(off_t offset, char *buffer, size_t len)> cb,
+                                                 size_t buffer_size)
 {
     return false;
 }
@@ -876,18 +878,52 @@ bool FileSystem::mkDirpWriteable(Path* path)
     return makeDirHelper(path->c_str());
 }
 
-RC FileSystem::listFilesBelow(Path *p, std::vector<pair<Path*,FileStat>> *files, SortOrder so)
+RC FileSystem::listDirsBelow(Path *p, std::vector<pair<Path*,FileStat>> *dirs, SortOrder so, int max_depth)
 {
     int depth = p->depth();
+    // If max_depth is 1 then look at all files with one more depth than p.
+    if (max_depth > 0) max_depth = depth+max_depth;
     vector<pair<Path*,FileStat>> found;
     RC rc = RC::OK;
     rc = recurse(p,
-                 [&found,depth](Path *path, FileStat *stat)
+                 [&found,depth,max_depth](Path *path, FileStat *stat)
+                 {
+                     Path *pp = path->subpath(depth);
+                     if (stat->isDirectory()) {
+                         found.push_back({ pp, *stat });
+                         if (max_depth > 0 && path->depth() >= max_depth) return RecurseSkipSubTree;
+                     }
+
+                     return RecurseContinue;
+                 });
+
+    sortOn(so, found);
+    for (auto& p : found)
+    {
+        dirs->push_back( p );
+    }
+    return rc;
+}
+
+RC FileSystem::listFilesBelow(Path *p, std::vector<pair<Path*,FileStat>> *files, SortOrder so, int max_depth)
+{
+    int depth = p->depth();
+    // If max_depth is 1 then look at all files with one more depth than p.
+    if (max_depth > 0) max_depth = depth+max_depth;
+    vector<pair<Path*,FileStat>> found;
+    RC rc = RC::OK;
+    rc = recurse(p,
+                 [&found,depth,max_depth](Path *path, FileStat *stat)
                  {
                      Path *pp = path->subpath(depth);
                      if (stat->isRegularFile()) {
                          found.push_back({ pp, *stat });
                      }
+                     else
+                     {
+                         if (max_depth > 0 && path->depth() >= max_depth) return RecurseSkipSubTree;
+                     }
+
                      return RecurseContinue;
                  });
 

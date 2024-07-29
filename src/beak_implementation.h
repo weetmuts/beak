@@ -92,6 +92,7 @@ struct BeakImplementation : Beak
     RC umountRestore(Settings *settings);
 
     RC shell(Settings *settings, Monitor *monitor);
+    RC cameraMedia(Settings *settings, Monitor *monitor);
     RC importMedia(Settings *settings, Monitor *monitor);
     RC indexMedia(Settings *settings, Monitor *monitor);
     RC serveMedia(Settings *settings, Monitor *monitor);
@@ -101,6 +102,8 @@ struct BeakImplementation : Beak
     RC store(Settings *settings, Monitor *monitor);
     RC restore(Settings *settings, Monitor *monitor);
     RC stash(Settings *settings, Monitor *monitor);
+
+    FileSystem *localFS() { return local_fs_; }
 
     void genAutoComplete(string filename);
 

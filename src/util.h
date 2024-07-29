@@ -52,6 +52,7 @@ std::string keepDigits(std::string &s);
 bool parseTimeZoneOffset(std::string o, time_t *out);
 RC parseDateTime(std::string dt, time_t *tv_sec);
 RC parseYYYYMMDDhhmmss(std::string dt, struct tm *tp);
+RC parseYYYY_MM_DD_hh_mm_ss(std::string dt, struct tm *tp);
 RC parseDateTimeUTCNanos(std::string dt, time_t *tv_sec, long *tv_nsec);
 bool parseLengthOfTime(std::string s, time_t *out);
 std::string getLengthOfTime(time_t t);

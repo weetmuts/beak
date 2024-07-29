@@ -37,7 +37,7 @@ RC ReadOnlyFileSystem::utime(Path *p, FileStat *fs)
     return RC::ERR;
 }
 
-Path *ReadOnlyFileSystem::tempDir()
+Path *ReadOnlyFileSystem::userRunDir()
 {
     return NULL;
 }
@@ -68,7 +68,8 @@ RC ReadOnlyFileSystem::createFile(Path *file, std::vector<char> *buf)
 }
 
 bool ReadOnlyFileSystem::createFile(Path *path, FileStat *stat,
-                                    std::function<size_t(off_t offset, char *buffer, size_t len)> cb)
+                                    std::function<size_t(off_t offset, char *buffer, size_t len)> cb,
+                                    size_t buffer_size)
 {
     return false;
 }

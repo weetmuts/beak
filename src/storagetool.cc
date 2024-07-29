@@ -51,7 +51,8 @@ struct StorageToolImplementation : public StorageTool
                              Path *backup_dir,
                              Storage *storage,
                              Settings *settings,
-                             ProgressStatistics *progress);
+                             ProgressStatistics *progress,
+                             size_t buffer_size);
 
     RC removeBackupFiles(Storage *storage,
                          std::vector<Path*>& files,
@@ -174,7 +175,8 @@ void copy_local_backup_file(Path *relpath,
                             FileStat *stat,
                             Path *dest_location,
                             FileSystem *dest_fs,
-                            ProgressStatistics *progress)
+                            ProgressStatistics *progress,
+                            size_t buffer_size)
 {
     debug(STORAGETOOL, "copy %s ## %s to %s ## %s\n",
           source_location->c_str(),
@@ -211,7 +213,8 @@ void copy_local_backup_file(Path *relpath,
                                 debug(STORAGETOOL, "Copied %ju bytes from %ju.\n", n, offset);
                                 update_progress(n);
                                 return n;
-                               });
+                            },
+                            buffer_size);
 
         dest_fs->utime(to_file_name, stat);
         progress->stats.num_files_stored++;
@@ -442,7 +445,8 @@ RC StorageToolImplementation::copyBackupIntoStorage(FileSystem *backup_fs,
                                                     Path *backup_dir,
                                                     Storage *storage,
                                                     Settings *settings,
-                                                    ProgressStatistics *progress)
+                                                    ProgressStatistics *progress,
+                                                    size_t buffer_size)
 {
     // Store the archive files here.
     FileSystem *storage_fs = NULL;
@@ -502,7 +506,8 @@ RC StorageToolImplementation::copyBackupIntoStorage(FileSystem *backup_fs,
                                                       stat,
                                                       storage->storage_location,
                                                       storage_fs,
-                                                      progress);
+                                                      progress,
+                                                      buffer_size);
                                return RecurseContinue; });
         break;
     }
@@ -651,7 +656,7 @@ RC CacheFS::loadDirectoryStructure(map<Path*,CacheEntry> *entries)
     map<Path*,FileStat> contents;
     RC rc = RC::OK;
 
-    auto progress = monitor_->newProgressStatistics("Loading directory structure...");
+    auto progress = monitor_->newProgressStatistics("Loading directory structure...", "load");
 
     switch (storage_->type) {
     case NoSuchStorage:
@@ -720,7 +725,7 @@ RC CacheFS::fetchFile(Path *file)
 
 RC CacheFS::fetchFiles(vector<Path*> *files)
 {
-    auto progress = monitor_->newProgressStatistics("Fetching files...");
+    auto progress = monitor_->newProgressStatistics("Fetching files...", "fetch");
     for (auto p : *files) {
         debug(CACHE, "fetch %s\n", p->c_str());
     }
