@@ -331,12 +331,14 @@ RC BeakImplementation::cameraMedia(Settings *settings, Monitor *monitor)
 
     if (rc.isErr()) return RC::ERR;
 
-    vector<pair<Path*,FileStat>> files_to_copy;
 
     for (Path *imagedir : imagedirs)
     {
+        vector<pair<Path*,FileStat>> files_to_copy;
         vector<pair<Path*,FileStat>> files;
         scan_directory(this, imagedir, &files);
+
+        if (files.size() == 0) continue;
 
         for (auto &p : files)
         {
@@ -366,8 +368,15 @@ RC BeakImplementation::cameraMedia(Settings *settings, Monitor *monitor)
             }
             if (!found)
             {
-                files_to_copy.push_back(p);
-                debug(CAMERA, "copying %s\n", p.first->c_str());
+                if (p.second.st_size < 10*1024*1024)
+                {
+                    files_to_copy.push_back(p);
+                    debug(CAMERA, "copying %s\n", p.first->c_str());
+                }
+                else
+                {
+                    printf("Skipping big file %s\n", p.first->c_str());
+                }
             }
 
         }
@@ -398,7 +407,7 @@ RC BeakImplementation::cameraMedia(Settings *settings, Monitor *monitor)
 
         if (progress->stats.num_files_stored == 0 && progress->stats.num_dirs_updated == 0)
         {
-            info(CAMERA, "No copying needed WOOT?\n");
+            info(CAMERA, "No copying needed, everything was already copied to the temporary import directory.\n");
         }
 
     }

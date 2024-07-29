@@ -328,7 +328,7 @@ RC BeakImplementation::indexMedia(Settings *settings, Monitor *monitor)
     UI::clearLine();
     info(INDEXMEDIA, "Indexed %zu media files.\n", index_media.medias_.size());
 
-    unique_ptr<ProgressStatistics> progress = monitor->newProgressStatistics(buildJobName("import", settings));
+    unique_ptr<ProgressStatistics> progress = monitor->newProgressStatistics(buildJobName("import", settings), "index");
     progress->startDisplayOfProgress();
 
     index_media.sortFiles();
