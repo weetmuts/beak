@@ -139,6 +139,7 @@ private:
     bool isRCloneStorage(Path *storage_location, string *type = NULL);
     bool isRSyncStorage(Path *storage_location);
     bool isAftMtpStorage(Path *storage_location);
+    bool isGPhoto2Storage(Path *storage_location);
 
     // Map rule name to rule.
     map<string,Rule> rules_;
@@ -1133,6 +1134,17 @@ bool ConfigurationImplementation::isAftMtpStorage(Path *storage_location)
     return prefix == "aftmtp:";
 }
 
+bool ConfigurationImplementation::isGPhoto2Storage(Path *storage_location)
+{
+    string arg = storage_location->str();
+    auto colon = arg.find(':');
+    if (colon == string::npos) return false;
+
+    string prefix = arg.substr(0,colon+1);
+
+    return prefix == "gphoto2:";
+}
+
 // Storage created on the fly depending on the command line arguments.
 Storage a_storage;
 
@@ -1163,6 +1175,12 @@ Storage *ConfigurationImplementation::findStorageFrom(Path *storage_location, Co
     else if (isAftMtpStorage(storage_location))
     {
         a_storage.type = AftMtpStorage;
+        a_storage.storage_location = storage_location;
+        return &a_storage;
+    }
+    else if (isGPhoto2Storage(storage_location))
+    {
+        a_storage.type = GPhoto2Storage;
         a_storage.storage_location = storage_location;
         return &a_storage;
     }
