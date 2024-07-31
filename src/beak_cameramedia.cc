@@ -221,17 +221,26 @@ RC BeakImplementation::cameraMedia(Settings *settings, Monitor *monitor)
     local_fs_->allowAccessTimeUpdates();
 
     assert(settings->from.type == ArgStorage);
+    assert(settings->from.storage->type == AftMtpStorage);
     assert(settings->to.type == ArgDir);
     Path *destination = settings->to.dir;
 
+    // The directory name where we store the media files.
+    string archive_name = destination->name()->str();
+
+    // Establish access to the phone/camera and get the device name.
     string device_name = aftmtpEstablishAccess(sys_);
 
-    info(CAMERA, "Importing media from %s\n", device_name.c_str());
+    info(CAMERA, "Importing media from %s into %s\n", device_name.c_str(), archive_name.c_str());
 
     unique_ptr<ProgressStatistics> progress = monitor->newProgressStatistics(buildJobName("listing", settings), "list");
 
     map<Path*,FileStat> files;
 
+    // Just list the files in the android phone, The crappy mtp protocol is soooo slow just listing the files.
+    // Anyway we do this once (hopefully unless there is a random disconnect) then we can check size and date
+    // for if we think we have imported this file already. I.e. no need to download slowly over mtp to do
+    // the full processing.
     for (;;)
     {
         rc = aftmtpListFiles(settings->from.storage,
@@ -243,6 +252,9 @@ RC BeakImplementation::cameraMedia(Settings *settings, Monitor *monitor)
         // The mtp link crashed already in the first transfer.... Blech.
         aftmtpReEstablishAccess(sys_, true);
     }
+
+    UI::output("Found ... new files not yet in %s", archive_name.c_str());
+
     vector<pair<Path*,FileStat>> potential_files_to_copy;
     for (auto &p : files)
     {
@@ -251,12 +263,15 @@ RC BeakImplementation::cameraMedia(Settings *settings, Monitor *monitor)
         {
             potential_files_to_copy.push_back(p);
             debug(CAMERA, "potential download %s\n", p.first->c_str());
+            UI::clearLine();
+            UI::output("Found %zu new files not yet in %s", potential_files_to_copy.size(), archive_name.c_str());
         }
     }
-
+    UI::clearLine();
     if (potential_files_to_copy.size() == 0)
     {
-        info(CAMERA, "All files imported already.\n");
+        UI::clearLine();
+        info(CAMERA, "All files imported into %s already.\n", archive_name.c_str());
         return RC::OK;
     }
 
@@ -280,10 +295,11 @@ RC BeakImplementation::cameraMedia(Settings *settings, Monitor *monitor)
 
     size_t already_in_cache = potential_files_to_copy.size()-files_to_copy.size();
     size_t already_imported = files.size()-files_to_copy.size();
-    info(CAMERA, "Downloading %zu files from camera (%zu already in cache and %zu already fully imported).\n",
+    info(CAMERA, "Downloading %zu files (%zu already in cache and %zu already fully imported into %s).\n",
          files_to_copy.size(),
          already_in_cache,
-         already_imported);
+         already_imported,
+         archive_name.c_str());
 
     progress->startDisplayOfProgress();
     rc = aftmtpFetchFiles(settings->from.storage,
@@ -294,43 +310,18 @@ RC BeakImplementation::cameraMedia(Settings *settings, Monitor *monitor)
                           progress.get());
 
     progress->finishProgress();
-/*
-    vector<string> args;
-    for (auto &p : files_to_copy)
-    {
-        Path *to = cache->append(p.first->subpath(imagedir->depth())->c_str());
-        string get;
-        strprintf(get, "get-id %d %s", p.second.st_ino-1000000, to->c_str());
-        args.push_back(get);
-    }
 
-        disconnect_android_access(sys_, mount);
+    // Now import the cache into the real archive.
+    settings->from.type = ArgDir;
+    settings->from.dir = cache;
 
-        for (string &s : args) printf("%s\n", s.c_str());
+    settings->to.type = ArgStorage;
+    Storage st {};
+    settings->to.storage = &st;
+    settings->to.storage->storage_location = destination;
+    settings->to.storage->type = FileSystemStorage;
 
-        int out_rc = 0;
-        sys_->run("aft-mtp-cli", args, &out_rc);
+    rc = importMedia(settings, monitor);
 
-
-        prutt
-        progress->startDisplayOfProgress();
-        Storage st {};
-        st.type = FileSystemStorage;
-        st.storage_location = cache;
-
-        storage_tool_->copyBackupIntoStorage(map_fs.get(),
-                                             cache,
-                                             &st,
-                                             settings,
-                                             progress.get(),
-                                             50*1024*1024);
-
-        if (progress->stats.num_files_stored == 0 && progress->stats.num_dirs_updated == 0)
-        {
-            info(CAMERA, "No copying needed, everything was already copied to the temporary import directory.\n");
-        }
-
-    }
-*/
     return rc;
 }
