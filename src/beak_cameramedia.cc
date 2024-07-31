@@ -37,148 +37,6 @@ static ComponentId CAMERA = registerLogComponent("camera");
 
 #include "media.h"
 
-enum class CameraType
-{
-    UNKNOWN, // Unknown camera
-    FILESYSTEM, // A generic (slow) filesystem access containing a DCIM directory somewhere.
-    MTP_ANDROID, // Use aft-mtp-cli and aft-mtp-mount to copy from the DCIM.
-    MTP_IOS // Use gphoto2 etc...
-};
-
-char mounted_dir[1024];
-
-RC find_imagedir(Path *mount, CameraType ct, FileSystem *fs, System *sys, vector<Path*> *imagedirs)
-{
-    vector<pair<Path*,FileStat>> dcims;
-
-    for (int depth = 1; depth < 4; ++depth)
-    {
-        vector<pair<Path*,FileStat>> mounts;
-        fs->listDirsBelow(mount, &mounts, SortOrder::Unspecified, depth);
-        for (auto &p : mounts)
-        {
-            if (p.first->endsWith("DCIM"))
-            {
-                dcims.push_back(p);
-            }
-        }
-        if (dcims.size() > 0) break;
-    }
-
-    for (auto &p : dcims)
-    {
-        // Some silly phones use DCIM/Camera (and keeps a lot of other crap inside DCIM, like
-        // DCIM/Screenshots etc.) Lets check with a quick stat if DCIM/Camera exists, if so, then use it
-        // to avoid backing up a lot of non-camera data. For normal phones the DCIM directory
-        // only contains images (and no other silly data).
-        //
-        // Also we cannot list the contents of DCIM to check the Camera dir, since this can take
-        // a loooong time if DCIM is filled with many images. We use stat for this.
-        Path *dcim = mount->append(p.first->str());
-        Path *camera = dcim->append("Camera");
-        FileStat st {};
-        RC rc = fs->stat(camera, &st);
-        if (rc.isOk() && st.isDirectory())
-        {
-            imagedirs->push_back(camera);
-        }
-        else
-        {
-            imagedirs->push_back(dcim);
-        }
-    }
-    return RC::OK;
-}
-
-
-
-RC scan_directory(BeakImplementation *bi, Path *p, vector<pair<Path*,FileStat>> *files)
-{
-    UI::output("Scanning: \"%s\"", p->c_str());
-
-    size_t num = 0;
-
-    uint64_t start = clockGetTimeMicroSeconds();
-
-    bi->localFS()->recurse(p, [&files, &num](Path *p, FileStat *st) {
-        if (st->isRegularFile())
-        {
-            files->push_back({p, *st });
-            num++;
-        }
-        return RecurseContinue;
-    });
-
-    UI::clearLine();
-
-    if (num > 0)
-    {
-        uint64_t stop = clockGetTimeMicroSeconds();
-        size_t millis = (stop-start)/1000;
-
-        double seconds = ((double)millis)/1000.0;
-        size_t files_per_sec = (size_t)(((double)num) / seconds);
-
-        UI::output("Found %zu files in %zu ms at %zu files/s\n", num, millis, files_per_sec);
-    }
-
-    return RC::OK;
-}
-
-/*
-
-    UI::clearLine();
-
-    args.clear();
-    args.push_back("ls DCIM");
-    output.clear();
-    out_rc = 0;
-    rc = sys->invoke("aft-mtp-cli", args, &output, CaptureBoth, NULL, &out_rc);
-
-    if (rc.isErr() || out_rc != 0)
-    {
-        UI::output("Error reading the DCIM directory. Giving up.\n");
-    }
-
-    args.clear();
-    args.push_back("lsext-r DCIM/Camera");
-    output.clear();
-    out_rc = 0;
-    rc = sys->invoke("aft-mtp-cli", args, &output, CaptureBoth,
-                     [&num_nl, device_media](char *buf, size_t len) {
-                         int n = 0;
-                         char *end = buf+len;
-                         for (char *i = buf; i < end; ++i) { if (*i == '\n') n++; }
-                         num_nl += n;
-                         if (!debug_logging_)
-                         {
-                             UI::clearLine();
-                             UI::output("Scanning DCIM %d", num_nl);
-                         }
-                         else
-                         {
-                             UI::output("Scanning DCIM %d\n", num_nl);
-                         }
-                     }, &out_rc);
-
-    if (rc.isErr() || out_rc != 0)
-    {
-        UI::clearLine();
-        UI::output("Error reading the files below the DCIM directory. Giving up.\n");
-    }
-
-    nl_pos = 0;
-    num_nl = count_newlines(output, &nl_pos);
-
-    UI::clearLine();
-    UI::output("Found %d media files in DCIM.\n", num_nl);
-
-    parse_aft(output, device_media);
-
-    return rc;
-*/
-
-
 bool check_if_already_exists(Path *file, FileStat stat, FileSystem *fs, Path *destination)
 {
     string suffix = normalizeMediaSuffix(file);
@@ -211,17 +69,18 @@ bool check_if_already_exists(Path *file, FileStat stat, FileSystem *fs, Path *de
     return found;
 }
 
-RC BeakImplementation::cameraMedia(Settings *settings, Monitor *monitor)
+RC import_aft_mtp_cli(Settings *settings,
+                      Monitor *monitor,
+                      System *sys,
+                      FileSystem *local_fs,
+                      BeakImplementation *bi)
 {
-    RC rc = RC::OK;
-
+    assert(settings->from.storage->type == AftMtpStorage);
     Path *home = Path::lookup(getenv("HOME"));
     Path *cache = home->append(".cache/beak/temp-beak-media-import");
 
-    local_fs_->allowAccessTimeUpdates();
+    local_fs->allowAccessTimeUpdates();
 
-    assert(settings->from.type == ArgStorage);
-    assert(settings->from.storage->type == AftMtpStorage);
     assert(settings->to.type == ArgDir);
     Path *destination = settings->to.dir;
 
@@ -229,7 +88,7 @@ RC BeakImplementation::cameraMedia(Settings *settings, Monitor *monitor)
     string archive_name = destination->name()->str();
 
     // Establish access to the phone/camera and get the device name.
-    string device_name = aftmtpEstablishAccess(sys_);
+    string device_name = aftmtpEstablishAccess(sys);
 
     info(CAMERA, "Importing media from %s into %s\n", device_name.c_str(), archive_name.c_str());
 
@@ -243,14 +102,14 @@ RC BeakImplementation::cameraMedia(Settings *settings, Monitor *monitor)
     // the full processing.
     for (;;)
     {
-        rc = aftmtpListFiles(settings->from.storage,
+        RC rc = aftmtpListFiles(settings->from.storage,
                              &files,
-                             sys_,
+                             sys,
                              progress.get());
 
         if (rc.isOk()) break;
         // The mtp link crashed already in the first transfer.... Blech.
-        aftmtpReEstablishAccess(sys_, true);
+        aftmtpReEstablishAccess(sys, true);
     }
 
     UI::output("Found ... new files not yet in %s", archive_name.c_str());
@@ -258,7 +117,7 @@ RC BeakImplementation::cameraMedia(Settings *settings, Monitor *monitor)
     vector<pair<Path*,FileStat>> potential_files_to_copy;
     for (auto &p : files)
     {
-        bool already_exists = check_if_already_exists(p.first, p.second, local_fs_, destination);
+        bool already_exists = check_if_already_exists(p.first, p.second, local_fs, destination);
         if (!already_exists)
         {
             potential_files_to_copy.push_back(p);
@@ -277,7 +136,7 @@ RC BeakImplementation::cameraMedia(Settings *settings, Monitor *monitor)
 
     // We have some potential files that we do not think have been imported yet.
     // Lets download them into a temporary dir from which we can import them properly.
-    local_fs_->mkDirpWriteable(cache);
+    local_fs->mkDirpWriteable(cache);
 
     // Downloading from the phone/camera using mtp can take some time, lets track the progress.
     progress = monitor->newProgressStatistics(buildJobName("copying", settings), "copy");
@@ -289,7 +148,7 @@ RC BeakImplementation::cameraMedia(Settings *settings, Monitor *monitor)
         // Remember that the usb connection to the phone can break at any time.
         // We want to pickup where we left off.
         Path *dest_file = p.first->prepend(cache);
-        addWork(progress.get(), p.first, p.second, local_fs_, dest_file, &files_to_copy);
+        addWork(progress.get(), p.first, p.second, local_fs, dest_file, &files_to_copy);
         // The file is added (or not) to files_to_copy.
     }
 
@@ -302,11 +161,11 @@ RC BeakImplementation::cameraMedia(Settings *settings, Monitor *monitor)
          archive_name.c_str());
 
     progress->startDisplayOfProgress();
-    rc = aftmtpFetchFiles(settings->from.storage,
+    RC rc = aftmtpFetchFiles(settings->from.storage,
                           &files_to_copy,
                           cache,
-                          sys_,
-                          local_fs_,
+                          sys,
+                          local_fs,
                           progress.get());
 
     progress->finishProgress();
@@ -321,7 +180,19 @@ RC BeakImplementation::cameraMedia(Settings *settings, Monitor *monitor)
     settings->to.storage->storage_location = destination;
     settings->to.storage->type = FileSystemStorage;
 
-    rc = importMedia(settings, monitor);
+    rc = bi->importMedia(settings, monitor);
 
     return rc;
+}
+
+RC BeakImplementation::cameraMedia(Settings *settings, Monitor *monitor)
+{
+    assert(settings->from.type == ArgStorage);
+
+    if (settings->from.storage->type == AftMtpStorage)
+    {
+        return import_aft_mtp_cli(settings, monitor, sys_, local_fs_, this);
+    }
+
+    return RC::ERR;
 }
