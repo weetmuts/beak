@@ -4745,6 +4745,21 @@ printf "%s\n" "found" >&6; }
     MEDIA_CFLAGS="${MEDIA_CFLAGS} ${MAGICKPP_CFLAGS}"
     MEDIA_LIBS="${MEDIA_LIBS} ${MAGICKPP_LIBS}"
 
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for GPhoto2" >&5
+printf %s "checking for GPhoto2... " >&6; }
+    if $PKG_CONFIG libgphoto2 --cflags > /dev/null 2>&1
+    then
+        GPHOTO2_CFLAGS="$($PKG_CONFIG libgphoto2 --cflags)"
+        GPHOTO2_LIBS="$($PKG_CONFIG libgphoto2 --libs)"
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: found" >&5
+printf "%s\n" "found" >&6; }
+    else
+        as_fn_error $? "Could not find libghoto2!" "$LINENO" 5
+    fi
+
+    MEDIA_CFLAGS="${MEDIA_CFLAGS} ${GPHOTO2_CFLAGS}"
+    MEDIA_LIBS="${MEDIA_LIBS} ${GPHOTO2_LIBS}"
+
 else
     echo "media disabled"
 fi
@@ -5371,12 +5386,12 @@ CXXFLAGS="-DPLATFORM_${PLATFORM} ${CXXFLAGS_EXTRAS} -D${MNEMONIC} -Wall -Wno-err
 
 CXXFLAGS_asan="-O0 -g ${ASAN_CFLAGS}"
 CXXFLAGS_debug="-O0 -g"
-CXXFLAGS_release="-Os"
+CXXFLAGS_release="-O2"
 
 LDFLAGS=""
 LDFLAGS_asan="-g ${ASAN_LDFLAGS} ${MEDIA_LIBS}"
 LDFLAGS_debug="-g ${MEDIA_LIBS}"
-LDFLAGS_release="-Os"
+LDFLAGS_release="-O2"
 LDFLAGSEND_asan=""
 LDFLAGSBEGIN_asan="${ASAN_LIBS} ${MEDIA_LIBS}"
 LDFLAGSEND_debug=""

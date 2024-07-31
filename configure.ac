@@ -305,6 +305,19 @@ if test "${ENABLE_MEDIA}" = "yes"; then
     MEDIA_CFLAGS="${MEDIA_CFLAGS} ${MAGICKPP_CFLAGS}"
     MEDIA_LIBS="${MEDIA_LIBS} ${MAGICKPP_LIBS}"
 
+    AC_MSG_CHECKING([for GPhoto2])
+    if $PKG_CONFIG libgphoto2 --cflags > /dev/null 2>&1
+    then
+        GPHOTO2_CFLAGS="$($PKG_CONFIG libgphoto2 --cflags)"
+        GPHOTO2_LIBS="$($PKG_CONFIG libgphoto2 --libs)"
+        AC_MSG_RESULT([found])
+    else
+        AC_MSG_ERROR([Could not find libghoto2!])
+    fi
+
+    MEDIA_CFLAGS="${MEDIA_CFLAGS} ${GPHOTO2_CFLAGS}"
+    MEDIA_LIBS="${MEDIA_LIBS} ${GPHOTO2_LIBS}"
+
 else
     echo "media disabled"
 fi
