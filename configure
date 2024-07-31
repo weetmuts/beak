@@ -668,6 +668,8 @@ CXXFLAGS
 MEDIA_LIBS
 MEDIA_CFLAGS
 ENABLE_MEDIA
+GPHOTO2_LIBS
+GPHOTO2_CFLAGS
 LIBRSYNC_LIBS
 LIBRSYNC_CFLAGS
 ZLIB_LIBS
@@ -4659,6 +4661,21 @@ fi
 
 
 
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for GPhoto2" >&5
+printf %s "checking for GPhoto2... " >&6; }
+if $PKG_CONFIG libgphoto2 --cflags > /dev/null 2>&1
+then
+    GPHOTO2_CFLAGS="$($PKG_CONFIG libgphoto2 --cflags)"
+    GPHOTO2_LIBS="$($PKG_CONFIG libgphoto2 --libs)"
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: found" >&5
+printf "%s\n" "found" >&6; }
+else
+    as_fn_error $? "Could not find libghoto2!" "$LINENO" 5
+fi
+
+
+
+
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for media support" >&5
 printf %s "checking for media support... " >&6; }
 
@@ -4744,21 +4761,6 @@ printf "%s\n" "found" >&6; }
 
     MEDIA_CFLAGS="${MEDIA_CFLAGS} ${MAGICKPP_CFLAGS}"
     MEDIA_LIBS="${MEDIA_LIBS} ${MAGICKPP_LIBS}"
-
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for GPhoto2" >&5
-printf %s "checking for GPhoto2... " >&6; }
-    if $PKG_CONFIG libgphoto2 --cflags > /dev/null 2>&1
-    then
-        GPHOTO2_CFLAGS="$($PKG_CONFIG libgphoto2 --cflags)"
-        GPHOTO2_LIBS="$($PKG_CONFIG libgphoto2 --libs)"
-        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: found" >&5
-printf "%s\n" "found" >&6; }
-    else
-        as_fn_error $? "Could not find libghoto2!" "$LINENO" 5
-    fi
-
-    MEDIA_CFLAGS="${MEDIA_CFLAGS} ${GPHOTO2_CFLAGS}"
-    MEDIA_LIBS="${MEDIA_LIBS} ${GPHOTO2_LIBS}"
 
 else
     echo "media disabled"

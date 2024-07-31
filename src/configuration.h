@@ -76,7 +76,8 @@ struct Keep
     X(FileSystemStorage, "Store to a directory")                         \
     X(RCloneStorage,     "Store using rclone")                           \
     X(RSyncStorage,      "Store using rsync")                            \
-    X(AftMtpStorage,     "Fetch from aftmtp")                            \
+    X(AftMtpStorage,     "Fetch uing aft-mtp-cli")                       \
+    X(GPhoto2Storage,    "Fetch using libgphoto2")                       \
 
 #define LIST_OF_STORAGE_USAGES \
     X(Always, "Always")                                  \
