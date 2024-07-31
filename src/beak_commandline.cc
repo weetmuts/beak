@@ -161,6 +161,7 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
             case FileSystemStorage: debug(COMMANDLINE, "storage \"%s\" parsed as directory.\n", arg.c_str()); break;
             case RCloneStorage: debug(COMMANDLINE, "storage \"%s\" parsed as rclone.\n", arg.c_str()); break;
             case RSyncStorage: debug(COMMANDLINE, "storage \"%s\" parsed as rsync.\n", arg.c_str()); break;
+            case AftMtpStorage: debug(COMMANDLINE, "storage \"%s\" parsed as aftmtp.\n", arg.c_str()); break;
             case NoSuchStorage: break;
             }
             debug(COMMANDLINE, "found storage arg \"%s\", as expected.\n", storage_location->c_str());

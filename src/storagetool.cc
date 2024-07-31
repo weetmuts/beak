@@ -25,6 +25,7 @@
 #include "system.h"
 #include "storage_rclone.h"
 #include "storage_rsync.h"
+#include "storage_aftmtp.h"
 
 #include <algorithm>
 #include <unistd.h>
@@ -258,9 +259,13 @@ RC StorageToolImplementation::storeBackupIntoStorage(FileSystem *backup_fs,
         {
             rc = rcloneListBeakFiles(storage, &files, &bad_files, &other_files, &contents, sys_, progress);
         }
-        else
+        else if (storage->type == RSyncStorage)
         {
             rc = rsyncListBeakFiles(storage, &files, &bad_files, &other_files, &contents, sys_, progress);
+        }
+        else
+        {
+            rc = aftmtpListBeakFiles(storage, &files, &bad_files, &other_files, &contents, sys_, progress);
         }
         if (rc.isErr())
         {
@@ -287,7 +292,8 @@ RC StorageToolImplementation::storeBackupIntoStorage(FileSystem *backup_fs,
 
         FileSystem *storage_fs = local_fs_;
         if (storage->type == RCloneStorage ||
-            storage->type == RSyncStorage)
+            storage->type == RSyncStorage ||
+            storage->type == AftMtpStorage)
         {
             storage_fs = asCachedReadOnlyFS(storage, monitor);
         }
@@ -391,6 +397,7 @@ RC StorageToolImplementation::storeBackupIntoStorage(FileSystem *backup_fs,
         break;
     }
     case RSyncStorage:
+    case AftMtpStorage:
     case RCloneStorage:
     {
         progress->updateProgress();
@@ -410,8 +417,16 @@ RC StorageToolImplementation::storeBackupIntoStorage(FileSystem *backup_fs,
                                  sys_,
                                  progress,
                                  settings->writeonly);
-        } else {
+        }
+        else if (storage->type == RSyncStorage) {
             rc = rsyncSendFiles(storage,
+                                &beak_files_to_backup,
+                                mount,
+                                local_fs_,
+                                sys_,
+                                progress);
+        } else {
+            rc = aftmtpSendFiles(storage,
                                 &beak_files_to_backup,
                                 mount,
                                 local_fs_,
@@ -460,7 +475,7 @@ RC StorageToolImplementation::copyBackupIntoStorage(FileSystem *backup_fs,
         storage_fs = local_fs_;
     }
     else
-    if (storage->type == RCloneStorage || storage->type == RSyncStorage)
+    if (storage->type == RCloneStorage || storage->type == RSyncStorage || storage->type == AftMtpStorage)
     {
         vector<TarFileName> files, bad_files;
         vector<string> other_files;
@@ -469,9 +484,13 @@ RC StorageToolImplementation::copyBackupIntoStorage(FileSystem *backup_fs,
         {
             rc = rcloneListBeakFiles(storage, &files, &bad_files, &other_files, &contents, sys_, progress);
         }
-        else
+        else if (storage->type == RSyncStorage)
         {
             rc = rsyncListBeakFiles(storage, &files, &bad_files, &other_files, &contents, sys_, progress);
+        }
+        else
+        {
+            rc = aftmtpListBeakFiles(storage, &files, &bad_files, &other_files, &contents, sys_, progress);
         }
         if (rc.isErr())
         {
@@ -512,6 +531,7 @@ RC StorageToolImplementation::copyBackupIntoStorage(FileSystem *backup_fs,
         break;
     }
     case RSyncStorage:
+    case AftMtpStorage:
     case RCloneStorage:
     {
         progress->updateProgress();
@@ -525,12 +545,19 @@ RC StorageToolImplementation::copyBackupIntoStorage(FileSystem *backup_fs,
                                  sys_,
                                  progress,
                                  settings->writeonly);
-        } else {
+        } else if (storage->type == RSyncStorage) {
             rc = rsyncSendFiles(storage,
                                 &beak_files_to_backup,
                                 backup_dir,
                                 local_fs_,
                                 sys_, progress);
+        } else
+        {
+            rc = aftmtpSendFiles(storage,
+                                 &beak_files_to_backup,
+                                 backup_dir,
+                                 local_fs_,
+                                 sys_, progress);
         }
 
         if (rc.isErr()) {
@@ -568,6 +595,7 @@ RC StorageToolImplementation::removeBackupFiles(Storage *storage,
         break;
     }
     case RSyncStorage:
+    case AftMtpStorage:
     case RCloneStorage:
     {
         progress->updateProgress();
@@ -577,11 +605,19 @@ RC StorageToolImplementation::removeBackupFiles(Storage *storage,
                                    &files_to_remove,
                                    local_fs_,
                                    sys_, progress);
-        } else {
+        } else if (storage->type == RSyncStorage)
+        {
             rc = rsyncDeleteFiles(storage,
                                   &files_to_remove,
                                   local_fs_,
                                   sys_, progress);
+        }
+        else
+        {
+            rc = aftmtpDeleteFiles(storage,
+                                   &files_to_remove,
+                                   local_fs_,
+                                   sys_, progress);
         }
 
         if (rc.isErr()) {
@@ -668,6 +704,9 @@ RC CacheFS::loadDirectoryStructure(map<Path*,CacheEntry> *entries)
     case RCloneStorage:
         rc = rcloneListBeakFiles(storage_, &files, &bad_files, &other_files, &contents, sys_, progress.get());
         break;
+    case AftMtpStorage:
+        rc = aftmtpListBeakFiles(storage_, &files, &bad_files, &other_files, &contents, sys_, progress.get());
+        break;
     }
 
     Path *prev_dir = NULL;
@@ -743,6 +782,11 @@ RC CacheFS::fetchFiles(vector<Path*> *files)
     {
         debug(CACHE, "fetching %d files from rclone %s\n", files->size(), storage_->storage_location->c_str());
         return rcloneFetchFiles(storage_, files, cache_dir_, sys_, cache_fs_, progress.get());
+    }
+    case AftMtpStorage:
+    {
+        debug(CACHE, "fetching %d files from aftmtp %s\n", files->size(), storage_->storage_location->c_str());
+        return aftmtpFetchFiles(storage_, files, cache_dir_, sys_, cache_fs_, progress.get());
     }
     }
     return RC::ERR;

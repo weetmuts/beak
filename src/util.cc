@@ -1167,3 +1167,22 @@ bool isDate(const char *y, const char *m, const char *d)
     if (day < 1 || day > 31) return false;
     return true;
 }
+
+int count_newlines(vector<char> &v, size_t *out_nl_pos)
+{
+    int num_nl = 0;
+    size_t offset = 0;
+    size_t nl_pos = 0;
+    for (char c : v)
+    {
+        offset++;
+        if (c == '\n')
+        {
+            num_nl++;
+            nl_pos = offset-1;
+        }
+    }
+
+    *out_nl_pos = nl_pos;
+    return num_nl;
+}

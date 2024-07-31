@@ -406,3 +406,50 @@ unique_ptr<ProgressStatistics> newwProgressStatistics(ProgressDisplayType t, Mon
 {
     return unique_ptr<ProgressStatisticsImplementation>(new ProgressStatisticsImplementation(t, monitor, job, what));
 }
+
+
+void addWork(ProgressStatistics *progress,
+             Path *source_file,
+             FileStat source_stat,
+             FileSystem *dest_fs,
+             Path *dest_file,
+             vector<Path*> *files_to_copy)
+{
+    if (source_stat.isRegularFile())
+    {
+        assert(progress->stats.file_sizes.count(source_file) == 0);
+        progress->stats.file_sizes[source_file] = source_stat.st_size;
+        debug(MONITOR, "Check %s %zu against %s\n", source_file->c_str(), source_stat.st_size, dest_file->c_str());
+
+        // Compare our local file with the stats of the one stored remotely.
+        FileStat dest_stat;
+        RC rc = dest_fs->stat(dest_file, &dest_stat);
+
+        // The time is weird.... but as long as the size is right it should be ok.
+        time_t time_diff = abs(source_stat.st_mtim.tv_sec - dest_stat.st_mtim.tv_sec);
+
+        bool same = rc.isOk() &&
+            source_stat.st_size == dest_stat.st_size &&
+            time_diff < 7200;
+
+        if (!same)
+        {
+            // Yep, we need to store the local file remotely.
+            // Accumulate the count/size of files to be uploaded.
+            progress->stats.num_files_to_store++;
+            progress->stats.size_files_to_store += source_stat.st_size;
+            // Remember the files to be copied.
+            files_to_copy->push_back(source_file);
+            debug(MONITOR, "Add copy %s %d\n", source_file->c_str(), source_stat.disk_update);
+        }
+        // Accumulate the total count of files.
+        progress->stats.num_files++;
+        progress->stats.size_files += source_stat.st_size;
+    }
+    else if (source_stat.isDirectory())
+    {
+        // We count the directories, only for information.
+        // Directories are created implicitly on the storage side anyway.
+        progress->stats.num_dirs++;
+    }
+}

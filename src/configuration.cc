@@ -138,6 +138,7 @@ private:
     bool isFileSystemStorage(Path *storage_location, Command cmd);
     bool isRCloneStorage(Path *storage_location, string *type = NULL);
     bool isRSyncStorage(Path *storage_location);
+    bool isAftMtpStorage(Path *storage_location);
 
     // Map rule name to rule.
     map<string,Rule> rules_;
@@ -1121,6 +1122,17 @@ bool ConfigurationImplementation::isRSyncStorage(Path *storage_location)
     return false;
 }
 
+bool ConfigurationImplementation::isAftMtpStorage(Path *storage_location)
+{
+    string arg = storage_location->str();
+    auto colon = arg.find(':');
+    if (colon == string::npos) return false;
+
+    string prefix = arg.substr(0,colon+1);
+
+    return prefix == "aftmtp:";
+}
+
 // Storage created on the fly depending on the command line arguments.
 Storage a_storage;
 
@@ -1145,6 +1157,12 @@ Storage *ConfigurationImplementation::findStorageFrom(Path *storage_location, Co
     else if (isRSyncStorage(storage_location))
     {
         a_storage.type = RSyncStorage;
+        a_storage.storage_location = storage_location;
+        return &a_storage;
+    }
+    else if (isAftMtpStorage(storage_location))
+    {
+        a_storage.type = AftMtpStorage;
         a_storage.storage_location = storage_location;
         return &a_storage;
     }

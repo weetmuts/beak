@@ -72,10 +72,11 @@ struct Keep
 };
 
 #define LIST_OF_STORAGE_TYPES \
-    X(NoSuchStorage, "Not a storage")                                   \
+    X(NoSuchStorage, "Not a storage")                                    \
     X(FileSystemStorage, "Store to a directory")                         \
     X(RCloneStorage,     "Store using rclone")                           \
     X(RSyncStorage,      "Store using rsync")                            \
+    X(AftMtpStorage,     "Fetch from aftmtp")                            \
 
 #define LIST_OF_STORAGE_USAGES \
     X(Always, "Always")                                  \

@@ -130,4 +130,6 @@ long upToNearestMicros(long nsec);
 // Check that y is four digits, m is two digits, 1-12, and d is 1-31 or -30 or -28 or -29.
 bool isDate(const char *y, const char *m, const char *d);
 
+int count_newlines(std::vector<char> &v, size_t *out_nl_pos);
+
 #endif

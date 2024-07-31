@@ -80,6 +80,13 @@ struct ProgressStatistics
     virtual ~ProgressStatistics() {};
 };
 
+void addWork(ProgressStatistics *progress,
+             Path *source_path,
+             FileStat source_stat,
+             FileSystem *dest_fs,
+             Path *dest_file,
+             std::vector<Path*> *files_to_copy);
+
 enum class ProgressDisplayType
 {
     Normal, // Print on terminal, use cursor control to move and overwrite.

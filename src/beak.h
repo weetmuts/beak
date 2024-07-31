@@ -125,7 +125,7 @@ enum ArgumentType
 
 #define LIST_OF_COMMANDS \
     X(bmount,CommandType::SECONDARY,"Mount your file system as a backup.",ArgOrigin,ArgDir) \
-    X(camera,CommandType::MEDIA,"Find camera devices and import media from them into the selected target dir.",ArgDir,ArgDir) \
+    X(camera,CommandType::MEDIA,"Find camera devices and import media from them into the selected target dir.",ArgStorage,ArgDir) \
     X(config,CommandType::PRIMARY,"Configure backup rules.",ArgNone,ArgNone)               \
     X(delta,CommandType::PRIMARY,"Create new delta files in to storage for beak files not in from storage.",ArgStorage,ArgStorage) \
     X(diff,CommandType::PRIMARY,"Show differences between backups and/or origins.",ArgORS,ArgORS) \

@@ -27,6 +27,7 @@
 #include "log.h"
 #include "media.h"
 #include "storagetool.h"
+#include "storage_aftmtp.h"
 #include "system.h"
 #include "util.h"
 
@@ -89,117 +90,7 @@ RC find_imagedir(Path *mount, CameraType ct, FileSystem *fs, System *sys, vector
     return RC::OK;
 }
 
-int count_newlines(vector<char> &v, size_t *out_nl_pos)
-{
-    int num_nl = 0;
-    size_t offset = 0;
-    size_t nl_pos = 0;
-    for (char c : v)
-    {
-        offset++;
-        if (c == '\n')
-        {
-            num_nl++;
-            nl_pos = offset-1;
-        }
-    }
 
-    *out_nl_pos = nl_pos;
-    return num_nl;
-}
-
-RC establish_android_access(System *sys, Path *mount, vector<char> *mount_output)
-{
-    vector<string> args;
-    args.push_back("-l");
-    vector<char> output;
-    int out_rc = 0;
-    RC rc = sys->invoke("aft-mtp-cli", args, &output, CaptureBoth, NULL, &out_rc);
-
-    if (out_rc != 0 || rc.isErr())
-    {
-        UI::output("Have you installed aft-mtp-cli? Could not run \"aft-mtp-cli -l\" to list available android devices.\n");
-        return RC::ERR;
-    }
-
-    size_t nl_pos = 0;
-    int num_nl = count_newlines(output, &nl_pos);
-
-    if (num_nl == 0)
-    {
-        UI::output("No android device connected.\n");
-        return RC::ERR;
-    }
-    if (num_nl > 1)
-    {
-        UI::output("More than one android device connected. Please connect only one.\n");
-        return RC::ERR;
-    }
-    string str(output.begin(), output.begin()+nl_pos);
-
-    UI::output("Importing media from: %s\n", str.c_str());
-
-    bool printed = false;
-    int num_attempts = 0;
-
-    for (;;)
-    {
-        args.clear();
-        args.push_back("pwd");
-        output.clear();
-        out_rc = 0;
-        rc = sys->invoke("aft-mtp-cli", args, &output, CaptureBoth, NULL, &out_rc);
-        if (out_rc == 0) break;
-
-        num_attempts++;
-        if (num_attempts > 10)
-        {
-            UI::clearLine();
-            UI::output("No permission given to read phone after 10 attempts. Giving up.\n");
-            return RC::ERR;
-        }
-        if (!printed)
-        {
-            UI::output("Check your phone and give permission to transfer files! ");
-            printed = true;
-        }
-        else
-        {
-            UI::output(".");
-        }
-        usleep(2*1000*1000);
-    }
-
-    if (num_attempts > 0) UI::clearLine();
-    args.clear();
-    args.push_back(mount->str());
-    rc = sys->run("aft-mtp-mount", args, &out_rc);
-
-    if (out_rc != 0) return RC::ERR;
-
-    strncpy(mounted_dir, mount->c_str(), 1024);
-    mounted_dir[1023] = 0;
-
-    /*
-    onTerminated("unmount", [sys]{
-        vector<string> args = { "-u", mounted_dir };
-        int tmp;
-        sys->run("fusermount", args, &tmp);
-        });*/
-
-    return rc;
-}
-
-RC disconnect_android_access(System *sys, Path *mount)
-{
-    vector<string> args = { "-u", mounted_dir };
-    int tmp;
-    sys->run("fusermount", args, &tmp);
-
-    if (tmp != 0) return RC::ERR;
-
-    return RC::OK;
-}
 
 RC scan_directory(BeakImplementation *bi, Path *p, vector<pair<Path*,FileStat>> *files)
 {
@@ -288,111 +179,140 @@ RC scan_directory(BeakImplementation *bi, Path *p, vector<pair<Path*,FileStat>> 
 */
 
 
+bool check_if_already_exists(Path *file, FileStat stat, FileSystem *fs, Path *destination)
+{
+    string suffix = normalizeMediaSuffix(file);
+    time_t pt = stat.st_mtim.tv_sec;
+    struct tm ts;
+    localtime_r(&pt, &ts);
+
+    string days;
+    strprintf(days, "%04d/%02d/%02d", ts.tm_year+1900, ts.tm_mon+1, ts.tm_mday);
+    Path *daydir = destination->append(days);
+
+    debug(CAMERA, "Check if %s %zu %d in day %s\n", file->c_str(), stat.st_size, stat.st_ino, daydir->c_str());
+
+    vector<pair<Path*,FileStat>> existing;
+    fs->listFilesBelow(daydir, &existing, SortOrder::Unspecified);
+
+    bool found = false;
+    for (auto &e : existing)
+    {
+        string esuffix = normalizeMediaSuffix(e.first);
+
+        if (e.second.st_size == stat.st_size && suffix == esuffix)
+        {
+            debug(CAMERA, "matches existing file: %s\n", e.first->c_str());
+            found = true;
+            break;
+        }
+    }
+
+    return found;
+}
+
 RC BeakImplementation::cameraMedia(Settings *settings, Monitor *monitor)
 {
     RC rc = RC::OK;
 
-    CameraType ct = CameraType::UNKNOWN;
+    Path *home = Path::lookup(getenv("HOME"));
+    Path *cache = home->append(".cache/beak/temp-beak-media-import");
 
     local_fs_->allowAccessTimeUpdates();
 
-    assert(settings->from.type == ArgDir);
+    assert(settings->from.type == ArgStorage);
     assert(settings->to.type == ArgDir);
-    Path *dir = settings->from.dir;
-    Path *home = Path::lookup(getenv("HOME"));
-    Path *cache = home->append(".cache/beak/temp-beak-media-import");
     Path *destination = settings->to.dir;
 
-    Path *mount = NULL;
+    string device_name = aftmtpEstablishAccess(sys_);
 
-    if (dir->endsWith("/android:"))
+    info(CAMERA, "Importing media from %s\n", device_name.c_str());
+
+    unique_ptr<ProgressStatistics> progress = monitor->newProgressStatistics(buildJobName("listing", settings), "list");
+
+    map<Path*,FileStat> files;
+
+    for (;;)
     {
-        ct = CameraType::MTP_ANDROID;
-        mount = local_fs_->userRunDir()->append("beak")->append("android_import");
-        local_fs_->mkDirpWriteable(mount);
+        rc = aftmtpListFiles(settings->from.storage,
+                             &files,
+                             sys_,
+                             progress.get());
+
+        if (rc.isOk()) break;
+        // The mtp link crashed already in the first transfer.... Blech.
+        aftmtpReEstablishAccess(sys_, true);
+    }
+    vector<pair<Path*,FileStat>> potential_files_to_copy;
+    for (auto &p : files)
+    {
+        bool already_exists = check_if_already_exists(p.first, p.second, local_fs_, destination);
+        if (!already_exists)
+        {
+            potential_files_to_copy.push_back(p);
+            debug(CAMERA, "potential download %s\n", p.first->c_str());
+        }
     }
 
-    if (dir->endsWith("/ios:"))
+    if (potential_files_to_copy.size() == 0)
     {
-        ct = CameraType::MTP_IOS;
-        mount = local_fs_->userRunDir()->append("beak")->append("ios_import");
-        local_fs_->mkDirpWriteable(mount);
+        info(CAMERA, "All files imported already.\n");
+        return RC::OK;
     }
 
-    vector<char> mount_output;
-    rc = establish_android_access(sys_, mount, &mount_output);
-    if (rc.isErr()) return RC::ERR;
+    // We have some potential files that we do not think have been imported yet.
+    // Lets download them into a temporary dir from which we can import them properly.
+    local_fs_->mkDirpWriteable(cache);
 
-    // Disconnect any mountalready.
-    //disconnect_android_access(sys_, mount);
+    // Downloading from the phone/camera using mtp can take some time, lets track the progress.
+    progress = monitor->newProgressStatistics(buildJobName("copying", settings), "copy");
 
-    vector<Path*> imagedirs;
-    rc = find_imagedir(mount, ct, local_fs_, sys_, &imagedirs);
-
-    if (rc.isErr()) return RC::ERR;
-
-
-    for (Path *imagedir : imagedirs)
+    vector<Path*> files_to_copy;
+    for (auto &p : potential_files_to_copy)
     {
-        vector<pair<Path*,FileStat>> files_to_copy;
-        vector<pair<Path*,FileStat>> files;
-        scan_directory(this, imagedir, &files);
+        // Check if the file has already been copied to the temporary dir.
+        // Remember that the usb connection to the phone can break at any time.
+        // We want to pickup where we left off.
+        Path *dest_file = p.first->prepend(cache);
+        addWork(progress.get(), p.first, p.second, local_fs_, dest_file, &files_to_copy);
+        // The file is added (or not) to files_to_copy.
+    }
 
-        if (files.size() == 0) continue;
+    size_t already_in_cache = potential_files_to_copy.size()-files_to_copy.size();
+    size_t already_imported = files.size()-files_to_copy.size();
+    info(CAMERA, "Downloading %zu files from camera (%zu already in cache and %zu already fully imported).\n",
+         files_to_copy.size(),
+         already_in_cache,
+         already_imported);
 
-        for (auto &p : files)
-        {
-            string suffix = normalizeMediaSuffix(p.first);
-            time_t pt = p.second.st_mtim.tv_sec;
-            struct tm ts;
-            localtime_r(&pt, &ts);
+    progress->startDisplayOfProgress();
+    rc = aftmtpFetchFiles(settings->from.storage,
+                          &files_to_copy,
+                          cache,
+                          sys_,
+                          local_fs_,
+                          progress.get());
 
-            string days;
-            strprintf(days, "%04d/%02d/%02d", ts.tm_year+1900, ts.tm_mon+1, ts.tm_mday);
-            Path *daydir = destination->append(days);
+    progress->finishProgress();
+/*
+    vector<string> args;
+    for (auto &p : files_to_copy)
+    {
+        Path *to = cache->append(p.first->subpath(imagedir->depth())->c_str());
+        string get;
+        strprintf(get, "get-id %d %s", p.second.st_ino-1000000, to->c_str());
+        args.push_back(get);
+    }
 
-            vector<pair<Path*,FileStat>> existing;
-            local_fs_->listFilesBelow(daydir, &existing, SortOrder::Unspecified);
+        disconnect_android_access(sys_, mount);
 
-            bool found = false;
-            for (auto &e : existing)
-            {
-                string esuffix = normalizeMediaSuffix(e.first);
+        for (string &s : args) printf("%s\n", s.c_str());
 
-                if (e.second.st_size == p.second.st_size)
-                {
-                    debug(CAMERA, "matches existing file: %s\n", e.first->c_str());
-                    found = true;
-                    break;
-                }
-            }
-            if (!found)
-            {
-                if (p.second.st_size < 10*1024*1024)
-                {
-                    files_to_copy.push_back(p);
-                    debug(CAMERA, "copying %s\n", p.first->c_str());
-                }
-                else
-                {
-                    printf("Skipping big file %s\n", p.first->c_str());
-                }
-            }
+        int out_rc = 0;
+        sys_->run("aft-mtp-cli", args, &out_rc);
 
-        }
-        local_fs_->mkDirpWriteable(cache);
 
-        auto map_fs = newMapFileSystem(local_fs_);
-
-        for (auto &p : files_to_copy)
-        {
-            Path *to = cache->append(p.first->subpath(imagedir->depth())->c_str());
-            map_fs->mapFile(p.second, to, p.first);
-        }
-        unique_ptr<ProgressStatistics> progress = monitor->newProgressStatistics(buildJobName("copying", settings), "copy");
-
-        info(CAMERA, "Copying %zu files from camera.\n", files_to_copy.size());
-
+        prutt
         progress->startDisplayOfProgress();
         Storage st {};
         st.type = FileSystemStorage;
@@ -411,8 +331,6 @@ RC BeakImplementation::cameraMedia(Settings *settings, Monitor *monitor)
         }
 
     }
-
-    rc = disconnect_android_access(sys_, mount);
-
+*/
     return rc;
 }
