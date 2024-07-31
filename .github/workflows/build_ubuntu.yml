@@ -10,7 +10,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - run: sudo apt-get update
-    - run: sudo apt-get install pkg-config fuse libfuse-dev librsync-dev libexiv2-dev libavformat-dev libmagickcore-dev libmagick++-dev
+    - run: sudo apt-get install pkg-config fuse libfuse-dev libgphoto2-dev librsync-dev libexiv2-dev libavformat-dev libmagickcore-dev libmagick++-dev
     - run: |
        sudo modprobe fuse
        sudo chmod 666 /dev/fuse

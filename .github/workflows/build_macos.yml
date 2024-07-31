@@ -11,7 +11,7 @@ jobs:
     - id: INSTALL_MACFUSE
       run: brew install --cask macfuse
     - id: INSTALL_ADDITIONAL_BUILD_DEPENDENCIES
-      run: brew install bash findutils coreutils rsync librsync openssl imagemagick ffmpeg exiv2 gawk gnu-sed gnu-tar
+      run: brew install bash findutils coreutils rsync libgphoto2 librsync openssl imagemagick ffmpeg exiv2 gawk gnu-sed gnu-tar
     - id: CONFIGURE
       run: ./configure --disable-fuse
     - id: CHECK
