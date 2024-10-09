@@ -90,7 +90,10 @@ void MonitorImplementation::checkSharedDir()
     if (rc.isErr())
     {
         // Directory does not exist, lets create it.
-        fs_->mkDir(shared_dir_, "", 0700);
+        fs_->mkDirpWriteable(shared_dir_);
+        fs_->stat(shared_dir_, &stat);
+        stat.st_mode &= 0700;
+        fs_->chmod(shared_dir_, &stat);
     }
     else
     {

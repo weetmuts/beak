@@ -73,6 +73,7 @@ struct Keep
 
 #define LIST_OF_STORAGE_TYPES \
     X(NoSuchStorage, "Not a storage")                                    \
+    X(AutoStorage, "Auto find storage location")                         \
     X(FileSystemStorage, "Store to a directory")                         \
     X(RCloneStorage,     "Store using rclone")                           \
     X(RSyncStorage,      "Store using rsync")                            \

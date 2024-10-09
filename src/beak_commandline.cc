@@ -163,6 +163,7 @@ Argument BeakImplementation::parseArgument(string arg, ArgumentType expected_typ
             case RSyncStorage: debug(COMMANDLINE, "storage \"%s\" parsed as rsync.\n", arg.c_str()); break;
             case AftMtpStorage: debug(COMMANDLINE, "storage \"%s\" parsed as aftmtp.\n", arg.c_str()); break;
             case GPhoto2Storage: debug(COMMANDLINE, "storage \"%s\" parsed as gphoto2.\n", arg.c_str()); break;
+            case AutoStorage: debug(COMMANDLINE, "storage \"%s\" parsed as auto\n", arg.c_str()); break;
             case NoSuchStorage: debug(COMMANDLINE, "nosuchstorage \"%s\"\n", arg.c_str()); break;
             }
             debug(COMMANDLINE, "found storage arg \"%s\", as expected.\n", storage_location->c_str());

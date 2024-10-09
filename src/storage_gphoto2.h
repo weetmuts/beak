@@ -26,6 +26,7 @@
 #include <string>
 #include <vector>
 
+bool gphoto2Detect(System *sys);
 std::string gphoto2EstablishAccess(System *sys);
 std::string gphoto2ReEstablishAccess(System *sys, bool hint_unplug);
 

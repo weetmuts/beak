@@ -309,6 +309,11 @@ RC BeakImplementation::cameraMedia(Settings *settings, Monitor *monitor)
 {
     assert(settings->from.type == ArgStorage);
 
+    if (settings->from.storage->type == AutoStorage)
+    {
+        // Auto detect attached device.
+    }
+
     if (settings->from.storage->type == AftMtpStorage)
     {
         return import_aft_mtp_cli(settings, monitor, sys_, local_fs_, this);

@@ -26,6 +26,7 @@
 #include <string>
 #include <vector>
 
+bool aftmtpDetect(System *sys);
 std::string aftmtpEstablishAccess(System *sys);
 std::string aftmtpReEstablishAccess(System *sys, bool hint_unplug);
 

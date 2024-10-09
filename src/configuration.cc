@@ -1146,6 +1146,7 @@ bool ConfigurationImplementation::isGPhoto2Storage(Path *storage_location)
 }
 
 // Storage created on the fly depending on the command line arguments.
+// TODO fix!
 Storage a_storage;
 
 Storage *ConfigurationImplementation::findStorageFrom(Path *storage_location, Command cmd)
@@ -1181,6 +1182,12 @@ Storage *ConfigurationImplementation::findStorageFrom(Path *storage_location, Co
     else if (isGPhoto2Storage(storage_location))
     {
         a_storage.type = GPhoto2Storage;
+        a_storage.storage_location = storage_location;
+        return &a_storage;
+    }
+    else if (storage_location->parent() == NULL && storage_location->name()->str() == "auto")
+    {
+        a_storage.type = AutoStorage;
         a_storage.storage_location = storage_location;
         return &a_storage;
     }
